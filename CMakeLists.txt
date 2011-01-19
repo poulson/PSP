@@ -14,6 +14,9 @@ if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
   message(WARNING "CXX compiler, ${CMAKE_CXX_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CXX or through the '-DCMAKE_CXX_COMPILER' cmake flag. You should probably also clean this build folder first.")
 endif(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
 
+# We need an F90 compiler is needed for MUMPS
+enable_language(Fortran)
+
 # Query the size of a void pointer in order to determine whether or not this is
 # a 32-bit system
 if(${CMAKE_SIZEOF_VOID_P} MATCHES 4)
@@ -81,9 +84,9 @@ if(NEED_MATH)
       set(MKL_FOUND OFF)
     endif( ${NAME}_LIB )
   endforeach(NAME)
-  message(STATUS "MKL_FOUND=${MKL_FOUND}")
   if(MKL_FOUND)
     set(NEED_MATH FALSE)
+    message(STATUS "Using MKL's math libraries.")
   else(MKL_FOUND)
     # Look for default BLAS/LAPACK/BLACS/ScaLAPACK
     # TODO: Add appropriate BLACS/ScaLAPACK libs
@@ -120,6 +123,8 @@ if(NEED_MATH)
         "Could not find BLAS/LAPACK/BLACS/ScaLAPACK libs. Please manually specify MATH_LIBS.")
     endif(REFERENCE_FOUND)
   endif(MKL_FOUND)
+  # Append the standard math libraries to the link list.
+  list(APPEND MATH_LIBS m)
 endif(NEED_MATH)
 
 # Attempt to detect the BLAS/LAPACK underscore conventions. 
