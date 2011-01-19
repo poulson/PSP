@@ -24,55 +24,102 @@ else(${CMAKE_SIZEOF_VOID_P} MATCHES 4)
   message(STATUS "Detected 64-bit system")
 endif(${CMAKE_SIZEOF_VOID_P} MATCHES 4)
 
-# Since the CMake find_blas for some reason requires a Fortran compiler, we
-# must build our own.
-include(${PROJECT_SOURCE_DIR}/cmake/find_library_list.cmake)
-
 if(MATH_LIBS)
   set(NEED_MATH FALSE)
 else(MATH_LIBS)
   set(NEED_MATH TRUE)
 endif(MATH_LIBS)
 
+message("CMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH}")
+message("CMAKE_SYSTEM_LIBRARY_PATH=${CMAKE_SYSTEM_LIBRARY_PATH}")
+message("CMAKE_SYSTEM_FRAMEWORK_PATH=${CMAKE_SYSTEM_FRAMEWORK_PATH}")
+
 if(NEED_MATH)
   set(MATH_DESC "BLAS/LAPACK/BLACS/ScaLAPACK link flags")
-  if(APPLE)
-    set(MATH_LIBS "-framework vecLib" CACHE STRING ${MATH_DESC})
-  elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    # Look for the base Intel libs first
-    if(32_BIT_SYSTEM)
-      set(INTEL_ARCH_SUBDIR lib/32)
-    else(32_BIT_SYSTEM)
-      set(INTEL_ARCH_SUBDIR lib/em64t)
-    endif(32_BIT_SYSTEM)
-    set(INTEL_LIBS guide iomp5)
-    find_library_list(FOUND_INTEL_LIBS INTEL_LIBS "" ${INTEL_ARCH_SUBDIR})
-    message(STATUS "FOUND_INTEL_LIBS=${FOUND_INTEL_LIBS}")
-    set(MKL_LIBS mkl_scalapack_lp64 mkl_blacs_lp64 mkl_intel_lp64 
-                 mkl_intel_thread mkl_core)
-    find_library_list(FOUND_MKL_LIBS MKL_LIBS "" ${INTEL_ARCH_SUBDIR})
-    message(STATUS "FOUND_MKL_LIBS=${FOUND_MKL_LIBS}")
-    find_library(PTHREAD_LIB pthread DOC "Pthreads library")
-    if(FOUND_INTEL_LIBS AND FOUND_MKL_LIBS AND FOUND_PTHREAD_LIB)
-      set(MATH_LIBS ${FOUND_MKL_LIBS} ${FOUND_INTEL_LIBS} ${PTHREAD_LIB} 
-          CACHE STRING ${MATH_DESC})
-      message(STATUS "Using MKL for BLAS/LAPACK/BLACS/ScaLAPACK.")
-      set(NEED_MATH FALSE)
-    else(FOUND_INTEL_LIBS AND FOUND_MKL_LIBS AND FOUND_PTHREAD_LIB)
-      # Look for default BLAS/LAPACK/BLACS/ScaLAPACK
-      # TODO: Add appropriate BLACS/ScaLAPACK libs
-      set(REFERENCE_LIBS scalapack blacs blacsF77 lapack blas)
-      find_library_list(REF_MATH_LIBS REFERENCE_LIBS "" "")
-      if(REF_MATH_LIBS)
-        set(MATH_LIBS ${REF_MATH_LIBS} CACHE STRING ${MATH_DESC})
-        message(STATUS "WARNING: Using reference BLAS/LAPACK/BLACS/ScaLAPACK.")
-      else(REF_MATH_LIBS)
-        set(MATH_LIBS "" CACHE STRING ${MATH_DESC})
-        message(FATAL_ERROR 
-          "Could not find BLAS/LAPACK/BLACS/ScaLAPACK libs. Please manually specify MATH_LIBS.")
-      endif(REF_MATH_LIBS)
-    endif(FOUND_INTEL_LIBS AND FOUND_MKL_LIBS AND FOUND_PTHREAD_LIB)
-  endif(APPLE)
+  # Look for the base Intel libs first
+  if(32_BIT_SYSTEM)
+    set(INTEL_ARCH_SUBDIRS lib/32)
+    set(MKL_ARCH_SUBDIRS lib/32)
+  else(32_BIT_SYSTEM)
+    set(INTEL_ARCH_SUBDIRS lib/em64t lib/intel64)
+    set(MKL_ARCH_SUBDIRS lib/em64t lib/intel64 mkl/lib/em64t)
+  endif(32_BIT_SYSTEM)
+  # There is a cyclic dependency between MKL_CORE and MKL_SEQUENTIAL with
+  # version 11.1/072, so we sandwich MKL_CORE between MKL_SEQUENTIALs
+  set(MKL_REQUIRED MKL_SCALAPACK MKL_BLACS
+      MKL_INTEL MKL_SEQUENTIAL MKL_CORE MKL_SEQUENTIAL GUIDE IOMP5 PTHREAD)
+  find_library(PTHREAD_LIB pthread)
+  find_library(IOMP5_LIB 
+               NAMES libiomp5.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${INTEL_ARCH_SUBDIRS})
+  find_library(GUIDE_LIB 
+               NAMES libguide.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${INTEL_ARCH_SUBDIRS})
+  find_library(MKL_CORE_LIB 
+               NAMES libmkl_core.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
+  find_library(MKL_SEQUENTIAL_LIB 
+               NAMES libmkl_sequential.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
+  find_library(MKL_INTEL_LIB 
+               NAMES libmkl_intel_lp64.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
+  find_library(MKL_BLACS_LIB 
+               NAMES libmkl_blacs_lp64.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
+  find_library(MKL_SCALAPACK_LIB 
+               NAMES libmkl_scalapack_lp64.a PATHS ${INTEL_ROOT}
+               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
+  set(MKL_FOUND ON)
+  set(MATH_LIBS "")
+  foreach(NAME ${MKL_REQUIRED})
+    if( ${NAME}_LIB )
+      message(STATUS "Found ${NAME}_LIB: ${${NAME}_LIB}")
+      list(APPEND MATH_LIBS ${${NAME}_LIB})
+    else( ${NAME}_LIB )
+      message(STATUS "Could not find ${NAME}_LIB: ${${NAME}_LIB}")
+      set(MKL_FOUND OFF)
+    endif( ${NAME}_LIB )
+  endforeach(NAME)
+  message(STATUS "MKL_FOUND=${MKL_FOUND}")
+  if(MKL_FOUND)
+    set(NEED_MATH FALSE)
+  else(MKL_FOUND)
+    # Look for default BLAS/LAPACK/BLACS/ScaLAPACK
+    # TODO: Add appropriate BLACS/ScaLAPACK libs
+    set(REFERENCE_REQUIRED SCALAPACK BLACS BLACSF LAPACK BLAS)
+    find_library(BLAS_LIB
+                 NAMES libblas.a blas.a blas.lib 
+                 PATHS ${REFERENCE_ROOT})
+    find_library(LAPACK_LIB
+                 NAMES liblapack.a lapack.a lapack.lib 
+                 PATHS ${REFERENCE_ROOT})
+    find_library(BLACSF_LIB
+                 NAMES libblacs.a blacs.a blacs.lib
+                 PATHS ${REFERENCE_ROOT})
+    find_library(SCALAPACK_LIB
+                 NAMES libscalapack.a scalapack.a scalapack.lib
+                 PATHS ${REFERENCE_ROOT})
+    set(REFERENCE_FOUND ON)
+    set(MATH_LIBS "")
+    foreach(NAME ${REFERENCE_REQUIRED})
+      if( ${NAME}_LIB )
+        message(STATUS "Found ${NAME}_LIB: ${${NAME}_LIB}")
+        list(APPEND MATH_LIBS ${${NAME}_LIB})
+      else( ${NAME}_LIB )
+        message(STATUS "Could not find ${NAME}_LIB: ${${NAME}_LIB}")
+        set(REFERENCE_FOUND OFF)
+      endif( ${NAME}_LIB )
+    endforeach(NAME)
+    message(STATUS "REFERENCE_FOUND=${REFERENCE_FOUND}")
+    if(REFERENCE_FOUND)
+      message(STATUS "WARNING: Using reference BLAS/LAPACK/BLACS/ScaLAPACK.")
+    else(REFERENCE_FOUND)
+      set(MATH_LIBS "" CACHE STRING ${MATH_DESC})
+      message(FATAL_ERROR 
+        "Could not find BLAS/LAPACK/BLACS/ScaLAPACK libs. Please manually specify MATH_LIBS.")
+    endif(REFERENCE_FOUND)
+  endif(MKL_FOUND)
 endif(NEED_MATH)
 
 # Attempt to detect the BLAS/LAPACK underscore conventions. 
