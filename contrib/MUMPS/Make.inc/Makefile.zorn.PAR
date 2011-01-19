@@ -1,0 +1,66 @@
+#
+#  This file is part of MUMPS 4.9.2, built on Thu Nov  5 07:05:08 UTC 2009
+#
+#Begin orderings
+
+# NOTE that PORD is distributed within MUMPS by default. If you would like to
+# use other orderings, you need to obtain the corresponding package and modify
+# the variables below accordingly.
+# For example, to have Metis available within MUMPS:
+#          1/ download Metis and compile it
+#          2/ uncomment (suppress # in first column) lines
+#             starting with LMETISDIR,  LMETIS
+#          3/ add -Dmetis in line ORDERINGSF
+#             ORDERINGSF  = -Dpord -Dmetis
+#          4/ Compile and install MUMPS
+#             make clean; make   (to clean up previous installation)
+#
+#          Metis/ParMetis and SCOTCH/PT-SCOTCH (ver 5.1 and later) orderings are now available for MUMPS.
+#
+
+LMETISDIR=../ParMetis
+#IMETIS = # Metis doesn't need include files (Fortran interface avail.)
+LMETIS = -L$(LMETISDIR) -lparmetis -lmetis
+
+#ORDERINGSF = -Dscotch -Dmetis -Dpord -Dptscotch -Dparmetis
+ORDERINGSF  = -Dparmetis
+ORDERINGSC  = $(ORDERINGSF)
+
+LORDERINGS = $(LMETIS)
+IORDERINGSF = 
+IORDERINGSC = $(IMETIS)
+
+#End orderings
+########################################################################
+################################################################################
+
+PLAT    =
+RM = /bin/rm -f
+CC = gcc
+FC = gfortran
+FL = gfortran
+AR = ar vr
+#RANLIB = ranlib
+RANLIB  = echo
+SCALABASE = /h2/poulson/Source/ScaLAPACK/lib
+SCALAP  = $(SCALABASE)/libscalapack.a $(SCALABASE)/blacs.a $(SCALABASE)/blacsF77.a  $(SCALABASE)/blacs.a $(SCALABASE)/libreflapack.a
+INCPAR = -I/usr/include/mpich2
+# LIBPAR = $(SCALAP)  -L/usr/local/lib/ -llammpio -llamf77mpi -lmpi -llam -lutil -ldl -lpthread
+LIBPAR = $(SCALAP) -L/usr/lib -lmpich 
+# See point 17 in the FAQ to have more details on the compilation of mpich with gfortran
+#INCSEQ = -I$(topdir)/libseq
+#LIBSEQ  =  -L$(topdir)/libseq -lmpiseq
+#LIBBLAS = -L/usr/lib/xmm/ -lf77blas -latlas
+LIBBLAS = -L/usr/lib/atlas -lblas
+LIBOTHERS = -lpthread
+#Preprocessor defs for calling Fortran from C (-DAdd_ or -DAdd__ or -DUPPER)
+CDEFS   = -DAdd_
+
+#Begin Optimized options
+OPTF    = -O -Dintel_ -DALLOW_NON_INIT 
+OPTL    = -O 
+OPTC    = -O
+#End Optimized options
+INC = $(INCPAR)
+LIB = $(LIBPAR)
+LIBSEQNEEDED =

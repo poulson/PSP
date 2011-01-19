@@ -14,7 +14,7 @@ all:	s d c z
 s:	ssimpletest
 d:	dsimpletest c_example
 c:	csimpletest
-z:	zsimpletest
+z:	zsimpletest cz_example
 
 
 include $(topdir)/Makefile.inc
@@ -49,6 +49,8 @@ zsimpletest: $(LIBZMUMPS) $$@.o
 c_example:	$(LIBDMUMPS) $$@.o
 	$(FL) -o $@ $(OPTL) $@.o $(LIBDMUMPS) $(LORDERINGS) $(LIB) $(LIBBLAS) $(LIBOTHERS)
 
+cz_example:	$(LIBZMUMPS) $$@.o
+	$(FL) -o $@ $(OPTL) $@.o $(LIBZMUMPS) $(LORDERINGS) $(LIB) $(LIBBLAS) $(LIBOTHERS)
 
 .SUFFIXES: .c .F .o
 .F.o:

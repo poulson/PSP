@@ -58,22 +58,9 @@ requiredobj: Makefile.inc $(LIBSEQNEEDED) $(libdir)/libpord$(PLAT).a
 libseqneeded:
 	(cd libseq; $(MAKE))
 
-# Build the libpord.a library and copy it into $(topdir)/lib
-$(libdir)/libpord$(PLAT).a:
-	if [ "$(LPORDDIR)" != "" ] ; then \
-	  cd $(LPORDDIR); \
-	  $(MAKE) CC="$(CC)" CFLAGS="$(OPTC)" AR="$(AR)" ARFUNCT= RANLIB="$(RANLIB)"; \
-	fi;
-	if [ "$(LPORDDIR)" != "" ] ; then \
-	  cp $(LPORDDIR)/libpord.a $@; \
-	fi;
-
 clean:
 	(cd src; $(MAKE) clean)
 	(cd examples; $(MAKE) clean)
 	(cd $(libdir); $(RM) *$(PLAT).a)
 	(cd libseq; $(MAKE) clean)
-	if [ $(LPORDDIR) != "" ] ; then \
-	  cd $(LPORDDIR); $(MAKE) realclean; \
-        fi;
 

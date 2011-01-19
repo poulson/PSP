@@ -2,7 +2,7 @@
    Sweeper: a distributed-memory implementation of a sweeping preconditioner
    for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson <jack.poulson@gmail.com> and
+   Copyright (C) 2011 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
  
    This program is free software: you can redistribute it and/or modify
@@ -28,4 +28,3 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-
