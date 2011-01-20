@@ -89,7 +89,7 @@ GraphType *Mc_MoveGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
 
   if (lpwgts[nparts]+gpwgts[nparts] > wspace->maxcore) {
     /* Adjust core memory, incase the graph was originally very memory unbalanced */
-    GKfree((void **)&wspace->core, LTERM);
+    GKfree((void **)&wspace->core);
     wspace->maxcore = lpwgts[nparts]+4*gpwgts[nparts]; /* In spirit of the 8*nedges */
     wspace->core    = idxmalloc(wspace->maxcore, "Mc_MoveGraph: wspace->core");
   }
@@ -180,7 +180,7 @@ GraphType *Mc_MoveGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   ASSERTP(ctrl, jj == mgraph->nedges, (ctrl, "%d %d\n", jj, mgraph->nedges));
   ASSERTP(ctrl, ii == gpwgts[nparts], (ctrl, "%d %d %d %d %d\n", ii, gpwgts[nparts], jj, mgraph->nedges, nvtxs));
 
-  GKfree((void **)&newlabel, LTERM);
+  GKfree((void **)&newlabel);
 
 #ifdef DEBUG
   IFSET(ctrl->dbglvl, DBG_INFO, rprintf(ctrl, "Checking moved graph...\n"));

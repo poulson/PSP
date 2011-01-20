@@ -156,8 +156,11 @@ void ParMETIS_V3_AdaptiveRepart(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy
   /*************************************/
   /* Free memory, renumber, and return */
   /*************************************/
-  GKfree((void **)&graph->lnpwgts, &graph->gnpwgts, &graph->nvwgt, &graph->home, 
-      &itpwgts, LTERM);
+  GKfree((void **)&graph->lnpwgts);
+  GKfree((void **)&graph->gnpwgts);
+  GKfree((void **)&graph->nvwgt);
+  GKfree((void **)&graph->home);
+  GKfree((void **)&itpwgts);
       
   FreeInitialGraphAndRemap(graph, iwgtflag, vsize == NULL);
   FreeWSpace(&wspace);

@@ -80,7 +80,6 @@ static void siqst(idxtype *base, idxtype *max)
   register idxtype *j;
   register idxtype *jj;
   register idxtype *mid;
-  register int ii;
   register idxtype c;
   idxtype *tmp;
   int lo;
@@ -210,7 +209,6 @@ static void iiqst(int *base, int *max)
   register int *j;
   register int *jj;
   register int *mid;
-  register int ii;
   register int c;
   int *tmp;
   int lo;

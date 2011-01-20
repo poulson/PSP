@@ -234,7 +234,10 @@ float WavefrontDiffusion(CtrlType *ctrl, GraphType *graph, idxtype *home)
 
 
 CleanUpAndExit:
-  GKfree((void **)&solution, (void **)&perm, (void **)&workspace, (void **)&cand, LTERM);
+  GKfree((void **)&solution);
+  GKfree((void **)&perm);
+  GKfree((void **)&workspace);
+  GKfree((void **)&cand);
 
   return cost;
 }

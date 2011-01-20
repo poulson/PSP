@@ -46,7 +46,7 @@ void METIS_WPartGraphRecursive(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxty
                                idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
                                float *tpwgts, int *options, int *edgecut, idxtype *part)
 {
-  int i, j;
+  int i;
   GraphType graph;
   CtrlType ctrl;
   float *mytpwgts;
@@ -102,7 +102,7 @@ void METIS_WPartGraphRecursive(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxty
 **************************************************************************/
 int MlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxtype *part, float *tpwgts, float ubfactor, int fpart)
 {
-  int i, j, nvtxs, cut, tvwgt, tpwgts2[2];
+  int i, nvtxs, cut, tvwgt, tpwgts2[2];
   idxtype *label, *where;
   GraphType lgraph, rgraph;
   float wsum;
@@ -135,7 +135,9 @@ int MlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxty
 
 
   /* Free the memory of the top level graph */
-  GKfree(&graph->gdata, &graph->rdata, &graph->label, LTERM);
+  GKfree((void **)&graph->gdata);
+  GKfree((void **)&graph->rdata);
+  GKfree((void **)&graph->label);
 
   /* Scale the fractions in the tpwgts according to the true weight */
   wsum = ssum(nparts/2, tpwgts);
@@ -154,7 +156,8 @@ int MlevelRecursiveBisection(CtrlType *ctrl, GraphType *graph, int nparts, idxty
   }
   else if (nparts == 3) {
     cut += MlevelRecursiveBisection(ctrl, &rgraph, nparts-nparts/2, part, tpwgts+nparts/2, ubfactor, fpart+nparts/2);
-    GKfree(&lgraph.gdata, &lgraph.label, LTERM);
+    GKfree((void **)&lgraph.gdata);
+    GKfree((void **)&lgraph.label);
   }
 
   return cut;

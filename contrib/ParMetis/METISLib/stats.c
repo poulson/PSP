@@ -22,7 +22,6 @@ void Moc_ComputePartitionBalance(GraphType *graph, int nparts, idxtype *where, f
 {
   int i, j, nvtxs, ncon;
   float *kpwgts, *nvwgt;
-  float balance;
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;

@@ -126,7 +126,7 @@ void ChangeMesh2FNumbering(int n, idxtype *mesh, int nvtxs, idxtype *xadj, idxty
 **************************************************************************/
 void ChangeMesh2FNumbering2(int n, idxtype *mesh, int ne, int nn, idxtype *epart, idxtype *npart)
 {
-  int i, nedges;
+  int i;
 
   for (i=0; i<n; i++)
     mesh[i]++;

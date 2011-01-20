@@ -100,7 +100,10 @@ void MultilevelOrder(CtrlType *ctrl, GraphType *graph, idxtype *order, idxtype *
   }
 
   FreeGraph(mgraph);
-  GKfree((void **)&perm, (void **)&lastnode, (void **)&porder, (void **)&morder, LTERM);
+  GKfree((void **)&perm);
+  GKfree((void **)&lastnode);
+  GKfree((void **)&porder);
+  GKfree((void **)&morder);
 
   /* PrintVector(ctrl, 2*npes-1, 0, sizes, "SIZES"); */
 }
@@ -180,8 +183,7 @@ void LabelSeparators(CtrlType *ctrl, GraphType *graph, idxtype *lastnode, idxtyp
     lastnode[2*nparts+2*(i+1)] = sizescan[nparts+i]-gpwgts[nparts+i];
   }
 
-  GKfree((void **)&sizescan, LTERM);
-
+  GKfree((void **)&sizescan);
 }
 
 
@@ -264,15 +266,29 @@ void CompactGraph(CtrlType *ctrl, GraphType *graph, idxtype *perm, WorkSpaceType
   }
   SHIFTCSR(i, cnvtxs, xadj);
 
-  GKfree((void **)&graph->match, (void **)&graph->cmap, (void **)&graph->lperm, 
-         (void **)&graph->where, (void **)&graph->label, (void **)&graph->rinfo,
-         (void **)&graph->nrinfo, (void **)&graph->lpwgts, (void **)&graph->gpwgts, 
-         (void **)&graph->sepind, (void **)&graph->hmarker, (void **)&graph->peind,
-         (void **)&graph->sendptr, (void **)&graph->sendind, 
-         (void **)&graph->recvptr, (void **)&graph->recvind, 
-         (void **)&graph->imap, (void **)&graph->rlens, (void **)&graph->slens, 
-         (void **)&graph->rcand, (void **)&graph->pexadj, 
-         (void **)&graph->peadjncy, (void **)&graph->peadjloc, LTERM);
+  GKfree((void **)&graph->match);
+  GKfree((void **)&graph->cmap);
+  GKfree((void **)&graph->lperm);
+  GKfree((void **)&graph->where);
+  GKfree((void **)&graph->label);
+  GKfree((void **)&graph->rinfo);
+  GKfree((void **)&graph->nrinfo);
+  GKfree((void **)&graph->lpwgts);
+  GKfree((void **)&graph->gpwgts);
+  GKfree((void **)&graph->sepind);
+  GKfree((void **)&graph->hmarker);
+  GKfree((void **)&graph->peind);
+  GKfree((void **)&graph->sendptr);
+  GKfree((void **)&graph->sendind);
+  GKfree((void **)&graph->recvptr);
+  GKfree((void **)&graph->recvind);
+  GKfree((void **)&graph->imap);
+  GKfree((void **)&graph->rlens);
+  GKfree((void **)&graph->slens);
+  GKfree((void **)&graph->rcand);
+  GKfree((void **)&graph->pexadj);
+  GKfree((void **)&graph->peadjncy);
+  GKfree((void **)&graph->peadjloc);
  
   graph->nvtxs  = cnvtxs;
   graph->nedges = l;

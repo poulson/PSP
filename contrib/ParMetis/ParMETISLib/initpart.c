@@ -188,7 +188,14 @@ void Mc_InitPartition_RB(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
 
   FreeGraph(agraph);
   MPI_Comm_free(&ipcomm);
-  GKfree((void **)&gwhere0, (void **)&gwhere1, (void **)&mytpwgts, (void **)&part, (void **)&xadj, (void **)&adjncy, (void **)&adjwgt, (void **)&vwgt, LTERM);
+  GKfree((void **)&gwhere0);
+  GKfree((void **)&gwhere1);
+  GKfree((void **)&mytpwgts);
+  GKfree((void **)&part);
+  GKfree((void **)&xadj);
+  GKfree((void **)&adjncy);
+  GKfree((void **)&adjwgt);
+  GKfree((void **)&vwgt);
 
   IFSET(ctrl->dbglvl, DBG_TIME, MPI_Barrier(ctrl->comm));
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->InitPartTmr));

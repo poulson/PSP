@@ -245,8 +245,10 @@ int Mc_Diffusion(CtrlType *ctrl, GraphType *graph, idxtype *vtxdist,
                 where[map[i]] = egraph->where[i];
           }
 
-          GKfree((void **)&egraph->xadj, (void **)&egraph->nvwgt, (void **)&egraph->adjncy, LTERM);
-          GKfree((void **)&egraph, LTERM);
+          GKfree((void **)&egraph->xadj);
+          GKfree((void **)&egraph->nvwgt);
+          GKfree((void **)&egraph->adjncy);
+          GKfree((void **)&egraph);
         }
 
         /**********************/
@@ -350,9 +352,15 @@ if (ctrl->mype == PE) printf("WARNING: empty subdomain %d in Mc_Diffusion\n", me
   /******************************/
   /* now free memory and return */
   /******************************/
-  GKfree((void **)&load, (void **)&proc2sub, (void **)&sub2proc, (void **)&rcount, LTERM);
-  GKfree((void **)&pack, (void **)&workspace, (void **)&degrees, (void **)&rinfo, LTERM);
-  GKfree((void **)&visited, LTERM);
+  GKfree((void **)&load);
+  GKfree((void **)&proc2sub);
+  GKfree((void **)&sub2proc);
+  GKfree((void **)&rcount);
+  GKfree((void **)&pack);
+  GKfree((void **)&workspace);
+  GKfree((void **)&degrees);
+  GKfree((void **)&rinfo);
+  GKfree((void **)&visited);
   graph->gnpwgts = NULL;
   graph->rinfo = NULL;
 

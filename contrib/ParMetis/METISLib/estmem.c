@@ -21,7 +21,7 @@
 **************************************************************************/
 void METIS_EstimateMemory(int *nvtxs, idxtype *xadj, idxtype *adjncy, int *numflag, int *optype, int *nbytes)
 {
-  int i, j, k, nedges, nlevels;
+  int nedges, nlevels;
   float vfraction, efraction, vmult, emult;
   int coresize, gdata, rdata;
 
@@ -99,7 +99,9 @@ void EstimateCFraction(int nvtxs, idxtype *xadj, idxtype *adjncy, float *vfracti
   *vfraction = (1.0*cnvtxs)/(1.0*nvtxs);
   *efraction = (1.0*cnedges)/(1.0*xadj[nvtxs]);
 
-  GKfree(&cmap, &match, &perm, LTERM);
+  GKfree((void **)&cmap);
+  GKfree((void **)&match);
+  GKfree((void **)&perm);
 }
 
 
@@ -110,7 +112,7 @@ void EstimateCFraction(int nvtxs, idxtype *xadj, idxtype *adjncy, float *vfracti
 **************************************************************************/
 int ComputeCoarseGraphSize(int nvtxs, idxtype *xadj, idxtype *adjncy, int cnvtxs, idxtype *cmap, idxtype *match, idxtype *perm)
 {
-  int i, j, k, istart, iend, nedges, cnedges, v, u;
+  int i, j, k, istart, iend, cnedges, v, u;
   idxtype *htable;
 
   htable = idxsmalloc(cnvtxs, -1, "htable");
@@ -149,7 +151,7 @@ int ComputeCoarseGraphSize(int nvtxs, idxtype *xadj, idxtype *adjncy, int cnvtxs
     cnvtxs++;
   }
 
-  GKfree(&htable, LTERM);
+  GKfree((void **)&htable);
 
   return cnedges;
 }

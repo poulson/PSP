@@ -20,7 +20,7 @@
 **************************************************************************/
 void ComputePartitionInfo(GraphType *graph, int nparts, idxtype *where)
 {
-  int i, j, k, nvtxs, ncon, mustfree=0;
+  int i, j, nvtxs, ncon, mustfree=0;
   idxtype *xadj, *adjncy, *vwgt, *adjwgt, *kpwgts, *tmpptr;
   idxtype *padjncy, *padjwgt, *padjcut;
 
@@ -120,7 +120,10 @@ void ComputePartitionInfo(GraphType *graph, int nparts, idxtype *where)
     graph->adjwgt = NULL;
   }
 
-  GKfree(&kpwgts, &padjncy, &padjwgt, &padjcut, LTERM);
+  GKfree((void **)&kpwgts);
+  GKfree((void **)&padjncy);
+  GKfree((void **)&padjwgt);
+  GKfree((void **)&padjcut);
 }
 
 
@@ -129,8 +132,8 @@ void ComputePartitionInfo(GraphType *graph, int nparts, idxtype *where)
 **************************************************************************/
 void ComputePartitionInfoBipartite(GraphType *graph, int nparts, idxtype *where)
 {
-  int i, j, k, nvtxs, ncon, mustfree=0;
-  idxtype *xadj, *adjncy, *vwgt, *vsize, *adjwgt, *kpwgts, *tmpptr;
+  int i, j, nvtxs, ncon, mustfree=0;
+  idxtype *xadj, *adjncy, *vwgt, *vsize, *adjwgt, *kpwgts;
   idxtype *padjncy, *padjwgt, *padjcut;
 
   nvtxs = graph->nvtxs;
@@ -224,7 +227,10 @@ void ComputePartitionInfoBipartite(GraphType *graph, int nparts, idxtype *where)
     graph->adjwgt = NULL;
   }
 
-  GKfree(&kpwgts, &padjncy, &padjwgt, &padjcut, LTERM);
+  GKfree((void **)&kpwgts);
+  GKfree((void **)&padjncy);
+  GKfree((void **)&padjwgt);
+  GKfree((void **)&padjcut);
 }
 
 
@@ -236,7 +242,6 @@ void ComputePartitionBalance(GraphType *graph, int nparts, idxtype *where, float
 {
   int i, j, nvtxs, ncon;
   idxtype *kpwgts, *vwgt;
-  float balance;
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;
@@ -294,7 +299,6 @@ void Moc_ComputePartitionBalance(GraphType *graph, int nparts, idxtype *where, f
 {
   int i, j, nvtxs, ncon;
   float *kpwgts, *nvwgt;
-  float balance;
 
   nvtxs = graph->nvtxs;
   ncon = graph->ncon;

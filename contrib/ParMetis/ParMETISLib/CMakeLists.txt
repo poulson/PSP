@@ -1,0 +1,10 @@
+file(GLOB_RECURSE PARMETIS_C 
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
+file(GLOB_RECURSE PARMETIS_H 
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.h")
+set(PARMETIS_SRC "${PARMETIS_C};${PARMETIS_H}")
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/..")
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+add_library(parmetis STATIC ${PARMETIS_SRC})
+

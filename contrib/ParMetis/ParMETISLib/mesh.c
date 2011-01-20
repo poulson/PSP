@@ -345,10 +345,18 @@ void ParMETIS_V3_Mesh2Dual(idxtype *elmdist, idxtype *eptr, idxtype *eind,
     ChangeNumberingMesh(elmdist, eptr, eind, myxadj, myadjncy, NULL, npes, mype, 0);
 
   /* do not free nodelist, recvbuffer, rbuffer */
-  GKfree((void **)&scounts, (void **)&nodedist, (void **)&nmap, (void **)&sbuffer, 
-         (void **)&htable, (void **)&nptr, (void **)&nind, (void **)&gnptr, 
-	 (void **)&gnind, (void **)&auxarray, &ind, &wgt, LTERM);
-
+  GKfree((void **)&scounts);
+  GKfree((void **)&nodedist);
+  GKfree((void **)&nmap);
+  GKfree((void **)&sbuffer);
+  GKfree((void **)&htable);
+  GKfree((void **)&nptr);
+  GKfree((void **)&nind);
+  GKfree((void **)&gnptr);
+  GKfree((void **)&gnind);
+  GKfree((void **)&auxarray);
+  GKfree((void **)&ind);
+  GKfree((void **)&wgt);
   FreeCtrl(&ctrl);
 
   return;

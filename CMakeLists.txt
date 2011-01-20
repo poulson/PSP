@@ -33,10 +33,6 @@ else(MATH_LIBS)
   set(NEED_MATH TRUE)
 endif(MATH_LIBS)
 
-message("CMAKE_LIBRARY_PATH=${CMAKE_LIBRARY_PATH}")
-message("CMAKE_SYSTEM_LIBRARY_PATH=${CMAKE_SYSTEM_LIBRARY_PATH}")
-message("CMAKE_SYSTEM_FRAMEWORK_PATH=${CMAKE_SYSTEM_FRAMEWORK_PATH}")
-
 if(NEED_MATH)
   set(MATH_DESC "BLAS/LAPACK/BLACS/ScaLAPACK link flags")
   # Look for the base Intel libs first
@@ -158,8 +154,8 @@ else(HAVE_DPOTRF)
   endif(HAVE_DPOTRF_POST)
 endif(HAVE_DPOTRF)
 
-#add_subdirectory(contrib/ParMetis)
-#add_subdirectory(contrib/MUMPS)
+add_subdirectory(contrib/ParMetis)
+add_subdirectory(contrib/MUMPS)
 
 #configure_file( ${CMAKE_SOURCE_DIR}/include/sweeper/config.h.cmake
 #                ${CMAKE_BINARY_DIR}/include/sweeper/config.h )

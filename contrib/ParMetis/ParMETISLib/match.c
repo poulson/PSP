@@ -307,7 +307,8 @@ void Mc_GlobalMatch_Balance(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wsp
     rprintf(ctrl, "Done with matching...\n");
   }
 
-  GKfree((void **)(&myhome), (void **)(&nreqs_pe), LTERM);
+  GKfree((void **)&myhome);
+  GKfree((void **)&nreqs_pe);
 
   IFSET(ctrl->dbglvl, DBG_TIME, MPI_Barrier(ctrl->comm));
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->MatchTmr));
@@ -787,10 +788,15 @@ void Mc_Global_CreateCoarseGraph(CtrlType *ctrl, GraphType *graph,
   idxcopy(cnedges, cadjwgt, cgraph->adjwgt);
 
   /* Note that graph->where works fine even if it is NULL */
-  GKfree((void **)&cadjncy, &graph->where, &perm, LTERM);
+  GKfree((void **)&cadjncy);
+  GKfree((void **)&graph->where);
+  GKfree((void **)&perm);
 
   if (rgraph != (idxtype *)wspace->degrees) 
-    GKfree((void **)&rgraph, &sgraph, LTERM);
+  {
+    GKfree((void **)&rgraph);
+    GKfree(&sgraph);
+  }
 
 }
 

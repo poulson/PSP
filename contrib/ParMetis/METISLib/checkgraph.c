@@ -121,7 +121,7 @@ int CheckGraph(GraphType *graph)
     printf("A total of %d errors exist in the input file. Correct them, and run again!\n", err);
   }
 
-  GKfree(&htable, LTERM);
+  GKfree((void **)&htable);
   return (err == 0 ? 1 : 0);
 }
 

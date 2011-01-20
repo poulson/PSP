@@ -44,7 +44,7 @@ void AllocateNodePartitionParams(CtrlType *ctrl, GraphType *graph, WorkSpaceType
   vwgt        = graph->vwgt;
   graph->vwgt = idxmalloc(nvtxs+graph->nrecv, "AllocateNodePartitionParams: graph->vwgt");
   idxcopy(nvtxs, vwgt, graph->vwgt);
-  GKfree((void **)&vwgt, LTERM);
+  GKfree((void **)&vwgt);
 
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->KWayInitTmr));
 }
@@ -408,7 +408,10 @@ void KWayNodeRefine(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace,
       break;
   }
 
-  GKfree((void **)&update, &nupds_pe, &htable, &changed, LTERM);
+  GKfree((void **)&update);
+  GKfree(&nupds_pe);
+  GKfree(&htable);
+  GKfree(&changed);
 
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->KWayTmr));
 }

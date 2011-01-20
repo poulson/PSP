@@ -148,7 +148,9 @@ void CompressGraph(CtrlType *ctrl, GraphType *graph, int nvtxs, idxtype *xadj, i
 
   }
 
-  GKfree(&keys, &map, &mark, LTERM);
+  GKfree((void **)&keys);
+  GKfree((void **)&map);
+  GKfree((void **)&mark);
 }
 
 
@@ -160,7 +162,7 @@ void CompressGraph(CtrlType *ctrl, GraphType *graph, int nvtxs, idxtype *xadj, i
 void PruneGraph(CtrlType *ctrl, GraphType *graph, int nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *iperm, float factor)
 {
   int i, j, k, l, nlarge, pnvtxs, pnedges;
-  idxtype *pxadj, *padjncy, *padjwgt, *pvwgt;
+  idxtype *pxadj, *padjncy;
   idxtype *perm;
 
   perm = idxmalloc(nvtxs, "PruneGraph: perm");

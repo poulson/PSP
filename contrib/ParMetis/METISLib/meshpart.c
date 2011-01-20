@@ -98,7 +98,9 @@ void METIS_PartMeshNodal(int *ne, int *nn, idxtype *elmnts, int *etype, int *num
   if (*numflag == 1)
     ChangeMesh2FNumbering2((*ne)*esize, elmnts, *ne, *nn, epart, npart);
 
-  GKfree(&xadj, &adjncy, &pwgts, LTERM);
+  GKfree((void **)&xadj);
+  GKfree((void **)&adjncy);
+  GKfree((void **)&pwgts);
 
 }
 
@@ -199,6 +201,10 @@ void METIS_PartMeshDual(int *ne, int *nn, idxtype *elmnts, int *etype, int *numf
   if (*numflag == 1)
     ChangeMesh2FNumbering2((*ne)*esize, elmnts, *ne, *nn, epart, npart);
 
-  GKfree(&xadj, &adjncy, &pwgts, &nptr, &nind, LTERM);
+  GKfree((void **)&xadj);
+  GKfree((void **)&adjncy);
+  GKfree((void **)&pwgts);
+  GKfree((void **)&nptr);
+  GKfree((void **)&nind);
 
 }

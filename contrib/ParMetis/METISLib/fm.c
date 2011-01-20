@@ -19,7 +19,7 @@
 **************************************************************************/
 void FM_2WayEdgeRefine(CtrlType *ctrl, GraphType *graph, int *tpwgts, int npasses)
 {
-  int i, ii, j, k, kwgt, nvtxs, nbnd, nswaps, from, to, pass, me, limit, tmp;
+  int i, ii, j, k, kwgt, nvtxs, nbnd, nswaps, from, to, pass, limit, tmp;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind, *pwgts;
   idxtype *moved, *swaps, *perm;
   PQueueType parts[2];

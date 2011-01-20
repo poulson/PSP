@@ -15,12 +15,15 @@
 
 #include <metis.h>
 
+/* Added by Jack Poulson to prevent implicit declaration */
+int SelectQueueOneWay(int, float*, float*, int, PQueueType queues[MAXNCON][2]);
+
 /*************************************************************************
 * This function computes the initial bisection of the coarsest graph
 **************************************************************************/
 void MocInit2WayPartition(CtrlType *ctrl, GraphType *graph, float *tpwgts, float ubfactor) 
 {
-  int i, dbglvl;
+  int dbglvl;
 
   dbglvl = ctrl->dbglvl;
   IFSET(ctrl->dbglvl, DBG_REFINE, ctrl->dbglvl -= DBG_REFINE);
@@ -59,7 +62,7 @@ void MocInit2WayPartition(CtrlType *ctrl, GraphType *graph, float *tpwgts, float
 **************************************************************************/
 void MocGrowBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float ubfactor)
 {
-  int i, j, k, nvtxs, ncon, from, bestcut, mincut, nbfs;
+  int nvtxs, bestcut, nbfs;
   idxtype *bestwhere, *where;
 
   nvtxs = graph->nvtxs;
@@ -95,7 +98,7 @@ void MocGrowBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float ubf
   graph->mincut = bestcut;
   idxcopy(nvtxs, bestwhere, where);
 
-  GKfree(&bestwhere, LTERM);
+  GKfree(&bestwhere);
 }
 
 
@@ -107,7 +110,7 @@ void MocGrowBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float ubf
 **************************************************************************/
 void MocRandomBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float ubfactor)
 {
-  int i, ii, j, k, nvtxs, ncon, from, bestcut, mincut, nbfs, qnum;
+  int i, ii, nvtxs, ncon, bestcut, nbfs, qnum;
   idxtype *bestwhere, *where, *perm;
   int counts[MAXNCON];
   float *nvwgt;
@@ -164,7 +167,8 @@ void MocRandomBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float u
   graph->mincut = bestcut;
   idxcopy(nvtxs, bestwhere, where);
 
-  GKfree(&bestwhere, &perm, LTERM);
+  GKfree((void **)&bestwhere);
+  GKfree((void **)&perm);
 }
 
 
@@ -180,7 +184,7 @@ void MocRandomBisection(CtrlType *ctrl, GraphType *graph, float *tpwgts, float u
 **************************************************************************/
 void MocInit2WayBalance(CtrlType *ctrl, GraphType *graph, float *tpwgts)
 {
-  int i, ii, j, k, l, kwgt, nvtxs, nbnd, ncon, nswaps, from, to, pass, me, cnum, tmp;
+  int i, ii, j, k, l, kwgt, nvtxs, nbnd, ncon, nswaps, from, to, cnum, tmp;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *perm, *qnum;
   float *nvwgt, *npwgts;

@@ -19,8 +19,8 @@
 void Random_KWayVolRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
                           float ubfactor, int npasses, int ffactor)
 {
-  int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
-  int from, me, to, oldcut, oldvol, vwgt;
+  int i, ii, iii, j, k, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
+  int from, to, oldcut, oldvol, vwgt;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *bndptr, *bndind, *minwgt, *maxwgt, *itpwgts, *updind, *marker, *phtable;
   VEDegreeType *myedegrees;
@@ -148,7 +148,9 @@ void Random_KWayVolRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *t
       break;
   }
 
-  GKfree(&marker, &updind, &phtable, LTERM);
+  GKfree((void **)&marker);
+  GKfree((void **)&updind);
+  GKfree((void **)&phtable);
 
   idxwspacefree(ctrl, nparts);
   idxwspacefree(ctrl, nparts);
@@ -163,7 +165,7 @@ void Random_KWayVolRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *t
 void Random_KWayVolRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
             float ubfactor, int npasses, int ffactor)
 {
-  int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
+  int i, ii, iii, j, k, l, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
   int from, me, to, oldcut, oldvol, vwgt, nadd, maxndoms;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *bndptr, *bndind, *minwgt, *maxwgt, *itpwgts, *updind, *marker, *phtable;
@@ -384,7 +386,9 @@ void Random_KWayVolRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, flo
       break;
   }
 
-  GKfree(&marker, &updind, &phtable, LTERM);
+  GKfree((void **)&marker);
+  GKfree((void **)&updind);
+  GKfree((void **)&phtable);
 
   idxwspacefree(ctrl, nparts);
   idxwspacefree(ctrl, nparts);
@@ -402,8 +406,8 @@ void Random_KWayVolRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, flo
 void Greedy_KWayVolBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
                            float ubfactor, int npasses)
 {
-  int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
-  int from, me, to, vwgt, gain;
+  int i, ii, j, k, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
+  int from, to, vwgt;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *moved, *bndptr, *bndind, *minwgt, *maxwgt, *itpwgts, *updind, *marker, *phtable;
   VEDegreeType *myedegrees;
@@ -537,7 +541,9 @@ void Greedy_KWayVolBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *
 
   }
 
-  GKfree(&marker, &updind, &phtable, LTERM);
+  GKfree((void **)&marker);
+  GKfree((void **)&updind);
+  GKfree((void **)&phtable);
 
   PQueueFree(ctrl, &queue);
 
@@ -556,8 +562,8 @@ void Greedy_KWayVolBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *
 void Greedy_KWayVolBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, 
                                 float ubfactor, int npasses)
 {
-  int i, ii, iii, j, jj, k, kk, l, u, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
-  int from, me, to, vwgt, gain, maxndoms, nadd;
+  int i, ii, j, k, l, pass, nvtxs, nmoves, tvwgt, myndegrees, xgain; 
+  int from, me, to, vwgt, maxndoms, nadd;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *moved, *bndptr, *bndind, *minwgt, *maxwgt, *itpwgts, *updind, *marker, *phtable;
   idxtype *pmat, *pmatptr, *ndoms;
@@ -781,7 +787,9 @@ void Greedy_KWayVolBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, fl
 
   }
 
-  GKfree(&marker, &updind, &phtable, LTERM);
+  GKfree((void **)&marker);
+  GKfree((void **)&updind);
+  GKfree((void **)&phtable);
 
   PQueueFree(ctrl, &queue);
 
@@ -805,7 +813,7 @@ void Greedy_KWayVolBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, fl
 void KWayVolUpdate(CtrlType *ctrl, GraphType *graph, int v, int from, int to,
                    idxtype *marker, idxtype *phtable, idxtype *updind)
 {
-  int ii, iii, j, jj, k, kk, l, u, nupd, other, me, myidx; 
+  int ii, j, jj, k, kk, u, nupd, other, me, myidx; 
   idxtype *xadj, *vsize, *adjncy, *adjwgt, *where;
   VEDegreeType *myedegrees, *oedegrees;
   VRInfoType *myrinfo, *orinfo;
@@ -1088,7 +1096,7 @@ void KWayVolUpdate(CtrlType *ctrl, GraphType *graph, int v, int from, int to,
 **************************************************************************/
 void ComputeKWayVolume(GraphType *graph, int nupd, idxtype *updind, idxtype *marker, idxtype *phtable)
 {
-  int ii, iii, i, j, k, kk, l, nvtxs, me, other, pid;
+  int ii, iii, i, j, k, kk, nvtxs, me, other;
   idxtype *xadj, *vsize, *adjncy, *adjwgt, *where;
   VRInfoType *rinfo, *myrinfo, *orinfo;
   VEDegreeType *myedegrees, *oedegrees;
@@ -1179,7 +1187,7 @@ void ComputeKWayVolume(GraphType *graph, int nupd, idxtype *updind, idxtype *mar
 **************************************************************************/
 int ComputeVolume(GraphType *graph, idxtype *where)
 {
-  int i, j, k, me, nvtxs, nparts, totalv;
+  int i, j, k, nvtxs, nparts, totalv;
   idxtype *xadj, *adjncy, *vsize, *marker;
 
 
@@ -1218,8 +1226,8 @@ int ComputeVolume(GraphType *graph, idxtype *where)
 **************************************************************************/
 void CheckVolKWayPartitionParams(CtrlType *ctrl, GraphType *graph, int nparts)
 {
-  int i, ii, j, k, kk, l, nvtxs, nbnd, mincut, minvol, me, other, pid;
-  idxtype *xadj, *vsize, *adjncy, *adjwgt, *pwgts, *where, *bndind, *bndptr;
+  int i, ii, j, k, kk, nvtxs, me, other, pid;
+  idxtype *xadj, *vsize, *adjncy, *adjwgt, *where;
   VRInfoType *rinfo, *myrinfo, *orinfo, tmprinfo;
   VEDegreeType *myedegrees, *oedegrees, *tmpdegrees;
 
@@ -1601,7 +1609,8 @@ void EliminateVolSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, fl
   idxwspacefree(ctrl, nparts);
   idxwspacefree(ctrl, nvtxs);
 
-  GKfree(&cand, &cand2, LTERM);
+  GKfree((void **)&cand);
+  GKfree((void **)&cand2);
 }
 
 

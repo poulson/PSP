@@ -21,7 +21,7 @@
 **************************************************************************/
 void Random_KWayEdgeRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses, int ffactor)
 {
-  int i, ii, iii, j, jj, k, l, pass, nvtxs, nmoves, nbnd, tvwgt, myndegrees; 
+  int i, ii, iii, j, k, l, pass, nvtxs, nmoves, nbnd, tvwgt, myndegrees; 
   int from, me, to, oldcut, vwgt, gain;
   int maxndoms, nadd;
   idxtype *xadj, *adjncy, *adjwgt;
@@ -311,7 +311,7 @@ void Random_KWayEdgeRefineMConn(CtrlType *ctrl, GraphType *graph, int nparts, fl
 **************************************************************************/
 void Greedy_KWayEdgeBalanceMConn(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses)
 {
-  int i, ii, iii, j, jj, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain, nmoves; 
+  int i, ii, j, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain, nmoves; 
   int from, me, to, oldcut, vwgt, maxndoms, nadd;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *bndptr, *bndind, *minwgt, *maxwgt, *moved, *itpwgts;
@@ -882,7 +882,8 @@ void EliminateSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, float
   idxwspacefree(ctrl, nparts);
   idxwspacefree(ctrl, nvtxs);
 
-  GKfree(&cand, &cand2, LTERM);
+  GKfree((void **)&cand);
+  GKfree((void **)&cand2);
 }
 
 
@@ -892,7 +893,7 @@ void EliminateSubDomainEdges(CtrlType *ctrl, GraphType *graph, int nparts, float
 void MoveGroupMConn(CtrlType *ctrl, GraphType *graph, idxtype *ndoms, idxtype *pmat,
                     int nparts, int to, int nind, idxtype *ind)
 {
-  int i, ii, iii, j, jj, k, l, nvtxs, nbnd, myndegrees; 
+  int i, ii, iii, j, k, nvtxs, nbnd; 
   int from, me;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *bndptr, *bndind;
@@ -1047,7 +1048,7 @@ void MoveGroupMConn(CtrlType *ctrl, GraphType *graph, idxtype *ndoms, idxtype *p
 **************************************************************************/
 void EliminateComponents(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor)
 {
-  int i, ii, j, jj, k, me, nvtxs, tvwgt, first, last, nleft, ncmps, cwgt, other, target, deltawgt;
+  int i, ii, j, jj, k, me, nvtxs, tvwgt, first, last, nleft, ncmps, cwgt, target, deltawgt;
   idxtype *xadj, *adjncy, *vwgt, *adjwgt, *where, *pwgts, *maxpwgt;
   idxtype *cpvec, *touched, *perm, *todo, *cind, *cptr, *npcmps;
 
@@ -1173,7 +1174,7 @@ void EliminateComponents(CtrlType *ctrl, GraphType *graph, int nparts, float *tp
 **************************************************************************/
 void MoveGroup(CtrlType *ctrl, GraphType *graph, int nparts, int to, int gid, idxtype *ptr, idxtype *ind)
 {
-  int i, ii, iii, j, jj, k, l, nvtxs, nbnd, myndegrees; 
+  int i, ii, iii, j, k, nvtxs, nbnd; 
   int from, me;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *bndptr, *bndind;

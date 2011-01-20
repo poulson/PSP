@@ -163,7 +163,8 @@ void ParMETIS_V3_NodeND(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, int *n
   IFSET(dbglvl_original, DBG_TIME, PrintTimingInfo(&ctrl));
   IFSET(dbglvl_original, DBG_TIME, MPI_Barrier(ctrl.gcomm));
 
-  GKfree((void **)&ctrl.tpwgts, &morder, LTERM);
+  GKfree((void **)&ctrl.tpwgts);
+  GKfree(&morder);
   FreeGraph(mgraph);
   FreeInitialGraphAndRemap(graph, 0, 1);
   FreeWSpace(&wspace);

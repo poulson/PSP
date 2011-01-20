@@ -142,7 +142,7 @@ void InitMultisection(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   /* The minimum PE performs the Scatter */
   vtxdist = graph->vtxdist;
   ASSERT(ctrl, graph->where != NULL);
-  GKfree((void **)&graph->where, LTERM);  /* Remove the propagated down where info */
+  GKfree((void **)&graph->where);  /* Remove the propagated down where info */
   graph->where = idxmalloc(graph->nvtxs+graph->nrecv, "InitPartition: where");
 
   sendcounts = imalloc(ctrl->npes, "InitPartitionNew: sendcounts");
@@ -156,7 +156,9 @@ void InitMultisection(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   MPI_Scatterv((void *)agraph->where, sendcounts, displs, IDX_DATATYPE, 
                (void *)graph->where, graph->nvtxs, IDX_DATATYPE, 0, ctrl->comm);
 
-  GKfree((void **)&sendcounts, (void **)&displs, (void **)&label, LTERM);
+  GKfree((void **)&sendcounts);
+  GKfree((void **)&displs);
+  GKfree((void **)&label);
 
   FreeGraph(agraph);
 
@@ -221,7 +223,8 @@ GraphType *AssembleMultisectedGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceT
   ggraph = (gsize <= wspace->maxcore-mysize ? wspace->core+mysize : idxmalloc(gsize, "AssembleGraph: ggraph"));
   MPI_Allgatherv((void *)mygraph, mysize, IDX_DATATYPE, (void *)ggraph, recvcounts, displs, IDX_DATATYPE, ctrl->comm);
 
-  GKfree((void **)&recvcounts, (void **)&displs, LTERM);
+  GKfree((void **)&recvcounts);
+  GKfree((void **)&displs);
   if (mysize > wspace->maxcore)
     free(mygraph);
 

@@ -59,15 +59,13 @@ void AdjustWSpace(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
 /**************************************************************************/
 void FreeWSpace(WorkSpaceType *wspace)
 {
-
-  GKfree((void **)&wspace->core, 
-         (void **)&wspace->pv1, 
-         (void **)&wspace->pv2, 
-         (void **)&wspace->pv3,
-         (void **)&wspace->pv4, 
-         (void **)&wspace->pepairs1, 
-         (void **)&wspace->pepairs2, 
-         LTERM);
+  GKfree((void **)&wspace->core);
+  GKfree((void **)&wspace->pv1);
+  GKfree((void **)&wspace->pv2);
+  GKfree((void **)&wspace->pv3);
+  GKfree((void **)&wspace->pv4);
+  GKfree((void **)&wspace->pepairs1);
+  GKfree((void **)&wspace->pepairs2);
 }
 
 
@@ -137,40 +135,39 @@ void InitGraph(GraphType *graph)
 void FreeGraph(GraphType *graph) 
 {
 
-  GKfree((void **)&graph->xadj, 
-         (void **)&graph->vwgt,
-         (void **)&graph->nvwgt,
-         (void **)&graph->vsize,
-         (void **)&graph->adjncy,
-         (void **)&graph->adjwgt,
-         (void **)&graph->vtxdist, 
-         (void **)&graph->match, 
-         (void **)&graph->cmap, 
-         (void **)&graph->lperm, 
-         (void **)&graph->label, 
-         (void **)&graph->where, 
-         (void **)&graph->home, 
-         (void **)&graph->rinfo, 
-         (void **)&graph->nrinfo, 
-         (void **)&graph->sepind,
-         (void **)&graph->hmarker,
-         (void **)&graph->lpwgts, 
-         (void **)&graph->gpwgts, 
-         (void **)&graph->lnpwgts, 
-         (void **)&graph->gnpwgts, 
-         (void **)&graph->peind, 
-         (void **)&graph->sendptr, 
-         (void **)&graph->sendind, 
-         (void **)&graph->recvptr, 
-         (void **)&graph->recvind, 
-         (void **)&graph->imap,
-         (void **)&graph->rlens,
-         (void **)&graph->slens,
-         (void **)&graph->rcand,
-         (void **)&graph->pexadj,
-         (void **)&graph->peadjncy,
-         (void **)&graph->peadjloc,
-         LTERM);
+  GKfree((void **)&graph->xadj);
+  GKfree((void **)&graph->vwgt);
+  GKfree((void **)&graph->nvwgt);
+  GKfree((void **)&graph->vsize);
+  GKfree((void **)&graph->adjncy);
+  GKfree((void **)&graph->adjwgt);
+  GKfree((void **)&graph->vtxdist);
+  GKfree((void **)&graph->match);
+  GKfree((void **)&graph->cmap);
+  GKfree((void **)&graph->lperm);
+  GKfree((void **)&graph->label);
+  GKfree((void **)&graph->where);
+  GKfree((void **)&graph->home);
+  GKfree((void **)&graph->rinfo);
+  GKfree((void **)&graph->nrinfo);
+  GKfree((void **)&graph->sepind);
+  GKfree((void **)&graph->hmarker);
+  GKfree((void **)&graph->lpwgts);
+  GKfree((void **)&graph->gpwgts);
+  GKfree((void **)&graph->lnpwgts);
+  GKfree((void **)&graph->gnpwgts);
+  GKfree((void **)&graph->peind);
+  GKfree((void **)&graph->sendptr);
+  GKfree((void **)&graph->sendind);
+  GKfree((void **)&graph->recvptr);
+  GKfree((void **)&graph->recvind);
+  GKfree((void **)&graph->imap);
+  GKfree((void **)&graph->rlens);
+  GKfree((void **)&graph->slens);
+  GKfree((void **)&graph->rcand);
+  GKfree((void **)&graph->pexadj);
+  GKfree((void **)&graph->peadjncy);
+  GKfree((void **)&graph->peadjloc);
 
   free(graph);
 }
@@ -195,39 +192,38 @@ void FreeInitialGraphAndRemap(GraphType *graph, int wgtflag, int freevsize)
   }
 
   /* Free Metis's things */
-  GKfree((void **)&graph->match, 
-         (void **)&graph->cmap, 
-         (void **)&graph->lperm, 
-         (void **)&graph->where, 
-         (void **)&graph->label, 
-         (void **)&graph->rinfo, 
-         (void **)&graph->nrinfo, 
-         (void **)&graph->nvwgt, 
-         (void **)&graph->lpwgts, 
-         (void **)&graph->gpwgts, 
-         (void **)&graph->lnpwgts, 
-         (void **)&graph->gnpwgts, 
-         (void **)&graph->sepind,
-         (void **)&graph->peind, 
-         (void **)&graph->sendptr, 
-         (void **)&graph->sendind, 
-         (void **)&graph->recvptr, 
-         (void **)&graph->recvind, 
-         (void **)&graph->imap,
-         (void **)&graph->rlens,
-         (void **)&graph->slens,
-         (void **)&graph->rcand,
-         (void **)&graph->pexadj,
-         (void **)&graph->peadjncy,
-         (void **)&graph->peadjloc,
-         LTERM);
+  GKfree((void **)&graph->match);
+  GKfree((void **)&graph->cmap);
+  GKfree((void **)&graph->lperm);
+  GKfree((void **)&graph->where);
+  GKfree((void **)&graph->label);
+  GKfree((void **)&graph->rinfo);
+  GKfree((void **)&graph->nrinfo);
+  GKfree((void **)&graph->nvwgt);
+  GKfree((void **)&graph->lpwgts);
+  GKfree((void **)&graph->gpwgts);
+  GKfree((void **)&graph->lnpwgts);
+  GKfree((void **)&graph->gnpwgts);
+  GKfree((void **)&graph->sepind);
+  GKfree((void **)&graph->peind);
+  GKfree((void **)&graph->sendptr);
+  GKfree((void **)&graph->sendind);
+  GKfree((void **)&graph->recvptr);
+  GKfree((void **)&graph->recvind);
+  GKfree((void **)&graph->imap);
+  GKfree((void **)&graph->rlens);
+  GKfree((void **)&graph->slens);
+  GKfree((void **)&graph->rcand);
+  GKfree((void **)&graph->pexadj);
+  GKfree((void **)&graph->peadjncy);
+  GKfree((void **)&graph->peadjloc);
 
   if (freevsize)
-    GKfree((void **)&graph->vsize, LTERM);
+    GKfree((void **)&graph->vsize);
   if ((wgtflag&2) == 0) 
-    GKfree((void **)&graph->vwgt, LTERM);
+    GKfree((void **)&graph->vwgt);
   if ((wgtflag&1) == 0) 
-    GKfree((void **)&graph->adjwgt, LTERM);
+    GKfree((void **)&graph->adjwgt);
 
   free(graph);
 }

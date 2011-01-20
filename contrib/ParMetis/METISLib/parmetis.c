@@ -45,7 +45,6 @@ void METIS_WPartGraphKway2(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *
                           idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
                           float *tpwgts, int *options, int *edgecut, idxtype *part)
 {
-  int i, j;
   GraphType graph;
   CtrlType ctrl;
 
@@ -95,7 +94,7 @@ void METIS_WPartGraphKway2(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *
 void METIS_NodeNDP(int nvtxs, idxtype *xadj, idxtype *adjncy, int npes, 
                    int *options, idxtype *perm, idxtype *iperm, idxtype *sizes) 
 {
-  int i, ii, j, l, wflag, nflag;
+  int i, ii, j, l;
   GraphType graph;
   CtrlType ctrl;
   idxtype *cptr, *cind;
@@ -140,7 +139,8 @@ void METIS_NodeNDP(int nvtxs, idxtype *xadj, idxtype *adjncy, int npes,
 
     if (graph.nvtxs >= COMPRESSION_FRACTION*(nvtxs)) {
       ctrl.oflags--; /* We actually performed no compression */
-      GKfree(&cptr, &cind, LTERM);
+      GKfree((void **)&cptr);
+      GKfree((void **)&cind);
     }
     else if (2*graph.nvtxs < nvtxs && ctrl.nseps == 1)
       ctrl.nseps = 2;
@@ -173,7 +173,8 @@ void METIS_NodeNDP(int nvtxs, idxtype *xadj, idxtype *adjncy, int npes,
       }
     }
 
-    GKfree(&cptr, &cind, LTERM);
+    GKfree((void **)&cptr);
+    GKfree((void **)&cind);
   }
 
 
@@ -192,7 +193,7 @@ void METIS_NodeNDP(int nvtxs, idxtype *xadj, idxtype *adjncy, int npes,
 void MlevelNestedDissectionP(CtrlType *ctrl, GraphType *graph, idxtype *order, int lastvtx, 
                              int npes, int cpos, idxtype *sizes)
 {
-  int i, j, nvtxs, nbnd, tvwgt, tpwgts2[2];
+  int i, nvtxs, nbnd, tvwgt, tpwgts2[2];
   idxtype *label, *bndind;
   GraphType lgraph, rgraph;
   float ubfactor;
@@ -200,7 +201,9 @@ void MlevelNestedDissectionP(CtrlType *ctrl, GraphType *graph, idxtype *order, i
   nvtxs = graph->nvtxs;
 
   if (nvtxs == 0) {
-    GKfree(&graph->gdata, &graph->rdata, &graph->label, LTERM);
+    GKfree((void **)&graph->gdata);
+    GKfree((void **)&graph->rdata);
+    GKfree((void **)&graph->label);
     return;
   }
 
@@ -235,19 +238,25 @@ void MlevelNestedDissectionP(CtrlType *ctrl, GraphType *graph, idxtype *order, i
   SplitGraphOrder(ctrl, graph, &lgraph, &rgraph);
 
   /* Free the memory of the top level graph */
-  GKfree(&graph->gdata, &graph->rdata, &graph->label, LTERM);
+  GKfree((void **)&graph->gdata);
+  GKfree((void **)&graph->rdata);
+  GKfree((void **)&graph->label);
 
   if (rgraph.nvtxs > MMDSWITCH || 2*cpos+1 < npes-1) 
     MlevelNestedDissectionP(ctrl, &rgraph, order, lastvtx, npes, 2*cpos+1, sizes);
   else {
     MMDOrder(ctrl, &rgraph, order, lastvtx); 
-    GKfree(&rgraph.gdata, &rgraph.rdata, &rgraph.label, LTERM);
+    GKfree((void **)&rgraph.gdata);
+    GKfree((void **)&rgraph.rdata);
+    GKfree((void **)&rgraph.label);
   }
   if (lgraph.nvtxs > MMDSWITCH || 2*cpos+2 < npes-1) 
     MlevelNestedDissectionP(ctrl, &lgraph, order, lastvtx-rgraph.nvtxs, npes, 2*cpos+2, sizes);
   else {
     MMDOrder(ctrl, &lgraph, order, lastvtx-rgraph.nvtxs); 
-    GKfree(&lgraph.gdata, &lgraph.rdata, &lgraph.label, LTERM);
+    GKfree((void **)&lgraph.gdata);
+    GKfree((void **)&lgraph.rdata);
+    GKfree((void **)&lgraph.label);
   }
 }
 
@@ -259,7 +268,7 @@ void MlevelNestedDissectionP(CtrlType *ctrl, GraphType *graph, idxtype *order, i
 void METIS_NodeComputeSeparator(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
            idxtype *adjwgt, int *options, int *sepsize, idxtype *part) 
 {
-  int i, j, tvwgt, tpwgts[2];
+  int tvwgt, tpwgts[2];
   GraphType graph;
   CtrlType ctrl;
 
@@ -301,8 +310,9 @@ void METIS_NodeComputeSeparator(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxt
   *sepsize = graph.pwgts[2];
   idxcopy(*nvtxs, graph.where, part);
 
-  GKfree(&graph.gdata, &graph.rdata, &graph.label, LTERM);
-
+  GKfree((void **)&graph.gdata);
+  GKfree((void **)&graph.rdata);
+  GKfree((void **)&graph.label);
 
   FreeWorkSpace(&ctrl, &graph);
 
@@ -316,7 +326,7 @@ void METIS_NodeComputeSeparator(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxt
 void METIS_EdgeComputeSeparator(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxtype *vwgt, 
            idxtype *adjwgt, int *options, int *sepsize, idxtype *part) 
 {
-  int i, j, tvwgt, tpwgts[2];
+  int tvwgt, tpwgts[2];
   GraphType graph;
   CtrlType ctrl;
 
@@ -359,8 +369,9 @@ void METIS_EdgeComputeSeparator(int *nvtxs, idxtype *xadj, idxtype *adjncy, idxt
   *sepsize = graph.pwgts[2];
   idxcopy(*nvtxs, graph.where, part);
 
-  GKfree(&graph.gdata, &graph.rdata, &graph.label, LTERM);
-
+  GKfree((void **)&graph.gdata);
+  GKfree((void **)&graph.rdata);
+  GKfree((void **)&graph.label);
 
   FreeWorkSpace(&ctrl, &graph);
 
@@ -375,11 +386,9 @@ void METIS_mCPartGraphRecursive2(int *nvtxs, int *ncon, idxtype *xadj, idxtype *
        idxtype *vwgt, idxtype *adjwgt, int *wgtflag, int *numflag, int *nparts, 
        float *tpwgts, int *options, int *edgecut, idxtype *part)
 {
-  int i, j;
   GraphType graph;
   CtrlType ctrl;
   float *mytpwgts;
-  float avgwgt;
 
   if (*numflag == 1)
     Change2CNumbering(*nvtxs, xadj, adjncy);
@@ -445,7 +454,7 @@ printf("\n");
   IFSET(ctrl.dbglvl, DBG_TIME, PrintTimers(&ctrl));
 
   FreeWorkSpace(&ctrl, &graph);
-  GKfree((void *)&mytpwgts, LTERM);
+  GKfree((void *)&mytpwgts);
 
   if (*numflag == 1)
     Change2FNumbering(*nvtxs, xadj, adjncy, part);
@@ -483,7 +492,11 @@ int MCMlevelRecursiveBisection2(CtrlType *ctrl, GraphType *graph, int nparts,
     SplitGraphPart(ctrl, graph, &lgraph, &rgraph);
 
   /* Free the memory of the top level graph */
-  GKfree(&graph->gdata, &graph->nvwgt, &graph->rdata, &graph->label, &graph->npwgts, LTERM);
+  GKfree((void **)&graph->gdata);
+  GKfree((void **)&graph->nvwgt);
+  GKfree((void **)&graph->rdata);
+  GKfree((void **)&graph->label);
+  GKfree((void **)&graph->npwgts);
 
   /* Scale the fractions in the tpwgts according to the true weight */
   wsum = ssum(nparts/2, tpwgts);
@@ -497,7 +510,9 @@ int MCMlevelRecursiveBisection2(CtrlType *ctrl, GraphType *graph, int nparts,
   }
   else if (nparts == 3) {
     cut += MCMlevelRecursiveBisection2(ctrl, &rgraph, nparts-nparts/2, tpwgts+nparts/2, part, ubfactor, fpart+nparts/2);
-    GKfree(&lgraph.gdata, &lgraph.nvwgt, &lgraph.label, LTERM);
+    GKfree((void **)&lgraph.gdata);
+    GKfree((void **)&lgraph.nvwgt);
+    GKfree((void **)&lgraph.label);
   }
 
   return cut;

@@ -73,7 +73,7 @@ void RefineVolKWay(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int np
     if (graph == orggraph)
       break;
 
-    GKfree(&graph->gdata, LTERM);  /* Deallocate the graph related arrays */
+    GKfree((void **)&graph->gdata);  /* Deallocate the graph related arrays */
 
     graph = graph->finer;
 
@@ -130,10 +130,10 @@ void AllocateVolKWayPartitionMemory(CtrlType *ctrl, GraphType *graph, int nparts
 **************************************************************************/
 void ComputeVolKWayPartitionParams(CtrlType *ctrl, GraphType *graph, int nparts)
 {
-  int i, ii, j, k, kk, l, nvtxs, nbnd, mincut, minvol, me, other, pid; 
+  int i, j, k, nvtxs, mincut, me, other; 
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *pwgts, *where;
-  VRInfoType *rinfo, *myrinfo, *orinfo;
-  VEDegreeType *myedegrees, *oedegrees;
+  VRInfoType *rinfo, *myrinfo;
+  VEDegreeType *myedegrees;
 
   nvtxs = graph->nvtxs;
   xadj = graph->xadj;
@@ -212,7 +212,7 @@ stoptimer(ctrl->AuxTmr1);
 **************************************************************************/
 void ComputeKWayVolGains(CtrlType *ctrl, GraphType *graph, int nparts)
 {
-  int i, ii, j, k, kk, l, nvtxs, me, other, pid, myndegrees; 
+  int i, ii, j, k, kk, nvtxs, me, other, myndegrees; 
   idxtype *xadj, *vsize, *adjncy, *adjwgt, *where, *bndind, *bndptr, *ophtable;
   VRInfoType *rinfo, *myrinfo, *orinfo;
   VEDegreeType *myedegrees, *oedegrees;

@@ -18,7 +18,7 @@
 **************************************************************************/
 void Random_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses, int ffactor)
 {
-  int i, ii, iii, j, jj, k, l, pass, nvtxs, nmoves, nbnd, tvwgt, myndegrees; 
+  int i, ii, iii, j, k, pass, nvtxs, nmoves, nbnd, tvwgt, myndegrees; 
   int from, me, to, oldcut, vwgt, gain;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *bndptr, *bndind, *minwgt, *maxwgt, *itpwgts;
@@ -221,7 +221,7 @@ void Random_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *
 **************************************************************************/
 void Greedy_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses)
 {
-  int i, ii, iii, j, jj, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain; 
+  int i, ii, iii, j, k, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain; 
   int from, me, to, oldcut, vwgt;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *bndptr, *bndind, *minwgt, *maxwgt, *moved, *itpwgts;
@@ -451,7 +451,7 @@ void Greedy_KWayEdgeRefine(CtrlType *ctrl, GraphType *graph, int nparts, float *
 **************************************************************************/
 void Greedy_KWayEdgeBalance(CtrlType *ctrl, GraphType *graph, int nparts, float *tpwgts, float ubfactor, int npasses)
 {
-  int i, ii, iii, j, jj, k, l, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain, nmoves; 
+  int i, ii, j, k, pass, nvtxs, nbnd, tvwgt, myndegrees, oldgain, gain, nmoves; 
   int from, me, to, oldcut, vwgt;
   idxtype *xadj, *adjncy, *adjwgt;
   idxtype *where, *pwgts, *perm, *bndptr, *bndind, *minwgt, *maxwgt, *moved, *itpwgts;

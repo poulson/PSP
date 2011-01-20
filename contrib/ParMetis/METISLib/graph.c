@@ -21,7 +21,7 @@
 void SetUpGraph(GraphType *graph, int OpType, int nvtxs, int ncon,
        idxtype *xadj, idxtype *adjncy, idxtype *vwgt, idxtype *adjwgt, int wgtflag)
 {
-  int i, j, k, sum, gsize;
+  int i, j, sum, gsize;
   float *nvwgt;
   idxtype tvwgt[MAXNCON];
 
@@ -442,7 +442,9 @@ int IsConnectedSubdomain(CtrlType *ctrl, GraphType *graph, int pid, int report)
     printf("\n");
   }
 
-  GKfree(&touched, &queue, &cptr, LTERM);
+  GKfree(&touched);
+  GKfree(&queue);
+  GKfree(&cptr);
 
   return (ncmps == 1 ? 1 : 0);
 }
@@ -541,7 +543,9 @@ int IsConnected2(GraphType *graph, int report)
     printf("\n");
   }
 
-  GKfree(&touched, &queue, &cptr, LTERM);
+  GKfree(&touched);
+  GKfree(&queue);
+  GKfree(&cptr);
 
   return (ncmps == 1 ? 1 : 0);
 }

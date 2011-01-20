@@ -107,7 +107,8 @@ void PQueueFree(CtrlType *ctrl, PQueueType *queue)
   if (queue->type == 1) {
     if (queue->mustfree) {
       queue->buckets -= queue->ngainspan;  
-      GKfree(&queue->nodes, &queue->buckets, LTERM);
+      GKfree((void **)&queue->nodes);
+      GKfree((void **)&queue->buckets);
     } 
     else {
       idxwspacefree(ctrl, sizeof(ListNodeType *)*(queue->ngainspan+queue->pgainspan+1)/sizeof(idxtype));
@@ -137,7 +138,7 @@ int PQueueGetSize(PQueueType *queue)
 **************************************************************************/
 int PQueueInsert(PQueueType *queue, int node, int gain)
 {
-  int i, j, k;
+  int i, j;
   idxtype *locator;
   ListNodeType *newnode;
   KeyValueType *heap;
@@ -294,7 +295,6 @@ int PQueueUpdate(PQueueType *queue, int node, int oldgain, int newgain)
 {
   int i, j;
   idxtype *locator;
-  ListNodeType *newnode;
   KeyValueType *heap;
 
   if (oldgain == newgain) 

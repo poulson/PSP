@@ -169,7 +169,7 @@ void GENDUALMETIS(int nelmnts, int nvtxs, int etype, idxtype *elmnts, idxtype *d
 ******************************************************************************/
 void TRINODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxtype *dadjncy)
 {
-   int i, j, jj, k, kk, kkk, l, m, n, nedges;
+   int i, j, jj, k, kk, nedges;
    idxtype *nptr, *nind;
    idxtype *mark;
 
@@ -218,7 +218,7 @@ void TRINODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxt
 ******************************************************************************/
 void TETNODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxtype *dadjncy)
 {
-   int i, j, jj, k, kk, kkk, l, m, n, nedges;
+   int i, j, jj, k, kk, nedges;
    idxtype *nptr, *nind;
    idxtype *mark;
 
@@ -267,7 +267,7 @@ void TETNODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxt
 ******************************************************************************/
 void HEXNODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxtype *dadjncy)
 {
-   int i, j, jj, k, kk, kkk, l, m, n, nedges;
+   int i, j, jj, k, kk, nedges;
    idxtype *nptr, *nind;
    idxtype *mark;
    int table[8][3] = {1, 3, 4,
@@ -340,7 +340,7 @@ void HEXNODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxt
 ******************************************************************************/
 void QUADNODALMETIS(int nelmnts, int nvtxs, idxtype *elmnts, idxtype *dxadj, idxtype *dadjncy)
 {
-   int i, j, jj, k, kk, kkk, l, m, n, nedges;
+   int i, j, jj, k, kk, nedges;
    idxtype *nptr, *nind;
    idxtype *mark;
    int table[4][2] = {1, 3, 

@@ -121,7 +121,7 @@ void Mc_LocalMatch_HEM(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace)
   }
 
   CommInterfaceData(ctrl, graph, match, wspace->indices, match+nvtxs);
-  GKfree((void **)(&myhome), LTERM);
+  GKfree((void **)&myhome);
 
 #ifdef DEBUG_MATCH
   PrintVector2(ctrl, nvtxs, firstvtx, match, "Match1");
@@ -360,7 +360,8 @@ void Mc_Local_CreateCoarseGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType 
   idxcopy(cnedges, cadjwgt, cgraph->adjwgt);
 
   /* Note that graph->where works fine even if it is NULL */
-  GKfree((void **)&cadjncy, (void **)&graph->where, LTERM); 
+  GKfree((void **)&cadjncy);
+  GKfree((void **)&graph->where);
 
 }
 

@@ -84,9 +84,9 @@ void InitSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
 **************************************************************************/
 void GrowBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
 {
-  int i, j, k, nvtxs, drain, nleft, first, last, pwgts[2], minpwgt[2], maxpwgt[2], from, bestcut, icut, mincut, me, pass, nbfs;
+  int i, j, k, nvtxs, drain, nleft, first, last, pwgts[2], minpwgt[2], maxpwgt[2], bestcut, nbfs;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where;
-  idxtype *queue, *touched, *gain, *bestwhere;
+  idxtype *queue, *touched, *bestwhere;
 
 
   nvtxs = graph->nvtxs;
@@ -199,7 +199,9 @@ void GrowBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor
   graph->mincut = bestcut;
   idxcopy(nvtxs, bestwhere, where);
 
-  GKfree(&bestwhere, &queue, &touched, LTERM);
+  GKfree((void **)&bestwhere);
+  GKfree((void **)&queue);
+  GKfree((void **)&touched);
 }
 
 
@@ -212,9 +214,9 @@ void GrowBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor
 **************************************************************************/
 void GrowBisectionNode(CtrlType *ctrl, GraphType *graph, float ubfactor)
 {
-  int i, j, k, nvtxs, drain, nleft, first, last, pwgts[2], tpwgts[2], minpwgt[2], maxpwgt[2], from, bestcut, icut, mincut, me, pass, nbfs;
+  int i, j, k, nvtxs, drain, nleft, first, last, pwgts[2], tpwgts[2], minpwgt[2], maxpwgt[2], bestcut, nbfs;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where, *bndind;
-  idxtype *queue, *touched, *gain, *bestwhere;
+  idxtype *queue, *touched, *bestwhere;
 
   nvtxs = graph->nvtxs;
   xadj = graph->xadj;
@@ -337,7 +339,9 @@ void GrowBisectionNode(CtrlType *ctrl, GraphType *graph, float ubfactor)
 
   Compute2WayNodePartitionParams(ctrl, graph); 
 
-  GKfree(&bestwhere, &queue, &touched, LTERM);
+  GKfree((void **)&bestwhere);
+  GKfree((void **)&queue);
+  GKfree((void **)&touched);
 }
 
 
@@ -348,7 +352,7 @@ void GrowBisectionNode(CtrlType *ctrl, GraphType *graph, float ubfactor)
 **************************************************************************/
 void RandomBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfactor)
 {
-  int i, ii, j, k, nvtxs, pwgts[2], minpwgt[2], maxpwgt[2], from, bestcut, icut, mincut, me, pass, nbfs;
+  int i, ii, nvtxs, pwgts[2], minpwgt[2], maxpwgt[2], bestcut, nbfs;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *where;
   idxtype *perm, *bestwhere;
 
@@ -417,7 +421,8 @@ void RandomBisection(CtrlType *ctrl, GraphType *graph, int *tpwgts, float ubfact
   graph->mincut = bestcut;
   idxcopy(nvtxs, bestwhere, where);
 
-  GKfree(&bestwhere, &perm, LTERM);
+  GKfree((void **)&bestwhere);
+  GKfree((void **)&perm);
 }
 
 

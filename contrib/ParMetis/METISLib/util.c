@@ -28,7 +28,7 @@ void errexit(char *f_str,...)
 
   sprintf(out2, "Error! %s", out1);
 
-  fprintf(stdout, out2);
+  fprintf(stdout, "%s", out2);
   fflush(stdout);
 
   abort();
@@ -118,26 +118,14 @@ void *GKmalloc(int nbytes, char *msg)
 
 /*************************************************************************
 * This function is my wrapper around free, allows multiple pointers    
+* 
+* Modified by Jack Poulson on 2011/01/19 to only accept a single pointer.
 **************************************************************************/
-void GKfree(void **ptr1,...)
+void GKfree(void **ptr)
 {
-  va_list plist;
-  void **ptr;
-
-  if (*ptr1 != NULL)
-    free(*ptr1);
-  *ptr1 = NULL;
-
-  va_start(plist, ptr1);
-
-  /* while ((int)(ptr = va_arg(plist, void **)) != -1) { */
-  while ((ptr = va_arg(plist, void **)) != LTERM) {
-    if (*ptr != NULL)
-      free(*ptr);
-    *ptr = NULL;
-  }
-
-  va_end(plist);
+  if (*ptr != NULL)
+    free(*ptr);
+  *ptr = NULL;
 }            
 
 

@@ -246,7 +246,7 @@ void ParMETIS_V3_PartGeomKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
     rprintf(&ctrl, "  avg: %.3f\n", avg/(float)incon);
   }
 
-  GKfree((void **)&itpwgts, LTERM);
+  GKfree((void **)&itpwgts);
   FreeGraph(mgraph);
   FreeInitialGraphAndRemap(graph, iwgtflag, 1);
   FreeWSpace(&wspace);
@@ -322,7 +322,8 @@ void ParMETIS_V3_PartGeom(idxtype *vtxdist, int *ndims, float *xyz, idxtype *par
   FreeWSpace(&wspace);
   FreeCtrl(&ctrl);
 
-  GKfree((void **)&xadj, (void **)&adjncy, LTERM);
+  GKfree((void **)&xadj);
+  GKfree((void **)&adjncy);
 }
 
 

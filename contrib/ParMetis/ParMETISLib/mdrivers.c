@@ -107,7 +107,10 @@ void Mc_Global_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
     }
 
     if (graph->level != 0)
-      GKfree((void **)&graph->lnpwgts, (void **)&graph->gnpwgts, LTERM);
+    {
+      GKfree((void **)&graph->lnpwgts);
+      GKfree((void **)&graph->gnpwgts);
+    }
   }
 
   return;

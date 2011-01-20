@@ -4,14 +4,11 @@ targeting a working version sometime in March.
 On Shark, I am currently targeting the build process looking like:
     mkdir build
     cd build
-    cmake -DCMAKE_CXX_COMPILER=`which mpicxx` -DCMAKE_C_COMPILER=`which gcc` \
-          -DCMAKE_Fortran_COMPILER=`which gfortran` \
+    cmake -DCMAKE_CXX_COMPILER=`which mpicxx` \
+          -DCMAKE_C_COMPILER=`which mpicc` \
+          -DCMAKE_Fortran_COMPILER=`which mpif90` \
           -DINTEL_ROOT=/opt/intel/Compiler/11.1/072 ..
     make
 
-All C++ code requires an MPI compiler (our code) and all C and Fortran code 
-expects a serial compiler (i.e., MUMPS and ParMetis). This is somewhat kludgy, 
-but the next major release of CMake should support multi-language MPI 
-configurations so that we could avoid our ad-hoc mixture of MPI and non-MPI 
-compilers. 
+Each of the specified compilers should support MPI.
 

@@ -1,0 +1,8 @@
+file(GLOB_RECURSE METIS_C 
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.c")
+file(GLOB_RECURSE METIS_H 
+     RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "*.h")
+set(METIS_SRC "${METIS_C};${METIS_H}")
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}")
+add_library(metis STATIC ${METIS_SRC})

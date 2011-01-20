@@ -220,7 +220,9 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
       break;
   }
 
-  GKfree((void **)&minwgt, (void **)&maxwgt, (void **)&cand, LTERM);
+  GKfree((void **)&minwgt);
+  GKfree((void **)&maxwgt);
+  GKfree((void **)&cand);
 
   return;
 }
@@ -474,7 +476,9 @@ void SerialRemap(GraphType *graph, int nparts, idxtype *base, idxtype *scratch,
   for (i=0; i<nvtxs; i++)
     remap[i] = map[remap[i]];
 
-  GKfree((void **)&sortvtx, (void **)&flowto, (void **)&htable, LTERM);
+  GKfree((void **)&sortvtx);
+  GKfree((void **)&flowto);
+  GKfree((void **)&htable);
 }
 
 
@@ -694,7 +698,10 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
     FPQueueFree(&parts[i][1]);
   }
 
-  GKfree((void **)&cand, (void **)&qnum, (void **)&moved, (void **)&swaps, LTERM);
+  GKfree((void **)&cand);
+  GKfree((void **)&qnum);
+  GKfree((void **)&moved);
+  GKfree((void **)&swaps);
   return;
 }
 
@@ -990,7 +997,10 @@ void Mc_Serial_Balance2Way(GraphType *graph, float *tpwgts, float lbfactor)
     FPQueueFree(&parts[i][1]);
   }
 
-  GKfree((void **)&cand, (void **)&qnum, (void **)&moved, (void **)&swaps, LTERM);
+  GKfree((void **)&cand);
+  GKfree((void **)&qnum);
+  GKfree((void **)&moved);
+  GKfree((void **)&swaps);
   return;
 }
 
@@ -1121,7 +1131,8 @@ void Mc_Serial_Init2WayBalance(GraphType *graph, float *tpwgts)
     FPQueueFree(&parts[i][1]);
   }
 
-  GKfree((void **)&cand, (void **)&qnum, LTERM);
+  GKfree((void **)&cand);
+  GKfree((void **)&qnum);
 }
 
 

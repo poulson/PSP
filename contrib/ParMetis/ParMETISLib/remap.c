@@ -156,8 +156,8 @@ void ParallelTotalVReMap(CtrlType *ctrl, idxtype *lpwgts, idxtype *map,
     IFSET(ctrl->dbglvl, DBG_REMAP, rprintf(ctrl, "Savings from parallel remapping: %d\n", amax(0,gnsaved))); 
   }
 
-  GKfree((void **)&recv, (void **)&mylpwgts, LTERM);
-
+  GKfree((void **)&recv);
+  GKfree((void **)&mylpwgts);
 }
 
 

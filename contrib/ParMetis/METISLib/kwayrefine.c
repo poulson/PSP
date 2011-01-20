@@ -71,7 +71,7 @@ void RefineKWay(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int npart
     if (graph == orggraph)
       break;
 
-    GKfree(&graph->gdata, LTERM);  /* Deallocate the graph related arrays */
+    GKfree((void **)&graph->gdata);  /* Deallocate the graph related arrays */
 
     graph = graph->finer;
 
@@ -103,7 +103,10 @@ void RefineKWay(CtrlType *ctrl, GraphType *orggraph, GraphType *graph, int npart
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->AuxTmr2));
 
   if (mustfree) 
-    GKfree(&graph->vwgt, &graph->adjwgt, LTERM);
+  {
+    GKfree((void **)&graph->vwgt);
+    GKfree((void **)&graph->adjwgt);
+  }
 
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->UncoarsenTmr));
 }
@@ -140,7 +143,7 @@ void AllocateKWayPartitionMemory(CtrlType *ctrl, GraphType *graph, int nparts)
 **************************************************************************/
 void ComputeKWayPartitionParams(CtrlType *ctrl, GraphType *graph, int nparts)
 {
-  int i, j, k, l, nvtxs, nbnd, mincut, me, other;
+  int i, j, k, nvtxs, nbnd, mincut, me, other;
   idxtype *xadj, *vwgt, *adjncy, *adjwgt, *pwgts, *where, *bndind, *bndptr;
   RInfoType *rinfo, *myrinfo;
   EDegreeType *myedegrees;
@@ -328,7 +331,7 @@ void ProjectKWayPartition(CtrlType *ctrl, GraphType *graph, int nparts)
 **************************************************************************/
 int IsBalanced(idxtype *pwgts, int nparts, float *tpwgts, float ubfactor)
 {
-  int i, j, tvwgt;
+  int i, tvwgt;
 
   tvwgt = idxsum(nparts, pwgts);
   for (i=0; i<nparts; i++) {

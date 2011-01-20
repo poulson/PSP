@@ -149,8 +149,12 @@ void ParMETIS_V3_RefineKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy,
   /*************************************/
   /* Free memory, renumber, and return */
   /*************************************/
-  GKfree((void **)&graph->lnpwgts, &graph->gnpwgts, &graph->nvwgt, &graph->home, 
-      &graph->vsize, &itpwgts, LTERM);
+  GKfree((void **)&graph->lnpwgts);
+  GKfree((void **)&graph->gnpwgts);
+  GKfree((void **)&graph->nvwgt);
+  GKfree((void **)&graph->home);
+  GKfree((void **)&graph->vsize);
+  GKfree((void **)&itpwgts);
 
   FreeInitialGraphAndRemap(graph, iwgtflag, 1);
   FreeWSpace(&wspace);

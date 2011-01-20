@@ -249,7 +249,9 @@ void PartSort(CtrlType *ctrl, GraphType *graph, KeyValueType *elmnts, WorkSpaceT
   }
 
 
-  GKfree((void **)&mypicks, (void **)&allpicks, (void **)&perm, LTERM);
+  GKfree((void **)&mypicks);
+  GKfree((void **)&allpicks);
+  GKfree((void **)&perm);
   if (wspace->nlarge < nrecv)
     free(relmnts);
 

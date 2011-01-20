@@ -588,10 +588,21 @@ void Mc_KWayFM(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int npas
     printf("niters: %d, nswaps: %d, nzgswaps: %d\n", pass+1, gnswaps, gnzgswaps);
 */
 
-  GKfree((void **)&badmaxpwgt, (void **)&update, (void **)&nupds_pe, (void **)&htable, LTERM);
-  GKfree((void **)&changed, (void **)&pperm, (void **)&perm, (void **)&moved, LTERM);
-  GKfree((void **)&pgnpwgts, (void **)&ognpwgts, (void **)&overfill, (void **)&movewgts, LTERM);
-  GKfree((void **)&tmp_where, (void **)&tmp_rinfo, (void **)&tmp_edegrees, LTERM);
+  GKfree((void **)&badmaxpwgt);
+  GKfree((void **)&update);
+  GKfree((void **)&nupds_pe);
+  GKfree((void **)&htable);
+  GKfree((void **)&changed);
+  GKfree((void **)&pperm);
+  GKfree((void **)&perm);
+  GKfree((void **)&moved);
+  GKfree((void **)&pgnpwgts);
+  GKfree((void **)&ognpwgts);
+  GKfree((void **)&overfill);
+  GKfree((void **)&movewgts);
+  GKfree((void **)&tmp_where);
+  GKfree((void **)&tmp_rinfo);
+  GKfree((void **)&tmp_edegrees);
 
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->KWayTmr));
 }

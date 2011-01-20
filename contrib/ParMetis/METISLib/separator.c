@@ -20,7 +20,7 @@
 **************************************************************************/
 void ConstructSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
 {
-  int i, j, k, nvtxs, nbnd;
+  int i, j, nvtxs, nbnd;
   idxtype *xadj, *where, *bndind;
 
   nvtxs = graph->nvtxs;
@@ -37,7 +37,7 @@ void ConstructSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor)
       where[j] = 2;
   }
 
-  GKfree(&graph->rdata, LTERM);
+  GKfree((void **)&graph->rdata);
   Allocate2WayNodePartitionMemory(ctrl, graph);
   idxcopy(nvtxs, where, graph->where);
   idxwspacefree(ctrl, nvtxs);
@@ -143,7 +143,8 @@ void ConstructMinCoverSeparator0(CtrlType *ctrl, GraphType *graph, float ubfacto
       where[j] = 2;
     }
 
-    GKfree(&bxadj, &badjncy, LTERM);
+    GKfree((void **)&bxadj);
+    GKfree((void **)&badjncy);
 
     for (i=0; i<nbnd; i++)
       bndptr[bndind[i]] = -1;
@@ -258,7 +259,8 @@ void ConstructMinCoverSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor
       where[j] = 2;
     }
 
-    GKfree(&bxadj, &badjncy, LTERM);
+    GKfree((void **)&bxadj);
+    GKfree((void **)&badjncy);
   }
   else {
     IFSET(ctrl->dbglvl, DBG_SEPINFO,
@@ -267,7 +269,7 @@ void ConstructMinCoverSeparator(CtrlType *ctrl, GraphType *graph, float ubfactor
 
   /* Prepare to refine the vertex separator */
   idxcopy(nvtxs, graph->where, vmap);
-  GKfree(&graph->rdata, LTERM);
+  GKfree((void **)&graph->rdata);
 
   Allocate2WayNodePartitionMemory(ctrl, graph);
   idxcopy(nvtxs, vmap, graph->where);

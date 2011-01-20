@@ -336,7 +336,11 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
       FPQueueFree(queues+i+nqueues);
     }
 
-  GKfree((void **)&hval, (void **)&nvpq, (void **)&ptr, (void **)&inq, (void **)&queues, LTERM);
+  GKfree((void **)&hval);
+  GKfree((void **)&nvpq);
+  GKfree((void **)&ptr);
+  GKfree((void **)&inq);
+  GKfree((void **)&queues);
   return nswaps;
 }
 

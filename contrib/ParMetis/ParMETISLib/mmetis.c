@@ -14,7 +14,6 @@
 
 #include <parmetislib.h>
 
-
 /***********************************************************************************
 * This function is the entry point of the parallel k-way multilevel mesh partitionioner. 
 * This function assumes nothing about the mesh distribution.
@@ -25,7 +24,7 @@ void ParMETIS_V3_PartMeshKway(idxtype *elmdist, idxtype *eptr, idxtype *eind, id
 		 float *tpwgts, float *ubvec, int *options, int *edgecut, idxtype *part, 
 		 MPI_Comm *comm)
 {
-  int i, nvtxs, nedges, gnedges, npes, mype;
+  int nvtxs, nedges, npes, mype;
   idxtype *xadj, *adjncy;
   timer TotalTmr, Mesh2DualTmr, ParMETISTmr;
   CtrlType ctrl;
@@ -87,7 +86,8 @@ void ParMETIS_V3_PartMeshKway(idxtype *elmdist, idxtype *eptr, idxtype *eind, id
   IFSET(ctrl.dbglvl, DBG_TIME, PrintTimer(&ctrl, ParMETISTmr,	"    ParMETIS"));
   IFSET(ctrl.dbglvl, DBG_TIME, PrintTimer(&ctrl, TotalTmr,	"       Total"));
 
-  GKfree((void **)&xadj, (void **)&adjncy, LTERM);
+  GKfree((void **)&xadj);
+  GKfree((void **)&adjncy);
 
   FreeCtrl(&ctrl);
 

@@ -92,7 +92,9 @@ void PartitionSmallGraph(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
       lnpwgts[me*ncon+h] += graph->nvwgt[i*ncon+h];
   }
   MPI_Allreduce((void *)lnpwgts, (void *)gnpwgts, nparts*ncon, MPI_FLOAT, MPI_SUM, ctrl->comm);
-  GKfree((void**)&mypart, (void**)&sendcounts, (void**)&displs, LTERM);
+  GKfree((void**)&mypart);
+  GKfree((void**)&sendcounts);
+  GKfree((void**)&displs);
   FreeGraph(agraph);
 
   return;

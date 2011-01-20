@@ -15,8 +15,6 @@
 #define METISTITLE              "  METIS 4.0   Copyright 1998, Regents of the University of Minnesota\n\n"
 #define MAXLINE			1280000
 
-#define LTERM			(void **) 0	/* List terminator for GKfree() */
-
 #define MAXNCON			16		/* The maximum number of constrains */
 #define MAXNOBJ			16		/* The maximum number of objectives */
 

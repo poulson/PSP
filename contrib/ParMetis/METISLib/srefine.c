@@ -88,7 +88,7 @@ void Allocate2WayNodePartitionMemory(CtrlType *ctrl, GraphType *graph)
 **************************************************************************/
 void Compute2WayNodePartitionParams(CtrlType *ctrl, GraphType *graph)
 {
-  int i, j, k, l, nvtxs, nbnd;
+  int i, j, nvtxs, nbnd;
   idxtype *xadj, *adjncy, *adjwgt, *vwgt;
   idxtype *where, *pwgts, *bndind, *bndptr, *edegrees;
   NRInfoType *rinfo;
@@ -143,7 +143,7 @@ void Compute2WayNodePartitionParams(CtrlType *ctrl, GraphType *graph)
 **************************************************************************/
 void Project2WayNodePartition(CtrlType *ctrl, GraphType *graph)
 {
-  int i, j, nvtxs;
+  int i, nvtxs;
   idxtype *cmap, *where, *cwhere;
   GraphType *cgraph;
 

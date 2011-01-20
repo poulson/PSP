@@ -49,7 +49,8 @@ void Mc_ComputeSerialBalance(CtrlType *ctrl, GraphType *graph, idxtype *where, f
     ubvec[j] = maximb;
   }
 
-  GKfree((void **)&pwgts, (void **)&tvwgts, LTERM);
+  GKfree((void **)&pwgts);
+  GKfree((void **)&tvwgts);
 }
 
 
@@ -94,7 +95,8 @@ void Mc_ComputeParallelBalance(CtrlType *ctrl, GraphType *graph, idxtype *where,
     ubvec[j] = maximb;
   }
 
-  GKfree((void **)&lnpwgts, (void **)&gnpwgts, LTERM);
+  GKfree((void **)&lnpwgts);
+  GKfree((void **)&gnpwgts);
 
   return;
 }
@@ -327,6 +329,13 @@ void Mc_ComputeRefineStats(CtrlType *ctrl, GraphType *graph, float *ubvec)
   if (mype == 0) printf("******************************\n");
   if (mype == 0) printf("******************************\n");
 
-  GKfree((void **)&gconnect, (void **)&connect, (void **)&gborder, (void **)&border, (void **)&gfrom, (void **)&from, (void **)&gto, (void **)&to, LTERM);
+  GKfree((void **)&gconnect);
+  GKfree((void **)&connect);
+  GKfree((void **)&gborder);
+  GKfree((void **)&border);
+  GKfree((void **)&gfrom);
+  GKfree((void **)&from);
+  GKfree((void **)&gto);
+  GKfree((void **)&to);
   return;
 }

@@ -14,7 +14,10 @@
 
 #include <parmetislib.h>
 
-
+/* Modified by Jack Poulson on 2011/01/19 to avoid implicit function
+   declarations */
+MeshType* CreateMesh();
+void InitMesh( MeshType* );
 
 /*************************************************************************
 * This function setsup the CtrlType structure

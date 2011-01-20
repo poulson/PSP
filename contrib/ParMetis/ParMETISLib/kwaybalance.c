@@ -446,9 +446,16 @@ void Mc_KWayBalance(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace, int
     printf("niters: %d, nswaps: %d\n", pass+1, gnswaps);
 */
 
-  GKfree((void **)&badmaxpwgt, (void **)&update, (void **)&nupds_pe, (void **)&htable, LTERM);
-  GKfree((void **)&changed, (void **)&pperm, (void **)&perm, (void **)&moved, LTERM);
-  GKfree((void **)&tmp_where, (void **)&tmp_rinfo, (void **)&tmp_edegrees, LTERM);
+  GKfree((void **)&badmaxpwgt);
+  GKfree((void **)&update);
+  GKfree((void **)&nupds_pe);
+  GKfree((void **)&htable);
+  GKfree((void **)&changed);
+  GKfree((void **)&pperm);
+  GKfree((void **)&moved);
+  GKfree((void **)&tmp_where);
+  GKfree((void **)&tmp_rinfo);
+  GKfree((void **)&tmp_edegrees);
 
   IFSET(ctrl->dbglvl, DBG_TIME, stoptimer(ctrl->KWayTmr));
 }

@@ -169,7 +169,7 @@ MPI_Comm_rank(MPI_COMM_WORLD, &mype);
 
   idxcopy(nvtxs, selectwhere, where);
 
-  GKfree((void **)&rdata, LTERM);
+  GKfree((void **)&rdata);
   return;
 }
 

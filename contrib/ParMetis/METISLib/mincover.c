@@ -115,7 +115,11 @@ void MinCover(idxtype *xadj, idxtype *adjncy, int asize, int bsize, idxtype *cov
 
   MinCover_Decompose(xadj, adjncy, asize, bsize, mate, cover, csize);
 
-  GKfree(&mate, &flag, &level, &queue, &lst, LTERM);
+  GKfree((void **)&mate);
+  GKfree((void **)&flag);
+  GKfree((void **)&level);
+  GKfree((void **)&queue);
+  GKfree((void **)&lst);
 
 }
 

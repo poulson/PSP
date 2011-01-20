@@ -162,7 +162,10 @@ void ParMETIS_V3_PartKway(idxtype *vtxdist, idxtype *xadj, idxtype *adjncy, idxt
     rprintf(&ctrl, "  avg: %.3f\n", avg/(float)incon);
   }
 
-  GKfree((void **)&itpwgts, (void **)&graph->lnpwgts, (void **)&graph->gnpwgts, (void **)&graph->nvwgt, LTERM);
+  GKfree((void **)&itpwgts);
+  GKfree((void **)&graph->lnpwgts);
+  GKfree((void **)&graph->gnpwgts);
+  GKfree((void **)&graph->nvwgt);
   FreeInitialGraphAndRemap(graph, iwgtflag, 1);
   FreeWSpace(&wspace);
   FreeCtrl(&ctrl);
@@ -267,7 +270,10 @@ void Mc_Global_Partition(CtrlType *ctrl, GraphType *graph, WorkSpaceType *wspace
     }
 
     if (graph->level != 0)
-      GKfree((void **)&graph->lnpwgts, (void **)&graph->gnpwgts, LTERM);
+    {
+      GKfree((void **)&graph->lnpwgts);
+      GKfree((void **)&graph->gnpwgts);
+    }
   }
 
   return;

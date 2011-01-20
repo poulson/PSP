@@ -56,7 +56,7 @@ void MocInit2WayPartition2(CtrlType *ctrl, GraphType *graph, float *tpwgts, floa
 **************************************************************************/
 void MocGrowBisection2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
 {
-  int i, j, k, nvtxs, ncon, from, bestcut, mincut, nbfs;
+  int nvtxs, bestcut, nbfs;
   idxtype *bestwhere, *where;
 
   nvtxs = graph->nvtxs;
@@ -92,7 +92,7 @@ void MocGrowBisection2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *u
   graph->mincut = bestcut;
   idxcopy(nvtxs, bestwhere, where);
 
-  GKfree(&bestwhere, LTERM);
+  GKfree((void **)&bestwhere);
 }
 
 
@@ -107,7 +107,7 @@ void MocGrowBisection2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *u
 **************************************************************************/
 void MocGrowBisectionNew2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
 {
-  int i, j, k, nvtxs, ncon, from, bestcut, mincut, nbfs;
+  int nvtxs, bestcut, nbfs;
   idxtype *bestwhere, *where;
 
   nvtxs = graph->nvtxs;
@@ -140,7 +140,7 @@ void MocGrowBisectionNew2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float
   graph->mincut = bestcut;
   idxcopy(nvtxs, bestwhere, where);
 
-  GKfree(&bestwhere, LTERM);
+  GKfree((void **)&bestwhere);
 }
 
 
@@ -155,7 +155,7 @@ void MocGrowBisectionNew2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float
 **************************************************************************/
 void MocInit2WayBalance2(CtrlType *ctrl, GraphType *graph, float *tpwgts, float *ubvec)
 {
-  int i, ii, j, k, l, kwgt, nvtxs, nbnd, ncon, nswaps, from, to, pass, me, cnum, tmp, imin;
+  int i, ii, j, k, l, kwgt, nvtxs, nbnd, ncon, nswaps, from, to, cnum, tmp, imin;
   idxtype *xadj, *adjncy, *adjwgt, *where, *id, *ed, *bndptr, *bndind;
   idxtype *moved, *perm, *qnum;
   float *nvwgt, *npwgts, minwgt;

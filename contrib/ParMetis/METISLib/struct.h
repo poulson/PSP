@@ -23,7 +23,8 @@ typedef short idxtype;
 #endif
 #endif
 
-#define MAXIDX	(1<<8*sizeof(idxtype)-2)
+/* Jack Poulson add parenthesis around 8*sizeof(idxtype)-2 for clarity */
+#define MAXIDX	(1<<(8*sizeof(idxtype)-2))
 
 
 /*************************************************************************

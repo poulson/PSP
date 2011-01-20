@@ -44,8 +44,6 @@
 #define MAX_NCON_FOR_DIFFUSION  2
 #define SMALLGRAPH              10000
 
-#define LTERM                   (void **) 0     /* List terminator for GKfree() */
-
 #define NGD_PASSES		20
 
 #define OPTION_IPART		1

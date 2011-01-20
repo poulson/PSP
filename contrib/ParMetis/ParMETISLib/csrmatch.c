@@ -83,6 +83,6 @@ void CSR_Match_SHEM(MatrixType *matrix, idxtype *match, idxtype *mlist,
     }
   }
 
-  GKfree((void **)&links, LTERM);
+  GKfree((void **)&links);
 }
 

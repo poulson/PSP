@@ -122,7 +122,12 @@ void Mc_ComputeMoveStatistics(CtrlType *ctrl, GraphType *graph, int *nmoved, int
     lstart[i] = gend[i]+gleft[i]-gstart[i];
   *maxin = lstart[idxamax(nparts, lstart)];
 
-  GKfree((void **)&lstart, (void **)&gstart, (void **)&lleft, (void **)&gleft, (void **)&lend, (void **)&gend, LTERM);
+  GKfree((void **)&lstart);
+  GKfree((void **)&gstart);
+  GKfree((void **)&lleft);
+  GKfree((void **)&gleft);
+  GKfree((void **)&lend);
+  GKfree((void **)&gend);
 }
 
 /*************************************************************************
