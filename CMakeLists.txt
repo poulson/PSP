@@ -95,23 +95,19 @@ if(NEED_MATH)
     # TODO: Add appropriate BLACS/ScaLAPACK libs
     set(REFERENCE_REQUIRED SCALAPACK BLACS BLACSF LAPACK BLAS)
     find_library(BLAS_LIB
-                 NAMES libblas.a blas.a libblas.so blas.so blas.lib 
+                 NAMES blas
                  PATHS ${REFERENCE_ROOT})
     find_library(LAPACK_LIB
-                 NAMES libreflapack.a reflapack.a libreflapack.so reflapack.so
-                       liblapack.a lapack.a liblapack.so lapack.so 
-                       lapack.lib 
+                 NAMES lapack reflapack
                  PATHS ${REFERENCE_ROOT})
     find_library(BLACSF_LIB
-                 NAMES libblacsF77.a blacsF77.a libblacsF77.so blacsF77.so 
-                       blacs.lib
+                 NAMES blacsF77 blacsF77init
                  PATHS ${REFERENCE_ROOT})
     find_library(BLACS_LIB
-                 NAMES libblacs.a blacs.a libblacs.so blacs.so blacs.lib
+                 NAMES blacs
                  PATHS ${REFERENCE_ROOT})
     find_library(SCALAPACK_LIB
-                 NAMES libscalapack.a scalapack.a libscalapack.so scalapack.so 
-                       scalapack.lib
+                 NAMES scalapack
                  PATHS ${REFERENCE_ROOT})
     set(REFERENCE_FOUND ON)
     set(MATH_LIBS "")
