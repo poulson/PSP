@@ -49,35 +49,42 @@ if(NEED_MATH)
       MKL_INTEL MKL_SEQUENTIAL MKL_CORE MKL_SEQUENTIAL GUIDE IOMP5 PTHREAD)
   find_library(PTHREAD_LIB pthread)
   find_library(IOMP5_LIB 
-               NAMES libiomp5.a PATHS ${INTEL_ROOT}
+               NAMES libiomp5.a iomp5.lib 
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${INTEL_ARCH_SUBDIRS})
   find_library(GUIDE_LIB 
-               NAMES libguide.a PATHS ${INTEL_ROOT}
+               NAMES libguide.a guide.lib
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${INTEL_ARCH_SUBDIRS})
   find_library(MKL_CORE_LIB 
-               NAMES libmkl_core.a PATHS ${INTEL_ROOT}
+               NAMES libmkl_core.a mkl_core.lib
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   find_library(MKL_SEQUENTIAL_LIB 
-               NAMES libmkl_sequential.a PATHS ${INTEL_ROOT}
+               NAMES libmkl_sequential.a mkl_sequential.lib
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   find_library(MKL_INTEL_LIB 
-               NAMES libmkl_intel_lp64.a PATHS ${INTEL_ROOT}
+               NAMES libmkl_intel_lp64.a mkl_intel_lp64.lib
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   find_library(MKL_BLACS_LIB 
-               NAMES libmkl_blacs_lp64.a PATHS ${INTEL_ROOT}
+               NAMES libmkl_blacs_lp64.a mkl_blacs_lp64.lib
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   find_library(MKL_SCALAPACK_LIB 
-               NAMES libmkl_scalapack_lp64.a PATHS ${INTEL_ROOT}
+               NAMES libmkl_scalapack_lp64.a mkl_scalapack_lp64.lib
+               PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
-  set(MKL_FOUND ON)
+  set(MKL_FOUND TRUE)
   set(MATH_LIBS "")
   foreach(NAME ${MKL_REQUIRED})
     if( ${NAME}_LIB )
       message(STATUS "Found ${NAME}_LIB: ${${NAME}_LIB}")
       list(APPEND MATH_LIBS ${${NAME}_LIB})
     else( ${NAME}_LIB )
-      message(STATUS "Could not find ${NAME}_LIB: ${${NAME}_LIB}")
-      set(MKL_FOUND OFF)
+      message(STATUS "Could not find ${NAME}_LIB")
+      set(MKL_FOUND FALSE)
     endif( ${NAME}_LIB )
   endforeach(NAME)
   if(MKL_FOUND)
@@ -88,16 +95,17 @@ if(NEED_MATH)
     # TODO: Add appropriate BLACS/ScaLAPACK libs
     set(REFERENCE_REQUIRED SCALAPACK BLACS BLACSF LAPACK BLAS)
     find_library(BLAS_LIB
-                 NAMES libblas.a blas.a blas.lib 
+                 NAMES libblas.a blas.a libblas.so blas.so blas.lib 
                  PATHS ${REFERENCE_ROOT})
     find_library(LAPACK_LIB
-                 NAMES liblapack.a lapack.a lapack.lib 
+                 NAMES liblapack.a lapack.a liblapack.so lapack.so lapack.lib 
                  PATHS ${REFERENCE_ROOT})
     find_library(BLACSF_LIB
-                 NAMES libblacs.a blacs.a blacs.lib
+                 NAMES libblacs.a blacs.a libblacs.so blacs.so blacs.lib
                  PATHS ${REFERENCE_ROOT})
     find_library(SCALAPACK_LIB
-                 NAMES libscalapack.a scalapack.a scalapack.lib
+                 NAMES libscalapack.a scalapack.a libscalapack.so scalapack.so 
+                       scalapack.lib
                  PATHS ${REFERENCE_ROOT})
     set(REFERENCE_FOUND ON)
     set(MATH_LIBS "")
@@ -106,7 +114,7 @@ if(NEED_MATH)
         message(STATUS "Found ${NAME}_LIB: ${${NAME}_LIB}")
         list(APPEND MATH_LIBS ${${NAME}_LIB})
       else( ${NAME}_LIB )
-        message(STATUS "Could not find ${NAME}_LIB: ${${NAME}_LIB}")
+        message(STATUS "Could not find ${NAME}_LIB")
         set(REFERENCE_FOUND OFF)
       endif( ${NAME}_LIB )
     endforeach(NAME)
