@@ -191,20 +191,20 @@ set(SWEEPER_SRC "${SWEEPER_CPP};${SWEEPER_HEADERS}")
 
 # Create a dummy library in order to be able to force the math libraries
 # to be linked last
-#add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
-#target_link_libraries(cmake-dummy-lib ${MATH_LIBS})
+add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
+target_link_libraries(cmake-dummy-lib ${MATH_LIBS})
 
 # Copy the headers into the build directory
-#foreach(HEADER ${SWEEPER_HEADERS})
-#  add_custom_command(
-#    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
-#    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
-#            ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
-#  )
-#endforeach(HEADER)
+foreach(HEADER ${SWEEPER_HEADERS})
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
+            ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
+  )
+endforeach(HEADER)
 
 # Make sure the Sweeper headers can be found
-#include_directories("${PROJECT_BINARY_DIR}/include")
+include_directories("${PROJECT_BINARY_DIR}/include")
 
 # Build the main library
 #add_library(sweeper STATIC ${SWEEPER_SRC})
