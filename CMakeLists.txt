@@ -98,9 +98,15 @@ if(NEED_MATH)
                  NAMES libblas.a blas.a libblas.so blas.so blas.lib 
                  PATHS ${REFERENCE_ROOT})
     find_library(LAPACK_LIB
-                 NAMES liblapack.a lapack.a liblapack.so lapack.so lapack.lib 
+                 NAMES libreflapack.a reflapack.a libreflapack.so reflapack.so
+                       liblapack.a lapack.a liblapack.so lapack.so 
+                       lapack.lib 
                  PATHS ${REFERENCE_ROOT})
     find_library(BLACSF_LIB
+                 NAMES libblacsF77.a blacsF77.a libblacsF77.so blacsF77.so 
+                       blacs.lib
+                 PATHS ${REFERENCE_ROOT})
+    find_library(BLACS_LIB
                  NAMES libblacs.a blacs.a libblacs.so blacs.so blacs.lib
                  PATHS ${REFERENCE_ROOT})
     find_library(SCALAPACK_LIB
@@ -121,10 +127,11 @@ if(NEED_MATH)
     message(STATUS "REFERENCE_FOUND=${REFERENCE_FOUND}")
     if(REFERENCE_FOUND)
       message(STATUS "WARNING: Using reference BLAS/LAPACK/BLACS/ScaLAPACK.")
+      message(STATUS "MATH_LIBS=${MATH_LIBS}")
     else(REFERENCE_FOUND)
       set(MATH_LIBS "" CACHE STRING ${MATH_DESC})
       message(FATAL_ERROR 
-        "Could not find BLAS/LAPACK/BLACS/ScaLAPACK libs. Please manually specify MATH_LIBS.")
+        "Could not find BLAS/LAPACK/BLACS/ScaLAPACK libs. Please provide the root directory of MKL with -DMKL_ROOT, the directory of reference implementations with -DREFERENCE_ROOT, or manually specify all math libraries with -DMATH_LIBS. There are numerous idiosyncratic library dependencies for BLAS/LAPACK/BLACS/ScaLAPACK, so you will almost certainly need to manually specify -DMATH_LIBS.")
     endif(REFERENCE_FOUND)
   endif(MKL_FOUND)
   # Append the standard math libraries to the link list.
