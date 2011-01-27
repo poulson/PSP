@@ -31,6 +31,8 @@
 #ifndef SWEEPER_FINITE_DIFFERENCE_CONTROL_H
 #define SWEEPER_FINITE_DIFFERENCE_CONTROL_H 1
 
+namespace sweeper {
+
 enum BoundaryCondition { PML, DIRICHLET };
 enum FiniteDifferenceStencil { SEVEN_POINT, TWENTY_SEVEN_POINT }
 
@@ -41,12 +43,12 @@ enum FiniteDifferenceStencil { SEVEN_POINT, TWENTY_SEVEN_POINT }
 //                /              /|
 //            y  /              / |
 //              /              /  |
-//             /______________/   |
-//             |              |   |
-//             |              |   / (wx,wy,0)
-//           z |              |  /  
-//             |              | /  
-//             |______________|/
+// sweep dir.  /______________/   |
+//     /\      |              |   |
+//     ||      |              |   / (wx,wy,0)
+//     ||    z |              |  /  
+//     ||      |              | /  
+//     ||      |______________|/
 //          (0,0,0)    x    (wx,0,0)
 //
 // PML must be enforced at least on the bottom face, and the remaining faces 
@@ -80,5 +82,7 @@ struct FiniteDifferenceControl
     BoundaryCondition topBC;
     // The bottom boundary condition must be PML since we are sweeping from it.
 };
+
+} // namespace sweeper
 
 #endif // SWEEPER_FINITE_DIFFERENCE_CONTROL_H
