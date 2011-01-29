@@ -59,11 +59,31 @@ main( int argc, char* argv[] )
     control.leftBC = sweeper::PML;
     control.topBC = sweeper::PML;
 
+    // Go ahead and define the number of degrees of freedom
+    const int n = control.nx * control.ny * control.nz;
+
+    // Create a handle for an instance of MUMPS
+    sweeper::ZMumpsHandle handle;
+    sweeper::ZMumpsInit( handle );
+
     // Perform the analysis step
     if( rank == 0 )
     {
-        // Compute total number of nonzeros in the lower triangle
-        // int nz = ...
+        // Compute total number of nonzeros in the lower triangle.
+        // There is certainly a faster way to compute this, but this will do
+        // for now.
+        int nz = 0;
+        for( int vtx=0; vtx<nvtxs; ++vtx )
+        {
+            const int i = vtx % control.nx;
+            const int j = (vtx/control.nx) % control.ny;
+            const int k = vtx/(control.nx*control.ny);
+
+            ++nz;              // count connection to self
+            if( i != 0 ) ++nz; // count connection to (i-1,j,k)
+            if( j != 0 ) ++nz; // count connection to (i,j-1,k)
+            if( k != 0 ) ++nz; // count connection to (i,j,k-1)
+        }
 
         // Allocate vectors for storing the row and column indices
         std::vector<int> rowIndices(nz);
@@ -111,29 +131,71 @@ main( int argc, char* argv[] )
             }
         }
 
-        // Call the analysis phase of MUMPS
+        // Call the analysis phase of MUMPS (use ParMetis for now)
+        ZMumpsHostAnalysisWithMetisOrdering
+        ( handle, &rowIndices[0], &colIndices[0] );
     }
     else
     {
-        // Call the analysis phase of MUMPS with dummy IRN/JCN arrays
+        // Call the slave analysis routine
+        ZMumpsSlaveAnalysisWithMetisOrdering( handle );
     }
 
-    // Create local portion of distributed matrix
+    // Create local portion of distributed matrix and then factor it
+    int numLocalPivots;
+    {
+        // int numLocalEntries = ...
+        std::vector<int> localRowIndices(numLocalEntries);
+        std::vector<int> localColIndices(numLocalEntries);
+        std::vector<DComplex> localA(numLocalEntries);
+        // TODO: Fill local row indices...
+        // TODO: Fill local col indices...
 
-    // Factor
-    // Call the factorization phase of MUMPS
+        // Factor
+        numLocalPivots = 
+            ZMumpsFactorization
+            ( handle, numLocalEntries, &localRowIndices[0], &localColIndices[0],
+              &localA[0] );
+    }
     
-    // Solve with one RHS
-    // Call the solve phase of MUMPS
+    // Solve with various numbers of RHS
+    for( int numRhs = 1; numRhs <= 100; numRhs *= 10 )
+    {
+        // Allocate space for the solution
+        std::vector<DComplex> localSolutions(numRhs*numLocalPivots);
+        std::vector<int> localIntegers(numLocalPivots);
 
-    // Solve with 10 RHS
-    // Call the solve phase of MUMPS
+        if( rank == 0 )
+        {
+            // Allocate and fill the 10 RHS
+            std::vector<DComplex> rhs(numRhs*n);
+            for( int i=0; i<numRhs*n; ++i )
+            {
+                // Just set each RHS to be e1
+                if( i % n == 0 )
+                {
+                    rhs[i].r = 1;
+                    rhs[i].i = 0;
+                }
+                else
+                {
+                    rhs[i].r = 0;
+                    rhs[i].i = 0;
+                }
+            }
 
-    // Solve with 100 RHS
-    // Call the solve phase of MUMPS
+            ZMumpsHostSolve
+            ( numRhs, rhsBuffer, n, localSolutionBuffer, numLocalPivots,
+              localIntegerBuffer );
+        }
+        else
+        {
+            ZMumpsSlaveSolve( localSolutionBuffer, numLocalPivots );
+        }
+    }
 
-    // Solve with 1000 RHS
-    // Call the solve phase of MUMPS
+    // Finalize our MUMPS instance
+    ZMumpsFinalize( handle );
 
     MPI_Finalize();
     return 0;
