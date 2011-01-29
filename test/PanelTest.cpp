@@ -132,13 +132,13 @@ main( int argc, char* argv[] )
         }
 
         // Call the analysis phase of MUMPS (use ParMetis for now)
-        ZMumpsHostAnalysisWithMetisOrdering
+        sweeper::ZMumpsHostAnalysisWithMetisOrdering
         ( handle, &rowIndices[0], &colIndices[0] );
     }
     else
     {
         // Call the slave analysis routine
-        ZMumpsSlaveAnalysisWithMetisOrdering( handle );
+        sweeper::ZMumpsSlaveAnalysisWithMetisOrdering( handle );
     }
 
     // Create local portion of distributed matrix and then factor it
@@ -153,7 +153,7 @@ main( int argc, char* argv[] )
 
         // Factor
         numLocalPivots = 
-            ZMumpsFactorization
+            sweeper::ZMumpsFactorization
             ( handle, numLocalEntries, &localRowIndices[0], &localColIndices[0],
               &localA[0] );
     }
@@ -184,18 +184,18 @@ main( int argc, char* argv[] )
                 }
             }
 
-            ZMumpsHostSolve
+            sweeper::ZMumpsHostSolve
             ( numRhs, rhsBuffer, n, localSolutionBuffer, numLocalPivots,
               localIntegerBuffer );
         }
         else
         {
-            ZMumpsSlaveSolve( localSolutionBuffer, numLocalPivots );
+            sweeper::ZMumpsSlaveSolve( localSolutionBuffer, numLocalPivots );
         }
     }
 
     // Finalize our MUMPS instance
-    ZMumpsFinalize( handle );
+    sweeper::ZMumpsFinalize( handle );
 
     MPI_Finalize();
     return 0;
