@@ -1,6 +1,6 @@
 /*
-   Sweeper: a distributed-memory implementation of a sweeping preconditioner
-   for 3d Helmholtz equations.
+   Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+   of a sweeping preconditioner for 3d Helmholtz equations.
 
    Copyright (C) 2011 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
@@ -28,10 +28,10 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-#ifndef SWEEPER_FINITE_DIFFERENCE_CONTROL_H
-#define SWEEPER_FINITE_DIFFERENCE_CONTROL_H 1
+#ifndef PSP_FINITE_DIFFERENCE_CONTROL_H
+#define PSP_FINITE_DIFFERENCE_CONTROL_H 1
 
-namespace sweeper {
+namespace psp {
 
 enum BoundaryCondition { PML, DIRICHLET };
 enum FiniteDifferenceStencil { SEVEN_POINT, TWENTY_SEVEN_POINT }
@@ -83,6 +83,6 @@ struct FiniteDifferenceControl
     // The bottom boundary condition must be PML since we are sweeping from it.
 };
 
-} // namespace sweeper
+} // namespace psp
 
-#endif // SWEEPER_FINITE_DIFFERENCE_CONTROL_H
+#endif // PSP_FINITE_DIFFERENCE_CONTROL_H

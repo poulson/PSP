@@ -1,6 +1,6 @@
 /*
-   Sweeper: a distributed-memory implementation of a sweeping preconditioner
-   for 3d Helmholtz equations.
+   Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+   of a sweeping preconditioner for 3d Helmholtz equations.
 
    Copyright (C) 2011 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
@@ -28,9 +28,9 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-#ifndef SWEEPER_H
-#define SWEEPER_H 1
+#ifndef PSP_H
+#define PSP_H 1
 
-#include "sweeper/finite_difference_control.hpp"
+#include "psp/finite_difference_control.hpp"
 
-#endif // SWEEPER_H
+#endif // PSP_H

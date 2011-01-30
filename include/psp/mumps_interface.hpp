@@ -1,6 +1,6 @@
 /*
-   Sweeper: a distributed-memory implementation of a sweeping preconditioner
-   for 3d Helmholtz equations.
+   Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+   of a sweeping preconditioner for 3d Helmholtz equations.
 
    Copyright (C) 2011 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
@@ -28,8 +28,8 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-#ifndef SWEEPER_MUMPS_INTERFACE_H
-#define SWEEPER_MUMPS_INTERFACE_H 1
+#ifndef PSP_MUMPS_INTERFACE_H
+#define PSP_MUMPS_INTERFACE_H 1
 
 #include <vector>
 
@@ -37,7 +37,7 @@ extern "C" struct SComplex { float r; float i; }
 extern "C" struct DComplex { double r; double i; }
 
 // We mirror MUMPS's C interface definition here so that we can avoid having to 
-// use their headers when using sweeper
+// use their headers when using psp
 #define MUMPS_VERSION "4.9.2"
 #define MUMPS_VERSION_MAX_LEN 14
 extern "C"
@@ -134,11 +134,11 @@ struct ZMUMPS_STRUC_C {
 };
 
 // This is the prototype of the double-complex MUMPS routine, but it should 
-// not be called directly from within sweeper
+// not be called directly from within psp
 extern "C" void
 zmumps_c( ZMUMPS_STRUC_C* handle );
 
-namespace sweeper {
+namespace psp {
 
 typedef ZMUMPS_STRUC_C ZMumpsHandle;
 
@@ -610,6 +610,6 @@ ZMumpsFinalize( ZMumpsHandle& handle )
     // handle.infog[1]: additional info about error or warning
 }
 
-} // namespace sweeper
+} // namespace psp
 
-#endif // SWEEPER_MUMPS_INTERFACE_H
+#endif // PSP_MUMPS_INTERFACE_H

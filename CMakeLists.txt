@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8)
-project(Sweeper)
+project(PSP)
 
-set(Sweeper_VERSION_MAJOR 0)
-set(Sweeper_VERSION_MINOR 1)
+set(PSP_VERSION_MAJOR 0)
+set(PSP_VERSION_MINOR 1)
 
 option(BUILD_TESTS ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
@@ -168,10 +168,10 @@ endif(HAVE_DPOTRF)
 add_subdirectory(contrib/ParMetis)
 add_subdirectory(contrib/MUMPS)
 
-#configure_file( ${CMAKE_SOURCE_DIR}/include/sweeper/config.h.cmake
-#                ${CMAKE_BINARY_DIR}/include/sweeper/config.h )
+#configure_file( ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
+#                ${CMAKE_BINARY_DIR}/include/psp/config.h )
 
-# Grab all of the .c, .cpp, .h, and .hpp Sweeper files
+# Grab all of the .c, .cpp, .h, and .hpp PSP files
 file(GLOB_RECURSE SWEEPER_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
      "src/*.c" "src/*.cpp")
 file(GLOB_RECURSE SWEEPER_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
@@ -203,12 +203,12 @@ foreach(HEADER ${SWEEPER_HEADERS})
   )
 endforeach(HEADER)
 
-# Make sure the Sweeper headers can be found
+# Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
 
 # Build the main library
-#add_library(sweeper STATIC ${SWEEPER_SRC})
-#target_link_libraries(sweeper zmumps parmetis metis)
+#add_library(psp STATIC ${SWEEPER_SRC})
+#target_link_libraries(psp zmumps parmetis metis)
 
 # Build the test drivers if necessary
 #if(BUILD_TESTS)
@@ -216,7 +216,7 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 #  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/core/")
 #  foreach(TEST ${CORE_TESTS})
 #    add_executable(core-${TEST} ${TEST_DIR}/core/${TEST}.cpp)
-#    target_link_libraries(core-${TEST} sweeper cmake-dummy-lib)
+#    target_link_libraries(core-${TEST} psp cmake-dummy-lib)
 #    set_target_properties(core-${TEST} 
 #                          PROPERTIES OUTPUT_NAME ${TEST}
 #                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})

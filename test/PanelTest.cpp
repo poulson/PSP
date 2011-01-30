@@ -1,6 +1,6 @@
 /*
-   Sweeper: a distributed-memory implementation of a sweeping preconditioner
-   for 3d Helmholtz equations.
+   Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+   of a sweeping preconditioner for 3d Helmholtz equations.
 
    Copyright (C) 2011 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
@@ -28,7 +28,7 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-#include "sweeper.hpp"
+#include "psp.hpp"
 #include <vector>
 
 int
@@ -41,8 +41,8 @@ main( int argc, char* argv[] )
     MPI_Comm_rank( comm, &rank );
 
     // This is just an exercise in filling the control structure
-    sweeper::FiniteDifferenceControl control;    
-    control.stencil = sweeper::SEVEN_POINT;
+    psp::FiniteDifferenceControl control;    
+    control.stencil = psp::SEVEN_POINT;
     control.nx = 1000;
     control.ny = 1000;
     control.nz = 10;
@@ -53,18 +53,18 @@ main( int argc, char* argv[] )
     control.C = 1.;
     control.b = 5;
     control.d = 5;
-    control.frontBC = sweeper::PML;
-    control.rightBC = sweeper::PML;
-    control.backBC = sweeper::PML;
-    control.leftBC = sweeper::PML;
-    control.topBC = sweeper::PML;
+    control.frontBC = psp::PML;
+    control.rightBC = psp::PML;
+    control.backBC = psp::PML;
+    control.leftBC = psp::PML;
+    control.topBC = psp::PML;
 
     // Go ahead and define the number of degrees of freedom
     const int n = control.nx * control.ny * control.nz;
 
     // Create a handle for an instance of MUMPS
-    sweeper::ZMumpsHandle handle;
-    sweeper::ZMumpsInit( handle );
+    psp::ZMumpsHandle handle;
+    psp::ZMumpsInit( handle );
 
     // Perform the analysis step
     if( rank == 0 )
@@ -132,13 +132,13 @@ main( int argc, char* argv[] )
         }
 
         // Call the analysis phase of MUMPS (use ParMetis for now)
-        sweeper::ZMumpsHostAnalysisWithMetisOrdering
+        psp::ZMumpsHostAnalysisWithMetisOrdering
         ( handle, &rowIndices[0], &colIndices[0] );
     }
     else
     {
         // Call the slave analysis routine
-        sweeper::ZMumpsSlaveAnalysisWithMetisOrdering( handle );
+        psp::ZMumpsSlaveAnalysisWithMetisOrdering( handle );
     }
 
     // Create local portion of distributed matrix and then factor it
@@ -153,7 +153,7 @@ main( int argc, char* argv[] )
 
         // Factor
         numLocalPivots = 
-            sweeper::ZMumpsFactorization
+            psp::ZMumpsFactorization
             ( handle, numLocalEntries, &localRowIndices[0], &localColIndices[0],
               &localA[0] );
     }
@@ -184,18 +184,18 @@ main( int argc, char* argv[] )
                 }
             }
 
-            sweeper::ZMumpsHostSolve
+            psp::ZMumpsHostSolve
             ( numRhs, rhsBuffer, n, localSolutionBuffer, numLocalPivots,
               localIntegerBuffer );
         }
         else
         {
-            sweeper::ZMumpsSlaveSolve( localSolutionBuffer, numLocalPivots );
+            psp::ZMumpsSlaveSolve( localSolutionBuffer, numLocalPivots );
         }
     }
 
     // Finalize our MUMPS instance
-    sweeper::ZMumpsFinalize( handle );
+    psp::ZMumpsFinalize( handle );
 
     MPI_Finalize();
     return 0;
