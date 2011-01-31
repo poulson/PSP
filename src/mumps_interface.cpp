@@ -63,7 +63,7 @@ psp::ZMumpsInit
     //
     // handle.info[0]: 0 if call was successful
     // handle.info[1]: holds additional info if error or warning
-    // handle.info[0]: 0 if successful, negative if error, positive if warning
+    // handle.infog[0]: 0 if successful, negative if error, positive if warning
     // handle.infog[1]: additional info about error or warning
     if( handle.info[0] != 0 )
     {

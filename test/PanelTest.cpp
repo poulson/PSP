@@ -65,8 +65,6 @@ main( int argc, char* argv[] )
     // This is just an exercise in filling the control structure
     psp::FiniteDiffControl control;    
     control.stencil = psp::SEVEN_POINT;
-    //control.nx = 500;
-    //control.ny = 500;
     control.nx = 200;
     control.ny = 200;
     control.nz = 10;
@@ -112,7 +110,7 @@ main( int argc, char* argv[] )
             static_cast<int>(static_cast<double>(numVertices)/numProcesses);
         int myVtxOffset = vtxChunkSize*rank;
         int numLocalVertices = 
-            std::min(numVertices,myVtxOffset+vtxChunkSize)-myVtxOffset;
+            ( rank==numProcesses-1 ? numVertices-myVtxOffset : vtxChunkSize );
         int numLocalNonzeros = 0;
         for( int vtx=myVtxOffset; vtx<myVtxOffset+numLocalVertices; ++vtx )
         {
@@ -130,6 +128,20 @@ main( int argc, char* argv[] )
         ( &numLocalNonzeros, &numNonzeros, 1, MPI_INT, MPI_SUM, comm );
         if( rank == 0 )
             std::cout << "numNonzeros = " << numNonzeros << std::endl;
+
+        for( int r=0; r<numProcesses; ++r )
+        {
+            if( rank == r )
+            {
+                std::cout << "rank " << r << ": \n" 
+                          << "  vtxChunkSize=" << vtxChunkSize << "\n"
+                          << "  myVtxOffset=" << myVtxOffset << "\n"
+                          << "  numLocalVertices=" << numLocalVertices << "\n"
+                          << "  numLocalNonzeros=" << numLocalNonzeros 
+                          << std::endl;
+            }
+            MPI_Barrier( comm );
+        }
 
         // Perform the analysis step
         MPI_Barrier( comm );
