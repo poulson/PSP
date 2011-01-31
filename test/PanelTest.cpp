@@ -29,22 +29,46 @@
    ParMetis used as well as that of the covered work.}
 */
 #include "psp.hpp"
-#include <vector>
+#include <iostream>
+
+#include <cmath>
+#include <cstdlib>
+#include <ctime>
+
+DComplex SampleUnitBall()
+{
+    // Grab a uniform sample from [0,1]
+    double r = static_cast<double>(rand())/static_cast<double>(RAND_MAX);
+    // Grab a uniform sample from [0,2*pi]
+    double theta = 
+        2*M_PI*static_cast<double>(rand())/static_cast<double>(RAND_MAX);
+    DComplex sample;
+    sample.r = r*cos(theta);
+    sample.i = r*sin(theta);
+    return sample;
+}
 
 int
 main( int argc, char* argv[] )
 {
     MPI_Init( &argc, &argv );
+    double startTime = MPI_Wtime();
 
+    int rank, numProcesses;
     MPI_Comm comm = MPI_COMM_WORLD;
-    int rank;
     MPI_Comm_rank( comm, &rank );
+    MPI_Comm_size( comm, &numProcesses );
+
+    // Seed the random number generator
+    srand( time(NULL)+rank );
 
     // This is just an exercise in filling the control structure
-    psp::FiniteDifferenceControl control;    
+    psp::FiniteDiffControl control;    
     control.stencil = psp::SEVEN_POINT;
-    control.nx = 1000;
-    control.ny = 1000;
+    //control.nx = 500;
+    //control.ny = 500;
+    control.nx = 200;
+    control.ny = 200;
     control.nz = 10;
     control.wx = 100.;
     control.wy = 100.;
@@ -60,143 +84,263 @@ main( int argc, char* argv[] )
     control.topBC = psp::PML;
 
     // Go ahead and define the number of degrees of freedom
-    const int n = control.nx * control.ny * control.nz;
-
-    // Create a handle for an instance of MUMPS
-    psp::ZMumpsHandle handle;
-    psp::ZMumpsInit( handle );
-
-    // Perform the analysis step
+    const int numVertices = control.nx * control.ny * control.nz;
     if( rank == 0 )
+        std::cout << "numVertices = " << numVertices << std::endl;
+
+    psp::ZMumpsHandle handle;
+    try 
     {
-        // Compute total number of nonzeros in the lower triangle.
-        // There is certainly a faster way to compute this, but this will do
-        // for now.
-        int nz = 0;
-        for( int vtx=0; vtx<nvtxs; ++vtx )
+        // Create a handle for an instance of MUMPS
+        MPI_Barrier( comm );
+        if( rank == 0 )
+        {
+            double t = MPI_Wtime() - startTime;
+            std::cout << "Starting ZMumpsInit at t=" << t << std::endl;
+        }
+        psp::ZMumpsInit( handle );
+        MPI_Barrier( comm );
+        if( rank == 0 )
+        {
+            double t = MPI_Wtime() - startTime;
+            std::cout << "Finished ZMumpsInit at t=" << t << std::endl;
+        }
+
+        // Compute the number of nonzeros. We can worry about finding a more 
+        // efficient (possibly analytical) expression later.
+        int vtxChunkSize = 
+            static_cast<int>(static_cast<double>(numVertices)/numProcesses);
+        int myVtxOffset = vtxChunkSize*rank;
+        int numLocalVertices = 
+            std::min(numVertices,myVtxOffset+vtxChunkSize)-myVtxOffset;
+        int numLocalNonzeros = 0;
+        for( int vtx=myVtxOffset; vtx<myVtxOffset+numLocalVertices; ++vtx )
         {
             const int i = vtx % control.nx;
             const int j = (vtx/control.nx) % control.ny;
             const int k = vtx/(control.nx*control.ny);
 
-            ++nz;              // count connection to self
-            if( i != 0 ) ++nz; // count connection to (i-1,j,k)
-            if( j != 0 ) ++nz; // count connection to (i,j-1,k)
-            if( k != 0 ) ++nz; // count connection to (i,j,k-1)
+            ++numLocalNonzeros; // count connection to self
+            if( i != 0 ) ++numLocalNonzeros; // count connection to (i-1,j,k)
+            if( j != 0 ) ++numLocalNonzeros; // count connection to (i,j-1,k)
+            if( k != 0 ) ++numLocalNonzeros; // count connection to (i,j,k-1)
         }
+        int numNonzeros;
+        MPI_Allreduce
+        ( &numLocalNonzeros, &numNonzeros, 1, MPI_INT, MPI_SUM, comm );
+        if( rank == 0 )
+            std::cout << "numNonzeros = " << numNonzeros << std::endl;
 
-        // Allocate vectors for storing the row and column indices
-        std::vector<int> rowIndices(nz);
-        std::vector<int> colIndices(nz);
-
-        // Fill in row and column indices each vertex at a time
-        int z = 0;
-        const int nvtxs = control.nx * control.ny * control.nz;
-        for( int vtx=0; vtx<nvtxs; ++vtx )
-        {
-            const int i = vtx % control.nx;
-            const int j = (vtx/control.nx) % control.ny;
-            const int k = vtx/(control.nx*control.ny); // no need for a modulo
-
-            // Add the connection to ourself
-            rowIndices[z] = vtx;
-            colIndices[z] = vtx;
-            ++z;
-
-            // Handle the possible connection in the x direction
-            if( i != 0 )
-            {
-                // Add the connection to (i-1,j,k)
-                rowIndices[z] = vtx;
-                colIndices[z] = vtx-1;
-                ++z;
-            }
-
-            // Handle the possible connection in the y direction
-            if( j != 0 )
-            {
-                // Add the connection to (i,j-1,k)
-                rowIndices[z] = vtx;
-                colIndices[z] = vtx-control.nx;
-                ++z;
-            }
-
-            // Handle the possible connection in the z direction
-            if( k != 0 )
-            {
-                // Add the connection to (i,j,k-1)
-                rowIndices[z] = vtx;
-                colIndices[z] = vtx-(control.nx*control.ny);
-                ++z;
-            }
-        }
-
-        // Call the analysis phase of MUMPS (use ParMetis for now)
-        psp::ZMumpsHostAnalysisWithMetisOrdering
-        ( handle, &rowIndices[0], &colIndices[0] );
-    }
-    else
-    {
-        // Call the slave analysis routine
-        psp::ZMumpsSlaveAnalysisWithMetisOrdering( handle );
-    }
-
-    // Create local portion of distributed matrix and then factor it
-    int numLocalPivots;
-    {
-        // int numLocalEntries = ...
-        std::vector<int> localRowIndices(numLocalEntries);
-        std::vector<int> localColIndices(numLocalEntries);
-        std::vector<DComplex> localA(numLocalEntries);
-        // TODO: Fill local row indices...
-        // TODO: Fill local col indices...
-
-        // Factor
-        numLocalPivots = 
-            psp::ZMumpsFactorization
-            ( handle, numLocalEntries, &localRowIndices[0], &localColIndices[0],
-              &localA[0] );
-    }
-    
-    // Solve with various numbers of RHS
-    for( int numRhs = 1; numRhs <= 100; numRhs *= 10 )
-    {
-        // Allocate space for the solution
-        std::vector<DComplex> localSolutions(numRhs*numLocalPivots);
-        std::vector<int> localIntegers(numLocalPivots);
-
+        // Perform the analysis step
+        MPI_Barrier( comm );
         if( rank == 0 )
         {
-            // Allocate and fill the 10 RHS
-            std::vector<DComplex> rhs(numRhs*n);
-            for( int i=0; i<numRhs*n; ++i )
+            double t = MPI_Wtime() - startTime;
+            std::cout << "Starting ZMumpsAnalysis at t=" << t << std::endl;
+        }
+        if( rank == 0 )
+        {
+            // Allocate vectors for storing the row and column indices
+            std::vector<int> rowIndices(numNonzeros);
+            std::vector<int> colIndices(numNonzeros);
+
+            // Fill in row and column indices each vertex at a time
+            int z = 0;
+            for( int vtx=0; vtx<numVertices; ++vtx )
             {
-                // Just set each RHS to be e1
-                if( i % n == 0 )
+                const int i = vtx % control.nx;
+                const int j = (vtx/control.nx) % control.ny;
+                const int k = vtx/(control.nx*control.ny); 
+
+                // Add the connection to ourself
+                rowIndices[z] = vtx+1;
+                colIndices[z] = vtx+1;
+                ++z;
+
+                // Handle the possible connection in the x direction
+                if( i != 0 )
                 {
-                    rhs[i].r = 1;
-                    rhs[i].i = 0;
+                    // Add the connection to (i-1,j,k)
+                    rowIndices[z] = vtx+1;
+                    colIndices[z] = vtx;
+                    ++z;
                 }
-                else
+
+                // Handle the possible connection in the y direction
+                if( j != 0 )
                 {
-                    rhs[i].r = 0;
-                    rhs[i].i = 0;
+                    // Add the connection to (i,j-1,k)
+                    rowIndices[z] = vtx+1;
+                    colIndices[z] = vtx+1-control.nx;
+                    ++z;
+                }
+
+                // Handle the possible connection in the z direction
+                if( k != 0 )
+                {
+                    // Add the connection to (i,j,k-1)
+                    rowIndices[z] = vtx+1;
+                    colIndices[z] = vtx+1-(control.nx*control.ny);
+                    ++z;
                 }
             }
 
-            psp::ZMumpsHostSolve
-            ( numRhs, rhsBuffer, n, localSolutionBuffer, numLocalPivots,
-              localIntegerBuffer );
+            // Call the analysis phase of MUMPS (use ParMetis for now)
+            psp::ZMumpsHostAnalysisWithMetisOrdering
+            ( handle, numVertices, numNonzeros, 
+              &rowIndices[0], &colIndices[0] );
         }
         else
         {
-            psp::ZMumpsSlaveSolve( localSolutionBuffer, numLocalPivots );
+            // Call the slave analysis routine
+            psp::ZMumpsSlaveAnalysisWithMetisOrdering( handle );
+        }
+        MPI_Barrier( comm );
+        if( rank == 0 )
+        {
+            double t = MPI_Wtime() - startTime;
+            std::cout << "Finished ZMumpsAnalysis at t=" << t << std::endl;
+        }
+
+        // Create local portion of distributed matrix and then factor it
+        int numLocalPivots;
+        {
+            if( rank == 0 )
+            {
+                double t = MPI_Wtime() - startTime;
+                std::cout << "Starting matrix formation at t=" << t 
+                          << std::endl;
+            }
+
+            // Give each process a chunk of the vertices
+            std::vector<int> localRowIndices(numLocalNonzeros);
+            std::vector<int> localColIndices(numLocalNonzeros);
+            std::vector<DComplex> localA(numLocalNonzeros);
+
+            int z = 0;
+            for( int vtx=myVtxOffset; vtx<myVtxOffset+numLocalVertices; ++vtx ) 
+            {
+                const int i = vtx % control.nx;
+                const int j = (vtx/control.nx) % control.ny;
+                const int k = vtx/(control.nx*control.ny); 
+
+                // Count the self connection
+                localRowIndices[z] = vtx+1;    
+                localColIndices[z] = vtx+1;
+                // TODO: Fill in finite-diff approximation
+                localA[z] = SampleUnitBall();
+                ++z;
+
+                if( i != 0 )
+                {
+                    // Count the connection to (i-1,j,k)
+                    localRowIndices[z] = vtx+1;
+                    localColIndices[z] = vtx;
+                    // TODO: Fill in finite-diff approximation
+                    localA[z] = SampleUnitBall();
+                    ++z;
+                }
+                if( j != 0 )
+                {
+                    // Count the connection to (i,j-1,k)
+                    localRowIndices[z] = vtx+1;
+                    localColIndices[z] = vtx+1-control.nx;
+                    // TODO: Fill in finite-diff approximation
+                    localA[z] = SampleUnitBall();
+                    ++z;
+                }
+                if( k != 0 )
+                {
+                    // Count the connection to (i,j,k-1)
+                    localRowIndices[z] = vtx+1;
+                    localColIndices[z] = vtx+1-control.nx*control.ny;
+                    // TODO: Fill in finite-diff approximation
+                    localA[z] = SampleUnitBall();
+                    ++z;
+                }
+            }
+            MPI_Barrier( comm );
+            if( rank == 0 ) 
+            {
+                double t = MPI_Wtime() - startTime;
+                std::cout << "Finished forming matrix at t=" << t << std::endl;
+            }
+
+            // Factor
+            if( rank == 0 )
+            {
+                double t = MPI_Wtime() - startTime;
+                std::cout << "Starting factorization at t=" << t << std::endl;
+            }
+            numLocalPivots = 
+                psp::ZMumpsFactorization
+                ( handle, numLocalNonzeros, &localRowIndices[0], 
+                  &localColIndices[0], &localA[0] );
+            MPI_Barrier( comm );
+            if( rank == 0 )
+            {
+                double t = MPI_Wtime() - startTime;
+                std::cout << "Finished factorization at t=" << t << std::endl;
+            }
+        }
+    
+        // Solve with various numbers of RHS
+        for( int numRhs = 1; numRhs <= 100; numRhs *= 10 )
+        {
+            // Allocate space for the solution
+            std::vector<DComplex> localSolutions(numRhs*numLocalPivots);
+            std::vector<int> localIntegers(numLocalPivots);
+
+            if( rank == 0 )
+            {
+                double t = MPI_Wtime() - startTime;
+                std::cout << "Starting solve with numRhs=" << numRhs << " at t="
+                          << t << std::endl;
+            }
+            if( rank == 0 )
+            {
+                // Allocate and fill the 10 RHS
+                std::vector<DComplex> rhs(numRhs*numVertices);
+                for( int i=0; i<numRhs*numVertices; ++i )
+                {
+                    // Just set each RHS to be e1
+                    if( i % numVertices == 0 )
+                    {
+                        rhs[i].r = 1;
+                        rhs[i].i = 0;
+                    }
+                    else
+                    {
+                        rhs[i].r = 0;
+                        rhs[i].i = 0;
+                    }
+                }
+
+                psp::ZMumpsHostSolve
+                ( handle, numRhs, &rhs[0], numVertices, 
+                  &localSolutions[0], numLocalPivots, &localIntegers[0] );
+            }
+            else
+            {
+                psp::ZMumpsSlaveSolve
+                ( handle, &localSolutions[0], numLocalPivots, 
+                  &localIntegers[0] );
+            }
+            MPI_Barrier( comm );
+            if( rank == 0 )
+            {
+                double t = MPI_Wtime() - startTime;
+                std::cout << "Finished solve at t=" << t << std::endl;
+            }
         }
     }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught exception on rank " << rank << ": "
+                  << e.what() << std::endl;
+    }
 
-    // Finalize our MUMPS instance
     psp::ZMumpsFinalize( handle );
-
     MPI_Finalize();
     return 0;
 }

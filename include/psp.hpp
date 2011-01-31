@@ -31,6 +31,8 @@
 #ifndef PSP_H
 #define PSP_H 1
 
-#include "psp/finite_difference_control.hpp"
+#include "mpi.h"
+#include "psp/finite_diff_control.hpp"
+#include "psp/mumps_interface.hpp"
 
 #endif // PSP_H

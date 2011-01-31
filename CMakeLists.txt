@@ -4,7 +4,7 @@ project(PSP)
 set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 1)
 
-option(BUILD_TESTS ON)
+option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
 mark_as_advanced(AVOID_COMPLEX_MPI)
 
@@ -172,22 +172,20 @@ add_subdirectory(contrib/MUMPS)
 #                ${CMAKE_BINARY_DIR}/include/psp/config.h )
 
 # Grab all of the .c, .cpp, .h, and .hpp PSP files
-file(GLOB_RECURSE SWEEPER_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
+file(GLOB_RECURSE PSP_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
      "src/*.c" "src/*.cpp")
-file(GLOB_RECURSE SWEEPER_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
+file(GLOB_RECURSE PSP_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
      "include/*.h" "include/*.hpp")
-set(SWEEPER_SRC "${SWEEPER_CPP};${SWEEPER_HEADERS}")
+set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 
 # Create the lists of test executables and configure the compile flags
 # for the various build modes
-#if(BUILD_TESTS)
-#  set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
-#
-#  set(CORE_TESTS DifferentGrids DistMatrix Matrix)
-#
-#  set(CMAKE_CXX_FLAGS_PURERELEASE
-#      "${CXX_PURE_RELEASE_FLAGS}")
-#endif(BUILD_TESTS)
+if(BUILD_TESTS)
+  set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
+  set(TESTS PanelTest)
+
+  set(CMAKE_CXX_FLAGS_PURERELEASE "${CXX_PURE_RELEASE_FLAGS}")
+endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
 # to be linked last
@@ -195,7 +193,7 @@ add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 target_link_libraries(cmake-dummy-lib ${MATH_LIBS})
 
 # Copy the headers into the build directory
-foreach(HEADER ${SWEEPER_HEADERS})
+foreach(HEADER ${PSP_HEADERS})
   add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
@@ -206,20 +204,20 @@ endforeach(HEADER)
 # Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
 
-# Build the main library
-#add_library(psp STATIC ${SWEEPER_SRC})
-#target_link_libraries(psp zmumps parmetis metis)
+# Build the main library (assuming it doesn't stay header-only)
+add_library(psp STATIC ${PSP_SRC})
+target_link_libraries(psp zmumps parmetis metis)
 
 # Build the test drivers if necessary
-#if(BUILD_TESTS)
-  # Build the core tests
-#  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/core/")
-#  foreach(TEST ${CORE_TESTS})
-#    add_executable(core-${TEST} ${TEST_DIR}/core/${TEST}.cpp)
-#    target_link_libraries(core-${TEST} psp cmake-dummy-lib)
-#    set_target_properties(core-${TEST} 
-#                          PROPERTIES OUTPUT_NAME ${TEST}
-#                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-#  endforeach(TEST)
-#endif(BUILD_TESTS)
+if(BUILD_TESTS)
+ # Build the core tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/")
+  foreach(TEST ${TESTS})
+    add_executable(${TEST} ${TEST_DIR}/${TEST}.cpp)
+    target_link_libraries(${TEST} psp cmake-dummy-lib)
+    set_target_properties(${TEST} 
+                          PROPERTIES OUTPUT_NAME ${TEST}
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+  endforeach(TEST)
+endif(BUILD_TESTS)
 

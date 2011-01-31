@@ -28,13 +28,13 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-#ifndef PSP_FINITE_DIFFERENCE_CONTROL_H
-#define PSP_FINITE_DIFFERENCE_CONTROL_H 1
+#ifndef PSP_FINITE_DIFF_CONTROL_H
+#define PSP_FINITE_DIFF_CONTROL_H 1
 
 namespace psp {
 
 enum BoundaryCondition { PML, DIRICHLET };
-enum FiniteDifferenceStencil { SEVEN_POINT, TWENTY_SEVEN_POINT }
+enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 
 // Our control structure for defining the basic parameters for the problem 
 // to be solved. The domain is assumed to be of the form:
@@ -60,9 +60,9 @@ enum FiniteDifferenceStencil { SEVEN_POINT, TWENTY_SEVEN_POINT }
 // Our sweeping procedure occurs within the z dimensions so that each x-y plane
 // is contiguous.
 //
-struct FiniteDifferenceControl
+struct FiniteDiffControl
 {
-    FiniteDifferenceStencil stencil; // 7-point or 27-point
+    Stencil stencil; // 7-point or 27-point
     int nx; // number of grid points in x direction
     int ny; // number of grid points in y direction
     int nz; // number of grid points in z direction
@@ -85,4 +85,4 @@ struct FiniteDifferenceControl
 
 } // namespace psp
 
-#endif // PSP_FINITE_DIFFERENCE_CONTROL_H
+#endif // PSP_FINITE_DIFF_CONTROL_H
