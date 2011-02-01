@@ -35,6 +35,14 @@
 #include <cstdlib>
 #include <ctime>
 
+void Usage()
+{
+    std::cout << "PanelTest <nx> <ny> <nz>\n\n"
+              << "  nx: number of vertices in x direction\n"
+              << "  ny: number of vertices in y direction\n"
+              << "  nz: number of vertices in z direction" << std::endl;
+}
+
 DComplex SampleUnitBall()
 {
     // Grab a uniform sample from [0,1]
@@ -59,17 +67,23 @@ main( int argc, char* argv[] )
     MPI_Comm_rank( comm, &rank );
     MPI_Comm_size( comm, &numProcesses );
 
+    if( argc != 4 )
+    {
+        //if( rank == 0 )
+            Usage();
+        MPI_Finalize();
+        return 0;
+    }
+
     // Seed the random number generator
     srand( time(NULL)+rank );
 
     // This is just an exercise in filling the control structure
     psp::FiniteDiffControl control;    
     control.stencil = psp::SEVEN_POINT;
-    //control.nx = 200;
-    //control.ny = 200;
-    control.nx = 10;
-    control.ny = 10;
-    control.nz = 10;
+    control.nx = atoi(argv[1]);
+    control.ny = atoi(argv[2]);
+    control.nx = atoi(argv[3]);
     control.wx = 100.;
     control.wy = 100.;
     control.wz = 10.;
