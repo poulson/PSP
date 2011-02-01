@@ -65,8 +65,10 @@ main( int argc, char* argv[] )
     // This is just an exercise in filling the control structure
     psp::FiniteDiffControl control;    
     control.stencil = psp::SEVEN_POINT;
-    control.nx = 200;
-    control.ny = 200;
+    //control.nx = 200;
+    //control.ny = 200;
+    control.nx = 10;
+    control.ny = 10;
     control.nz = 10;
     control.wx = 100.;
     control.wy = 100.;

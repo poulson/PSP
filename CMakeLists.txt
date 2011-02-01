@@ -68,8 +68,15 @@ if(NEED_MATH)
                NAMES libmkl_intel_lp64.a mkl_intel_lp64.lib
                PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
-  find_library(MKL_BLACS_LIB 
-               NAMES libmkl_blacs_lp64.a mkl_blacs_lp64.lib
+  message(STATUS 
+          "WARNING: Defaulting to looking for the OpenMPI MKL BLACS library...")
+# TODO: Find a way to choose the correct BLACS library
+#  find_library(MKL_BLACS_LIB 
+#               NAMES libmkl_blacs_lp64.a mkl_blacs_lp64.lib
+#               PATHS ${INTEL_ROOT} ${MKL_ROOT}
+#               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
+  find_library(MKL_BLACS_LIB
+               NAMES libmkl_blacs_openmpi_lp64.a mkl_blacs_openmpi_lp64.lib
                PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   find_library(MKL_SCALAPACK_LIB 
@@ -182,7 +189,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
-  set(TESTS PanelTest)
+  set(TESTS PanelTest ScaLAPACK-Cholesky)
 
   set(CMAKE_CXX_FLAGS_PURERELEASE "${CXX_PURE_RELEASE_FLAGS}")
 endif(BUILD_TESTS)
