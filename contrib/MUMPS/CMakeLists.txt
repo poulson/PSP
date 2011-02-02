@@ -20,8 +20,16 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 #  -Dintel_
 #  -DALLOW_NON_INIT
 #  -DAdd_
-set(CMAKE_C_FLAGS "-O3 -DAdd_ -Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z")
-set(CMAKE_Fortran_FLAGS "-O3 -Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z")
+if(Fortran_APPENDS_UNDERSCORE)
+  set(FUNDERSCORE_DEF "-DAdd_")
+else(Fortran_APPENDS_UNDERSCORE)
+  set(FUNDERSCORE_DEF "")
+endif(Fortran_APPENDS_UNDERSCORE)
+set(MUMPS_C_FLAGS "${FUNDERSCORE_DEF} -Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z")
+set(MUMPS_Fortran_FLAGS "-Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z")
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MUMPS_C_FLAGS}")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${MUMPS_Fortran_FLAGS}")
 
 add_library(zmumps STATIC ${MUMPS_SRC})
 target_link_libraries(zmumps parmetis metis)

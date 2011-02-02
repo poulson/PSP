@@ -4,18 +4,27 @@ project(PSP)
 set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 1)
 
-option(BUILD_TESTS "Build the test drivers" ON)
-option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
-mark_as_advanced(AVOID_COMPLEX_MPI)
-
-set(CXX_FLAGS "-O3" CACHE STRING "CXX optimization flags")
+# We need an F90 compiler is needed for MUMPS
+enable_language(Fortran)
 
 if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
   message(WARNING "CXX compiler, ${CMAKE_CXX_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CXX or through the '-DCMAKE_CXX_COMPILER' cmake flag. You should probably also clean this build folder first.")
 endif(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
 
-# We need an F90 compiler is needed for MUMPS
-enable_language(Fortran)
+option(BUILD_TESTS "Build the test drivers" ON)
+option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
+option(Fortran_APPENDS_UNDERSCORE 
+       "Turn on if Fortran compiler appends underscores to symbols" ON)
+mark_as_advanced(AVOID_COMPLEX_MPI)
+
+set(CXX_FLAGS "-O3" CACHE STRING "CXX flags")
+set(C_FLAGS "-O3" CACHE STRING "C flags")
+set(Fortran_FLAGS "-O3" CACHE STRING "Fortran flags")
+
+set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
+set(CMAKE_C_FLAGS "${C_FLAGS}")
+set(CMAKE_Fortran_FLAGS "${Fortran_FLAGS}")
+message("CMAKE_Fortran_FLAGS began as ${CMAKE_Fortran_FLAGS}")
 
 # Query the size of a void pointer in order to determine whether or not this is
 # a 32-bit system
@@ -71,12 +80,9 @@ if(NEED_MATH)
   message(STATUS 
           "WARNING: Defaulting to looking for the OpenMPI MKL BLACS library...")
 # TODO: Find a way to choose the correct BLACS library
-#  find_library(MKL_BLACS_LIB 
-#               NAMES libmkl_blacs_lp64.a mkl_blacs_lp64.lib
-#               PATHS ${INTEL_ROOT} ${MKL_ROOT}
-#               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
-  find_library(MKL_BLACS_LIB
-               NAMES libmkl_blacs_openmpi_lp64.a mkl_blacs_openmpi_lp64.lib
+  find_library(MKL_BLACS_LIB 
+               NAMES libmkl_blacs_lp64.a mkl_blacs_lp64.lib
+#               NAMES libmkl_blacs_openmpi_lp64.a mkl_blacs_openmpi_lp64.lib
                PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   find_library(MKL_SCALAPACK_LIB 
@@ -179,6 +185,8 @@ else(HAVE_DPOTRF)
   endif(HAVE_DPOTRF_POST)
 endif(HAVE_DPOTRF)
 
+check_function_exists(mkl_set_num_threads HAVE_MKL)
+
 add_subdirectory(contrib/ParMetis)
 add_subdirectory(contrib/MUMPS)
 
@@ -197,8 +205,6 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
   set(TESTS PanelTest ScaLAPACK-Cholesky)
-
-  set(CMAKE_CXX_FLAGS_PURERELEASE "${CXX_PURE_RELEASE_FLAGS}")
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
