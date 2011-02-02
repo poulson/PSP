@@ -142,54 +142,55 @@ zmumps_c( ZMUMPS_STRUC_C* handle );
 
 namespace psp {
 
-typedef ZMUMPS_STRUC_C ZMumpsHandle;
+template<typename F> struct MumpsHandle;
+template<> struct MumpsHandle<DComplex> { ZMUMPS_STRUC_C _internal; };
 
 void 
-ZMumpsInit
-( ZMumpsHandle& handle );
+MumpsInit
+( MumpsHandle<DComplex>& handle );
 
 void 
-ZMumpsSlaveAnalysisWithManualOrdering
-( ZMumpsHandle& handle );
+MumpsSlaveAnalysisWithManualOrdering
+( MumpsHandle<DComplex>& handle );
 
 void 
-ZMumpsHostAnalysisWithManualOrdering
-( ZMumpsHandle& handle,
+MumpsHostAnalysisWithManualOrdering
+( MumpsHandle<DComplex>& handle,
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices, int* ordering );
 
 void 
-ZMumpsSlaveAnalysisWithMetisOrdering
-( ZMumpsHandle& handle );
+MumpsSlaveAnalysisWithMetisOrdering
+( MumpsHandle<DComplex>& handle );
 
 void 
-ZMumpsHostAnalysisWithMetisOrdering
-( ZMumpsHandle& handle, 
+MumpsHostAnalysisWithMetisOrdering
+( MumpsHandle<DComplex>& handle, 
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices );
 
 int 
-ZMumpsFactorization
-( ZMumpsHandle& handle, 
+MumpsFactorization
+( MumpsHandle<DComplex>& handle, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
   DComplex* localABuffer );
 
 void
-ZMumpsSlaveSolve
-( ZMumpsHandle& handle, 
+MumpsSlaveSolve
+( MumpsHandle<DComplex>& handle, 
   DComplex* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer );
 
 void
-ZMumpsHostSolve
-( ZMumpsHandle& handle, 
+MumpsHostSolve
+( MumpsHandle<DComplex>& handle, 
   int numRhs, DComplex* rhsBuffer, int rhsLDim, 
               DComplex* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer );
 
 void
-ZMumpsFinalize
-( ZMumpsHandle& handle );
+MumpsFinalize
+( MumpsHandle<DComplex>& handle );
 
 } // namespace psp
 

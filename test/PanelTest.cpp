@@ -69,7 +69,7 @@ main( int argc, char* argv[] )
 
     if( argc != 4 )
     {
-        //if( rank == 0 )
+        if( rank == 0 )
             Usage();
         MPI_Finalize();
         return 0;
@@ -83,7 +83,7 @@ main( int argc, char* argv[] )
     control.stencil = psp::SEVEN_POINT;
     control.nx = atoi(argv[1]);
     control.ny = atoi(argv[2]);
-    control.nx = atoi(argv[3]);
+    control.nz = atoi(argv[3]);
     control.wx = 100.;
     control.wy = 100.;
     control.wz = 10.;
@@ -102,7 +102,7 @@ main( int argc, char* argv[] )
     if( rank == 0 )
         std::cout << "numVertices = " << numVertices << std::endl;
 
-    psp::ZMumpsHandle handle;
+    psp::MumpsHandle<DComplex> handle;
     try 
     {
         // Create a handle for an instance of MUMPS
@@ -110,14 +110,14 @@ main( int argc, char* argv[] )
         if( rank == 0 )
         {
             double t = MPI_Wtime() - startTime;
-            std::cout << "Starting ZMumpsInit at t=" << t << std::endl;
+            std::cout << "Starting MumpsInit at t=" << t << std::endl;
         }
-        psp::ZMumpsInit( handle );
+        psp::MumpsInit( handle );
         MPI_Barrier( comm );
         if( rank == 0 )
         {
             double t = MPI_Wtime() - startTime;
-            std::cout << "Finished ZMumpsInit at t=" << t << std::endl;
+            std::cout << "Finished MumpsInit at t=" << t << std::endl;
         }
 
         // Compute the number of nonzeros. We can worry about finding a more 
@@ -145,26 +145,12 @@ main( int argc, char* argv[] )
         if( rank == 0 )
             std::cout << "numNonzeros = " << numNonzeros << std::endl;
 
-        for( int r=0; r<numProcesses; ++r )
-        {
-            if( rank == r )
-            {
-                std::cout << "rank " << r << ": \n" 
-                          << "  vtxChunkSize=" << vtxChunkSize << "\n"
-                          << "  myVtxOffset=" << myVtxOffset << "\n"
-                          << "  numLocalVertices=" << numLocalVertices << "\n"
-                          << "  numLocalNonzeros=" << numLocalNonzeros 
-                          << std::endl;
-            }
-            MPI_Barrier( comm );
-        }
-
         // Perform the analysis step
         MPI_Barrier( comm );
         if( rank == 0 )
         {
             double t = MPI_Wtime() - startTime;
-            std::cout << "Starting ZMumpsAnalysis at t=" << t << std::endl;
+            std::cout << "Starting MumpsAnalysis at t=" << t << std::endl;
         }
         if( rank == 0 )
         {
@@ -214,20 +200,20 @@ main( int argc, char* argv[] )
             }
 
             // Call the analysis phase of MUMPS (use ParMetis for now)
-            psp::ZMumpsHostAnalysisWithMetisOrdering
+            psp::MumpsHostAnalysisWithMetisOrdering
             ( handle, numVertices, numNonzeros, 
               &rowIndices[0], &colIndices[0] );
         }
         else
         {
             // Call the slave analysis routine
-            psp::ZMumpsSlaveAnalysisWithMetisOrdering( handle );
+            psp::MumpsSlaveAnalysisWithMetisOrdering( handle );
         }
         MPI_Barrier( comm );
         if( rank == 0 )
         {
             double t = MPI_Wtime() - startTime;
-            std::cout << "Finished ZMumpsAnalysis at t=" << t << std::endl;
+            std::cout << "Finished MumpsAnalysis at t=" << t << std::endl;
         }
 
         // Create local portion of distributed matrix and then factor it
@@ -301,7 +287,7 @@ main( int argc, char* argv[] )
                 std::cout << "Starting factorization at t=" << t << std::endl;
             }
             numLocalPivots = 
-                psp::ZMumpsFactorization
+                psp::MumpsFactorization
                 ( handle, numLocalNonzeros, &localRowIndices[0], 
                   &localColIndices[0], &localA[0] );
             MPI_Barrier( comm );
@@ -344,13 +330,13 @@ main( int argc, char* argv[] )
                     }
                 }
 
-                psp::ZMumpsHostSolve
+                psp::MumpsHostSolve
                 ( handle, numRhs, &rhs[0], numVertices, 
                   &localSolutions[0], numLocalPivots, &localIntegers[0] );
             }
             else
             {
-                psp::ZMumpsSlaveSolve
+                psp::MumpsSlaveSolve
                 ( handle, &localSolutions[0], numLocalPivots, 
                   &localIntegers[0] );
             }
@@ -368,7 +354,7 @@ main( int argc, char* argv[] )
                   << e.what() << std::endl;
     }
 
-    psp::ZMumpsFinalize( handle );
+    psp::MumpsFinalize( handle );
     MPI_Finalize();
     return 0;
 }

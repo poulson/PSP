@@ -34,109 +34,112 @@
 
 #define USE_COMM_WORLD -987654
 void
-psp::ZMumpsInit
-( psp::ZMumpsHandle& handle )
+psp::MumpsInit
+( psp::MumpsHandle<DComplex>& handle )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to initialize an instance of MUMPS
-    handle.job = -1; 
+    h.job = -1; 
 
     // Signal that our matrix is general symmetric (not Hermitian)
-    handle.sym = 2;
+    h.sym = 2;
 
     // Have the host participate in the factorization/solve as well
-    handle.par = 1; 
+    h.par = 1; 
 
     // Use the entire MPI_COMM_WORLD communicator
-    handle.comm_fortran = USE_COMM_WORLD;
+    h.comm_fortran = USE_COMM_WORLD;
 
     // Define the input/output settings
-    handle.icntl[0] = 6; // default error output stream (- to suppress)
-    handle.icntl[1] = 0; // default diagnostic output stream (- to suppress)
-    handle.icntl[2] = 6; // default global output stream (- to suppress)
-    //handle.icntl[3] = 2; // default information level (- to suppress)
-    handle.icntl[3] = 4; // TODO: Switch back to '2' after debugging
+    h.icntl[0] = 6; // default error output stream (- to suppress)
+    h.icntl[1] = 0; // default diagnostic output stream (- to suppress)
+    h.icntl[2] = 6; // default global output stream (- to suppress)
+    h.icntl[3] = 2; // default information level (- to suppress)
 
     // Initialize the instance
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    if( handle.info[0] != 0 )
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsInit returned with info[0]=" << handle.info[0];
+        msg << "psp::MumpsInit returned with info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
 
 void
-psp::ZMumpsSlaveAnalysisWithManualOrdering
-( psp::ZMumpsHandle& handle )
+psp::MumpsSlaveAnalysisWithManualOrdering
+( psp::MumpsHandle<DComplex>& handle )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to analyze a matrix
-    handle.job = 1;
+    h.job = 1;
 
     // Fill the control variables
-    handle.icntl[4] = 0; // default host anlalysis method
-    handle.icntl[5] = 7; // default permutation/scaling option
-    handle.icntl[6] = 7; // manual ordering is supplied
-    handle.icntl[7] = 77; // let MUMPS determine the scaling strategy
-    handle.icntl[11] = 0; // default general symmetric ordering strategy
-    handle.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
-    handle.icntl[13] = 20; // percent increase in estimated workspace
-    handle.icntl[17] = 2; // host analyzes, but any distribution is allowed
-    handle.icntl[18] = 0; // do not return the Schur complement
-    handle.icntl[27] = 1; // our manual analysis is considered sequential
-    handle.icntl[28] = 0; // parallel analysis parameter (meaningless for us)
-    handle.cntl[3] = -1.0; // threshold for static pivoting (?)
+    h.icntl[4] = 0; // default host anlalysis method
+    h.icntl[5] = 7; // default permutation/scaling option
+    h.icntl[6] = 7; // manual ordering is supplied
+    h.icntl[7] = 77; // let MUMPS determine the scaling strategy
+    h.icntl[11] = 0; // default general symmetric ordering strategy
+    h.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
+    h.icntl[13] = 20; // percent increase in estimated workspace
+    h.icntl[17] = 2; // host analyzes, but any distribution is allowed
+    h.icntl[18] = 0; // do not return the Schur complement
+    h.icntl[27] = 1; // our manual analysis is considered sequential
+    h.icntl[28] = 0; // parallel analysis parameter (meaningless for us)
+    h.cntl[3] = -1.0; // threshold for static pivoting (?)
 
     // Analyze the matrix
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.rinfo[0]: estimated flops on this process for elimination
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[2]: estimated local entries needed for factorization; 
-    //                 if negative, it is the number of million entries
-    // handle.info[3]: estimated local integers needed for factorization
-    // handle.info[4]: estimated max local front size
-    // handle.info[5]: number of nodes in the complete tree
-    // handle.info[6]: min estimated size of integer array IS for factorization
-    // handle.info[7]: min estimated size of array S for fact.; if neg, millions
-    // handle.info[14]: estimated MB of in-core work space for fact./solve
-    // handle.info[16]: estimated MB of OOC work space for fact./solve
-    // handle.info[18]: estimated size of IS to run OOC factorization
-    // handle.info[19]: estimated size of S to run OOC fact; if neg, in millions
-    // handle.info[23]: estimated entries in factors on this process;
-    //                  if negative, is is the number of million entries
-    // handle.rinfog[0]: estimated total flops for elimination process
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[2]: total estimated workspace for factors; if negative, ...
-    // handle.infog[3]: total estimated integer workspace for factors
-    // handle.infog[4]: estimated max front size in the complete tree
-    // handle.infog[5]: number of nodes in complete tree
-    // handle.infog[6]: ordering method used
-    // handle.infog[7]: structural symmetry in percent
-    // handle.infog[15]: estimated max MB of MUMPS data for in-core fact.
-    // handle.infog[16]: estimated total MB of MUMPS data for in-core fact.
-    // handle.infog[19]: estimated number of entries in factors; if neg, ...
-    // handle.infog[22]: value of handle.icntl[5] effectively used
-    // handle.infog[23]: value of handle.icntl[11] effectively used
-    // handle.infog[25]: estimated max MB of MUMPS data for OOC factorization
-    // handle.infog[26]: estimated total MB of MUMPS data for OOC factorization
-    // handle.infog[32]: effective value for handle.icntl[7]    
-    if( handle.info[0] != 0 )
+    // h.rinfo[0]: estimated flops on this process for elimination
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[2]: estimated local entries needed for factorization; 
+    //            if negative, it is the number of million entries
+    // h.info[3]: estimated local integers needed for factorization
+    // h.info[4]: estimated max local front size
+    // h.info[5]: number of nodes in the complete tree
+    // h.info[6]: min estimated size of integer array IS for factorization
+    // h.info[7]: min estimated size of array S for fact.; if neg, millions
+    // h.info[14]: estimated MB of in-core work space for fact./solve
+    // h.info[16]: estimated MB of OOC work space for fact./solve
+    // h.info[18]: estimated size of IS to run OOC factorization
+    // h.info[19]: estimated size of S to run OOC fact; if neg, in millions
+    // h.info[23]: estimated entries in factors on this process;
+    //             if negative, is is the number of million entries
+    // h.rinfog[0]: estimated total flops for elimination process
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[2]: total estimated workspace for factors; if negative, ...
+    // h.infog[3]: total estimated integer workspace for factors
+    // h.infog[4]: estimated max front size in the complete tree
+    // h.infog[5]: number of nodes in complete tree
+    // h.infog[6]: ordering method used
+    // h.infog[7]: structural symmetry in percent
+    // h.infog[15]: estimated max MB of MUMPS data for in-core fact.
+    // h.infog[16]: estimated total MB of MUMPS data for in-core fact.
+    // h.infog[19]: estimated number of entries in factors; if neg, ...
+    // h.infog[22]: value of h.icntl[5] effectively used
+    // h.infog[23]: value of h.icntl[11] effectively used
+    // h.infog[25]: estimated max MB of MUMPS data for OOC factorization
+    // h.infog[26]: estimated total MB of MUMPS data for OOC factorization
+    // h.infog[32]: effective value for h.icntl[7]    
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsSlaveAnalysisWithManualOrdering returned with "
-               "info[0]=" << handle.info[0];
+        msg << "psp::MumpsSlaveAnalysisWithManualOrdering returned with "
+               "info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
@@ -144,150 +147,154 @@ psp::ZMumpsSlaveAnalysisWithManualOrdering
 // For the chosen analysis method, MUMPS requires the row/column indices and 
 // the specified ordering to reside entirely on the host...
 void
-psp::ZMumpsHostAnalysisWithManualOrdering
-( psp::ZMumpsHandle& handle,
+psp::MumpsHostAnalysisWithManualOrdering
+( psp::MumpsHandle<DComplex>& handle,
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices, int* ordering )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to analyze a matrix
-    handle.job = 1; 
+    h.job = 1; 
 
     // Fill in the size of the system
-    handle.n = numVertices;
-    handle.nz = numNonzeros;
+    h.n = numVertices;
+    h.nz = numNonzeros;
 
     // Set the row/column index buffers
-    handle.irn = rowIndices;
-    handle.jcn = colIndices;
+    h.irn = rowIndices;
+    h.jcn = colIndices;
 
     // Set the manual ordering buffer
-    handle.perm_in = ordering;
+    h.perm_in = ordering;
 
     // Fill the control variables
-    handle.icntl[4] = 0; // default host anlalysis method
-    handle.icntl[5] = 7; // default permutation/scaling option
-    handle.icntl[6] = 7; // manual ordering is supplied
-    handle.icntl[7] = 77; // let MUMPS determine the scaling strategy
-    handle.icntl[11] = 0; // default general symmetric ordering strategy
-    handle.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
-    handle.icntl[13] = 20; // percent increase in estimated workspace
-    handle.icntl[17] = 2; // host analyzes, but any distribution is allowed
-    handle.icntl[18] = 0; // do not return the Schur complement
-    handle.icntl[27] = 1; // our manual analysis is considered sequential
-    handle.icntl[28] = 0; // parallel analysis parameter (meaningless for us)
-    handle.cntl[3] = -1.0; // threshold for static pivoting (?)
+    h.icntl[4] = 0; // default host anlalysis method
+    h.icntl[5] = 7; // default permutation/scaling option
+    h.icntl[6] = 7; // manual ordering is supplied
+    h.icntl[7] = 77; // let MUMPS determine the scaling strategy
+    h.icntl[11] = 0; // default general symmetric ordering strategy
+    h.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
+    h.icntl[13] = 20; // percent increase in estimated workspace
+    h.icntl[17] = 2; // host analyzes, but any distribution is allowed
+    h.icntl[18] = 0; // do not return the Schur complement
+    h.icntl[27] = 1; // our manual analysis is considered sequential
+    h.icntl[28] = 0; // parallel analysis parameter (meaningless for us)
+    h.cntl[3] = -1.0; // threshold for static pivoting (?)
 
     // Analyze the matrix
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.rinfo[0]: estimated flops on this process for elimination
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[2]: estimated local entries needed for factorization; 
-    //                 if negative, it is the number of million entries
-    // handle.info[3]: estimated local integers needed for factorization
-    // handle.info[4]: estimated max local front size
-    // handle.info[5]: number of nodes in the complete tree
-    // handle.info[6]: min estimated size of integer array IS for factorization
-    // handle.info[7]: min estimated size of array S for fact.; if neg, millions
-    // handle.info[14]: estimated MB of in-core work space for fact./solve
-    // handle.info[16]: estimated MB of OOC work space for fact./solve
-    // handle.info[18]: estimated size of IS to run OOC factorization
-    // handle.info[19]: estimated size of S to run OOC fact; if neg, in millions
-    // handle.info[23]: estimated entries in factors on this process;
-    //                  if negative, is is the number of million entries
-    // handle.rinfog[0]: estimated total flops for elimination process
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[2]: total estimated workspace for factors; if negative, ...
-    // handle.infog[3]: total estimated integer workspace for factors
-    // handle.infog[4]: estimated max front size in the complete tree
-    // handle.infog[5]: number of nodes in complete tree
-    // handle.infog[6]: ordering method used
-    // handle.infog[7]: structural symmetry in percent
-    // handle.infog[15]: estimated max MB of MUMPS data for in-core fact.
-    // handle.infog[16]: estimated total MB of MUMPS data for in-core fact.
-    // handle.infog[19]: estimated number of entries in factors; if neg, ...
-    // handle.infog[22]: value of handle.icntl[5] effectively used
-    // handle.infog[23]: value of handle.icntl[11] effectively used
-    // handle.infog[25]: estimated max MB of MUMPS data for OOC factorization
-    // handle.infog[26]: estimated total MB of MUMPS data for OOC factorization
-    // handle.infog[32]: effective value for handle.icntl[7]
-    if( handle.info[0] != 0 )
+    // h.rinfo[0]: estimated flops on this process for elimination
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[2]: estimated local entries needed for factorization; 
+    //            if negative, it is the number of million entries
+    // h.info[3]: estimated local integers needed for factorization
+    // h.info[4]: estimated max local front size
+    // h.info[5]: number of nodes in the complete tree
+    // h.info[6]: min estimated size of integer array IS for factorization
+    // h.info[7]: min estimated size of array S for fact.; if neg, millions
+    // h.info[14]: estimated MB of in-core work space for fact./solve
+    // h.info[16]: estimated MB of OOC work space for fact./solve
+    // h.info[18]: estimated size of IS to run OOC factorization
+    // h.info[19]: estimated size of S to run OOC fact; if neg, in millions
+    // h.info[23]: estimated entries in factors on this process;
+    //             if negative, is is the number of million entries
+    // h.rinfog[0]: estimated total flops for elimination process
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[2]: total estimated workspace for factors; if negative, ...
+    // h.infog[3]: total estimated integer workspace for factors
+    // h.infog[4]: estimated max front size in the complete tree
+    // h.infog[5]: number of nodes in complete tree
+    // h.infog[6]: ordering method used
+    // h.infog[7]: structural symmetry in percent
+    // h.infog[15]: estimated max MB of MUMPS data for in-core fact.
+    // h.infog[16]: estimated total MB of MUMPS data for in-core fact.
+    // h.infog[19]: estimated number of entries in factors; if neg, ...
+    // h.infog[22]: value of h.icntl[5] effectively used
+    // h.infog[23]: value of h.icntl[11] effectively used
+    // h.infog[25]: estimated max MB of MUMPS data for OOC factorization
+    // h.infog[26]: estimated total MB of MUMPS data for OOC factorization
+    // h.infog[32]: effective value for h.icntl[7]
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsHostAnalysisWithManualOrdering returned with "
-               "info[0]=" << handle.info[0];
+        msg << "psp::MumpsHostAnalysisWithManualOrdering returned with "
+               "info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
 
 void
-psp::ZMumpsSlaveAnalysisWithMetisOrdering
-( psp::ZMumpsHandle& handle )
+psp::MumpsSlaveAnalysisWithMetisOrdering
+( psp::MumpsHandle<DComplex>& handle )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to analyze a matrix
-    handle.job = 1; 
+    h.job = 1; 
 
     // Fill the control variables
-    handle.icntl[4] = 0; // default host analysis method
-    handle.icntl[5] = 7; // default permutation/scaling option
-    handle.icntl[6] = 5; // use Metis for the ordering
-    handle.icntl[7] = 77; // let MUMPS determine the scaling strategy
-    handle.icntl[11] = 0; // default general symmetric ordering strategy
-    handle.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
-    handle.icntl[13] = 20; // percent increase in estimated workspace
-    handle.icntl[17] = 2; // host analyzes, but any distribution is allowed
-    handle.icntl[18] = 0; // do not return the Schur complement
-    handle.icntl[27] = 2; // perform parallel analysis
-    handle.icntl[28] = 2; // use ParMetis for the parallel analysis
-    handle.cntl[3] = -1.0; // threshold for static pivoting (?)
+    h.icntl[4] = 0; // default host analysis method
+    h.icntl[5] = 7; // default permutation/scaling option
+    h.icntl[6] = 5; // use Metis for the ordering
+    h.icntl[7] = 77; // let MUMPS determine the scaling strategy
+    h.icntl[11] = 0; // default general symmetric ordering strategy
+    h.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
+    h.icntl[13] = 20; // percent increase in estimated workspace
+    h.icntl[17] = 2; // host analyzes, but any distribution is allowed
+    h.icntl[18] = 0; // do not return the Schur complement
+    h.icntl[27] = 2; // perform parallel analysis
+    h.icntl[28] = 2; // use ParMetis for the parallel analysis
+    h.cntl[3] = -1.0; // threshold for static pivoting (?)
 
     // Analyze the matrix
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of the returned info:
     //
-    // handle.rinfo[0]: estimated flops on this process for elimination
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[2]: estimated local entries needed for factorization; 
-    //                 if negative, it is the number of million entries
-    // handle.info[3]: estimated local integers needed for factorization
-    // handle.info[4]: estimated max local front size
-    // handle.info[5]: number of nodes in the complete tree
-    // handle.info[6]: min estimated size of integer array IS for factorization
-    // handle.info[7]: min estimated size of array S for fact.; if neg, millions
-    // handle.info[14]: estimated MB of in-core work space for fact./solve
-    // handle.info[16]: estimated MB of OOC work space for fact./solve
-    // handle.info[18]: estimated size of IS to run OOC factorization
-    // handle.info[19]: estimated size of S to run OOC fact; if neg, in millions
-    // handle.info[23]: estimated entries in factors on this process;
-    //                  if negative, is is the number of million entries
-    // handle.rinfog[0]: estimated total flops for elimination process
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[2]: total estimated workspace for factors; if negative, ...
-    // handle.infog[3]: total estimated integer workspace for factors
-    // handle.infog[4]: estimated max front size in the complete tree
-    // handle.infog[5]: number of nodes in complete tree
-    // handle.infog[6]: ordering method used
-    // handle.infog[7]: structural symmetry in percent
-    // handle.infog[15]: estimated max MB of MUMPS data for in-core fact.
-    // handle.infog[16]: estimated total MB of MUMPS data for in-core fact.
-    // handle.infog[19]: estimated number of entries in factors; if neg, ...
-    // handle.infog[22]: value of handle.icntl[5] effectively used
-    // handle.infog[23]: value of handle.icntl[11] effectively used
-    // handle.infog[25]: estimated max MB of MUMPS data for OOC factorization
-    // handle.infog[26]: estimated total MB of MUMPS data for OOC factorization
-    // handle.infog[32]: effective value for handle.icntl[7]
-    if( handle.info[0] != 0 )
+    // h.rinfo[0]: estimated flops on this process for elimination
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[2]: estimated local entries needed for factorization; 
+    //            if negative, it is the number of million entries
+    // h.info[3]: estimated local integers needed for factorization
+    // h.info[4]: estimated max local front size
+    // h.info[5]: number of nodes in the complete tree
+    // h.info[6]: min estimated size of integer array IS for factorization
+    // h.info[7]: min estimated size of array S for fact.; if neg, millions
+    // h.info[14]: estimated MB of in-core work space for fact./solve
+    // h.info[16]: estimated MB of OOC work space for fact./solve
+    // h.info[18]: estimated size of IS to run OOC factorization
+    // h.info[19]: estimated size of S to run OOC fact; if neg, in millions
+    // h.info[23]: estimated entries in factors on this process;
+    //             if negative, is is the number of million entries
+    // h.rinfog[0]: estimated total flops for elimination process
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[2]: total estimated workspace for factors; if negative, ...
+    // h.infog[3]: total estimated integer workspace for factors
+    // h.infog[4]: estimated max front size in the complete tree
+    // h.infog[5]: number of nodes in complete tree
+    // h.infog[6]: ordering method used
+    // h.infog[7]: structural symmetry in percent
+    // h.infog[15]: estimated max MB of MUMPS data for in-core fact.
+    // h.infog[16]: estimated total MB of MUMPS data for in-core fact.
+    // h.infog[19]: estimated number of entries in factors; if neg, ...
+    // h.infog[22]: value of h.icntl[5] effectively used
+    // h.infog[23]: value of h.icntl[11] effectively used
+    // h.infog[25]: estimated max MB of MUMPS data for OOC factorization
+    // h.infog[26]: estimated total MB of MUMPS data for OOC factorization
+    // h.infog[32]: effective value for h.icntl[7]
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsSlaveAnalysisWithMetisOrdering returned with "
-               "info[0]=" << handle.info[0];
+        msg << "psp::MumpsSlaveAnalysisWithMetisOrdering returned with "
+               "info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
@@ -295,293 +302,303 @@ psp::ZMumpsSlaveAnalysisWithMetisOrdering
 // For the chosen analysis method, MUMPS requires the row/column indices to 
 // reside entirely on the host...
 void
-psp::ZMumpsHostAnalysisWithMetisOrdering
-( psp::ZMumpsHandle& handle, 
+psp::MumpsHostAnalysisWithMetisOrdering
+( psp::MumpsHandle<DComplex>& handle, 
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to analyze a matrix
-    handle.job = 1; 
+    h.job = 1; 
 
     // Fill in the size of the system
-    handle.n = numVertices;
-    handle.nz = numNonzeros;
+    h.n = numVertices;
+    h.nz = numNonzeros;
 
     // Set the row/column index buffers
-    handle.irn = rowIndices;
-    handle.jcn = colIndices;
+    h.irn = rowIndices;
+    h.jcn = colIndices;
 
     // Fill the control variables
-    handle.icntl[4] = 0; // default host analysis method
-    handle.icntl[5] = 7; // default permutation/scaling option
-    handle.icntl[6] = 5; // use Metis for the ordering
-    handle.icntl[7] = 77; // let MUMPS determine the scaling strategy
-    handle.icntl[11] = 0; // default general symmetric ordering strategy
-    handle.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
-    handle.icntl[13] = 20; // percent increase in estimated workspace
-    handle.icntl[17] = 2; // host analyzes, but any distribution is allowed
-    handle.icntl[18] = 0; // do not return the Schur complement
-    handle.icntl[27] = 2; // perform parallel analysis
-    handle.icntl[28] = 2; // use ParMetis for the parallel analysis
-    handle.cntl[3] = -1.0; // threshold for static pivoting (?)
+    h.icntl[4] = 0; // default host analysis method
+    h.icntl[5] = 7; // default permutation/scaling option
+    h.icntl[6] = 5; // use Metis for the ordering
+    h.icntl[7] = 77; // let MUMPS determine the scaling strategy
+    h.icntl[11] = 0; // default general symmetric ordering strategy
+    h.icntl[12] = 0; // default ScaLAPACK usage on root (important param)
+    h.icntl[13] = 20; // percent increase in estimated workspace
+    h.icntl[17] = 2; // host analyzes, but any distribution is allowed
+    h.icntl[18] = 0; // do not return the Schur complement
+    h.icntl[27] = 2; // perform parallel analysis
+    h.icntl[28] = 2; // use ParMetis for the parallel analysis
+    h.cntl[3] = -1.0; // threshold for static pivoting (?)
 
     // Analyze the matrix
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.rinfo[0]: estimated flops on this process for elimination
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[2]: estimated local entries needed for factorization; 
-    //                 if negative, it is the number of million entries
-    // handle.info[3]: estimated local integers needed for factorization
-    // handle.info[4]: estimated max local front size
-    // handle.info[5]: number of nodes in the complete tree
-    // handle.info[6]: min estimated size of integer array IS for factorization
-    // handle.info[7]: min estimated size of array S for fact.; if neg, millions
-    // handle.info[14]: estimated MB of in-core work space for fact./solve
-    // handle.info[16]: estimated MB of OOC work space for fact./solve
-    // handle.info[18]: estimated size of IS to run OOC factorization
-    // handle.info[19]: estimated size of S to run OOC fact; if neg, in millions
-    // handle.info[23]: estimated entries in factors on this process;
-    //                  if negative, is is the number of million entries
-    // handle.rinfog[0]: estimated total flops for elimination process
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[2]: total estimated workspace for factors; if negative, ...
-    // handle.infog[3]: total estimated integer workspace for factors
-    // handle.infog[4]: estimated max front size in the complete tree
-    // handle.infog[5]: number of nodes in complete tree
-    // handle.infog[6]: ordering method used
-    // handle.infog[7]: structural symmetry in percent
-    // handle.infog[15]: estimated max MB of MUMPS data for in-core fact.
-    // handle.infog[16]: estimated total MB of MUMPS data for in-core fact.
-    // handle.infog[19]: estimated number of entries in factors; if neg, ...
-    // handle.infog[22]: value of handle.icntl[5] effectively used
-    // handle.infog[23]: value of handle.icntl[11] effectively used
-    // handle.infog[25]: estimated max MB of MUMPS data for OOC factorization
-    // handle.infog[26]: estimated total MB of MUMPS data for OOC factorization
-    // handle.infog[32]: effective value for handle.icntl[7]
-    if( handle.info[0] != 0 )
+    // h.rinfo[0]: estimated flops on this process for elimination
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[2]: estimated local entries needed for factorization; 
+    //            if negative, it is the number of million entries
+    // h.info[3]: estimated local integers needed for factorization
+    // h.info[4]: estimated max local front size
+    // h.info[5]: number of nodes in the complete tree
+    // h.info[6]: min estimated size of integer array IS for factorization
+    // h.info[7]: min estimated size of array S for fact.; if neg, millions
+    // h.info[14]: estimated MB of in-core work space for fact./solve
+    // h.info[16]: estimated MB of OOC work space for fact./solve
+    // h.info[18]: estimated size of IS to run OOC factorization
+    // h.info[19]: estimated size of S to run OOC fact; if neg, in millions
+    // h.info[23]: estimated entries in factors on this process;
+    //             if negative, is is the number of million entries
+    // h.rinfog[0]: estimated total flops for elimination process
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[2]: total estimated workspace for factors; if negative, ...
+    // h.infog[3]: total estimated integer workspace for factors
+    // h.infog[4]: estimated max front size in the complete tree
+    // h.infog[5]: number of nodes in complete tree
+    // h.infog[6]: ordering method used
+    // h.infog[7]: structural symmetry in percent
+    // h.infog[15]: estimated max MB of MUMPS data for in-core fact.
+    // h.infog[16]: estimated total MB of MUMPS data for in-core fact.
+    // h.infog[19]: estimated number of entries in factors; if neg, ...
+    // h.infog[22]: value of h.icntl[5] effectively used
+    // h.infog[23]: value of h.icntl[11] effectively used
+    // h.infog[25]: estimated max MB of MUMPS data for OOC factorization
+    // h.infog[26]: estimated total MB of MUMPS data for OOC factorization
+    // h.infog[32]: effective value for h.icntl[7]
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsHostAnalysisWithMetisOrdering returned with "
-               "info[0]=" << handle.info[0];
+        msg << "psp::MumpsHostAnalysisWithMetisOrdering returned with "
+               "info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
 
 int 
-psp::ZMumpsFactorization
-( psp::ZMumpsHandle& handle, 
+psp::MumpsFactorization
+( psp::MumpsHandle<DComplex>& handle, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
   DComplex* localABuffer )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to factor a matrix
-    handle.job = 2;
+    h.job = 2;
 
     // Describe the distribution
-    handle.nz_loc = numLocalNonzeros;
-    handle.irn_loc = localRowIndices;
-    handle.jcn_loc = localColIndices;
-    handle.a_loc = localABuffer;
+    h.nz_loc = numLocalNonzeros;
+    h.irn_loc = localRowIndices;
+    h.jcn_loc = localColIndices;
+    h.a_loc = localABuffer;
 
     // Fill the control variables
-    handle.icntl[21] = 0; // in-core factorization
-    handle.icntl[22] = 5 * handle.infog[25]; // workspace size
-    handle.icntl[23] = 0; // null-pivots cause the factorization to fail.
-                          // We might want to change this because our 
-                          // factorization is only being used as a 
-                          // preconditioner.
-    handle.cntl[0] = 0.01; // default relative threshold for pivoting
-                           // higher values lead to more fill-in
-    handle.cntl[2] = 0.0; // null-pivot flag (irrelevant since we ignore them)
-    handle.cntl[4] = 0.0; // fixation for null-pivots (?)
+    h.icntl[21] = 0; // in-core factorization
+    h.icntl[22] = 5 * h.infog[25]; // workspace size
+    h.icntl[23] = 0; // null-pivots cause the factorization to fail.
+                     // We might want to change this because our 
+                     // factorization is only being used as a 
+                     // preconditioner.
+    h.cntl[0] = 0.01; // default relative threshold for pivoting
+                      // higher values lead to more fill-in
+    h.cntl[2] = 0.0; // null-pivot flag (irrelevant since we ignore them)
+    h.cntl[4] = 0.0; // fixation for null-pivots (?)
 
     // Factor the matrix
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.rinfo[1]: flops on this process for assembly
-    // handle.rinfo[2]: flops on this process for elimination
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[8]: number of local entries for storing factorization;
-    //                 if negative, number of entries in millions
-    // handle.info[9]: size of integer space for storing factorization
-    // handle.info[10]: order of largest frontal matrix on this process
-    // handle.info[11]: number of negative pivots on this process
-    // handle.info[12]: number of postponed eliminations because of numerics
-    // handle.info[13]: number of memory compresses
-    // handle.info[15]: size in MB of MUMPS-allocated data during in-core fact.
-    // handle.info[17]: size in MB of MUMPS-allocated data during OOC fact.
-    // handle.info[20]: effective space for S; if negative, in millions
-    // handle.info[21]: MB of memory used for factorization
-    // handle.info[22]: number of pivots eliminated on this process.
-    //                  set ISOL_LOC to it and SOL_LOC = LSOL_LOC x NRHS,
-    //                  where LSOL_LOC >= handle.info[22]
-    // handle.info[24]: number of tiny pivots on this process
-    // handle.info[26]: number of entries in factors on this process;
-    //                  if negative, then number in millions
-    // handle.rinfog[1]: total flops for assembly
-    // handle.rinfog[2]: total flops for the elimination process
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[8]: total workspace for factors; if negative, in millions
-    // handle.infog[9]: total integer workspace for factors
-    // handle.infog[10]: order of largest frontal matrix
-    // handle.infog[11]: total number of negative pivots
-    // handle.infog[12]: total number of delayed pivots (if > 10%, num. problem)
-    // handle.infog[13]: total number of memory compresses
-    // handle.infog[17]: max MB of MUMPS data needed for factorization
-    // handle.infog[18]: total MB of MUMPS data needed for factorization
-    // handle.infog[20]: max MB of memory used during factorization
-    // handle.infog[21]: total MB of memory used during factorization
-    // handle.infog[24]: number of tiny pivots
-    // handle.infog[27]: number of null pivots encountered
-    // handle.infog[28]: effective number of entries in factors; if neg, ...
-    if( handle.info[0] != 0 )
+    // h.rinfo[1]: flops on this process for assembly
+    // h.rinfo[2]: flops on this process for elimination
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[8]: number of local entries for storing factorization;
+    //            if negative, number of entries in millions
+    // h.info[9]: size of integer space for storing factorization
+    // h.info[10]: order of largest frontal matrix on this process
+    // h.info[11]: number of negative pivots on this process
+    // h.info[12]: number of postponed eliminations because of numerics
+    // h.info[13]: number of memory compresses
+    // h.info[15]: size in MB of MUMPS-allocated data during in-core fact.
+    // h.info[17]: size in MB of MUMPS-allocated data during OOC fact.
+    // h.info[20]: effective space for S; if negative, in millions
+    // h.info[21]: MB of memory used for factorization
+    // h.info[22]: number of pivots eliminated on this process.
+    //             set ISOL_LOC to it and SOL_LOC = LSOL_LOC x NRHS,
+    //             where LSOL_LOC >= h.info[22]
+    // h.info[24]: number of tiny pivots on this process
+    // h.info[26]: number of entries in factors on this process;
+    //             if negative, then number in millions
+    // h.rinfog[1]: total flops for assembly
+    // h.rinfog[2]: total flops for the elimination process
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[8]: total workspace for factors; if negative, in millions
+    // h.infog[9]: total integer workspace for factors
+    // h.infog[10]: order of largest frontal matrix
+    // h.infog[11]: total number of negative pivots
+    // h.infog[12]: total number of delayed pivots (if > 10%, num. problem)
+    // h.infog[13]: total number of memory compresses
+    // h.infog[17]: max MB of MUMPS data needed for factorization
+    // h.infog[18]: total MB of MUMPS data needed for factorization
+    // h.infog[20]: max MB of memory used during factorization
+    // h.infog[21]: total MB of memory used during factorization
+    // h.infog[24]: number of tiny pivots
+    // h.infog[27]: number of null pivots encountered
+    // h.infog[28]: effective number of entries in factors; if neg, ...
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsFactorization returned with info[0]="
-            << handle.info[0];
+        msg << "psp::MumpsFactorization returned with info[0]="
+            << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 
-    return handle.info[22];
+    return h.info[22];
 }
 
 void
-psp::ZMumpsSlaveSolve
-( psp::ZMumpsHandle& handle, 
+psp::MumpsSlaveSolve
+( psp::MumpsHandle<DComplex>& handle, 
   DComplex* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer ) 
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to solve
-    handle.job = 3;    
+    h.job = 3;    
 
     // Fill the solution buffers
-    handle.sol_loc = localSolutionBuffer;
-    handle.lsol_loc = localSolutionLDim;
-    handle.isol_loc = localIntegerBuffer;
+    h.sol_loc = localSolutionBuffer;
+    h.lsol_loc = localSolutionLDim;
+    h.isol_loc = localIntegerBuffer;
 
     // Fill the control variables
-    handle.icntl[8] = 1; // solve Ax=b, not A^Tx=b
-    handle.icntl[9] = 0; // no iterative refinement for distributed solutions
-    handle.icntl[10] = 0; // do not return statistics b/c they are expensive
-    handle.icntl[13] = 20; // percent increase in estimated workspace
-    handle.icntl[19] = 0; // we will input our RHS's as dense vectors
-    handle.icntl[20] = 1; // the RHS's will be kept distributed
-    handle.icntl[24] = 0; // we do not need to handle null-pivots yet
-    handle.icntl[25] = 0; // do not worry about the interface Schur complement
-    handle.icntl[26] = 128; // IMPORTANT: handles the number of RHS's that can
-                            // be simultaneously solved
-    handle.cntl[1] = 0; // iterative refinement is irrelavant with multiple RHS
+    h.icntl[8] = 1; // solve Ax=b, not A^Tx=b
+    h.icntl[9] = 0; // no iterative refinement for distributed solutions
+    h.icntl[10] = 0; // do not return statistics b/c they are expensive
+    h.icntl[13] = 20; // percent increase in estimated workspace
+    h.icntl[19] = 0; // we will input our RHS's as dense vectors
+    h.icntl[20] = 1; // the RHS's will be kept distributed
+    h.icntl[24] = 0; // we do not need to handle null-pivots yet
+    h.icntl[25] = 0; // do not worry about the interface Schur complement
+    h.icntl[26] = 128; // IMPORTANT: handles the number of RHS's that can
+                       // be simultaneously solved
+    h.cntl[1] = 0; // iterative refinement is irrelavant with multiple RHS
 
     // Solve the system
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of the returned information:
     //
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[25]: MB of work space used for solution on this process
-    //                  (maximum and sum returned by infog[29] and infog[30])
-    // handle.rinfog[3-10]: only set if error analysis is on
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[14]: number of steps of iterative refinement (zero for us)
-    // handle.infog[29]: max MB of effective memory for solution
-    // handle.infog[30]: total MB of effective memory for solution
-    
-    if( handle.info[0] != 0 )
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[25]: MB of work space used for solution on this process
+    //             (maximum and sum returned by infog[29] and infog[30])
+    // h.rinfog[3-10]: only set if error analysis is on
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[14]: number of steps of iterative refinement (zero for us)
+    // h.infog[29]: max MB of effective memory for solution
+    // h.infog[30]: total MB of effective memory for solution
+   
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsSlaveSolve returned with info[0]=" << handle.info[0];
+        msg << "psp::MumpsSlaveSolve returned with info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
 
 // MUMPS requires the RHS to reside entirely on the host...
 void
-psp::ZMumpsHostSolve
-( psp::ZMumpsHandle& handle,
+psp::MumpsHostSolve
+( psp::MumpsHandle<DComplex>& handle,
   int numRhs, DComplex* rhsBuffer, int rhsLDim, 
               DComplex* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer ) 
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we would like to solve
-    handle.job = 3;    
+    h.job = 3;    
 
     // Set up the RHS
-    handle.nrhs = numRhs;
-    handle.rhs = rhsBuffer;
-    handle.lrhs = rhsLDim;
+    h.nrhs = numRhs;
+    h.rhs = rhsBuffer;
+    h.lrhs = rhsLDim;
 
     // Set up the solution buffers
-    handle.sol_loc = localSolutionBuffer;
-    handle.lsol_loc = localSolutionLDim;
-    handle.isol_loc = localIntegerBuffer;
+    h.sol_loc = localSolutionBuffer;
+    h.lsol_loc = localSolutionLDim;
+    h.isol_loc = localIntegerBuffer;
 
     // Fill the control variables
-    handle.icntl[8] = 1; // solve Ax=b, not A^Tx=b
-    handle.icntl[9] = 0; // no iterative refinement for distributed solutions
-    handle.icntl[10] = 0; // do not return statistics b/c they are expensive
-    handle.icntl[13] = 20; // percent increase in estimated workspace
-    handle.icntl[19] = 0; // we will input our RHS's as dense vectors
-    handle.icntl[20] = 1; // the RHS's will be kept distributed
-    handle.icntl[24] = 0; // we do not need to handle null-pivots yet
-    handle.icntl[25] = 0; // do not worry about the interface Schur complement
-    handle.icntl[26] = 128; // IMPORTANT: handles the number of RHS's that can
-                            // be simultaneously solved
-    handle.cntl[1] = 0; // iterative refinement is irrelavant with multiple RHS
+    h.icntl[8] = 1; // solve Ax=b, not A^Tx=b
+    h.icntl[9] = 0; // no iterative refinement for distributed solutions
+    h.icntl[10] = 0; // do not return statistics b/c they are expensive
+    h.icntl[13] = 20; // percent increase in estimated workspace
+    h.icntl[19] = 0; // we will input our RHS's as dense vectors
+    h.icntl[20] = 1; // the RHS's will be kept distributed
+    h.icntl[24] = 0; // we do not need to handle null-pivots yet
+    h.icntl[25] = 0; // do not worry about the interface Schur complement
+    h.icntl[26] = 128; // IMPORTANT: handles the number of RHS's that can
+                       // be simultaneously solved
+    h.cntl[1] = 0; // iterative refinement is irrelavant with multiple RHS
 
     // Solve the system
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.info[25]: MB of work space used for solution on this process
-    //                  (maximum and sum returned by infog[29] and infog[30])
-    // handle.rinfog[3-10]: only set if error analysis is on
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
-    // handle.infog[14]: number of steps of iterative refinement (zero for us)
-    // handle.infog[29]: max MB of effective memory for solution
-    // handle.infog[30]: total MB of effective memory for solution
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.info[25]: MB of work space used for solution on this process
+    //             (maximum and sum returned by infog[29] and infog[30])
+    // h.rinfog[3-10]: only set if error analysis is on
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
+    // h.infog[14]: number of steps of iterative refinement (zero for us)
+    // h.infog[29]: max MB of effective memory for solution
+    // h.infog[30]: total MB of effective memory for solution
     
-    if( handle.info[0] != 0 )
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsHostSolve returned with info[0]=" << handle.info[0];
+        msg << "psp::MumpsHostSolve returned with info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }
 
 void
-psp::ZMumpsFinalize( psp::ZMumpsHandle& handle )
+psp::MumpsFinalize( psp::MumpsHandle<DComplex>& handle )
 {
+    ZMUMPS_STRUC_C& h = handle._internal;
+
     // Signal that we are destroying a MUMPS instance
-    handle.job = -2;
+    h.job = -2;
 
     // Destroy the instance
-    zmumps_c( &handle );
+    zmumps_c( &h );
 
     // Summary of returned info:
     //
-    // handle.info[0]: 0 if call was successful
-    // handle.info[1]: holds additional info if error or warning
-    // handle.infog[0]: 0 if successful, negative if error, positive if warning
-    // handle.infog[1]: additional info about error or warning
+    // h.info[0]: 0 if call was successful
+    // h.info[1]: holds additional info if error or warning
+    // h.infog[0]: 0 if successful, negative if error, positive if warning
+    // h.infog[1]: additional info about error or warning
     
-    if( handle.info[0] != 0 )
+    if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::ZMumpsFinalize returned with info[0]=" << handle.info[0];
+        msg << "psp::MumpsFinalize returned with info[0]=" << h.info[0];
         throw std::runtime_error( msg.str() );
     }
 }

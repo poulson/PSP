@@ -100,21 +100,28 @@ if(NEED_MATH)
   else(MKL_FOUND)
     # Look for default BLAS/LAPACK/BLACS/ScaLAPACK
     # TODO: Add appropriate BLACS/ScaLAPACK libs
-    set(REFERENCE_REQUIRED SCALAPACK BLACS BLACSF LAPACK BLAS)
+    set(REFERENCE_REQUIRED 
+        SCALAPACK BLACSF BLACSC BLACS BLACSC BLACSF LAPACK BLAS)
     find_library(BLAS_LIB
-                 NAMES blas
+                 NAMES blas blas.a blas.lib
                  PATHS ${REFERENCE_ROOT})
     find_library(LAPACK_LIB
-                 NAMES lapack reflapack
-                 PATHS ${REFERENCE_ROOT})
-    find_library(BLACSF_LIB
-                 NAMES blacsF77 blacsF77init
+                 NAMES lapack lapack.a lapack.lib
+                       reflapack reflapack.a reflapack.lib
                  PATHS ${REFERENCE_ROOT})
     find_library(BLACS_LIB
-                 NAMES blacs
+                 NAMES blacs blacs.a blacs.lib
+                 PATHS ${REFERENCE_ROOT})
+    find_library(BLACSC_LIB
+                 NAMES blacsC blacsC.a blacsC.lib
+                       blacsCinit blacsCinit.a blacsCinit.lib
+                 PATHS ${REFERENCE_ROOT})
+    find_library(BLACSF_LIB
+                 NAMES blacsF77 blacsF77.a blacsF77.lib
+                       blacsF77init blacsF77init.a blacsF77init.lib
                  PATHS ${REFERENCE_ROOT})
     find_library(SCALAPACK_LIB
-                 NAMES scalapack
+                 NAMES scalapack scalapack.a scalapack.lib
                  PATHS ${REFERENCE_ROOT})
     set(REFERENCE_FOUND ON)
     set(MATH_LIBS "")

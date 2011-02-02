@@ -45,7 +45,6 @@ int
 main( int argc, char* argv[] )
 {
     int rankMPI;
-    int negOne = -1;
     int one = 1; 
     int zero = 0;
 
