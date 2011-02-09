@@ -45,13 +45,14 @@ void Usage()
 static char help[] = "A simple PETSc test.\n\n";
 
 extern "C"
-struct SweepingPC
+struct FiniteDiffSweepingPC
 {
-    // TODO: Fill in details of struct. Perhaps the psp one?
+    psp::FiniteDiffControl control;
+    // TODO: parallel info? MUMPS handle?
 };
 
 PetscErrorCode
-SweepingPCSetUp(PC pc,Mat A,Vec x)
+FiniteDiffSweepingPCSetUp(PC pc,Mat A,Vec x)
 {
     PetscErrorCode ierr;
 
@@ -61,11 +62,11 @@ SweepingPCSetUp(PC pc,Mat A,Vec x)
 }
 
 PetscErrorCode 
-SweepingPCApply(PC pc,Vec x,Vec y)
+FiniteDiffSweepingPCApply(PC pc,Vec x,Vec y)
 {
     PetscErrorCode ierr;
 
-    SweepingPC *context;
+    FiniteDiffSweepingPC *context;
     ierr = PCShellGetContext(pc,(void**)&context);
 
     // TODO: Apply sweeping preconditioner. This will require a modified
@@ -75,11 +76,11 @@ SweepingPCApply(PC pc,Vec x,Vec y)
 }
 
 PetscErrorCode
-SweepingPCDestroy(Pc pc)
+FiniteDiffSweepingPCDestroy(Pc pc)
 {
     PetscErrorCode ierr;
 
-    SweepingPC* context;
+    FiniteDiffSweepingPC* context;
     ierr = PCShellGetContext(pc,(void**)&context);
 
     // TODO: Call MUMPS destruction routines
@@ -144,10 +145,12 @@ main( int argc, char* argv[] )
     PC pc;
     KSPGetPC(ksp,&pc);
     KSPSetTolerances(ksp,1.e-6,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
+    FiniteDiffSweepingPC context;
+    // TODO: Fill and set context here
     PCSetType(pc,PCSHELL);
-    PCShellSetSetUp(pc,SweepingPCSetUp);
-    PCShellSetApply(pc,SweepingPCApply);
-    PCShellSetDestroy(pc,SweepingPCDestroy);
+    PCShellSetSetUp(pc,FiniteDiffSweepingPCSetUp);
+    PCShellSetApply(pc,FiniteDiffSweepingPCApply);
+    PCShellSetDestroy(pc,FiniteDiffSweepingPCDestroy);
 
     // Optionally override our KSP options from the commandline. We should
     // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.

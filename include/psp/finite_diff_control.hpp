@@ -60,6 +60,7 @@ enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 // Our sweeping procedure occurs within the z dimensions so that each x-y plane
 // is contiguous.
 //
+extern "C"
 struct FiniteDiffControl
 {
     Stencil stencil; // 7-point or 27-point
