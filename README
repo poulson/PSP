@@ -1,22 +1,21 @@
 This project is only just getting started, so please be patient. We are 
 targeting a working version sometime in March.
 
-On Shark, I am currently targeting the build process looking like:
-    mkdir build
-    cd build
-    cmake -DCMAKE_CXX_COMPILER=/usr/bin/mpicxx.mpich \
-          -DCMAKE_C_COMPILER=/usr/bin/mpicc.mpich \
-          -DCMAKE_Fortran_COMPILER=/usr/bin/mpif90.mpich \
-          -DFortran_FLAGS="-O3 -I/usr/lib/mpich/include" \
-          -DINTEL_ROOT=/opt/intel/Compiler/11.1/072 ..
-    make
+I will soon create a toolchain file for BG/P since Shark is not functioning 
+properly.
 
-Each of the specified compilers should support MPI.
-
-As of now, the resulting executables should be run with /usr/bin/mpirun.mpich,
-e.g., to run bin/PanelTest on a 100 x 100 x 10 grid with 6 processes,
-    cd build/bin
-    mpirun.mpich -np 6 ./PanelTest 100 100 10
-This currently requires entering your password p-1 times when p MPI processes 
-are launched. The need for entering in your password can be fixed by properly
-installing ssh keys or setting up mpd.
+#On Shark, I am currently targeting the build process looking like:
+#    mkdir build
+#    cd build
+#    cmake -DCMAKE_CXX_COMPILER=/usr/bin/mpicxx.mpich \
+#          -DCMAKE_C_COMPILER=/usr/bin/mpicc.mpich \
+#          -DCMAKE_Fortran_COMPILER=/usr/bin/mpif90.mpich \
+#          -DFortran_FLAGS="-O3 -I/usr/lib/mpich/include" \
+#          -DINTEL_ROOT=/opt/intel/Compiler/11.1/072 ..
+#    make
+#
+#
+#As of now, the resulting executables should be run with /usr/bin/mpirun.mpich,
+#e.g., to run bin/PanelTest on a 100 x 100 x 10 grid with 6 processes,
+#    cd build/bin
+#    mpirun.mpich -np 6 ./PanelTest 100 100 10

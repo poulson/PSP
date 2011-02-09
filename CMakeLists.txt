@@ -11,6 +11,11 @@ if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
   message(WARNING "CXX compiler, ${CMAKE_CXX_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CXX or through the '-DCMAKE_CXX_COMPILER' cmake flag. You should probably also clean this build folder first.")
 endif(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
 
+if(NOT PETSC_DIR)
+  message(FATAL_ERROR 
+	  "PETSC_DIR must be set to the location of the PETSc installation.")
+endif(NOT PETSC_DIR)
+
 option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
 option(Fortran_APPENDS_UNDERSCORE 
@@ -204,7 +209,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
-  set(TESTS PanelTest ScaLAPACK-Cholesky)
+  set(TESTS PanelTest PetscTest ScaLAPACK-Cholesky)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
@@ -223,6 +228,9 @@ endforeach(HEADER)
 
 # Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
+
+# Make sure that the PETSc includes can be found
+include_directories("${PETSC_DIR}/include")
 
 # Build the main library (assuming it doesn't stay header-only)
 add_library(psp STATIC ${PSP_SRC})
