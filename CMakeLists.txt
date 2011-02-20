@@ -11,154 +11,158 @@ if(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
   message(WARNING "C compiler, ${CMAKE_C_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CC or through the '-DCMAKE_C_COMPILER' cmake flag. You should probably also clean this build folder first.")
 endif(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
 
-# AMD (linked but not used)
-if(NOT AMD_LIB)
+# We need PETSc's GMRES, so go ahead and use its dependencies, which we must link
+# anyways.
+if(NOT PETSC_DIR)    
   message(
     FATAL_ERROR
-    "AMD_LIB must be set to the location of the AMD library."
+    "PETSC_DIR must be set to the location of the top-level PETSc folder."
   )
+endif(NOT PETSC_DIR)
+if(NOT PETSC_ARCH_DIR)
+  message(
+    FATAL_ERROR
+    "PETSC_ARCH_DIR must be set to the architecture-specific PETSc directory."
+  )
+endif(NOT PETSC_ARCH_DIR)
+set(PETSC_INCLUDE_DIR "${PETSC_DIR}/include")
+set(PETSC_ARCH_INCLUDE_DIR "${PETSC_ARCH_DIR}/include")
+set(PETSC_LIB_DIR "${PETSC_ARCH_DIR}/lib")
+find_library(PETSC_LIB NAMES petsc HINTS ${PETSC_LIB_DIR})
+if(NOT PETSC_LIB)
+  message(
+    FATAL_ERROR
+    "Could not find PETSc using PETSC_ARCH_DIR. Please make sure it was built."
+  )
+endif(NOT PETSC_LIB)
+
+# AMD (linked but not used)
+find_library(AMD_LIB NAMES amd HINTS ${PETSC_LIB_DIR})
+if(NOT AMD_LIB )
+  message(WARNING "Could not find AMD using PETSC_ARCH_DIR.")
 endif(NOT AMD_LIB)
 
 # Chaco (linked but not used)
-if(NOT CHACO_LIB)
-  message(
-    FATAL_ERROR
-    "CHACO_LIB must be set to the location of the Chaco library."
-  )
+find_library(CHACO_LIB NAMES chaco HINTS ${PETSC_LIB_DIR})
+if(NOT CHACO_LIB )
+  message(WARNING "Could not find Chaco using PETSC_ARCH_DIR.")
 endif(NOT CHACO_LIB)
 
-# HYPRE (linked but not used)
-if(NOT HYPRE_LIB)
-  message(
-    FATAL_ERROR
-    "HYPRE_LIB must be set to the location of the HYPRE library."
-  )
+# HYPRE (linked but not used
+find_library(HYPRE_LIB NAMES HYPRE HINTS ${PETSC_LIB_DIR})
+if(NOT HYPRE_LIB )
+  message(WARNING "Could not find HYPRE using PETSC_ARCH_DIR.")
 endif(NOT HYPRE_LIB)
 
 # Metis + ParMetis
+find_library(METIS_LIB NAMES metis HINTS ${PETSC_LIB_DIR})
 if(NOT METIS_LIB)
   message(
     FATAL_ERROR
-    "METIS_LIB must be set to the location of the Metis library."
+    "Could not find Metis library in PETSC_ARCH_DIR. Make sure PETSc built it."
   )
 endif(NOT METIS_LIB)
+find_library(PARMETIS_LIB NAMES parmetis HINTS ${PETSC_LIB_DIR})
 if(NOT PARMETIS_LIB)
   message(
     FATAL_ERROR
-    "PARMETIS_LIB must be set to the location of the ParMetis library."
+    "Could not find ParMetis lib in PETSC_ARCH_DIR. Make sure PETSc built it."
   )
 endif(NOT PARMETIS_LIB)
 
 # MUMPS
-if(NOT MUMPS_LIBS)
+find_library(CMUMPS_LIB NAMES cmumps HINTS ${PETSC_LIB_DIR})
+find_library(DMUMPS_LIB NAMES dmumps HINTS ${PETSC_LIB_DIR})
+find_library(SMUMPS_LIB NAMES smumps HINTS ${PETSC_LIB_DIR})
+find_library(ZMUMPS_LIB NAMES zmumps HINTS ${PETSC_LIB_DIR})
+find_library(MUMPS_COMMON_LIB NAMES mumps_common HINTS ${PETSC_LIB_DIR})
+if(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
+   OR NOT MUMPS_COMMON_LIB)
   message(
     FATAL_ERROR
-    "MUMPS_LIBS must be a semicolon delimited list of the mumps libraries."
+    "Could not find MUMPS libraries in PETSC_ARCH_DIR. Make sure they exist."
   )
-endif(NOT MUMPS_LIBS)
-
-# PETSc
-if(NOT PETSC_INCLUDE_DIR)
-  message(
-    FATAL_ERROR 
-    "PETSC_INCLUDE_DIR must be set to the location of the PETSc include folder."
-  )
-endif(NOT PETSC_INCLUDE_DIR)
-if(NOT PETSC_ARCH_INCLUDE_DIR)
-  message(
-    FATAL_ERROR 
-    "PETSC_ARCH_INCLUDE_DIR must be set to the location of the PETSc arch include folder."
-  )
-endif(NOT PETSC_ARCH_INCLUDE_DIR)
-if(NOT PETSC_LIB)
-  message(
-    FATAL_ERROR
-    "PETSC_LIB must be set to the full path of a PETSc library."
-  )
-endif(NOT PETSC_LIB)
+endif(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
+      OR NOT MUMPS_COMMON_LIB)
+set(MUMPS_LIBS 
+  "${CMUMPS_LIB};${DMUMPS_LIB};${SMUMPS_LIB};${ZMUMPS_LIB};${MUMPS_COMMON_LIB}")
 
 # PLAPACK (linked but not used)
+find_library(PLAPACK_LIB NAMES PLAPACK HINTS ${PETSC_LIB_DIR})
 if(NOT PLAPACK_LIB)
-  message(
-    FATAL_ERROR
-    "PLAPACK_LIB must be set to the location of the PLAPACK library."
-  )
+  message(WARNING "Could not find PLAPACK using PETSC_ARCH_DIR.")
 endif(NOT PLAPACK_LIB)
 
 # PORD (linked but not used)
+find_library(PORD_LIB NAMES pord HINTS ${PETSC_LIB_DIR})
 if(NOT PORD_LIB)
-  message(
-    FATAL_ERROR
-    "PORD_LIB must be set to the location of the PORD library."
-  )
+  message(WARNING "Could not find PORD using PETSC_ARCH_DIR.")
 endif(NOT PORD_LIB)
 
 # Prometheus (linked but not used)
-if(NOT PROMETHEUS_LIBS)
-  message(
-    FATAL_ERROR
-    "PROMETHEUS_LIBS must be the semicolon-delimited list of Prometheus libs."
-  )
-endif(NOT PROMETHEUS_LIBS)
+find_library(PROMETHEUS_MAIN_LIB NAMES prometheus HINTS ${PETSC_LIB_DIR})
+find_library(PROMFEI_LIB NAMES promfei HINTS ${PETSC_LIB_DIR})
+if(NOT PROMETHEUS_MAIN_LIB OR NOT PROMFEI_LIB)
+  message(WARNING "Could not find Prometheus using PETSC_ARCH_DIR.")
+endif(NOT PROMETHEUS_MAIN_LIB OR NOT PROMFEI_LIB)
+set(PROMETHEUS_LIBS "${PROMFEI_LIB};${PROMETHEUS_MAIN_LIB}")
 
-# ScaLAPACK + BLACS
+# ScaLAPACK
+find_library(SCALAPACK_LIB NAMES scalapack HINTS ${PETSC_LIB_DIR})
 if(NOT SCALAPACK_LIB)
   message(
     FATAL_ERROR
-    "SCALAPACK_LIB must be set to the location of the ScaLAPACK library."
+    "Could not find ScaLAPACK using PETSC_ARCH_DIR. Make sure PETSc built it."
   )
 endif(NOT SCALAPACK_LIB)
-if(NOT BLACS_LIBS)
+
+# BLACS
+find_library(BLACS_LIB NAMES blacs HINTS ${PETSC_LIB_DIR})
+if(NOT BLACS_LIB)
   message(
     FATAL_ERROR
-    "BLACS_LIBS must be a semicolon delimited list of the BLACS libraries."
+    "Could not find BLACS using PETSC_ARCH_DIR. Make sure PETSc build it."
   )
-endif(NOT BLACS_LIBS)
+endif(NOT BLACS_LIB)
 
 # SPAI (linked but not used)
+find_library(SPAI_LIB NAMES spai HINTS ${PETSC_LIB_DIR})
 if(NOT SPAI_LIB)
-  message(
-    FATAL_ERROR
-    "SPAI_LIB must be set to the location of the SPAI library."
-  )
+  message(WARNING "Could not find SPAI using PETSC_ARCH_DIR.")
 endif(NOT SPAI_LIB)
 
 # SPOOLES (linked but not used)
+find_library(SPOOLES_LIB NAMES spooles HINTS ${PETSC_LIB_DIR})
 if(NOT SPOOLES_LIB)
-  message(
-    FATAL_ERROR
-    "SPOOLES_LIB must be set to the location of the SPOOLES library."
-  )
+  message(WARNING "Could not find SPOOLES using PETSC_ARCH_DIR.")
 endif(NOT SPOOLES_LIB)
 
 # SuperLU (linked but not used)
+find_library(SUPERLU_LIB NAMES superlu_4.0 superlu HINTS ${PETSC_LIB_DIR})
 if(NOT SUPERLU_LIB)
-  message(
-    FATAL_ERROR
-    "SUPERLU_LIB must be set to the location of the SuperLU library."
-  )
+  message(WARNING "Could not find SuperLU using PETSC_ARCH_DIR.")
 endif(NOT SUPERLU_LIB)
-if(NOT SUPERLU_DIST_LIB)
-  message(
-    FATAL_ERROR
-    "SUPERLU_DIST_LIB must point to the distributed SuperLU library."
+
+# SuperLUDist
+find_library(
+  SUPERLU_DIST_LIB 
+  NAMES superlu_dist_2.3 superlu_dist 
+  HINTS ${PETSC_LIB_DIR}
   )
+if(NOT SUPERLU_DIST_LIB)
+  message(WARNING "Could not find SuperLUDist using PETSC_ARCH_DIR.")
 endif(NOT SUPERLU_DIST_LIB)
 
 # Triangle (linked but not used)
+find_library(TRIANGLE_LIB NAMES triangle HINTS ${PETSC_LIB_DIR})
 if(NOT TRIANGLE_LIB)
-  message(
-    FATAL_ERROR
-    "TRIANGLE_LIB must be set to the location of the Triangle library."
-  )
+  message(WARNING "Could not find Triangle using PETSC_ARCH_DIR.")
 endif(NOT TRIANGLE_LIB)
 
 # UMFPACK (linked but not used)
+find_library(UMFPACK_LIB NAMES umfpack HINTS ${PETSC_LIB_DIR})
 if(NOT UMFPACK_LIB)
-  message(
-    FATAL_ERROR
-    "UMFPACK_LIB must be set to the location of the UMFPACK library."
-  )
+  message(WARNING "Could not find UMFPACK using PETSC_ARCH_DIR.")
 endif(NOT UMFPACK_LIB)
 
 option(BUILD_TESTS "Build the test drivers" ON)
@@ -222,20 +226,6 @@ if(NEED_MATH)
                NAMES libmkl_intel_lp64.a mkl_intel_lp64.lib
                PATHS ${INTEL_ROOT} ${MKL_ROOT}
                PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
-# For now, default to the user specifying the BLACS/ScaLAPACK libs
-#
-#  message(STATUS 
-#          "WARNING: Defaulting to looking for the OpenMPI MKL BLACS library...")
-# TODO: Find a way to choose the correct BLACS library
-#  find_library(MKL_BLACS_LIB 
-#               NAMES libmkl_blacs_lp64.a mkl_blacs_lp64.lib
-#               NAMES libmkl_blacs_openmpi_lp64.a mkl_blacs_openmpi_lp64.lib
-#               PATHS ${INTEL_ROOT} ${MKL_ROOT}
-#               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
-#  find_library(MKL_SCALAPACK_LIB 
-#               NAMES libmkl_scalapack_lp64.a mkl_scalapack_lp64.lib
-#               PATHS ${INTEL_ROOT} ${MKL_ROOT}
-#               PATH_SUFFIXES ${MKL_ARCH_SUBDIRS})
   set(MKL_FOUND TRUE)
   set(MATH_LIBS "")
   foreach(NAME ${MKL_REQUIRED})
@@ -260,22 +250,6 @@ if(NEED_MATH)
                  NAMES lapack lapack.a lapack.lib
                        reflapack reflapack.a reflapack.lib
                  PATHS ${REFERENCE_ROOT})
-# For now, default to the user specifying the BLACS/ScaLAPACK libs
-#
-#    find_library(BLACS_LIB
-#                 NAMES blacs blacs.a blacs.lib
-#                 PATHS ${REFERENCE_ROOT})
-#    find_library(BLACSC_LIB
-#                 NAMES blacsC blacsC.a blacsC.lib
-#                       blacsCinit blacsCinit.a blacsCinit.lib
-#                 PATHS ${REFERENCE_ROOT})
-#    find_library(BLACSF_LIB
-#                 NAMES blacsF77 blacsF77.a blacsF77.lib
-#                       blacsF77init blacsF77init.a blacsF77init.lib
-#                 PATHS ${REFERENCE_ROOT})
-#    find_library(SCALAPACK_LIB
-#                 NAMES scalapack scalapack.a scalapack.lib
-#                 PATHS ${REFERENCE_ROOT})
     set(REFERENCE_FOUND ON)
     set(MATH_LIBS "")
     foreach(NAME ${REFERENCE_REQUIRED})
@@ -368,7 +342,7 @@ list(APPEND EXTERNAL_LIBS "${CHACO_LIB}")
 list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
 list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
 list(APPEND EXTERNAL_LIBS "${PLAPACK_LIB}")
-list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIBS}")
+list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIB}")
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
