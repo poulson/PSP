@@ -21,14 +21,13 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/include")
 #  -DALLOW_NON_INIT
 #  -DAdd_
 if(Fortran_APPENDS_UNDERSCORE)
-  set(FUNDERSCORE_DEF "-DAdd_")
+  set(FUNDERSCORE_DEF "-DAdd_") # This is not as portable as it could be
 else(Fortran_APPENDS_UNDERSCORE)
   set(FUNDERSCORE_DEF "")
 endif(Fortran_APPENDS_UNDERSCORE)
-set(MUMPS_C_FLAGS "${FUNDERSCORE_DEF} -Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z")
-set(MUMPS_Fortran_FLAGS "-Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z")
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${MUMPS_C_FLAGS}")
+add_definitions(-Dparmetis -DMUMPS_ARITH=MUMPS_ARITH_z)
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${FUNDERSCORE_DEF}")
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${MUMPS_Fortran_FLAGS}")
 
 add_library(zmumps STATIC ${MUMPS_SRC})

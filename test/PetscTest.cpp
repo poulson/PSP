@@ -44,15 +44,16 @@ void Usage()
 
 static char help[] = "A simple PETSc test.\n\n";
 
-extern "C"
+extern "C" {
 struct FiniteDiffSweepingPC
 {
     psp::FiniteDiffControl control;
     // TODO: parallel info? MUMPS handle?
 };
+}
 
 PetscErrorCode
-FiniteDiffSweepingPCSetUp(PC pc,Mat A,Vec x)
+FiniteDiffSweepingPCSetUp(PC pc)
 {
     PetscErrorCode ierr;
 
@@ -67,7 +68,7 @@ FiniteDiffSweepingPCApply(PC pc,Vec x,Vec y)
     PetscErrorCode ierr;
 
     FiniteDiffSweepingPC *context;
-    ierr = PCShellGetContext(pc,(void**)&context);
+    ierr = PCShellGetContext(pc,(void**)&context); CHKERRQ(ierr);
 
     // TODO: Apply sweeping preconditioner. This will require a modified
     //       version of the Vec scatter to zero routine.
@@ -76,7 +77,7 @@ FiniteDiffSweepingPCApply(PC pc,Vec x,Vec y)
 }
 
 PetscErrorCode
-FiniteDiffSweepingPCDestroy(Pc pc)
+FiniteDiffSweepingPCDestroy(PC pc)
 {
     PetscErrorCode ierr;
 
@@ -122,7 +123,7 @@ main( int argc, char* argv[] )
     ierr = MatMPISBAIJSetPreallocation(A,1,3,PETSC_NULL,3,PETSC_NULL); 
     CHKERRQ(ierr);
     PetscInt iStart, iEnd;
-    ierr = MatGetOwnershipRange(A,&Istart,&Iend); CHKERRQ(ierr);
+    ierr = MatGetOwnershipRange(A,&iStart,&iEnd); CHKERRQ(ierr);
 
     // TODO: Fill 7-point stencil for our index range here
 

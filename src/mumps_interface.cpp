@@ -34,8 +34,8 @@
 
 #define USE_COMM_WORLD -987654
 void
-psp::MumpsInit
-( psp::MumpsHandle<DComplex>& handle )
+psp::mumps::Init
+( psp::mumps::Handle<DComplex>& handle )
 {
     ZMUMPS_STRUC_C& h = handle._internal;
 
@@ -75,8 +75,8 @@ psp::MumpsInit
 }
 
 void
-psp::MumpsSlaveAnalysisWithManualOrdering
-( psp::MumpsHandle<DComplex>& handle )
+psp::mumps::SlaveAnalysisWithManualOrdering
+( psp::mumps::Handle<DComplex>& handle )
 {
     ZMUMPS_STRUC_C& h = handle._internal;
 
@@ -147,8 +147,8 @@ psp::MumpsSlaveAnalysisWithManualOrdering
 // For the chosen analysis method, MUMPS requires the row/column indices and 
 // the specified ordering to reside entirely on the host...
 void
-psp::MumpsHostAnalysisWithManualOrdering
-( psp::MumpsHandle<DComplex>& handle,
+psp::mumps::HostAnalysisWithManualOrdering
+( psp::mumps::Handle<DComplex>& handle,
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices, int* ordering )
 {
@@ -230,8 +230,8 @@ psp::MumpsHostAnalysisWithManualOrdering
 }
 
 void
-psp::MumpsSlaveAnalysisWithMetisOrdering
-( psp::MumpsHandle<DComplex>& handle )
+psp::mumps::SlaveAnalysisWithMetisOrdering
+( psp::mumps::Handle<DComplex>& handle )
 {
     ZMUMPS_STRUC_C& h = handle._internal;
 
@@ -302,8 +302,8 @@ psp::MumpsSlaveAnalysisWithMetisOrdering
 // For the chosen analysis method, MUMPS requires the row/column indices to 
 // reside entirely on the host...
 void
-psp::MumpsHostAnalysisWithMetisOrdering
-( psp::MumpsHandle<DComplex>& handle, 
+psp::mumps::HostAnalysisWithMetisOrdering
+( psp::mumps::Handle<DComplex>& handle, 
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices )
 {
@@ -382,8 +382,8 @@ psp::MumpsHostAnalysisWithMetisOrdering
 }
 
 int 
-psp::MumpsFactorization
-( psp::MumpsHandle<DComplex>& handle, 
+psp::mumps::Factor
+( psp::mumps::Handle<DComplex>& handle, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
   DComplex* localABuffer )
 {
@@ -465,8 +465,8 @@ psp::MumpsFactorization
 }
 
 void
-psp::MumpsSlaveSolve
-( psp::MumpsHandle<DComplex>& handle, 
+psp::mumps::SlaveSolve
+( psp::mumps::Handle<DComplex>& handle, 
   DComplex* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer ) 
 {
@@ -519,8 +519,8 @@ psp::MumpsSlaveSolve
 
 // MUMPS requires the RHS to reside entirely on the host...
 void
-psp::MumpsHostSolve
-( psp::MumpsHandle<DComplex>& handle,
+psp::mumps::HostSolve
+( psp::mumps::Handle<DComplex>& handle,
   int numRhs, DComplex* rhsBuffer, int rhsLDim, 
               DComplex* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer ) 
@@ -578,7 +578,7 @@ psp::MumpsHostSolve
 }
 
 void
-psp::MumpsFinalize( psp::MumpsHandle<DComplex>& handle )
+psp::mumps::Finalize( psp::mumps::Handle<DComplex>& handle )
 {
     ZMUMPS_STRUC_C& h = handle._internal;
 

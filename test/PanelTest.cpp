@@ -35,6 +35,8 @@
 #include <cstdlib>
 #include <ctime>
 
+using namespace psp;
+
 void Usage()
 {
     std::cout << "PanelTest <nx> <ny> <nz>\n\n"
@@ -79,8 +81,8 @@ main( int argc, char* argv[] )
     srand( time(NULL)+rank );
 
     // This is just an exercise in filling the control structure
-    psp::FiniteDiffControl control;    
-    control.stencil = psp::SEVEN_POINT;
+    FiniteDiffControl control;    
+    control.stencil = SEVEN_POINT;
     control.nx = atoi(argv[1]);
     control.ny = atoi(argv[2]);
     control.nz = atoi(argv[3]);
@@ -91,59 +93,30 @@ main( int argc, char* argv[] )
     control.C = 1.;
     control.b = 5;
     control.d = 5;
-    control.frontBC = psp::PML;
-    control.rightBC = psp::PML;
-    control.backBC = psp::PML;
-    control.leftBC = psp::PML;
-    control.topBC = psp::PML;
+    control.frontBC = PML;
+    control.rightBC = PML;
+    control.backBC = PML;
+    control.leftBC = PML;
+    control.topBC = PML;
 
-    // Go ahead and define the number of degrees of freedom
-    const int numVertices = control.nx * control.ny * control.nz;
-    if( rank == 0 )
-        std::cout << "numVertices = " << numVertices << std::endl;
-
-    psp::MumpsHandle<DComplex> handle;
+    mumps::Handle<DComplex> handle;
     try 
     {
         // Create a handle for an instance of MUMPS
         MPI_Barrier( comm );
-        if( rank == 0 )
-        {
-            double t = MPI_Wtime() - startTime;
-            std::cout << "Starting MumpsInit at t=" << t << std::endl;
-        }
-        psp::MumpsInit( handle );
-        MPI_Barrier( comm );
-        if( rank == 0 )
-        {
-            double t = MPI_Wtime() - startTime;
-            std::cout << "Finished MumpsInit at t=" << t << std::endl;
-        }
+        mumps::Init( handle );
 
-        // Compute the number of nonzeros. We can worry about finding a more 
-        // efficient (possibly analytical) expression later.
-        int vtxChunkSize = 
-            static_cast<int>(static_cast<double>(numVertices)/numProcesses);
-        int myVtxOffset = vtxChunkSize*rank;
-        int numLocalVertices = 
-            ( rank==numProcesses-1 ? numVertices-myVtxOffset : vtxChunkSize );
-        int numLocalNonzeros = 0;
-        for( int vtx=myVtxOffset; vtx<myVtxOffset+numLocalVertices; ++vtx )
-        {
-            const int i = vtx % control.nx;
-            const int j = (vtx/control.nx) % control.ny;
-            const int k = vtx/(control.nx*control.ny);
-
-            ++numLocalNonzeros; // count connection to self
-            if( i != 0 ) ++numLocalNonzeros; // count connection to (i-1,j,k)
-            if( j != 0 ) ++numLocalNonzeros; // count connection to (i,j-1,k)
-            if( k != 0 ) ++numLocalNonzeros; // count connection to (i,j,k-1)
-        }
-        int numNonzeros;
-        MPI_Allreduce
-        ( &numLocalNonzeros, &numNonzeros, 1, MPI_INT, MPI_SUM, comm );
+        int firstLocalVertex, numLocalVertices, numVertices;
+        int numLocalNonzeros, numNonzeros;
+	FiniteDiffInfo
+        ( MPI_COMM_WORLD, control, 
+          firstLocalVertex, numLocalVertices, numVertices, 
+          numLocalNonzeros, numNonzeros );
         if( rank == 0 )
-            std::cout << "numNonzeros = " << numNonzeros << std::endl;
+        {
+            std::cout << "numVertices = " << numVertices << "\n"
+                      << "numNonzeros = " << numNonzeros << std::endl;
+        }
 
         // Perform the analysis step
         MPI_Barrier( comm );
@@ -151,63 +124,20 @@ main( int argc, char* argv[] )
         {
             double t = MPI_Wtime() - startTime;
             std::cout << "Starting MumpsAnalysis at t=" << t << std::endl;
-        }
-        if( rank == 0 )
-        {
-            // Allocate vectors for storing the row and column indices
-            std::vector<int> rowIndices(numNonzeros);
-            std::vector<int> colIndices(numNonzeros);
 
-            // Fill in row and column indices each vertex at a time
-            int z = 0;
-            for( int vtx=0; vtx<numVertices; ++vtx )
-            {
-                const int i = vtx % control.nx;
-                const int j = (vtx/control.nx) % control.ny;
-                const int k = vtx/(control.nx*control.ny); 
-
-                // Add the connection to ourself
-                rowIndices[z] = vtx+1;
-                colIndices[z] = vtx+1;
-                ++z;
-
-                // Handle the possible connection in the x direction
-                if( i != 0 )
-                {
-                    // Add the connection to (i-1,j,k)
-                    rowIndices[z] = vtx+1;
-                    colIndices[z] = vtx;
-                    ++z;
-                }
-
-                // Handle the possible connection in the y direction
-                if( j != 0 )
-                {
-                    // Add the connection to (i,j-1,k)
-                    rowIndices[z] = vtx+1;
-                    colIndices[z] = vtx+1-control.nx;
-                    ++z;
-                }
-
-                // Handle the possible connection in the z direction
-                if( k != 0 )
-                {
-                    // Add the connection to (i,j,k-1)
-                    rowIndices[z] = vtx+1;
-                    colIndices[z] = vtx+1-(control.nx*control.ny);
-                    ++z;
-                }
-            }
+            std::vector<int> rowIndices, colIndices;
+            psp::FiniteDiffConnectivity
+            ( control, numNonzeros, rowIndices, colIndices );
 
             // Call the analysis phase of MUMPS (use ParMetis for now)
-            psp::MumpsHostAnalysisWithMetisOrdering
+	    mumps::HostAnalysisWithMetisOrdering
             ( handle, numVertices, numNonzeros, 
               &rowIndices[0], &colIndices[0] );
         }
         else
         {
             // Call the slave analysis routine
-            psp::MumpsSlaveAnalysisWithMetisOrdering( handle );
+            mumps::SlaveAnalysisWithMetisOrdering( handle );
         }
         MPI_Barrier( comm );
         if( rank == 0 )
@@ -232,7 +162,8 @@ main( int argc, char* argv[] )
             std::vector<DComplex> localA(numLocalNonzeros);
 
             int z = 0;
-            for( int vtx=myVtxOffset; vtx<myVtxOffset+numLocalVertices; ++vtx ) 
+            for( int vtx=firstLocalVertex; 
+                 vtx<firstLocalVertex+numLocalVertices; ++vtx ) 
             {
                 const int i = vtx % control.nx;
                 const int j = (vtx/control.nx) % control.ny;
@@ -287,7 +218,7 @@ main( int argc, char* argv[] )
                 std::cout << "Starting factorization at t=" << t << std::endl;
             }
             numLocalPivots = 
-                psp::MumpsFactorization
+                mumps::Factor
                 ( handle, numLocalNonzeros, &localRowIndices[0], 
                   &localColIndices[0], &localA[0] );
             MPI_Barrier( comm );
@@ -310,9 +241,7 @@ main( int argc, char* argv[] )
                 double t = MPI_Wtime() - startTime;
                 std::cout << "Starting solve with numRhs=" << numRhs << " at t="
                           << t << std::endl;
-            }
-            if( rank == 0 )
-            {
+
                 // Allocate and fill the 10 RHS
                 std::vector<DComplex> rhs(numRhs*numVertices);
                 for( int i=0; i<numRhs*numVertices; ++i )
@@ -330,13 +259,13 @@ main( int argc, char* argv[] )
                     }
                 }
 
-                psp::MumpsHostSolve
+                mumps::HostSolve
                 ( handle, numRhs, &rhs[0], numVertices, 
                   &localSolutions[0], numLocalPivots, &localIntegers[0] );
             }
             else
             {
-                psp::MumpsSlaveSolve
+                mumps::SlaveSolve
                 ( handle, &localSolutions[0], numLocalPivots, 
                   &localIntegers[0] );
             }
@@ -354,7 +283,7 @@ main( int argc, char* argv[] )
                   << e.what() << std::endl;
     }
 
-    psp::MumpsFinalize( handle );
+    mumps::Finalize( handle );
     MPI_Finalize();
     return 0;
 }

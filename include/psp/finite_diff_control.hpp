@@ -30,6 +30,7 @@
 */
 #ifndef PSP_FINITE_DIFF_CONTROL_H
 #define PSP_FINITE_DIFF_CONTROL_H 1
+#include <vector>
 
 namespace psp {
 
@@ -60,10 +61,9 @@ enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 // Our sweeping procedure occurs within the z dimensions so that each x-y plane
 // is contiguous.
 //
-extern "C"
 struct FiniteDiffControl
 {
-    Stencil stencil; // 7-point or 27-point
+    Stencil stencil; // 7-point planned, only 7-point supported so far
     int nx; // number of grid points in x direction
     int ny; // number of grid points in y direction
     int nz; // number of grid points in z direction
@@ -83,6 +83,17 @@ struct FiniteDiffControl
     BoundaryCondition topBC;
     // The bottom boundary condition must be PML since we are sweeping from it.
 };
+
+void
+FiniteDiffInfo
+( MPI_Comm comm, const FiniteDiffControl& control,
+  int& firstLocalVertex, int& numLocalVertices, int& numVertices,
+  int& numLocalNonzeros, int& numNonzeros );
+
+void
+FiniteDiffConnectivity
+( const FiniteDiffControl& control, const int numNonzeros,
+  std::vector<int>& rowIndices, std::vector<int>& colIndices );
 
 } // namespace psp
 

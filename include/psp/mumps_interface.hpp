@@ -42,7 +42,7 @@ struct DComplex { double r; double i; };
 // use their headers when using psp
 #define MUMPS_VERSION "4.9.2"
 #define MUMPS_VERSION_MAX_LEN 14
-extern "C"
+extern "C" {
 struct ZMUMPS_STRUC_C {
     int sym;
     int par;
@@ -134,6 +134,7 @@ struct ZMUMPS_STRUC_C {
     char write_problem[256];
     int lwk_user;
 };
+}
 
 // This is the prototype of the double-complex MUMPS routine, but it should 
 // not be called directly from within psp
@@ -141,57 +142,59 @@ extern "C" void
 zmumps_c( ZMUMPS_STRUC_C* handle );
 
 namespace psp {
+namespace mumps {
 
-template<typename F> struct MumpsHandle;
-template<> struct MumpsHandle<DComplex> { ZMUMPS_STRUC_C _internal; };
-
-void 
-MumpsInit
-( MumpsHandle<DComplex>& handle );
+template<typename F> struct Handle;
+template<> struct Handle<DComplex> { ZMUMPS_STRUC_C _internal; };
 
 void 
-MumpsSlaveAnalysisWithManualOrdering
-( MumpsHandle<DComplex>& handle );
+Init
+( Handle<DComplex>& handle );
 
 void 
-MumpsHostAnalysisWithManualOrdering
-( MumpsHandle<DComplex>& handle,
+SlaveAnalysisWithManualOrdering
+( Handle<DComplex>& handle );
+
+void 
+HostAnalysisWithManualOrdering
+( Handle<DComplex>& handle,
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices, int* ordering );
 
 void 
-MumpsSlaveAnalysisWithMetisOrdering
-( MumpsHandle<DComplex>& handle );
+SlaveAnalysisWithMetisOrdering
+( Handle<DComplex>& handle );
 
 void 
-MumpsHostAnalysisWithMetisOrdering
-( MumpsHandle<DComplex>& handle, 
+HostAnalysisWithMetisOrdering
+( Handle<DComplex>& handle, 
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices );
 
 int 
-MumpsFactorization
-( MumpsHandle<DComplex>& handle, 
+Factor
+( Handle<DComplex>& handle, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
   DComplex* localABuffer );
 
 void
-MumpsSlaveSolve
-( MumpsHandle<DComplex>& handle, 
+SlaveSolve
+( Handle<DComplex>& handle, 
   DComplex* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer );
 
 void
-MumpsHostSolve
-( MumpsHandle<DComplex>& handle, 
+HostSolve
+( Handle<DComplex>& handle, 
   int numRhs, DComplex* rhsBuffer, int rhsLDim, 
               DComplex* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer );
 
 void
-MumpsFinalize
-( MumpsHandle<DComplex>& handle );
+Finalize
+( Handle<DComplex>& handle );
 
+} // namespace mumps
 } // namespace psp
 
 #endif // PSP_MUMPS_INTERFACE_H
