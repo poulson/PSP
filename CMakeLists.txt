@@ -1,3 +1,33 @@
+#
+#  Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+#  of a sweeping preconditioner for 3d Helmholtz equations.
+#
+#  Copyright (C) 2011 Jack Poulson, Lexing Ying, and
+#  The University of Texas at Austin
+#
+#  This program is free software: you can redistribute it and/or modify
+#  it under the terms of the GNU General Public License as published by
+#  the Free Software Foundation, either version 3 of the License, or
+#  (at your option) any later version.
+#
+#  This program is distributed in the hope that it will be useful,
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#  GNU General Public License for more details.
+#
+#  You should have received a copy of the GNU General Public License
+#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#  Additional permissions under GNU GPL version 3 section 7
+#
+#  If you modify this Program, or any covered work, by linking or combining it
+#  with MUMPS and/or ParMetis (or modified versions of those libraries),
+#  containing parts covered by the terms of the respective licenses of MUMPS
+#  and ParMetis, the licensors of this Program grant you additional permission
+#  to convey the resulting work. {Corresponding Source for a non-source form of
+#  such a combination shall include the source code for the parts of MUMPS and
+#  ParMetis used as well as that of the covered work.}
+#
 cmake_minimum_required(VERSION 2.8)
 project(PSP)
 
@@ -36,24 +66,6 @@ if(NOT PETSC_LIB)
   )
 endif(NOT PETSC_LIB)
 
-# AMD (linked but not used)
-find_library(AMD_LIB NAMES amd HINTS ${PETSC_LIB_DIR})
-if(NOT AMD_LIB )
-  message(WARNING "Could not find AMD using PETSC_ARCH_DIR.")
-endif(NOT AMD_LIB)
-
-# Chaco (linked but not used)
-find_library(CHACO_LIB NAMES chaco HINTS ${PETSC_LIB_DIR})
-if(NOT CHACO_LIB )
-  message(WARNING "Could not find Chaco using PETSC_ARCH_DIR.")
-endif(NOT CHACO_LIB)
-
-# HYPRE (linked but not used
-find_library(HYPRE_LIB NAMES HYPRE HINTS ${PETSC_LIB_DIR})
-if(NOT HYPRE_LIB )
-  message(WARNING "Could not find HYPRE using PETSC_ARCH_DIR.")
-endif(NOT HYPRE_LIB)
-
 # Metis + ParMetis
 find_library(METIS_LIB NAMES metis HINTS ${PETSC_LIB_DIR})
 if(NOT METIS_LIB)
@@ -79,33 +91,18 @@ find_library(MUMPS_COMMON_LIB NAMES mumps_common HINTS ${PETSC_LIB_DIR})
 if(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
    OR NOT MUMPS_COMMON_LIB)
   message(
-    FATAL_ERROR
-    "Could not find MUMPS libraries in PETSC_ARCH_DIR. Make sure they exist."
+    FATAL_ERROR "Could not find MUMPS libraries in PETSC_ARCH_DIR. Make sure they exist."
   )
 endif(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
       OR NOT MUMPS_COMMON_LIB)
 set(MUMPS_LIBS 
   "${CMUMPS_LIB};${DMUMPS_LIB};${SMUMPS_LIB};${ZMUMPS_LIB};${MUMPS_COMMON_LIB}")
 
-# PLAPACK (linked but not used)
-find_library(PLAPACK_LIB NAMES PLAPACK HINTS ${PETSC_LIB_DIR})
-if(NOT PLAPACK_LIB)
-  message(WARNING "Could not find PLAPACK using PETSC_ARCH_DIR.")
-endif(NOT PLAPACK_LIB)
-
 # PORD (linked but not used)
 find_library(PORD_LIB NAMES pord HINTS ${PETSC_LIB_DIR})
 if(NOT PORD_LIB)
   message(WARNING "Could not find PORD using PETSC_ARCH_DIR.")
 endif(NOT PORD_LIB)
-
-# Prometheus (linked but not used)
-find_library(PROMETHEUS_MAIN_LIB NAMES prometheus HINTS ${PETSC_LIB_DIR})
-find_library(PROMFEI_LIB NAMES promfei HINTS ${PETSC_LIB_DIR})
-if(NOT PROMETHEUS_MAIN_LIB OR NOT PROMFEI_LIB)
-  message(WARNING "Could not find Prometheus using PETSC_ARCH_DIR.")
-endif(NOT PROMETHEUS_MAIN_LIB OR NOT PROMFEI_LIB)
-set(PROMETHEUS_LIBS "${PROMFEI_LIB};${PROMETHEUS_MAIN_LIB}")
 
 # ScaLAPACK
 find_library(SCALAPACK_LIB NAMES scalapack HINTS ${PETSC_LIB_DIR})
@@ -124,46 +121,6 @@ if(NOT BLACS_LIB)
     "Could not find BLACS using PETSC_ARCH_DIR. Make sure PETSc build it."
   )
 endif(NOT BLACS_LIB)
-
-# SPAI (linked but not used)
-find_library(SPAI_LIB NAMES spai HINTS ${PETSC_LIB_DIR})
-if(NOT SPAI_LIB)
-  message(WARNING "Could not find SPAI using PETSC_ARCH_DIR.")
-endif(NOT SPAI_LIB)
-
-# SPOOLES (linked but not used)
-find_library(SPOOLES_LIB NAMES spooles HINTS ${PETSC_LIB_DIR})
-if(NOT SPOOLES_LIB)
-  message(WARNING "Could not find SPOOLES using PETSC_ARCH_DIR.")
-endif(NOT SPOOLES_LIB)
-
-# SuperLU (linked but not used)
-find_library(SUPERLU_LIB NAMES superlu_4.0 superlu HINTS ${PETSC_LIB_DIR})
-if(NOT SUPERLU_LIB)
-  message(WARNING "Could not find SuperLU using PETSC_ARCH_DIR.")
-endif(NOT SUPERLU_LIB)
-
-# SuperLUDist
-find_library(
-  SUPERLU_DIST_LIB 
-  NAMES superlu_dist_2.3 superlu_dist 
-  HINTS ${PETSC_LIB_DIR}
-  )
-if(NOT SUPERLU_DIST_LIB)
-  message(WARNING "Could not find SuperLUDist using PETSC_ARCH_DIR.")
-endif(NOT SUPERLU_DIST_LIB)
-
-# Triangle (linked but not used)
-find_library(TRIANGLE_LIB NAMES triangle HINTS ${PETSC_LIB_DIR})
-if(NOT TRIANGLE_LIB)
-  message(WARNING "Could not find Triangle using PETSC_ARCH_DIR.")
-endif(NOT TRIANGLE_LIB)
-
-# UMFPACK (linked but not used)
-find_library(UMFPACK_LIB NAMES umfpack HINTS ${PETSC_LIB_DIR})
-if(NOT UMFPACK_LIB)
-  message(WARNING "Could not find UMFPACK using PETSC_ARCH_DIR.")
-endif(NOT UMFPACK_LIB)
 
 option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
@@ -275,41 +232,16 @@ if(NEED_MATH)
   list(APPEND MATH_LIBS m)
 endif(NEED_MATH)
 
-# Attempt to detect the BLAS/LAPACK underscore conventions. 
-# We currently only handle whether or not there is an underscore appended.
+# Figure out how we can convert MPI_Comm's from C to Fortran
 include(CheckFunctionExists)
-set(CMAKE_REQUIRED_LIBRARIES ${MATH_LIBS})
-check_function_exists(daxpy HAVE_DAXPY)
-if(HAVE_DAXPY)
-  set(BLAS_POST FALSE)
-  set(BLAS_DEFS "")
-else(HAVE_DAXPY)
-  check_function_exists(daxpy_ HAVE_DAXPY_POST)
-  if(HAVE_DAXPY_POST)
-    set(BLAS_POST TRUE)
-    set(BLAS_DEFS "-DBLAS_POST")
-  else(HAVE_DAXPY_POST)
-    message(FATAL_ERROR "Could not determine BLAS format.")
-  endif(HAVE_DAXPY_POST)
-endif(HAVE_DAXPY)
-check_function_exists(dpotrf HAVE_DPOTRF)
-if(HAVE_DPOTRF)
-  set(LAPACK_POST FALSE)
-  set(LAPACK_DEFS "")
-else(HAVE_DPOTRF)
-  check_function_exists(dpotrf_ HAVE_DPOTRF_POST)
-  if(HAVE_DPOTRF_POST)
-    set(LAPACK_POST TRUE)
-    set(LAPACK_DEFS "-DLAPACK_POST")
-  else(HAVE_DPOTRF_POST)
-    message(FATAL_ERROR "Could not determine LAPACK format.")
-  endif(HAVE_DPOTRF_POST)
-endif(HAVE_DPOTRF)
+check_function_exists(MPI_Comm_c2f HAVE_MPI_COMM_C2F)
+check_function_exists(MPIR_FromPointer HAVE_MPIR_FROM_POINTER)
 
-check_function_exists(mkl_set_num_threads HAVE_MKL)
-
-#configure_file( ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
-#                ${CMAKE_BINARY_DIR}/include/psp/config.h )
+# Store all of our system-specific definitions
+configure_file( 
+  ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
+  ${CMAKE_BINARY_DIR}/include/psp/config.h 
+)
 
 # Grab all of the .c, .cpp, .h, and .hpp PSP files
 file(GLOB_RECURSE PSP_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
@@ -329,19 +261,9 @@ endif(BUILD_TESTS)
 # to be linked last
 add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 set(EXTERNAL_LIBS "${PETSC_LIB}")
-list(APPEND EXTERNAL_LIBS "${AMD_LIB}")
-list(APPEND EXTERNAL_LIBS "${HYPRE_LIB}")
-list(APPEND EXTERNAL_LIBS "${PROMETHEUS_LIBS}")
-list(APPEND EXTERNAL_LIBS "${SPAI_LIB}")
-list(APPEND EXTERNAL_LIBS "${SPOOLES_LIB}")
-list(APPEND EXTERNAL_LIBS "${TRIANGLE_LIB}")
-list(APPEND EXTERNAL_LIBS "${UMFPACK_LIB}")
 list(APPEND EXTERNAL_LIBS "${MUMPS_LIBS}")
-list(APPEND EXTERNAL_LIBS "${SUPERLU_DIST_LIB};${SUPERLU_LIB}")
-list(APPEND EXTERNAL_LIBS "${CHACO_LIB}")
 list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
 list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
-list(APPEND EXTERNAL_LIBS "${PLAPACK_LIB}")
 list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIB}")
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
@@ -362,7 +284,7 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 include_directories("${PETSC_INCLUDE_DIR}")
 include_directories("${PETSC_ARCH_INCLUDE_DIR}")
 
-# Build the main library (assuming it doesn't stay header-only)
+# Build the PSP source
 add_library(psp STATIC ${PSP_SRC})
 
 # Build the test drivers if necessary

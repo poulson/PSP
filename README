@@ -1,21 +1,20 @@
 This project is only just getting started, so please be patient. We are 
 targeting a working version sometime in March.
 
-I will soon create a toolchain file for BG/P since Shark is not functioning 
-properly.
+The scientific dependencies (MUMPS,ScaLAPACK,BLACS,Metis,ParMetis) have been 
+moved to PETSc since PETSc's GMRES is going to be used anyway. Since ParMetis 
+is not used by typical PETSc installations from MUMPS, petsc-dev should be used.
+You can find instructions for obtaining a copy of petsc-dev here:
+http://www.mcs.anl.gov/petsc/petsc-2/developers/index.html
 
-#On Shark, I am currently targeting the build process looking like:
-#    mkdir build
-#    cd build
-#    cmake -DCMAKE_CXX_COMPILER=/usr/bin/mpicxx.mpich \
-#          -DCMAKE_C_COMPILER=/usr/bin/mpicc.mpich \
-#          -DCMAKE_Fortran_COMPILER=/usr/bin/mpif90.mpich \
-#          -DFortran_FLAGS="-O3 -I/usr/lib/mpich/include" \
-#          -DINTEL_ROOT=/opt/intel/Compiler/11.1/072 ..
-#    make
-#
-#
-#As of now, the resulting executables should be run with /usr/bin/mpirun.mpich,
-#e.g., to run bin/PanelTest on a 100 x 100 x 10 grid with 6 processes,
-#    cd build/bin
-#    mpirun.mpich -np 6 ./PanelTest 100 100 10
+The following configure flags are being used on BG/P:
+
+    ./config/configure.py --with-clanguage=cxx --download-mumps=1 --download-parmetis=1 --with-parmetis=1 --download-scalapack=1 --download-blacs=1 --with-lapack-lib=/soft/apps/LAPACK/liblapack_bgp.a --with-blas-lib=/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a --with-cxx=`which mpixlcxx_r` --with-cc=`which mpixlc_r` --with-fc='mpixlf77_r -qnosave' --with-x=0
+
+PSP can then be built on BG/P using:
+    cd psp 
+    mkdir build
+    cd build
+    cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/BGP-xl_dec2010-essl_4.3.1-1.cmake -DPETSC_DIR=/path/to/top/of/petsc-dev -DPETSC_DIR=/path/to/top/of/petsc-dev/then/arch ..
+    make
+

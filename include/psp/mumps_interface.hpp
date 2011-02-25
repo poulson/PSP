@@ -34,15 +34,14 @@
 #include <vector>
 
 extern "C" {
+
 struct SComplex { float r; float i; };    
 struct DComplex { double r; double i; };    
-}
 
 // We mirror MUMPS's C interface definition here so that we can avoid having to 
 // use their headers when using psp
 #define MUMPS_VERSION "4.9.2"
 #define MUMPS_VERSION_MAX_LEN 14
-extern "C" {
 struct ZMUMPS_STRUC_C {
     int sym;
     int par;
@@ -134,7 +133,8 @@ struct ZMUMPS_STRUC_C {
     char write_problem[256];
     int lwk_user;
 };
-}
+
+} // extern "C"
 
 // This is the prototype of the double-complex MUMPS routine, but it should 
 // not be called directly from within psp
@@ -149,7 +149,7 @@ template<> struct Handle<DComplex> { ZMUMPS_STRUC_C _internal; };
 
 void 
 Init
-( Handle<DComplex>& handle );
+( MPI_Comm comm, Handle<DComplex>& handle );
 
 void 
 SlaveAnalysisWithManualOrdering

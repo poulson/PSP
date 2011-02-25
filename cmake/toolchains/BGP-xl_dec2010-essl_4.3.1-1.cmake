@@ -5,8 +5,10 @@ set(CMAKE_CXX_COMPILER /bgsys/drivers/ppcfloor/comm/bin/mpixlcxx_r)
 
 set(CXX_FLAGS "-g -O4")
 
-set(PETSC_DIR "/soft/apps/petsc-3.1-p2")
-set(PETSC_ARCH_DIR "${PETSC_DIR}/bgp-ibm-cxx-opt")
+# Since I am currently building my own version of petsc-dev, this information needs
+# to be manually specified
+#set(PETSC_DIR "/soft/apps/petsc-3.1-p2")
+#set(PETSC_ARCH_DIR "${PETSC_DIR}/bgp-ibm-cxx-opt")
 
 set(LAPACK "-L/soft/apps/LAPACK -llapack_bgp")
 set(ESSL_DIR "/soft/apps/ESSL-4.3.1-1")

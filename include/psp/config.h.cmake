@@ -28,14 +28,15 @@
    such a combination shall include the source code for the parts of MUMPS and
    ParMetis used as well as that of the covered work.}
 */
-#ifndef PSP_H
-#define PSP_H 1
+#ifndef PSP_CONFIG_H
+#define PSP_CONFIG_H 1
 
-#include "mpi.h"
+/* Basic variables */
+#define PSP_VERSION_MAJOR @PSP_VERSION_MAJOR@
+#define PSP_VERSION_MINOR @PSP_VERSION_MINOR@
 
-#include "psp/config.h"
+/* Configuration-specific variables */
+#cmakedefine HAVE_MPI_COMM_C2F
+#cmakedefine HAVE_MPIR_FROM_POINTER
 
-#include "psp/finite_diff_control.hpp"
-#include "psp/mumps_interface.hpp"
-
-#endif // PSP_H
+#endif /* PSP_CONFIG_H */

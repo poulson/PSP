@@ -32,10 +32,26 @@
 #include <sstream>
 #include <stdexcept>
 
+namespace {
+int 
+TranslateCommFromCToF( MPI_Comm comm )
+{
+    int fortranComm;
+#if defined(HAVE_MPI_COMM_C2F)
+    fortranComm = MPI_Comm_c2f( comm );
+#elif defined(HAVE_MPIR_FROM_POINTER)
+    fortranComm = MPIR_FromPointer( comm );
+#else
+    fortranComm = (int)comm;
+#endif
+    return fortranComm;
+}
+} // anonymous namespace
+
 #define USE_COMM_WORLD -987654
 void
 psp::mumps::Init
-( psp::mumps::Handle<DComplex>& handle )
+( MPI_Comm comm, psp::mumps::Handle<DComplex>& handle )
 {
     ZMUMPS_STRUC_C& h = handle._internal;
 
@@ -48,8 +64,8 @@ psp::mumps::Init
     // Have the host participate in the factorization/solve as well
     h.par = 1; 
 
-    // Use the entire MPI_COMM_WORLD communicator
-    h.comm_fortran = USE_COMM_WORLD;
+    // Convert the specified communicator so that it can be used by Fortran
+    h.comm_fortran = TranslateCommFromCToF( comm );
 
     // Define the input/output settings
     h.icntl[0] = 6; // default error output stream (- to suppress)

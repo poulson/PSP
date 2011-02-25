@@ -104,7 +104,7 @@ main( int argc, char* argv[] )
     {
         // Create a handle for an instance of MUMPS
         MPI_Barrier( comm );
-        mumps::Init( handle );
+        mumps::Init( comm, handle );
 
         int firstLocalVertex, numLocalVertices, numVertices;
         int numLocalNonzeros, numNonzeros;
