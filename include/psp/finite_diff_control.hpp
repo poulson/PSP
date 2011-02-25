@@ -40,17 +40,17 @@ enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 // Our control structure for defining the basic parameters for the problem 
 // to be solved. The domain is assumed to be of the form:
 //
-//                 _______________ (wx,wy,wz)
+//                 _______________ (wx,wy,0)
 //                /              /|
-//            y  /              / |
+//            x  /              / |
 //              /              /  |
 // sweep dir.  /______________/   |
-//     /\      |              |   |
-//     ||      |              |   / (wx,wy,0)
+//     ||      |              |   |
+//     ||      |              |   / (wx,wy,wz)
 //     ||    z |              |  /  
 //     ||      |              | /  
-//     ||      |______________|/
-//          (0,0,0)    x    (wx,0,0)
+//     \/      |______________|/
+//          (0,0,wz)    y    (0,wy,wz)
 //
 // PML must be enforced at least on the bottom face, and the remaining faces 
 // may be set as either PML or a zero Dirichlet boundary condition.
@@ -80,8 +80,8 @@ struct FiniteDiffControl
     BoundaryCondition rightBC;
     BoundaryCondition backBC;
     BoundaryCondition leftBC;
-    BoundaryCondition topBC;
-    // The bottom boundary condition must be PML since we are sweeping from it.
+    BoundaryCondition bottomBC;
+    // The top boundary condition must be PML since we are sweeping from it.
 };
 
 void
