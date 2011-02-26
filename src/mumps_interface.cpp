@@ -29,10 +29,13 @@
    ParMetis used as well as that of the covered work.}
 */
 #include "psp.hpp"
+#include <iostream>
 #include <sstream>
 #include <stdexcept>
+#include <string>
 
 namespace {
+
 int 
 TranslateCommFromCToF( MPI_Comm comm )
 {
@@ -46,6 +49,214 @@ TranslateCommFromCToF( MPI_Comm comm )
 #endif
     return fortranComm;
 }
+
+const std::string
+DecipherMessage( int info1, int info2 )
+{
+    std::string msg;
+    std::ostringstream os;
+
+    if( info1 > 0 )
+    {
+        os << "Index (in IRN or JCN) out of range. Action taken by subroutine "
+              "is to ignore any such entries and continue. " << info2 
+           << " faulty entries were found.";
+        const std::string warning1 = os.str();
+        const std::string warning2 = 
+            "During error analysis the max-norm of the computed solution was "
+            "found to be zero.";
+        const std::string warning4 = 
+            "User data JCN has been modified by the solver.";
+        const std::string warning8 = 
+            "More than ICNTL(10) refinement iterations are required.";
+        if( info1 & 1 == 0 )
+            msg += warning1;
+        if( info1 & 2 == 0 )
+            msg += warning2;
+        if( info1 & 4 == 0 )
+            msg += warning4;
+        if( info1 & 8 == 0 )
+            msg += warning8;
+    }
+    else
+    {
+        switch( info1 )
+        {
+        case 0:
+            msg = "Success";
+            break;
+        case -1:
+            os << "An error occurred on process " << info2;
+            msg = os.str();
+            break;
+        case -2:
+            os << "NZ is out of range. NZ=" << info2;
+            msg = os.str();
+            break;
+        case -3:
+            msg = "MUMPS was called with an invalid value for JOB.";
+            break;
+        case -4:
+            os << "Error in user-provided permutation array in position " 
+               << info2;  
+            msg = os.str();
+            break;
+        case -5:
+            os << "Problem of REAL workspace allocation of size " << info2 
+               << " during analysis"; 
+            msg = os.str();
+            break;
+        case -6:
+            msg = "Matrix is singular in structure.";
+            break;
+        case -7:
+            os << "Problem of INTEGER workspace allocation of size " << info2
+               << " during analysis";
+            msg = os.str();
+            break;
+        case -8:
+            msg = "Main internal integer workarray IS too small for "
+                  "factorization. ICNTL(14) should be increased.";
+            break;
+        case -9:
+            msg = "Main internal workarray S is too small";
+            break;
+        case -10:
+            msg = "Numerically singular matrix.";
+            break;
+        case -11:
+            msg = "Internal workarray S too small for solution";
+            break;
+        case -12:
+            msg = "Internal workarray S too small for iterative refinement";
+            break;
+        case -13:
+            msg = "Error in Fortran ALLOCATE statement.";
+            break;
+        case -14:
+            msg = "Internal workarray IS too small for solution";
+            break;
+        case -15:
+            msg = "Integer workarray IS too small for refinement and/or error "
+                  "analysis";
+            break;
+        case -16:
+            os << "N is out of range. N=" << info2;
+            msg = os.str();
+            break;
+        case -17:
+            msg = "Internal send buffer allocated by MUMPS is too small. "
+                  "Increase ICNTL(14) and recall.";
+            break;
+        case -20:
+            msg = "Internal reception buffer allocated by MUMPS is too small. "
+                  "Increase ICNTL(14) and recall.";
+            break;
+        case -21:
+            msg = "Value of PAR=0 is not allowed because only one process is "
+                  "available";
+            break;
+        case -22:
+            os << "An invalid pointer array was provided. Pointer is for ";
+            switch( info2 )
+            {
+            case 1: os << "IRN or ELTPTR"; break;
+            case 2: os << "JCN or ELTVAR"; break;
+            case 3: os << "PERM_IN"; break;
+            case 4: os << "A or A_ELT"; break;
+            case 5: os << "ROWSCA"; break;
+            case 6: os << "COLSCA"; break;
+            case 7: os << "RHS"; break;
+            case 8: os << "LISTVAR_SCHUR"; break;
+            case 9: os << "SCHUR"; break;
+            case 10: os << "RHS_SPARSE"; break;
+            case 11: os << "IRHS_SPARSE"; break;
+            case 12: os << "IRHS_PTR"; break;
+            case 13: os << "IRHS_PTR"; break;
+            case 14: os << "SOL_LOC"; break;
+            case 15: os << "REDRHS"; break;
+            default: os << "N/A"; break;
+            }
+            msg = os.str();
+            break;
+        case -23:
+            msg = "MPI was not initialized by user before calling MUMPS";
+            break;
+        case -24:
+            os << "NELT is out of range. NELT=" << info2;
+            msg = os.str();
+            break;
+        case -25:
+            msg = "BLACS could not be initialized properly. Try netlib BLACS.";
+            break;
+        case -26:
+            os << "LRHS is out of range. LRHS=" << info2;
+            msg = os.str();
+            break;
+        case -27:
+            os << "NZ_RHS and IRHS_PTR do not match. IRHS_PTR=" << info2;
+            msg = os.str();
+            break;
+        case -28:
+            os << "IRHS_PTR is not equal to 1. IRHS_PTR=" << info2;
+            msg = os.str();
+            break;
+        case -29:
+            os << "LSOL_LOC is smaller than INFO(23). LSOL_LOC=" << info2;
+            msg = os.str();
+            break;
+        case -30:
+            os << "SCHUR_LLD is out of range. SCHUR_LLD=" << info2;
+            msg = os.str();
+            break;
+        case -31:
+            os << "A 2d block cyclic Schur complement required for ICNTL(19)=3,"
+                  " but you must use MBLOCK=NBLOCK. MBLOCK-NBLOCK=" << info2;
+            msg = os.str();
+            break;
+        case -32:
+            os << "Incompatible values of NRHS and ICNTL(25). NRHS=" << info2; 
+            msg = os.str();
+            break;
+        case -33:
+            os << "ICNTL(26) was needed during solve phase but Schur complement"
+                  "was not computed during factorization. ICNTL(26)="
+               << info2;     
+            msg = os.str();
+            break;
+        case -34:
+            os << "LREDRHS is out of range. LREDRHS=" << info2;
+            msg = os.str();
+            break;
+        case -35:
+            msg = "Expansion phase was called without calling the reduction "
+                  "phase";
+            break;
+        case -36:
+            os << "Incompatible values of ICNTL(25) and INFOG(28). ICNTL(25)=" 
+               << info2;
+            msg = os.str();
+            break;
+        case -38:
+            msg = "Parallel analysis was set but PT-SCOTCH or ParMetis were not"
+                  " provided";
+            break;
+        case -40:
+            msg = "Matrix was indicated as positive definite but a negative or "
+                  "null pivot was found during the processing of the root by "
+                  "ScaLAPACK. SYM=2 should be used.";
+            break;
+        case -90:
+            msg = "Error in out-of-core management. See the error message "
+                  "returned on output unit ICNTL(1) for more information.";
+            break;
+        default:
+            msg = "N/A";
+        }
+    }
+    return msg;
+}
+
 } // anonymous namespace
 
 #define USE_COMM_WORLD -987654
@@ -85,7 +296,8 @@ psp::mumps::Init
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsInit returned with info[0]=" << h.info[0];
+        msg << "psp::mumps::Init: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -100,7 +312,7 @@ psp::mumps::SlaveAnalysisWithManualOrdering
     h.job = 1;
 
     // Fill the control variables
-    h.icntl[4] = 0; // default host anlalysis method
+    h.icntl[4] = 0; // default host analysis method
     h.icntl[5] = 7; // default permutation/scaling option
     h.icntl[6] = 7; // manual ordering is supplied
     h.icntl[7] = 77; // let MUMPS determine the scaling strategy
@@ -154,8 +366,8 @@ psp::mumps::SlaveAnalysisWithManualOrdering
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsSlaveAnalysisWithManualOrdering returned with "
-               "info[0]=" << h.info[0];
+        msg << "psp::mumps::SlaveAnalysisWithManualOrdering: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -185,7 +397,7 @@ psp::mumps::HostAnalysisWithManualOrdering
     h.perm_in = ordering;
 
     // Fill the control variables
-    h.icntl[4] = 0; // default host anlalysis method
+    h.icntl[4] = 0; // default host analysis method
     h.icntl[5] = 7; // default permutation/scaling option
     h.icntl[6] = 7; // manual ordering is supplied
     h.icntl[7] = 77; // let MUMPS determine the scaling strategy
@@ -239,8 +451,8 @@ psp::mumps::HostAnalysisWithManualOrdering
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsHostAnalysisWithManualOrdering returned with "
-               "info[0]=" << h.info[0];
+        msg << "psp::mumps::HostAnalysisWithManualOrdering: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -309,8 +521,8 @@ psp::mumps::SlaveAnalysisWithMetisOrdering
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsSlaveAnalysisWithMetisOrdering returned with "
-               "info[0]=" << h.info[0];
+        msg << "psp::mumps::SlaveAnalysisWithMetisOrdering: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -391,8 +603,8 @@ psp::mumps::HostAnalysisWithMetisOrdering
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsHostAnalysisWithMetisOrdering returned with "
-               "info[0]=" << h.info[0];
+        msg << "psp::mumps::HostAnalysisWithMetisOrdering: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -472,8 +684,8 @@ psp::mumps::Factor
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsFactorization returned with info[0]="
-            << h.info[0];
+        msg << "psp::mumps::Factor: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 
@@ -528,7 +740,8 @@ psp::mumps::SlaveSolve
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsSlaveSolve returned with info[0]=" << h.info[0];
+        msg << "psp::mumps::SlaveSolve: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -588,7 +801,8 @@ psp::mumps::HostSolve
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsHostSolve returned with info[0]=" << h.info[0];
+        msg << "psp::mumps::HostSolve: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }
@@ -614,7 +828,8 @@ psp::mumps::Finalize( psp::mumps::Handle<DComplex>& handle )
     if( h.info[0] != 0 )
     {
         std::ostringstream msg;
-        msg << "psp::MumpsFinalize returned with info[0]=" << h.info[0];
+        msg << "psp::mumps::HostFinalize: " 
+            << DecipherMessage( h.info[0], h.info[1] );
         throw std::runtime_error( msg.str() );
     }
 }

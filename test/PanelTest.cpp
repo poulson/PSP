@@ -97,7 +97,7 @@ main( int argc, char* argv[] )
     control.rightBC = PML;
     control.backBC = PML;
     control.leftBC = PML;
-    control.topBC = PML;
+    control.bottomBC = PML;
 
     mumps::Handle<DComplex> handle;
     try 
@@ -114,7 +114,9 @@ main( int argc, char* argv[] )
           numLocalNonzeros, numNonzeros );
         if( rank == 0 )
         {
-            std::cout << "numVertices = " << numVertices << "\n"
+            std::cout << "numLocalVertices = " << numLocalVertices << "\n"
+                      << "numVertices = " << numVertices << "\n"
+                      << "numLocalNonzeros = " << numLocalNonzeros << "\n"
                       << "numNonzeros = " << numNonzeros << std::endl;
         }
 
