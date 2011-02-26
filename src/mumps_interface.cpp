@@ -276,7 +276,9 @@ psp::mumps::Init
     h.par = 1; 
 
     // Convert the specified communicator so that it can be used by Fortran
-    h.comm_fortran = TranslateCommFromCToF( comm );
+    //h.comm_fortran = TranslateCommFromCToF( comm );
+    std::cout << "TESTING: forcing usage of MPI_COMM_WORLD." << std::endl;
+    h.comm_fortran = USE_COMM_WORLD;
 
     // Define the input/output settings
     h.icntl[0] = 6; // default error output stream (- to suppress)

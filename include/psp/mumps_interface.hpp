@@ -31,115 +31,16 @@
 #ifndef PSP_MUMPS_INTERFACE_H
 #define PSP_MUMPS_INTERFACE_H 1
 
+#include "zmumps_c.h"
+
 #include <vector>
 
 extern "C" {
 
-struct SComplex { float r; float i; };    
-struct DComplex { double r; double i; };    
-
-// We mirror MUMPS's C interface definition here so that we can avoid having to 
-// use their headers when using psp
-#define MUMPS_VERSION "4.9.2"
-#define MUMPS_VERSION_MAX_LEN 14
-struct ZMUMPS_STRUC_C {
-    int sym;
-    int par;
-    int job;
-    int comm_fortran;
-    int icntl[40];
-    double cntl[15]; 
-    int n;
-
-    int nz_alloc;
-
-    // Assembled entry
-    int nz;
-    int* irn;
-    int* jcn;
-    DComplex* a;
-
-    // Distributed entry
-    int nz_loc;
-    int* irn_loc;
-    int* jcn_loc;
-    DComplex* a_loc;
-
-    // Element entry
-    int nelt;
-    int* eltptr;
-    int* eltvar;
-    DComplex* a_elt;
-
-    // Ordering, if given by user
-    int* perm_in;
-
-    // Orderings returned to user
-    int* sym_perm; // symmetric permutation
-    int* uns_perm; // column permutation
-
-    // Scaling (input only in this version)
-    double* colsca;
-    double* rowsca;
-
-    // RHS, solution, output data and statistics
-    DComplex* rhs;
-    DComplex* redrhs;
-    DComplex* rhs_sparse;
-    DComplex* sol_loc;
-    int* irhs_sparse;
-    int* irhs_ptr;
-    int* isol_loc;
-    int nrhs;
-    int lrhs;
-    int lredrhs;
-    int nz_rhs;
-    int lsol_loc;
-    int schur_mloc;
-    int schur_nloc;
-    int schur_lld;
-    int mblock;
-    int nblock;
-    int nprow;
-    int npcol;
-    int info[40];
-    int infog[40];
-    int rinfo[20];
-    int rinfog[20];
-
-    // Null space
-    int deficiency; // misspelled?
-    int* pivnul_list;
-    int* mapping;
-
-    // Schur
-    int size_schur;
-    int* listvar_shchur;
-    DComplex* schur;
-
-    // Internal parameters
-    int instance_number;
-    DComplex* wk_user;
-
-    // Version number: length=14 in FORTRAN + 1 for final \0 and + 1 for 
-    // alignment
-    char version_number[MUMPS_VERSION_MAX_LEN +2];
-
-    // For out-of-core
-    char ooc_tmpdir[256];
-    char ooc_prefix[64];
-
-    // To save the matrix in matrix market format
-    char write_problem[256];
-    int lwk_user;
-};
+typedef mumps_complex SComplex;    
+typedef mumps_double_complex DComplex;
 
 } // extern "C"
-
-// This is the prototype of the double-complex MUMPS routine, but it should 
-// not be called directly from within psp
-extern "C" void
-zmumps_c( ZMUMPS_STRUC_C* handle );
 
 namespace psp {
 namespace mumps {

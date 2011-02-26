@@ -280,9 +280,13 @@ endforeach(HEADER)
 # Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
 
+# TODO: Implement method for finding MUMPS_DIR
+set(MUMPS_DIR "MUMPS_4.9.2")
+
 # Make sure that the PETSc includes can be found
 include_directories("${PETSC_INCLUDE_DIR}")
 include_directories("${PETSC_ARCH_INCLUDE_DIR}")
+include_directories("${PETSC_DIR}/externalpackages/${MUMPS_DIR}/include")
 
 # Build the PSP source
 add_library(psp STATIC ${PSP_SRC})
