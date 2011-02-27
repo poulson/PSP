@@ -81,7 +81,7 @@ main( int argc, char* argv[] )
     srand( time(NULL)+rank );
 
     // This is just an exercise in filling the control structure
-    FiniteDiffControl control;    
+    FiniteDiffControl<double> control;    
     control.stencil = SEVEN_POINT;
     control.nx = atoi(argv[1]);
     control.ny = atoi(argv[2]);

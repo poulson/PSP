@@ -61,18 +61,19 @@ enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 // Our sweeping procedure occurs within the z dimensions so that each x-y plane
 // is contiguous.
 //
+template<typename R>
 struct FiniteDiffControl
 {
     Stencil stencil; // 7-point planned, only 7-point supported so far
     int nx; // number of grid points in x direction
     int ny; // number of grid points in y direction
     int nz; // number of grid points in z direction
-    double wx; // width in x direction (left side at x=0)
-    double wy; // width in y direction (left side at y=0)
-    double wz; // width in z direction (left side at z=0)
+    R wx; // width in x direction (left side at x=0)
+    R wy; // width in y direction (left side at y=0)
+    R wz; // width in z direction (left side at z=0)
 
-    double omega; // angular frequency of problem
-    double C; // coefficient for PML: basic form is C/eta * ((t-eta)/eta)^2
+    R omega; // angular frequency of problem
+    R C; // coefficient for PML: basic form is C/eta * ((t-eta)/eta)^2
     int b; // width of PML is b*(wx/nx), b*(wy/ny), b*(wz/nz) in each direction
     int d; // number of layers to process at a time
 
@@ -84,15 +85,17 @@ struct FiniteDiffControl
     // The top boundary condition must be PML since we are sweeping from it.
 };
 
+template<typename R>
 void
 FiniteDiffInfo
-( MPI_Comm comm, const FiniteDiffControl& control,
+( MPI_Comm comm, const FiniteDiffControl<R>& control,
   int& firstLocalVertex, int& numLocalVertices, int& numVertices,
   int& numLocalNonzeros, int& numNonzeros );
 
+template<typename R>
 void
 FiniteDiffConnectivity
-( const FiniteDiffControl& control, const int numNonzeros,
+( const FiniteDiffControl<R>& control, const int numNonzeros,
   std::vector<int>& rowIndices, std::vector<int>& colIndices );
 
 } // namespace psp

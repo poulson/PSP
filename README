@@ -7,14 +7,27 @@ is not used by typical PETSc installations from MUMPS, petsc-dev should be used.
 You can find instructions for obtaining a copy of petsc-dev here:
 http://www.mcs.anl.gov/petsc/petsc-2/developers/index.html
 
-The following configure flags are being used on BG/P:
+The following configure flags were attempted on BG/P:
 
     ./config/configure.py --with-clanguage=cxx --download-mumps=1 --download-parmetis=1 --with-parmetis=1 --download-scalapack=1 --download-blacs=1 --with-lapack-lib=/soft/apps/LAPACK/liblapack_bgp.a --with-blas-lib=/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a --with-cxx=`which mpixlcxx_r` --with-cc=`which mpixlc_r` --with-fc='mpixlf77_r -qnosave' --with-x=0
 
-PSP can then be built on BG/P using:
+but unfortunately there appears to be a bug in the way IBM compiles MUMPS. The following flags were therefore used instead:
+
+    ./config/configure.py --with-clanguage=cxx --download-mumps=1 --download-parmetis=1 --with-parmetis=1 --download-scalapack=1 --download-blacs=1 --download-f-blas-lapack-lib=1 --with-cxx=`which mpicxx` --with-cc=`which mpicc` --with-fc='mpif90' --with-x=0
+
+The above flags are far from optimal since it builds the debug version of PETSc and uses reference BLAS/LAPACK, but it should be good enough for development. On the other hand, those flags should work on most architectures.
+
+PSP can then be built using:
     cd psp 
     mkdir build
     cd build
-    cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/BGP-xl_dec2010-essl_4.3.1-1.cmake -DPETSC_DIR=/path/to/top/of/petsc-dev -DPETSC_DIR=/path/to/top/of/petsc-dev/then/arch ..
+    cmake -DCMAKE_CXX_COMPILER=`which mpicxx` -DCMAKE_C_COMPILER=`which mpicc` \
+      -DPETSC_DIR=/path/to/top/of/petsc-dev \
+      -DPETSC_ARCH_DIR=/path/to/top/of/petsc-dev/arch
     make
+
+If something other than the reference BLAS/LAPACK libs are desired for PSP, 
+you should add them into the CMake command using a semi-colon delimited list
+of the form:
+    -DMATH_LIBS="/path/to/first/lib.a;/path/to/second/lib.a"
 

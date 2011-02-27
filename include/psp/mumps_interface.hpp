@@ -31,6 +31,9 @@
 #ifndef PSP_MUMPS_INTERFACE_H
 #define PSP_MUMPS_INTERFACE_H 1
 
+#include "smumps_c.h"
+#include "dmumps_c.h"
+#include "cmumps_c.h"
 #include "zmumps_c.h"
 
 #include <vector>
@@ -46,54 +49,72 @@ namespace psp {
 namespace mumps {
 
 template<typename F> struct Handle;
+template<> struct Handle<float>    { SMUMPS_STRUC_C _internal; };
+template<> struct Handle<double>   { DMUMPS_STRUC_C _internal; };
+template<> struct Handle<SComplex> { CMUMPS_STRUC_C _internal; };
 template<> struct Handle<DComplex> { ZMUMPS_STRUC_C _internal; };
 
+template<typename F>
 void 
 Init
-( MPI_Comm comm, Handle<DComplex>& handle );
+( MPI_Comm comm, Handle<F>& h );
 
+template<typename F>
 void 
 SlaveAnalysisWithManualOrdering
-( Handle<DComplex>& handle );
+( Handle<F>& h );
 
+template<typename F>
 void 
 HostAnalysisWithManualOrdering
-( Handle<DComplex>& handle,
+( Handle<F>& h,
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices, int* ordering );
 
+template<typename F>
 void 
 SlaveAnalysisWithMetisOrdering
-( Handle<DComplex>& handle );
+( Handle<F>& h );
 
+template<typename F>
 void 
 HostAnalysisWithMetisOrdering
-( Handle<DComplex>& handle, 
+( Handle<F>& h, 
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices );
 
+template<typename F>
 int 
 Factor
-( Handle<DComplex>& handle, 
+( Handle<F>& h, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
-  DComplex* localABuffer );
+  F* localABuffer );
 
+template<typename F>
 void
 SlaveSolve
-( Handle<DComplex>& handle, 
-  DComplex* localSolutionBuffer, int localSolutionLDim, 
+( Handle<F>& h, 
+  F* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer );
 
+template<typename F>
 void
 HostSolve
-( Handle<DComplex>& handle, 
-  int numRhs, DComplex* rhsBuffer, int rhsLDim, 
-              DComplex* localSolutionBuffer, int localSolutionLDim,
+( Handle<F>& h, 
+  int numRhs, F* rhsBuffer, int rhsLDim, 
+              F* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer );
 
+template<typename F>
 void
 Finalize
-( Handle<DComplex>& handle );
+( Handle<F>& h );
+
+// You should not directly use these routines. They are for internal usage.
+void Call( Handle<float>& h );
+void Call( Handle<double>& h );
+void Call( Handle<SComplex>& h );
+void Call( Handle<DComplex>& h );
 
 } // namespace mumps
 } // namespace psp

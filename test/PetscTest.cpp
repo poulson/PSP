@@ -47,7 +47,7 @@ static char help[] = "A simple PETSc test.\n\n";
 extern "C" {
 struct FiniteDiffSweepingPC
 {
-    psp::FiniteDiffControl control;
+    psp::FiniteDiffControl<double> control;
     // TODO: parallel info? MUMPS handle?
 };
 }

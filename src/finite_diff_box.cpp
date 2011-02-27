@@ -32,9 +32,10 @@
 #include <stdexcept>
 
 // Return the basic information about our finite different discretization.
+template<typename R>
 void
 psp::FiniteDiffInfo
-( MPI_Comm comm, const psp::FiniteDiffControl& control, 
+( MPI_Comm comm, const psp::FiniteDiffControl<R>& control, 
   int& firstLocalVertex, int& numLocalVertices, int& numVertices, 
   int& numLocalNonzeros, int& numNonzeros )
 {
@@ -80,9 +81,10 @@ psp::FiniteDiffInfo
 // This should almost certainly only be called from the host process 
 // just before the MUMPS analysis. Try to free the memory for the 
 // row and col indices ASAP.
+template<typename R>
 void
 psp::FiniteDiffConnectivity
-( const psp::FiniteDiffControl& control, const int numNonzeros,
+( const psp::FiniteDiffControl<R>& control, const int numNonzeros,
   std::vector<int>& rowIndices, std::vector<int>& colIndices )
 {
     rowIndices.resize( numNonzeros );    
@@ -137,4 +139,23 @@ psp::FiniteDiffConnectivity
         throw std::logic_error("Only 7-point stencils are currently supported");
     }
 }
+
+template struct psp::FiniteDiffControl<float>;
+template struct psp::FiniteDiffControl<double>;
+
+template void psp::FiniteDiffInfo
+( MPI_Comm comm, const psp::FiniteDiffControl<float>& control, 
+  int& firstLocalVertex, int& numLocalVertices, int& numVertices, 
+  int& numLocalNonzeros, int& numNonzeros );
+template void psp::FiniteDiffInfo
+( MPI_Comm comm, const psp::FiniteDiffControl<double>& control, 
+  int& firstLocalVertex, int& numLocalVertices, int& numVertices, 
+  int& numLocalNonzeros, int& numNonzeros );
+
+template void psp::FiniteDiffConnectivity
+( const psp::FiniteDiffControl<float>& control, const int numNonzeros,
+  std::vector<int>& rowIndices, std::vector<int>& colIndices );
+template void psp::FiniteDiffConnectivity
+( const psp::FiniteDiffControl<double>& control, const int numNonzeros,
+  std::vector<int>& rowIndices, std::vector<int>& colIndices );
 
