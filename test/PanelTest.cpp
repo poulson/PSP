@@ -45,16 +45,14 @@ void Usage()
               << "  nz: number of vertices in z direction" << std::endl;
 }
 
-DComplex SampleUnitBall()
+std::complex<double> SampleUnitBall()
 {
     // Grab a uniform sample from [0,1]
     double r = static_cast<double>(rand())/static_cast<double>(RAND_MAX);
     // Grab a uniform sample from [0,2*pi]
     double theta = 
         2*M_PI*static_cast<double>(rand())/static_cast<double>(RAND_MAX);
-    DComplex sample;
-    sample.r = r*cos(theta);
-    sample.i = r*sin(theta);
+    std::complex<double> sample(r*cos(theta),r*sin(theta));
     return sample;
 }
 
@@ -99,7 +97,7 @@ main( int argc, char* argv[] )
     control.leftBC = PML;
     control.bottomBC = PML;
 
-    mumps::Handle<DComplex> handle;
+    mumps::Handle< std::complex<double> > handle;
     try 
     {
         // Create a handle for an instance of MUMPS
@@ -161,7 +159,7 @@ main( int argc, char* argv[] )
             // Give each process a chunk of the vertices
             std::vector<int> localRowIndices(numLocalNonzeros);
             std::vector<int> localColIndices(numLocalNonzeros);
-            std::vector<DComplex> localA(numLocalNonzeros);
+            std::vector< std::complex<double> > localA(numLocalNonzeros);
 
             int z = 0;
             for( int vtx=firstLocalVertex; 
@@ -235,7 +233,8 @@ main( int argc, char* argv[] )
         for( int numRhs = 1; numRhs <= 100; numRhs *= 10 )
         {
             // Allocate space for the solution
-            std::vector<DComplex> localSolutions(numRhs*numLocalPivots);
+            std::vector< std::complex<double> > 
+                localSolutions(numRhs*numLocalPivots);
             std::vector<int> localIntegers(numLocalPivots);
 
             if( rank == 0 )
@@ -245,20 +244,14 @@ main( int argc, char* argv[] )
                           << t << std::endl;
 
                 // Allocate and fill the 10 RHS
-                std::vector<DComplex> rhs(numRhs*numVertices);
+                std::vector< std::complex<double> > rhs(numRhs*numVertices);
                 for( int i=0; i<numRhs*numVertices; ++i )
                 {
                     // Just set each RHS to be e1
                     if( i % numVertices == 0 )
-                    {
-                        rhs[i].r = 1;
-                        rhs[i].i = 0;
-                    }
+                        rhs[i] = 1;
                     else
-                    {
-                        rhs[i].r = 0;
-                        rhs[i].i = 0;
-                    }
+                        rhs[i] = 0; 
                 }
 
                 mumps::HostSolve

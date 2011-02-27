@@ -30,6 +30,7 @@
 */
 #ifndef PSP_FINITE_DIFF_CONTROL_H
 #define PSP_FINITE_DIFF_CONTROL_H 1
+#include <complex>
 #include <vector>
 
 namespace psp {
@@ -83,6 +84,20 @@ struct FiniteDiffControl
     BoundaryCondition leftBC;
     BoundaryCondition bottomBC;
     // The top boundary condition must be PML since we are sweeping from it.
+};
+
+template<typename R>
+class FiniteDiffSweepingPC
+{
+    psp::FiniteDiffControl<R> control;
+    // TODO: Fill vector of handles, etc.
+};
+
+template<typename R>
+class FiniteDiffSweepingPC< std::complex<R> >
+{
+    psp::FiniteDiffControl<R> control;
+    // TODO: Fill vector of handles, etc.
 };
 
 template<typename R>

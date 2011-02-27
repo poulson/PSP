@@ -36,14 +36,8 @@
 #include "cmumps_c.h"
 #include "zmumps_c.h"
 
+#include <complex>
 #include <vector>
-
-extern "C" {
-
-typedef mumps_complex SComplex;    
-typedef mumps_double_complex DComplex;
-
-} // extern "C"
 
 namespace psp {
 namespace mumps {
@@ -51,8 +45,8 @@ namespace mumps {
 template<typename F> struct Handle;
 template<> struct Handle<float>    { SMUMPS_STRUC_C _internal; };
 template<> struct Handle<double>   { DMUMPS_STRUC_C _internal; };
-template<> struct Handle<SComplex> { CMUMPS_STRUC_C _internal; };
-template<> struct Handle<DComplex> { ZMUMPS_STRUC_C _internal; };
+template<> struct Handle< std::complex<float> > { CMUMPS_STRUC_C _internal; };
+template<> struct Handle< std::complex<double> > { ZMUMPS_STRUC_C _internal; };
 
 template<typename F>
 void 
@@ -113,8 +107,8 @@ Finalize
 // You should not directly use these routines. They are for internal usage.
 void Call( Handle<float>& h );
 void Call( Handle<double>& h );
-void Call( Handle<SComplex>& h );
-void Call( Handle<DComplex>& h );
+void Call( Handle< std::complex<float> >& h );
+void Call( Handle< std::complex<double> >& h );
 
 } // namespace mumps
 } // namespace psp

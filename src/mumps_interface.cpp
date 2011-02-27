@@ -50,6 +50,15 @@ TranslateCommFromCToF( MPI_Comm comm )
     return fortranComm;
 }
 
+float* CastForMumps( float* x ) 
+{ return x; }
+double* CastForMumps( double* x ) 
+{ return x; }
+mumps_complex* CastForMumps( std::complex<float>* x ) 
+{ return (mumps_complex*)x; }
+mumps_double_complex* CastForMumps( std::complex<double>* x )
+{ return (mumps_double_complex*)x; }
+
 const std::string
 DecipherMessage( int info1, int info2 )
 {
@@ -617,7 +626,7 @@ psp::mumps::Factor
     h._internal.nz_loc = numLocalNonzeros;
     h._internal.irn_loc = localRowIndices;
     h._internal.jcn_loc = localColIndices;
-    h._internal.a_loc = localABuffer;
+    h._internal.a_loc = CastForMumps(localABuffer);
 
     // Fill the control variables
     h._internal.icntl[21] = 0; // in-core factorization
@@ -696,7 +705,7 @@ psp::mumps::SlaveSolve
     h._internal.job = 3;    
 
     // Fill the solution buffers
-    h._internal.sol_loc = localSolutionBuffer;
+    h._internal.sol_loc = CastForMumps(localSolutionBuffer);
     h._internal.lsol_loc = localSolutionLDim;
     h._internal.isol_loc = localIntegerBuffer;
 
@@ -752,11 +761,11 @@ psp::mumps::HostSolve
 
     // Set up the RHS
     h._internal.nrhs = numRhs;
-    h._internal.rhs = rhsBuffer;
+    h._internal.rhs = CastForMumps(rhsBuffer);
     h._internal.lrhs = rhsLDim;
 
     // Set up the solution buffers
-    h._internal.sol_loc = localSolutionBuffer;
+    h._internal.sol_loc = CastForMumps(localSolutionBuffer);
     h._internal.lsol_loc = localSolutionLDim;
     h._internal.isol_loc = localIntegerBuffer;
 
@@ -828,9 +837,9 @@ void psp::mumps::Call( psp::mumps::Handle<float>& h )
 { smumps_c( &h._internal ); }
 void psp::mumps::Call( psp::mumps::Handle<double>& h )
 { dmumps_c( &h._internal ); }
-void psp::mumps::Call( psp::mumps::Handle<SComplex>& h )
+void psp::mumps::Call( psp::mumps::Handle< std::complex<float> >& h )
 { cmumps_c( &h._internal ); }
-void psp::mumps::Call( psp::mumps::Handle<DComplex>& h )
+void psp::mumps::Call( psp::mumps::Handle< std::complex<double> >& h )
 { zmumps_c( &h._internal ); }
 
 template void psp::mumps::Init
@@ -838,18 +847,18 @@ template void psp::mumps::Init
 template void psp::mumps::Init
 ( MPI_Comm comm, psp::mumps::Handle<double>& h );
 template void psp::mumps::Init
-( MPI_Comm comm, psp::mumps::Handle<SComplex>& h );
+( MPI_Comm comm, psp::mumps::Handle< std::complex<float> >& h );
 template void psp::mumps::Init
-( MPI_Comm comm, psp::mumps::Handle<DComplex>& h );
+( MPI_Comm comm, psp::mumps::Handle< std::complex<double> >& h );
 
 template void psp::mumps::SlaveAnalysisWithManualOrdering
 ( psp::mumps::Handle<float>& h );
 template void psp::mumps::SlaveAnalysisWithManualOrdering
 ( psp::mumps::Handle<double>& h );
 template void psp::mumps::SlaveAnalysisWithManualOrdering
-( psp::mumps::Handle<SComplex>& h );
+( psp::mumps::Handle< std::complex<float> >& h );
 template void psp::mumps::SlaveAnalysisWithManualOrdering
-( psp::mumps::Handle<DComplex>& h );
+( psp::mumps::Handle< std::complex<double> >& h );
 
 template void psp::mumps::HostAnalysisWithManualOrdering
 ( psp::mumps::Handle<float>& h,
@@ -860,11 +869,11 @@ template void psp::mumps::HostAnalysisWithManualOrdering
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices, int* ordering );
 template void psp::mumps::HostAnalysisWithManualOrdering
-( psp::mumps::Handle<SComplex>& h,
+( psp::mumps::Handle< std::complex<float> >& h,
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices, int* ordering );
 template void psp::mumps::HostAnalysisWithManualOrdering
-( psp::mumps::Handle<DComplex>& h,
+( psp::mumps::Handle< std::complex<double> >& h,
   int numVertices, int numNonzeros,
   int* rowIndices, int* colIndices, int* ordering );
 
@@ -873,9 +882,9 @@ template void psp::mumps::SlaveAnalysisWithMetisOrdering
 template void psp::mumps::SlaveAnalysisWithMetisOrdering
 ( psp::mumps::Handle<double>& h );
 template void psp::mumps::SlaveAnalysisWithMetisOrdering
-( psp::mumps::Handle<SComplex>& h );
+( psp::mumps::Handle< std::complex<float> >& h );
 template void psp::mumps::SlaveAnalysisWithMetisOrdering
-( psp::mumps::Handle<DComplex>& h );
+( psp::mumps::Handle< std::complex<double> >& h );
 
 template void psp::mumps::HostAnalysisWithMetisOrdering
 ( psp::mumps::Handle<float>& h, 
@@ -886,11 +895,11 @@ template void psp::mumps::HostAnalysisWithMetisOrdering
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices );
 template void psp::mumps::HostAnalysisWithMetisOrdering
-( psp::mumps::Handle<SComplex>& h, 
+( psp::mumps::Handle< std::complex<float> >& h, 
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices );
 template void psp::mumps::HostAnalysisWithMetisOrdering
-( psp::mumps::Handle<DComplex>& h, 
+( psp::mumps::Handle< std::complex<double> >& h, 
   int numVertices, int numNonzeros, 
   int* rowIndices, int* colIndices );
 
@@ -903,13 +912,13 @@ template int psp::mumps::Factor
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
   double* localABuffer );
 template int psp::mumps::Factor
-( psp::mumps::Handle<SComplex>& h, 
+( psp::mumps::Handle< std::complex<float> >& h, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
-  SComplex* localABuffer );
+  std::complex<float>* localABuffer );
 template int psp::mumps::Factor
-( psp::mumps::Handle<DComplex>& h, 
+( psp::mumps::Handle< std::complex<double> >& h, 
   int numLocalNonzeros, int* localRowIndices, int* localColIndices,
-  DComplex* localABuffer );
+  std::complex<double>* localABuffer );
 
 template void psp::mumps::SlaveSolve
 ( psp::mumps::Handle<float>& h, 
@@ -920,12 +929,12 @@ template void psp::mumps::SlaveSolve
   double* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer ); 
 template void psp::mumps::SlaveSolve
-( psp::mumps::Handle<SComplex>& h, 
-  SComplex* localSolutionBuffer, int localSolutionLDim, 
+( psp::mumps::Handle< std::complex<float> >& h, 
+  std::complex<float>* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer ); 
 template void psp::mumps::SlaveSolve
-( psp::mumps::Handle<DComplex>& h, 
-  DComplex* localSolutionBuffer, int localSolutionLDim, 
+( psp::mumps::Handle< std::complex<double> >& h, 
+  std::complex<double>* localSolutionBuffer, int localSolutionLDim, 
   int* localIntegerBuffer ); 
 
 template void psp::mumps::HostSolve
@@ -939,18 +948,22 @@ template void psp::mumps::HostSolve
               double* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer );
 template void psp::mumps::HostSolve
-( psp::mumps::Handle<SComplex>& h,
-  int numRhs, SComplex* rhsBuffer, int rhsLDim, 
-              SComplex* localSolutionBuffer, int localSolutionLDim,
+( psp::mumps::Handle< std::complex<float> >& h,
+  int numRhs, std::complex<float>* rhsBuffer, int rhsLDim, 
+              std::complex<float>* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer );
 template void psp::mumps::HostSolve
-( psp::mumps::Handle<DComplex>& h,
-  int numRhs, DComplex* rhsBuffer, int rhsLDim, 
-              DComplex* localSolutionBuffer, int localSolutionLDim,
+( psp::mumps::Handle< std::complex<double> >& h,
+  int numRhs, std::complex<double>* rhsBuffer, int rhsLDim, 
+              std::complex<double>* localSolutionBuffer, int localSolutionLDim,
   int* localIntegerBuffer );
 
-template void psp::mumps::Finalize( psp::mumps::Handle<float>& h );
-template void psp::mumps::Finalize( psp::mumps::Handle<double>& h );
-template void psp::mumps::Finalize( psp::mumps::Handle<SComplex>& h );
-template void psp::mumps::Finalize( psp::mumps::Handle<DComplex>& h );
+template void psp::mumps::Finalize
+( psp::mumps::Handle<float>& h );
+template void psp::mumps::Finalize
+( psp::mumps::Handle<double>& h );
+template void psp::mumps::Finalize
+( psp::mumps::Handle< std::complex<float> >& h );
+template void psp::mumps::Finalize
+( psp::mumps::Handle< std::complex<double> >& h );
 

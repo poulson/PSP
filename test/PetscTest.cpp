@@ -48,6 +48,7 @@ extern "C" {
 struct FiniteDiffSweepingPC
 {
     psp::FiniteDiffControl<double> control;
+    std::vector< psp::mumps::Handle< std::complex<double> > > panelHandles;
     // TODO: parallel info? MUMPS handle?
 };
 }
