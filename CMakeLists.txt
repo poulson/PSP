@@ -122,6 +122,12 @@ if(NOT BLACS_LIB)
   )
 endif(NOT BLACS_LIB)
 
+# Dynamic library
+find_library(DL_LIB NAMES dl)
+if(NOT DL_LIB)
+  message(FATAL_ERROR "Could not find dl library.")
+endif(NOT DL_LIB)
+
 option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
 mark_as_advanced(AVOID_COMPLEX_MPI)
@@ -266,6 +272,7 @@ list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
 list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
 list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIB}")
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
+list(APPEND EXTERNAL_LIBS "${DL_LIB}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
 # Copy the headers into the build directory

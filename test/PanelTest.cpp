@@ -228,7 +228,6 @@ main( int argc, char* argv[] )
             {
                 double t = MPI_Wtime() - startTime;
                 std::cout << "Finished factorization at t=" << t << std::endl;
-                std::cout << "z=" << z << std::endl;
             }
         }
     

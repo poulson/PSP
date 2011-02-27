@@ -69,13 +69,13 @@ DecipherMessage( int info1, int info2 )
             "User data JCN has been modified by the solver.";
         const std::string warning8 = 
             "More than ICNTL(10) refinement iterations are required.";
-        if( info1 & 1 == 0 )
+        if( (info1 & 1) == 0 )
             msg += warning1;
-        if( info1 & 2 == 0 )
+        if( (info1 & 2) == 0 )
             msg += warning2;
-        if( info1 & 4 == 0 )
+        if( (info1 & 4) == 0 )
             msg += warning4;
-        if( info1 & 8 == 0 )
+        if( (info1 & 8) == 0 )
             msg += warning8;
     }
     else
@@ -276,15 +276,16 @@ psp::mumps::Init
     h.par = 1; 
 
     // Convert the specified communicator so that it can be used by Fortran
-    //h.comm_fortran = TranslateCommFromCToF( comm );
-    std::cout << "TESTING: forcing usage of MPI_COMM_WORLD." << std::endl;
-    h.comm_fortran = USE_COMM_WORLD;
+    h.comm_fortran = TranslateCommFromCToF( comm );
 
     // Define the input/output settings
     h.icntl[0] = 6; // default error output stream (- to suppress)
-    h.icntl[1] = 0; // default diagnostic output stream (- to suppress)
-    h.icntl[2] = 6; // default global output stream (- to suppress)
-    h.icntl[3] = 2; // default information level (- to suppress)
+    //h.icntl[1] = 0; // default diagnostic output stream (- to suppress)
+    //h.icntl[2] = 6; // default global output stream (- to suppress)
+    //h.icntl[3] = 2; // default information level (- to suppress)
+    h.icntl[1] = -1;
+    h.icntl[2] = -1;
+    h.icntl[3] = -1;
 
     // Initialize the instance
     zmumps_c( &h );
