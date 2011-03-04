@@ -7,17 +7,20 @@ is not used by typical PETSc installations from MUMPS, petsc-dev should be used.
 You can find instructions for obtaining a copy of petsc-dev here:
 http://www.mcs.anl.gov/petsc/petsc-2/developers/index.html
 
-The following configure flags were attempted on BG/P:
+The following configure flags were used on BG/P:
+    
+    ./config/configure.py --with-clanguage=cxx --download-mumps=1 \
+      --download-parmetis=1 --download-superlu_dist=1 --with-parmetis=1 \
+      --download-scalapack=1 --download-blacs=1 \
+      --with-blas-lapack-lib=[/soft/apps/LAPACK/liblapack_bgp.a,/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlfmath.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlf90_r.a,/soft/apps/ibmcmp-dec2010/xlsmp/bg/1.7/bglib/libxlomp_ser.a] \
+      --with-cxx=mpixlcxx_r --with-cc=mpixlc_r --with-fc='mpixlf77_r -qnosave' \
+      --with-x=0 --with-batch=1 --known-mpi-shared-libraries=0 \
+      --with-scalar-type=complex --with-clanguage=c++
 
-    ./config/configure.py --with-clanguage=cxx --download-mumps=1 --download-parmetis=1 --with-parmetis=1 --download-scalapack=1 --download-blacs=1 --with-lapack-lib=/soft/apps/LAPACK/liblapack_bgp.a --with-blas-lib=/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a --with-cxx=`which mpixlcxx_r` --with-cc=`which mpixlc_r` --with-fc='mpixlf77_r -qnosave' --with-x=0
-
-but unfortunately there appears to be a bug in the way IBM compiles MUMPS. The following flags were therefore used instead:
-
-    ./config/configure.py --with-clanguage=cxx --download-mumps=1 --download-parmetis=1 --with-parmetis=1 --download-scalapack=1 --download-blacs=1 --download-f-blas-lapack-lib=1 --with-cxx=`which mpicxx` --with-cc=`which mpicc` --with-fc='mpif90' --with-x=0
-
-The above flags are far from optimal since it builds the debug version of PETSc and uses reference BLAS/LAPACK, but it should be good enough for development. On the other hand, those flags should work on most architectures.
+The above flags are far from optimal since it builds the debug version of PETSc.
 
 PSP can then be built using:
+
     cd psp 
     mkdir build
     cd build

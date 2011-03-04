@@ -17,21 +17,10 @@
 
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-   Additional permissions under GNU GPL version 3 section 7
-
-   If you modify this Program, or any covered work, by linking or combining it
-   with MUMPS and/or ParMetis (or modified versions of those libraries),
-   containing parts covered by the terms of the respective licenses of MUMPS
-   and ParMetis, the licensors of this Program grant you additional permission
-   to convey the resulting work. {Corresponding Source for a non-source form of
-   such a combination shall include the source code for the parts of MUMPS and
-   ParMetis used as well as that of the covered work.}
 */
-#ifndef PSP_FINITE_DIFF_CONTROL_H
-#define PSP_FINITE_DIFF_CONTROL_H 1
-#include <complex>
-#include <vector>
+#ifndef PSP_FINITE_DIFF_CONTROL_HPP
+#define PSP_FINITE_DIFF_CONTROL_HPP 1
+#include "petscvec.h"
 
 namespace psp {
 
@@ -62,21 +51,20 @@ enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 // Our sweeping procedure occurs within the z dimensions so that each x-y plane
 // is contiguous.
 //
-template<typename R>
 struct FiniteDiffControl
 {
     Stencil stencil; // 7-point planned, only 7-point supported so far
-    int nx; // number of grid points in x direction
-    int ny; // number of grid points in y direction
-    int nz; // number of grid points in z direction
-    R wx; // width in x direction (left side at x=0)
-    R wy; // width in y direction (left side at y=0)
-    R wz; // width in z direction (left side at z=0)
+    PetscInt nx; // number of grid points in x direction
+    PetscInt ny; // number of grid points in y direction
+    PetscInt nz; // number of grid points in z direction
+    PetscReal wx; // width in x direction (left side at x=0)
+    PetscReal wy; // width in y direction (left side at y=0)
+    PetscReal wz; // width in z direction (left side at z=0)
 
-    R omega; // angular frequency of problem
-    R C; // coefficient for PML: basic form is C/eta * ((t-eta)/eta)^2
-    int b; // width of PML is b*(wx/nx), b*(wy/ny), b*(wz/nz) in each direction
-    int d; // number of layers to process at a time
+    PetscReal omega; // angular frequency of problem
+    PetscReal C; // coefficient for PML: basic form is C/eta * ((t-eta)/eta)^2
+    PetscInt b; // width of PML is b*(wx/nx), b*(wy/ny), b*(wz/nz) in each dir
+    PetscInt d; // number of layers to process at a time
 
     BoundaryCondition frontBC;
     BoundaryCondition rightBC;
@@ -86,33 +74,6 @@ struct FiniteDiffControl
     // The top boundary condition must be PML since we are sweeping from it.
 };
 
-template<typename R>
-class FiniteDiffSweepingPC
-{
-    psp::FiniteDiffControl<R> control;
-    // TODO: Fill vector of handles, etc.
-};
-
-template<typename R>
-class FiniteDiffSweepingPC< std::complex<R> >
-{
-    psp::FiniteDiffControl<R> control;
-    // TODO: Fill vector of handles, etc.
-};
-
-template<typename R>
-void
-FiniteDiffInfo
-( MPI_Comm comm, const FiniteDiffControl<R>& control,
-  int& firstLocalVertex, int& numLocalVertices, int& numVertices,
-  int& numLocalNonzeros, int& numNonzeros );
-
-template<typename R>
-void
-FiniteDiffConnectivity
-( const FiniteDiffControl<R>& control, const int numNonzeros,
-  std::vector<int>& rowIndices, std::vector<int>& colIndices );
-
 } // namespace psp
 
-#endif // PSP_FINITE_DIFF_CONTROL_H
+#endif // PSP_FINITE_DIFF_CONTROL_HPP

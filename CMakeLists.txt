@@ -18,16 +18,6 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-#  Additional permissions under GNU GPL version 3 section 7
-#
-#  If you modify this Program, or any covered work, by linking or combining it
-#  with MUMPS and/or ParMetis (or modified versions of those libraries),
-#  containing parts covered by the terms of the respective licenses of MUMPS
-#  and ParMetis, the licensors of this Program grant you additional permission
-#  to convey the resulting work. {Corresponding Source for a non-source form of
-#  such a combination shall include the source code for the parts of MUMPS and
-#  ParMetis used as well as that of the covered work.}
-#
 cmake_minimum_required(VERSION 2.8)
 project(PSP)
 
@@ -41,8 +31,8 @@ if(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
   message(WARNING "C compiler, ${CMAKE_C_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CC or through the '-DCMAKE_C_COMPILER' cmake flag. You should probably also clean this build folder first.")
 endif(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
 
-# We need PETSc's GMRES, so go ahead and use its dependencies, which we must link
-# anyways.
+# We need PETSc's GMRES, so go ahead and use its dependencies, which we must 
+# link anyways.
 if(NOT PETSC_DIR)    
   message(
     FATAL_ERROR
@@ -97,6 +87,12 @@ endif(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB
       OR NOT MUMPS_COMMON_LIB)
 set(MUMPS_LIBS 
   "${CMUMPS_LIB};${DMUMPS_LIB};${SMUMPS_LIB};${ZMUMPS_LIB};${MUMPS_COMMON_LIB}")
+
+# SuperLU Dist
+find_library(SUPERLU_DIST_LIB NAMES superlu_dist_2.5 HINTS ${PETSC_LIB_DIR})
+if(NOT SUPERLU_DIST_LIB)
+  message(FATAL_ERROR "Could not find SuperLU_Dist in PETSC_ARCH_DIR.")
+endif(NOT SUPERLU_DIST_LIB)
 
 # PORD (linked but not used)
 find_library(PORD_LIB NAMES pord HINTS ${PETSC_LIB_DIR})
@@ -238,11 +234,6 @@ if(NEED_MATH)
   list(APPEND MATH_LIBS m)
 endif(NEED_MATH)
 
-# Figure out how we can convert MPI_Comm's from C to Fortran
-include(CheckFunctionExists)
-check_function_exists(MPI_Comm_c2f HAVE_MPI_COMM_C2F)
-check_function_exists(MPIR_FromPointer HAVE_MPIR_FROM_POINTER)
-
 # Store all of our system-specific definitions
 configure_file( 
   ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
@@ -267,6 +258,7 @@ endif(BUILD_TESTS)
 # to be linked last
 add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 set(EXTERNAL_LIBS "${PETSC_LIB}")
+list(APPEND EXTERNAL_LIBS "${SUPERLU_DIST_LIB}")
 list(APPEND EXTERNAL_LIBS "${MUMPS_LIBS}")
 list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
 list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
@@ -287,13 +279,9 @@ endforeach(HEADER)
 # Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
 
-# TODO: Implement method for finding MUMPS_DIR
-set(MUMPS_DIR "MUMPS_4.9.2")
-
 # Make sure that the PETSc includes can be found
 include_directories("${PETSC_INCLUDE_DIR}")
 include_directories("${PETSC_ARCH_INCLUDE_DIR}")
-include_directories("${PETSC_DIR}/externalpackages/${MUMPS_DIR}/include")
 
 # Build the PSP source
 add_library(psp STATIC ${PSP_SRC})
