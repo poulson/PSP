@@ -34,48 +34,46 @@ void Usage()
 
 static char help[] = "A simple PETSc test.\n\n";
 
-extern "C" {
-struct FiniteDiffSweepingPC
-{
-    psp::FiniteDiffControl<double> control;
-    std::vector< psp::mumps::Handle< std::complex<double> > > panelHandles;
-    // TODO: parallel info? MUMPS handle?
-};
-}
-
 PetscErrorCode
-FiniteDiffSweepingPCSetUp(PC pc)
+CustomPCSetUp( PC pc )
 {
     PetscErrorCode ierr;
 
-    // TODO: Fill in MUMPS factorization steps
+    psp::FiniteDiffSweepingPC* context;
+    ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
+
+    context->Init();
 
     return ierr;
 }
 
 PetscErrorCode 
-FiniteDiffSweepingPCApply(PC pc,Vec x,Vec y)
+CustomPCApply(PC pc,Vec x,Vec y)
 {
     PetscErrorCode ierr;
 
-    FiniteDiffSweepingPC *context;
-    ierr = PCShellGetContext(pc,(void**)&context); CHKERRQ(ierr);
+    psp::FiniteDiffSweepingPC* context;
+    ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
 
-    // TODO: Apply sweeping preconditioner. This will require a modified
-    //       version of the Vec scatter to zero routine.
+    // TODO: Write an application routine in the FiniteDiffSweepingPC class
+    //       which takes the arguments 'x' and 'y' for input and solution
+    //
+    // context->Apply( x, y );
 
     return ierr;
 }
 
 PetscErrorCode
-FiniteDiffSweepingPCDestroy(PC pc)
+CustomPCDestroy(PC pc)
 {
     PetscErrorCode ierr;
 
-    FiniteDiffSweepingPC* context;
-    ierr = PCShellGetContext(pc,(void**)&context);
+    psp::FiniteDiffSweepingPC* context;
+    ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
 
-    // TODO: Call MUMPS destruction routines
+    // TODO: Call a routine for freeing data.
+    //
+    // context->Destroy();
 
     return ierr;
 }
@@ -116,7 +114,8 @@ main( int argc, char* argv[] )
     PetscInt iStart, iEnd;
     ierr = MatGetOwnershipRange(A,&iStart,&iEnd); CHKERRQ(ierr);
 
-    // TODO: Fill 7-point stencil for our index range here
+    // TODO: Fill 7-point stencil for our index range here. We could actually
+    //       call the FiniteDiffSweepingPC::7PointSymmetricRow routine
 
     // Create the approx. solution (x), exact solution (u), and RHS (b) 
     // vectors
@@ -137,12 +136,18 @@ main( int argc, char* argv[] )
     PC pc;
     KSPGetPC(ksp,&pc);
     KSPSetTolerances(ksp,1.e-6,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
-    FiniteDiffSweepingPC context;
     // TODO: Fill and set context here
+    // psp::FiniteDiffControl control;
+    // control.nx = nx;
+    // control.ny = ny;
+    // control.nz = nz;
+    // control.w = ...
+    // psp::FiniteDiffSweepingPC context
+    // ( control, solver, slowness, numProcessRows, numProcessCols );
     PCSetType(pc,PCSHELL);
-    PCShellSetSetUp(pc,FiniteDiffSweepingPCSetUp);
-    PCShellSetApply(pc,FiniteDiffSweepingPCApply);
-    PCShellSetDestroy(pc,FiniteDiffSweepingPCDestroy);
+    PCShellSetSetUp(pc,CustomPCSetUp);
+    PCShellSetApply(pc,CustomPCApply);
+    PCShellSetDestroy(pc,CustomPCDestroy);
 
     // Optionally override our KSP options from the commandline. We should
     // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.
