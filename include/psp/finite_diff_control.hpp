@@ -63,8 +63,10 @@ struct FiniteDiffControl
 
     PetscReal omega; // angular frequency of problem
     PetscReal C; // coefficient for PML: basic form is C/eta * ((t-eta)/eta)^2
-    PetscInt b; // width of PML is b*(wx/nx), b*(wy/ny), b*(wz/nz) in each dir
-    PetscInt d; // number of layers to process at a time
+    PetscReal imagShift; // stabilizing imaginary diagonal offset for PC
+
+    PetscInt sizeOfPML;
+    PetscInt planesPerPanel;
 
     BoundaryCondition frontBC;
     BoundaryCondition rightBC;

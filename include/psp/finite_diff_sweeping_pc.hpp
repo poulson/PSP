@@ -83,8 +83,9 @@ class FiniteDiffSweepingPC
     SparseDirectSolver _solver;
 
     Vec& _slowness;
-    std::vector<Mat> _panels;
-    std::vector<Mat> _factors;
+    std::vector<Mat> _paddedPanels;
+    std::vector<Mat> _paddedFactors;
+    std::vector<Mat> _subdiagonalBlocks;
 
     MPI_Comm _comm;
     PetscInt _rank;
@@ -114,12 +115,12 @@ public:
 
     void FormSymmetricRow
     ( PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt heightOffset, PetscInt panelHeight,
+      PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
       std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
 
     void FormRow
     ( PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt heightOffset, PetscInt panelHeight,
+      PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
       std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
 };
 
@@ -178,8 +179,9 @@ psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
 // the particular stencil defined in _control.
 void
 psp::FiniteDiffSweepingPC::FormSymmetricRow
-( PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt heightOffset, PetscInt panelHeight,
+( PetscReal imagShift, 
+  PetscInt x, PetscInt y, PetscInt z, 
+  PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
   std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
 {
     const PetscInt pillarSize = _xChunkSize*_yChunkSize*panelHeight;
@@ -189,7 +191,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
         _myProcessCol*pillarSize;
     const PetscInt localX = x - _myXOffset;
     const PetscInt localY = y - _myYOffset;
-    const PetscInt localZ = z - heightOffset;
+    const PetscInt localZ = z - bottomOfPanel;
     const PetscInt rowIdx = myOffset + 
         localX + localY*_myXPortion + localZ*_myXPortion*_myYPortion;
 
@@ -265,8 +267,9 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
 // the particular stencil defined in _control.
 void
 psp::FiniteDiffSweepingPC::FormRow
-( PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt heightOffset, PetscInt panelHeight,
+( PetscReal imagShift,
+  PetscInt x, PetscInt y, PetscInt z, 
+  PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
   std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
 {
     const PetscInt pillarSize = _xChunkSize*_yChunkSize*panelHeight;
@@ -276,7 +279,7 @@ psp::FiniteDiffSweepingPC::FormRow
         _myProcessCol*pillarSize;
     const PetscInt localX = x - _myXOffset;
     const PetscInt localY = y - _myYOffset;
-    const PetscInt localZ = z - heightOffset;
+    const PetscInt localZ = z - bottomOfPanel;
     const PetscInt rowIdx = myOffset + 
         localX + localY*_myXPortion + localZ*_myXPortion*_myYPortion;
 
@@ -403,26 +406,32 @@ psp::FiniteDiffSweepingPC::FormRow
 void
 psp::FiniteDiffSweepingPC::Init()
 {
-    // Initialize each panel
-    const PetscInt nzMinusTopPML = _control.nz - _control.b;
+    //----------------------------------------------------------------//
+    // Form each of the PML-padded diagonal blocks and then factor it //
+    //----------------------------------------------------------------//
+    // TODO: Consider allowing the artificial panel PML to be of a different 
+    //       size than the outer fixed PML.
+    const PetscInt nzMinusTopPML = _control.nz - _control.sizeOfPML;
     const PetscInt numPanels = 
-        ( nzMinusTopPML>0 ? (nzMinusTopPML-1)/_control.b+1 : 0 );
-    _panels.resize( numPanels );
-    _factors.resize( numPanels );
+      ( nzMinusTopPML>0 ? (nzMinusTopPML-1)/_control.sizeOfPML+1 : 0 );
+    _paddedPanels.resize( numPanels );
+    _paddedFactors.resize( numPanels );
     if( _solver == MUMPS_SYMMETRIC )
     {
         // Our solver supports symmetry, so only fill the lower triangles
         for( PetscInt panel=0; panel<numPanels; ++panel )
         {
-            Mat& A = _panels[j];
+            Mat& A = _paddedPanels[panel];
             MatCreate( _comm, &A );
 
-            const PetscInt panelHeight = 
-                ( panel==numPanels-1 ? 
-                  _control.b + _control.d : 
-                  _control.b + (_control.nz-panel*_control.d) );
-            const PetscInt heightOffset = panel*(_control.b+_control.d);
-            const PetscInt heightOfPML = heightOffset + _control.b;
+            const PetscInt panelHeight = _control.sizeOfPML + 
+              ( panel==numPanels-1 ? 
+                _control.nz-(panel*_control.planesPerPanel+_control.sizeOfPML) :
+                _control.planesPerPanel );
+            const PetscInt bottomOfPanel = 
+              ( panel==0 ? 
+                0 : 
+                _control.sizeOfPML + panel*_control.planesPerPanel );
 
             const PetscInt localSize = _myXPortion*_myYPortion*panelHeight;
             const PetscInt size = _control.nx*_control.ny*panelHeight;
@@ -436,6 +445,7 @@ psp::FiniteDiffSweepingPC::Init()
             MatMPISBAIJSetPreallocation( A, 1, 3, PETSC_NULL, 3, PETSC_NULL );
 
             // Fill with 7-point stencil
+            // TODO: Batch several rows together for each MatSetValues
             std::vector<PetscScalar> row(4);
             std::vector<PetscInt> colIndices(4);
             PetscInt iStart, iEnd;
@@ -447,17 +457,15 @@ psp::FiniteDiffSweepingPC::Init()
                 const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
                 const PetscInt x = _myXOffset + localX;
                 const PetscInt y = _myYOffset + localY;
-                const PetscInt z = heightOffset + localZ;
+                const PetscInt z = begOfPML + localZ;
 
-                // Compute this row. The data is filled into the four entries
-                // as follows:
-                //   [0]: diagonal entry
-                //   [1]: left connection (if it exists)
-                //   [2]: front connection (if it exists)
-                //   [3]: bottom connection (if it exists)
+                // Compute the left half of this row
                 FormSymmetricRow
-                ( x, y, z, heightOffset, row, colIndices );
+                ( _control.imagShift, x, y, z, 
+                  bottomOfPanel, panelHeight, _control.sizeOfPML, 
+                  row, colIndices );
 
+                // Store the values into the distributed matrix
                 MatSetValues
                 ( A, &row[0], 1, &i, 4, &colIndices[0], INSERT_VALUES );
             }
@@ -465,7 +473,7 @@ psp::FiniteDiffSweepingPC::Init()
             MatAssemblyEnd( A, MAT_FINAL_ASSEMBLY );
 
             // Factor the matrix
-            Mat& F = _factors[j];
+            Mat& F = _paddedFactors[panel];
             MatGetFactor( A, MAT_SOLVER_MUMPS, MAT_FACTOR_CHOLESKY, &F );
             MatFactorInfo cholInfo;
             cholInfo.fill = 3.0; // TODO: Tweak/expose this
@@ -479,18 +487,22 @@ psp::FiniteDiffSweepingPC::Init()
     else // solver == MUMPS or solver == SUPERLU_DIST
     {
         // Our solver does not support symmetry, fill the entire matrices
-        for( PetscInt j=0; j<numPanels; ++j )
+        for( PetscInt panel=0; panel<numPanels; ++panel )
         {
-            Mat& A = _panels[j];
+            Mat& A = _paddedPanels[panel];
             MatCreate( _comm, &A );
 
-            const PetscInt height = 
-                ( j==numPanels-1 ? 
-                  _control.b + _control.d : 
-                  _control.b + (_control.nz-j*_control.d) );
+            const PetscInt panelHeight = _control.sizeOfPML + 
+              ( panel==numPanels-1 ? 
+                _control.nz-(panel*_control.planesPerPanel+_control.sizeOfPML) :
+                _control.planesPerPanel );
+            const PetscInt bottomOfPanel = 
+              ( panel==0 ? 
+                0 : 
+                _control.sizeOfPML + panel*_control.planesPerPanel );
 
-            const PetscInt localSize = _mySlicePortion*height;
-            const PetscInt size = _sliceSize*height;
+            const PetscInt localSize = _myXPortion*_myYPortion*panelHeight;
+            const PetscInt size = _control.nx*_control.ny*panelHeight;
             MatSetSizes( A, localSize, size, size, size );
 
             MatSetType( A, MATMPIAIJ );
@@ -499,6 +511,7 @@ psp::FiniteDiffSweepingPC::Init()
             MatMPIAIJSetPreallocation( A, 5, PETSC_NULL, 5, PETSC_NULL );
 
             // Fill with 7-point stencil
+            // TODO: Batch several rows together for each MatSetValues
             std::vector<PetscScalar> row(7);
             std::vector<PetscInt> colIndices(7);
             PetscInt iStart, iEnd;
@@ -510,12 +523,15 @@ psp::FiniteDiffSweepingPC::Init()
                 const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
                 const PetscInt x = _myXOffset + localX;
                 const PetscInt y = _myYOffset + localY;
-                const PetscInt z = heightOffset + localZ;
+                const PetscInt z = begOfPML + localZ;
 
                 // Compute this entire row.
                 FormRow
-                ( x, y, z, heightOffset, row, colIndices );
+                ( _control.imagShift, x, y, z, 
+                  bottomOfPanel, panelHeight, _control.sizeOfPML, 
+                  row, colIndices );
 
+                // Store the row in the distributed matrix
                 MatSetValues
                 ( A, &row[0], 1, &i, 7, &colIndices[0], INSERT_VALUES );
             }
@@ -523,7 +539,7 @@ psp::FiniteDiffSweepingPC::Init()
             MatAssemblyEnd( A, MAT_FINAL_ASSEMBLY );
 
             // Factor the matrix
-            Mat& F = _factors[j];
+            Mat& F = _paddedFactors[panel];
             if( solver == MUMPS )
                 MatGetFactor( A, MAT_SOLVER_MUMPS, MAT_FACTOR_LU, &F );
             else
@@ -537,6 +553,43 @@ psp::FiniteDiffSweepingPC::Init()
             MatLUFactorNumeric( F, A, &luInfo );
         }
     }
+
+    //---------------------------------------//
+    // Form the unpadded off-diagonal blocks //
+    //---------------------------------------//
+    _subdiagonalBlocks.resize( numPanels-1 );
+    for( PetscInt panel=0; panel<numPanels-1; ++panel )
+    {
+        Mat& B = _subdiagonalBlocks[panel];
+        MatCreate( _comm, &B );
+
+        const PetscInt thisPanelHeight = _control.planesPerPanel;
+        const PetscInt nextPanelHeight = 
+            ( panel==numPanels-2 ? 
+              _control.planesPerPanel : 
+              _control.nz-(panel+1)*_control.planesPerPanel-_control.sizeOfPML 
+            );
+        const PetscInt blockHeight = _control.nx*_control.ny*nextPanelHeight;
+        const PetscInt blockWidth = _control.nx*_control.ny*thisPanelHeight;
+        const PetscInt localBlockHeight = 
+            _myXPortion*_myYPortion*nextPanelHeight;
+        MatSetSizes( B, localBlockHeight, blockWidth, blockHeight, blockWidth );
+
+        MatSetType( A, MATMPIAIJ );
+
+        // Preallocate memory (go ahead and use one diagonal + one off-diagonal)
+        MatMPIAIJSetPreallocation( A, 1, PETSC_NULL, 1, PETSC_NULL );
+
+        // Fill the connections between our nodes in the last xy plane of 
+        // unpadded panel 'panel' and the first xy plane of unpadded panel 
+        // 'panel+1'.
+        std::vector<PetscScalar> subdiagRow(1);
+        std::vector<PetscInt> subdiagColIndices(1);
+        PetscInt iStart, iEnd;
+        MatGetOwnershipRange( B, &iStart, &iEnd );
+        // HERE: Fill in our connections from the bottom of this panel
+        //       to the top of the next panel.
+    }
     
     _initialized = true;
 }
@@ -548,11 +601,14 @@ psp::FiniteDiffSweepingPC::Destroy()
         throw std::logic_error
         ("Cannot destroy preconditioner without initializing");
     }
-    for( std::size_t j=0; j<_panels.size(); ++j )
+    PetscInt numPanels = _paddedPanels.size();
+    for( std::size_t panel=0; panel<numPanels; ++panel )
     {
-        MatDestroy( _panels[j] );
-        MatDestroy( _factors[j] );
+        MatDestroy( _paddedPanels[panel] );
+        MatDestroy( _paddedFactors[panel] );
     }
+    for( PetscInt panel=0; panel<numPanels-1; ++panel )
+        MatDestroy( _subdiagonalBlocks[panel] );
     _initialized = false;
 }
 
