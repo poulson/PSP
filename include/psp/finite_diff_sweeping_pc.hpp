@@ -98,7 +98,7 @@ class FiniteDiffSweepingPC
 
     Vec* _slowness;
     std::vector<Mat> _paddedFactors;
-    std::vector<Mat> _subdiagonalBlocks;
+    std::vector<Mat> _offDiagBlocks;
 
     bool _initialized;
 
@@ -254,8 +254,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Compute the left half of this row
             FormSymmetricRow
-            ( 0.0, x, y, z, 0, _control.nz, _control.sizeOfPML, 
-              row, colIndices );
+            ( 0.0, x, y, z, 0, _control.nz, _control.pmlSize, row, colIndices );
 
             // Put this row into the distributed matrix
             MatSetValues
@@ -270,28 +269,28 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     //----------------------------------------------------------------//
     // TODO: Consider allowing the artificial panel PML to be of a different 
     //       size than the outer fixed PML.
-    const PetscInt nzMinusTopPML = _control.nz - _control.sizeOfPML;
+    const PetscInt nzMinusTopPML = _control.nz - _control.pmlSize;
     const PetscInt numPanels = 
-      ( nzMinusTopPML>0 ? (nzMinusTopPML-1)/_control.sizeOfPML+1 : 0 );
+      ( nzMinusTopPML>0 ? (nzMinusTopPML-1)/_control.pmlSize+1 : 0 );
     _paddedFactors.resize( numPanels );
     if( _solver == MUMPS_SYMMETRIC )
     {
         // Our solver supports symmetry, so only fill the lower triangles
-        for( PetscInt panel=0; panel<numPanels; ++panel )
+        for( PetscInt m=0; m<numPanels; ++m )
         {
             Mat D;
             MatCreate( _comm, &D );
 
-            const PetscInt panelHeight = _control.sizeOfPML + 
-              ( panel==numPanels-1 ? 
-                _control.nz-(panel*_control.planesPerPanel+_control.sizeOfPML) :
+            const PetscInt panelHeight = _control.pmlSize + 
+              ( m==numPanels-1 ? 
+                _control.nz-(m*_control.planesPerPanel+_control.pmlSize) :
                 _control.planesPerPanel );
             const PetscInt bottomOfPanel = 
-              ( panel==0 ? 0 : panel*_control.planesPerPanel );
+              ( m==0 ? 0 : m*_control.planesPerPanel );
 
             const PetscInt localSize = _myXPortion*_myYPortion*panelHeight;
             const PetscInt size = _control.nx*_control.ny*panelHeight;
-            MatSetSizes( D, localSize, size, size, size );
+            MatSetSizes( D, localSize, localSize, size, size );
 
             // SBAIJ is required for symmetry support
             MatSetType( D, MATMPISBAIJ ); 
@@ -320,7 +319,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 // Compute the left half of this row
                 FormSymmetricRow
                 ( _control.imagShift, x, y, z, 
-                  bottomOfPanel, panelHeight, _control.sizeOfPML, 
+                  bottomOfPanel, panelHeight, _control.pmlSize, 
                   row, colIndices );
 
                 // Store the values into the distributed matrix
@@ -332,7 +331,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatAssemblyEnd( D, MAT_FINAL_ASSEMBLY );
 
             // Factor the matrix
-            Mat& F = _paddedFactors[panel];
+            Mat& F = _paddedFactors[m];
             MatGetFactor( D, MAT_SOLVER_MUMPS, MAT_FACTOR_CHOLESKY, &F );
             MatFactorInfo cholInfo;
             cholInfo.fill = 3.0; // TODO: Tweak/expose this
@@ -347,21 +346,21 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     else // solver == MUMPS or solver == SUPERLU_DIST
     {
         // Our solver does not support symmetry, fill the entire matrices
-        for( PetscInt panel=0; panel<numPanels; ++panel )
+        for( PetscInt m=0; m<numPanels; ++m )
         {
             Mat D;
             MatCreate( _comm, &D );
 
-            const PetscInt panelHeight = _control.sizeOfPML + 
-              ( panel==numPanels-1 ? 
-                _control.nz-(panel*_control.planesPerPanel+_control.sizeOfPML) :
+            const PetscInt panelHeight = _control.pmlSize + 
+              ( m==numPanels-1 ? 
+                _control.nz-(m*_control.planesPerPanel+_control.pmlSize) :
                 _control.planesPerPanel );
             const PetscInt bottomOfPanel = 
-              ( panel==0 ? 0 : panel*_control.planesPerPanel );
+              ( m==0 ? 0 : m*_control.planesPerPanel );
 
             const PetscInt localSize = _myXPortion*_myYPortion*panelHeight;
             const PetscInt size = _control.nx*_control.ny*panelHeight;
-            MatSetSizes( D, localSize, size, size, size );
+            MatSetSizes( D, localSize, localSize, size, size );
 
             MatSetType( D, MATMPIAIJ );
 
@@ -388,7 +387,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 // Compute this entire row.
                 FormRow
                 ( _control.imagShift, x, y, z, 
-                  bottomOfPanel, panelHeight, _control.sizeOfPML, 
+                  bottomOfPanel, panelHeight, _control.pmlSize, 
                   row, colIndices );
 
                 // Store the row in the distributed matrix
@@ -399,7 +398,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatAssemblyEnd( D, MAT_FINAL_ASSEMBLY );
 
             // Factor the matrix
-            Mat& F = _paddedFactors[panel];
+            Mat& F = _paddedFactors[m];
             if( solver == MUMPS )
                 MatGetFactor( D, MAT_SOLVER_MUMPS, MAT_FACTOR_LU, &F );
             else
@@ -418,41 +417,45 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     //---------------------------------------//
     // Form the unpadded off-diagonal blocks //
     //---------------------------------------//
-    _subdiagonalBlocks.resize( numPanels-1 );
-    for( PetscInt panel=0; panel<numPanels-1; ++panel )
+    _offDiagBlocks.resize( numPanels-1 );
+    for( PetscInt m=0; m<numPanels-1; ++m )
     {
-        Mat& B = _subdiagonalBlocks[panel];
+        Mat& B = _offDiagBlocks[m];
         MatCreate( _comm, &B );
 
         const PetscInt bottomOfPanel = 
-          ( panel==0 ? 0 : _control.sizeOfPML + panel*_control.planesPerPanel );
+          ( m==0 ? 0 : _control.pmlSize + m*_control.planesPerPanel );
 
         const PetscInt thisPanelHeight = _control.planesPerPanel;
         const PetscInt nextPanelHeight = 
-            ( panel==numPanels-2 ? 
+            ( m==numPanels-2 ? 
               _control.planesPerPanel : 
-              _control.nz-(panel+1)*_control.planesPerPanel-_control.sizeOfPML 
-            );
+              _control.nz-(m+1)*_control.planesPerPanel-_control.pmlSize );
         const PetscInt blockHeight = _control.nx*_control.ny*thisPanelHeight;
         const PetscInt blockWidth = _control.nx*_control.ny*nextPanelHeight;
         const PetscInt localBlockHeight = 
             _myXPortion*_myYPortion*thisPanelHeight;
-        MatSetSizes( B, localBlockHeight, blockWidth, blockHeight, blockWidth );
+        const PetscInt localBlockWidth = 
+            _myXPortion*_myYPortion*nextPanelHeight;
+        MatSetSizes
+        ( B, localBlockHeight, localBlockWidth, blockHeight, blockWidth );
 
         MatSetType( B, MATMPIAIJ );
 
         // Preallocate memory (go ahead and use one diagonal + one off-diagonal)
         // even though this is a gross overestimate (roughly factor of 10).
+        //
+        // TODO: Generalize beyond 7-point stencil
         MatMPIAIJSetPreallocation( B, 1, PETSC_NULL, 1, PETSC_NULL );
 
         // Fill the connections between our nodes in the last xy plane of 
-        // unpadded panel 'panel' and the first xy plane of unpadded panel 
-        // 'panel+1'.
+        // unpadded panel 'm' and the first xy plane of unpadded panel 
+        // 'm+1'.
         //
         // TODO: Batch together several MatSetValues calls
         const PetscInt rowSize = GetPanelConnectionSize();
-        std::vector<PetscScalar> subdiagRow(rowSize);
-        std::vector<PetscInt> subdiagColIndices(rowSize);
+        std::vector<PetscScalar> offDiagRow(rowSize);
+        std::vector<PetscInt> offDiagColIndices(rowSize);
         PetscInt iStart, iEnd;
         MatGetOwnershipRange( B, &iStart, &iEnd );
         const PetscInt iStartLastPlane = 
@@ -490,24 +493,259 @@ psp::FiniteDiffSweepingPC::Destroy()
         throw std::logic_error
         ("Cannot destroy preconditioner without initializing");
     }
-    PetscInt numPanels = _paddedFactors.size();
-    for( std::size_t panel=0; panel<numPanels; ++panel )
-        MatDestroy( _paddedFactors[panel] );
-    for( PetscInt panel=0; panel<numPanels-1; ++panel )
-        MatDestroy( _subdiagonalBlocks[panel] );
+    const PetscInt numPanels = _paddedFactors.size();
+    for( PetscInt m=0; m<numPanels; ++ml )
+        MatDestroy( _paddedFactors[m] );
+    for( PetscInt m=0; m<numPanels-1; ++m )
+        MatDestroy( _offDiagBlocks[m] );
     _initialized = false;
 }
 
 void
-psp::FiniteDiffSweepingPC::Apply( Vec& x, Vec& y ) const
+psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
 {
-    // TODO: Write the sweeping preconditioner application on x, into y
-    // 
-    // Since we are forming our Mat using local sizes ~N/p for both the rmap 
-    // and cmap layouts, these vectors should both obey the 'rod' distribution
-    // format and we should be able to cheaply call VecGetArray and perform a 
-    // single memcpy on each process in order to move data between panel, 
-    // padded panel, and full box orderings. We're getting close...
+    const PetscInt numPanels = _paddedFactors.size();
+    std::vector<Vec> uPanels(numPanels);
+
+    // for m=0,1,...,n-1
+    //   u_m = f_m
+    //
+    // We first grab a pointer to our local data in f. It points to a rod of 
+    // (x,y) dimensions (_myXPortion,_myYPortion) and z dimension _control.nz, 
+    // with the storage x-y-z major (i.e., x dimension is contiguous, as are xy 
+    // planes of our local data). This allows us to easily memcpy chunks of 
+    // our process's rod of data.
+    PetscScalar* fLocalData;
+    VecGetArray( f, &fLocalData );
+    for( PetscInt m=0; m<numPanels; ++m )
+    {
+        // A_{m,m+1}'s 'left' vector distribution should match u_m's, while 
+        // its right vector solution should match u_{m+1}
+        MatGetVecs( _offDiagBlocks[m], PETSC_NULL, &uPanels[m] );
+
+        // Get a pointer to this panel solution so that we may memcpy the
+        // appropriate chunk of f into it
+        PetscScalar* uPanelLocalData;
+        VecGetArray( uPanels[m], &uPanelLocalData );
+
+        // Copy this panel's RHS, "f_m", into u[m]
+        const PetscInt zOffset = 
+            ( m==0 ? 0 : _control.pmlSize+m*_control.planesPerPanel );
+        const PetscInt fOffset = _myXPortion*_myYPortion*zOffset;
+        const uPanelLocalSize = VecGetLocalSize( uPanels[m] );
+        std::memcpy
+        ( uPanelLocalData, &fLocalData[fOffset], 
+          uPanelLocalSize*sizeof(PetscScalar) );
+
+        // Give this u panel's pointer back
+        VecRestoreArray( uPanels[m], &uPanelLocalData );
+    }
+    // Give back the pointer to f
+    VecRestoreArray( f, &fLocalData );
+
+    // for m=0,...,n-2
+    //   u_{m+1} = u_{m+1} - A_{m+1,m}(T_m u_m)
+    // where, in our case, we are storing A_{m,m+1} and instead apply
+    //   u_{m+1} = u_{m+1} - A_{m,m+1}^T (T_m u_m).
+    // It is important to recognize that the (T_m u_m) step involves embedding
+    // u_m into a domain padded with PML, solving using the sparse direct 
+    // factorization, and then extracting the solution out of the region we 
+    // embedded into.
+    //
+    // Since we are already forming T_m u_m, which is the entire computation of 
+    // the next step:
+    //   for m=0,...,n-1,
+    //     u_m = T_m u_m
+    // we will go ahead and fuse these two steps.
+    for( PetscInt m=0; m<numPanels; ++m )
+    {
+        // Grab a pointer to our portion of u_m. Also grab the amount of data.
+        PetscScalar* uPanelLocalData;
+        VecGetArray( uPanels[m], &uPanelLocalData );
+        const PetscInt uPanelLocalSize = VecGetLocalSize( uPanels[m] );
+
+        // Create a temporary buffer that is conformal with our factored 
+        // diagonal block. Start by initializing it to zero
+        Vec paddedPanelRHS, paddedPanelSol;    
+        MatGetVecs( _paddedFactors[m], &paddedPanelRHS, PETSC_NULL );
+        VecDuplicate( paddedPanelRHS, &paddedPanelSol );
+
+        if( m == 0 )
+        {
+            // The first panel is already padded, so it fills the entire space.
+            PetscScalar* paddedPanelRHSLocalData;
+            VecGetArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+            std::memcpy
+            ( paddedPanelRHSLocalData, uPanelLocalData, 
+              uPanelLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+
+            // Solve using our sparse-direct factorization.
+            MatSolve( _paddedFactors[m], paddedPanelRHS, paddedPanelSol );
+
+            // Extract the entire solution into u_m 
+            PetscScalar* paddedPanelSolLocalData;
+            VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
+            std::memcpy
+            ( uPanelLocalData, paddedPanelRHSLocalData,
+              uPanelLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
+        }
+        else
+        {
+            const PetscInt pmlSize = _control.pmlSize;
+            const PetscInt paddedOffset = _myXPortion*_myYPortion*pmlSize;
+
+            // Copy our panel's data into the back of the zero-padded buffer
+            VecSet( paddedPanelRHS, 0.0 );
+            PetscScalar* paddedPanelRHSLocalData;
+            VecGetArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+            std::memcpy
+            ( &paddedPanelRHSLocalData[paddedOffset], uPanelLocalData,
+              uPanelLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+
+            // Solve using our sparse-direct factorization
+            MatSolve( _paddedFactors[m], paddedPanelRHS, paddedPanelSol );
+
+            // Extract the relevant portion of the solution and store in u_m
+            PetscScalar* paddedPanelSolLocalData;
+            VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
+            std::memcpy
+            ( uPanelLocalData, &paddedPanelSolLocalData[paddedOffset],
+              uPanelLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
+        }
+
+        // Every step but the last must update the next panel solution
+        if( m != numPanels-1 )
+        {
+            // Form A_{m,m+1}^T u_m into a work buffer
+            Vec work;
+            VecDuplicate( uPanels[m+1], work );
+            MatMultTranspose( _offDiagBlocks[m], uPanels[m], work );
+
+            // Substract the work vector from u_{m+1}
+            VecAXPY( uPanels[m+1], -1.0, work );
+
+            // Destroy the work vector
+            VecDestroy( work );
+        }
+
+        // Destroy the padded panel vectors
+        VecDestroy( paddedPanelRHS );
+        VecDestroy( paddedPanelSol );
+
+        // Release u_m's pointer
+        VecRestoreArray( uPanels[m], &uPanelLocalData );
+    }
+
+    // for m=n-2,...,0
+    //   u_m = u_m - T_m(A_{m,m+1}u_{m+1})
+    for( PetscInt m=numPanels-2; m>=0; --m )
+    {
+        // Form A_{m,m+1} u_{m+1} into a work vector
+        Vec work;
+        MatGetVecs( _offDiagBlocks[m+1], PETSC_NULL, work );
+        MatMult( _offDiagBlocks[m+1], uPanels[m+1], work );
+
+        // Grab a pointer to our portion of 'work'. 
+        // Also grab the amount of data.
+        PetscScalar* workLocalData;
+        VecGetArray( work, &workLocalData );
+        const PetscInt workLocalSize = VecGetLocalSize( work );
+
+        // Create a temporary buffer that is conformal with our factored 
+        // diagonal block. Start by initializing it to zero
+        Vec paddedPanelRHS, paddedPanelSol;    
+        MatGetVecs( _paddedFactors[m], &paddedPanelRHS, PETSC_NULL );
+        VecDuplicate( paddedPanelRHS, &paddedPanelSol );
+
+        if( m == 0 )
+        {
+            // The first panel is already padded, so it fills the entire space.
+            PetscScalar* paddedPanelRHSLocalData;
+            VecGetArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+            std::memcpy
+            ( paddedPanelRHSLocalData, workLocalData, 
+              workLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+
+            // Solve using our sparse-direct factorization.
+            MatSolve( _paddedFactors[m], paddedPanelRHS, paddedPanelSol );
+
+            // Extract the entire solution into work
+            PetscScalar* paddedPanelSolLocalData;
+            VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
+            std::memcpy
+            ( workLocalData, paddedPanelRHSLocalData,
+              workLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
+        }
+        else
+        {
+            const PetscInt pmlSize = _control.pmlSize;
+            const PetscInt paddedOffset = _myXPortion*_myYPortion*pmlSize;
+
+            // Copy our panel's data into the back of the zero-padded buffer
+            VecSet( paddedPanelRHS, 0.0 );
+            PetscScalar* paddedPanelRHSLocalData;
+            VecGetArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+            std::memcpy
+            ( &paddedPanelRHSLocalData[paddedOffset], workLocalData,
+              workLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelRHS, &paddedPanelRHSLocalData );
+
+            // Solve using our sparse-direct factorization
+            MatSolve( _paddedFactors[m], paddedPanelRHS, paddedPanelSol );
+
+            // Extract the relevant portion of the solution and store in u_m
+            PetscScalar* paddedPanelSolLocalData;
+            VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
+            std::memcpy
+            ( workLocalData, &paddedPanelSolLocalData[paddedOffset],
+              workLocalSize*sizeof(PetscScalar) );
+            VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
+        }
+
+        // Destroy the padded panel vectors
+        VecDestroy( paddedPanelRHS );
+        VecDestroy( paddedPanelSol );
+
+        // Substract the work vector from u_m
+        VecAXPY( uPanels[m], -1.0, work );
+
+        // Destroy the work vector
+        VecDestroy( work );
+    }
+
+    // Store the panel solutions into the full vector, u, and destroy the 
+    // panel solutions as we go
+    PetscScalar* uLocalData;
+    VecGetArray( u, &uLocalData );
+    for( PetscInt m=0; m<numPanels; ++m )
+    {
+        // Get a pointer to this panel solution so that we may memcpy from it
+        PetscScalar* uPanelLocalData;
+        VecGetArray( uPanels[m], &uPanelLocalData );
+
+        // Copy the panel solution into the full vector
+        const PetscInt zOffset = 
+            ( m==0 ? 0 : _control.pmlSize+m*_control.planesPerPanel );
+        const PetscInt fOffset = _myXPortion*_myYPortion*zOffset;
+        const uPanelLocalSize = VecGetLocalSize( uPanels[m] );
+        std::memcpy
+        ( &uLocalData[fOffset], uPanelLocalData,
+          uPanelLocalSize*sizeof(PetscScalar) );
+
+        // Give this u panel's pointer back
+        VecRestoreArray( uPanels[m], &uPanelLocalData );
+
+        // Destroy the panel solution
+        VecDestroy( uPanels[m] );
+    }
+    // Give the pointer to the full solution vector back
+    VecRestoreArray( u, &uLocalData );
 }
 
 PetscInt

@@ -123,6 +123,7 @@ main( int argc, char* argv[] )
     ierr = PetscObjectSetName((PetscObject)slowness,"slowness"); CHKERRQ(ierr);
     ierr = VecSetSizes(slowness,localSize,n); CHKERRQ(ierr);
     // TODO: Fill slowness vector here. We should probably start with all 1's.
+    VecSet(slowness,1.0);
 
     // Set up the approximate inverse and the original matrix
     Mat A;
