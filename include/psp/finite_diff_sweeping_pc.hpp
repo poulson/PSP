@@ -97,7 +97,6 @@ class FiniteDiffSweepingPC
     PetscInt _myYPortion;
 
     Vec* _slowness;
-    std::vector<Mat> _paddedPanels;
     std::vector<Mat> _paddedFactors;
     std::vector<Mat> _subdiagonalBlocks;
 
@@ -225,11 +224,46 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     if( localN != _myXPortion*_myYPortion*_control.nz )
         throw std::runtime_error("Slowness is not properly distributed");
 
-    //--------------------------------//
-    // Form the full forward operator //
-    //--------------------------------//
-    const PetscInt localSize = GetLocalSize();
-    // HERE
+    //-----------------------------------//
+    // Form the full forward operator, A //
+    //-----------------------------------//
+    {
+        const PetscInt localSize = GetLocalSize();
+        const PetscInt size = _control.nx*_control.ny*_control.nz;
+
+        MatCreate( _comm, &A );
+        MatSetSizes( A, localSize, size, size, size 0 );
+        MatSetType( A, MATMPISBAIJ );
+        MatSetBlocksize( D, 1 );
+        // TODO: Generalize this step for more stencils.
+        MatMPISBAIJSetPreallocation( A, 1, 3, PETSC_NULL, 3, PETSC_NULL );
+
+        const PetscInt symmRowSize = GetSymmetricRowSize();
+        std::vector<PetscScalar> row(symmRowSize);
+        std::vector<PetscInt> colIndices(symmRowSize);
+        PetscInt iStart, iEnd;
+        MatGetOwnershipRange( A, &iStart, &iEnd );
+        for( PetscInt i=iStart; i<iEnd; ++i )
+        {
+            const PetscInt localX = (i-iStart) % _myXPortion;
+            const PetscInt localY = ((i-iStart)/_myXPortion) % _myYPortion;
+            const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
+            const PetscInt x = _myXOffset + localX;
+            const PetscInt y = _myYOffset + localY;
+            const PetscInt z = localZ;
+
+            // Compute the left half of this row
+            FormSymmetricRow
+            ( 0.0, x, y, z, 0, _control.nz, _control.sizeOfPML, 
+              row, colIndices );
+
+            // Put this row into the distributed matrix
+            MatSetValues
+            ( A, &row[0], 1, &i, symmRowSize, &colIndices[0], INSERT_VALUES );
+        }
+        MatAssemblyBegin( A, MAT_FINAL_ASSEMBLY );
+        MatAssemblyEnd( A, MAT_FINAL_ASSEMBLY );
+    }
 
     //----------------------------------------------------------------//
     // Form each of the PML-padded diagonal blocks and then factor it //
@@ -239,14 +273,13 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     const PetscInt nzMinusTopPML = _control.nz - _control.sizeOfPML;
     const PetscInt numPanels = 
       ( nzMinusTopPML>0 ? (nzMinusTopPML-1)/_control.sizeOfPML+1 : 0 );
-    _paddedPanels.resize( numPanels );
     _paddedFactors.resize( numPanels );
     if( _solver == MUMPS_SYMMETRIC )
     {
         // Our solver supports symmetry, so only fill the lower triangles
         for( PetscInt panel=0; panel<numPanels; ++panel )
         {
-            Mat& D = _paddedPanels[panel];
+            Mat D;
             MatCreate( _comm, &D );
 
             const PetscInt panelHeight = _control.sizeOfPML + 
@@ -265,7 +298,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatSetBlocksize( D, 1 );
 
             // Preallocate memory. This should be an upper bound for 7-point.
-            // TODO: Generalize this for more general stencils.
+            // TODO: Generalize this for more stencils.
             MatMPISBAIJSetPreallocation( D, 1, 3, PETSC_NULL, 3, PETSC_NULL );
 
             // Fill our portion of the distributed matrix.
@@ -282,7 +315,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
                 const PetscInt x = _myXOffset + localX;
                 const PetscInt y = _myYOffset + localY;
-                const PetscInt z = begOfPML + localZ;
+                const PetscInt z = bottomOfPanel + localZ;
 
                 // Compute the left half of this row
                 FormSymmetricRow
@@ -308,6 +341,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             ISCreateStride( _comm, size, 0, 1, &perm );
             MatCholeskyFactorSymbolic( F, D, perm, &cholInfo );
             MatCholeskyFactorNumeric( F, D, &cholInfo );
+            MatDestroy( D );
         }
     }
     else // solver == MUMPS or solver == SUPERLU_DIST
@@ -315,7 +349,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         // Our solver does not support symmetry, fill the entire matrices
         for( PetscInt panel=0; panel<numPanels; ++panel )
         {
-            Mat& D = _paddedPanels[panel];
+            Mat D;
             MatCreate( _comm, &D );
 
             const PetscInt panelHeight = _control.sizeOfPML + 
@@ -349,7 +383,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
                 const PetscInt x = _myXOffset + localX;
                 const PetscInt y = _myYOffset + localY;
-                const PetscInt z = begOfPML + localZ;
+                const PetscInt z = bottomOfPanel + localZ;
 
                 // Compute this entire row.
                 FormRow
@@ -377,6 +411,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             ISCreateStride( _comm, size, 0, 1, &perm );
             MatLUFactorSymbolic( F, D, perm, &luInfo );
             MatLUFactorNumeric( F, D, &luInfo );
+            MatDestroy( D );
         }
     }
 
@@ -455,12 +490,9 @@ psp::FiniteDiffSweepingPC::Destroy()
         throw std::logic_error
         ("Cannot destroy preconditioner without initializing");
     }
-    PetscInt numPanels = _paddedPanels.size();
+    PetscInt numPanels = _paddedFactors.size();
     for( std::size_t panel=0; panel<numPanels; ++panel )
-    {
-        MatDestroy( _paddedPanels[panel] );
         MatDestroy( _paddedFactors[panel] );
-    }
     for( PetscInt panel=0; panel<numPanels-1; ++panel )
         MatDestroy( _subdiagonalBlocks[panel] );
     _initialized = false;
@@ -470,6 +502,9 @@ void
 psp::FiniteDiffSweepingPC::Apply( Vec& x, Vec& y ) const
 {
     // TODO: Write the sweeping preconditioner application on x, into y
+    // 
+    // However, I first need to know what the expected distributions of x and 
+    // y are.
 }
 
 PetscInt
