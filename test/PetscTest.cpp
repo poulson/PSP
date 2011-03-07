@@ -32,8 +32,6 @@ void Usage()
               << "  nz: number of vertices in z direction" << std::endl;
 }
 
-static char help[] = "A simple PETSc test.\n\n";
-
 PetscErrorCode
 CustomPCSetUp( PC pc )
 {
@@ -55,10 +53,7 @@ CustomPCApply(PC pc,Vec x,Vec y)
     psp::FiniteDiffSweepingPC* context;
     ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
 
-    // TODO: Write an application routine in the FiniteDiffSweepingPC class
-    //       which takes the arguments 'x' and 'y' for input and solution
-    //
-    // context->Apply( x, y );
+    context->Apply( x, y );
 
     return ierr;
 }
@@ -71,9 +66,7 @@ CustomPCDestroy(PC pc)
     psp::FiniteDiffSweepingPC* context;
     ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
 
-    // TODO: Call a routine for freeing data.
-    //
-    // context->Destroy();
+    context->Destroy();
 
     return ierr;
 }
@@ -81,14 +74,14 @@ CustomPCDestroy(PC pc)
 int
 main( int argc, char* argv[] )
 {
-    PetscInitialize( &argc, &argv, (char*)0, help );
+    PetscInitialize( &argc, &argv, PETSC_NULL, PETSC_NULL );
 
     PetscErrorCode ierr;
     PetscMPIInt size, rank;
     ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size); CHKERRQ(ierr);
     ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank); CHKERRQ(ierr);
 
-    if( argc != 4 )
+    if( argc < 4 )
     {
         if( rank == 0 )    
 	    Usage();
@@ -97,25 +90,43 @@ main( int argc, char* argv[] )
     }
 
     PetscInt argNum = 0;
-    PetscInt nx = atoi(argv[++argNum]);
-    PetscInt ny = atoi(argv[++argNum]);
-    PetscInt nz = atoi(argv[++argNum]);
-    PetscInt n = nx*ny*nz;
+    const PetscInt nx = atoi(argv[++argNum]);
+    const PetscInt ny = atoi(argv[++argNum]);
+    const PetscInt nz = atoi(argv[++argNum]);
+    const PetscInt n = nx*ny*nz;
 
-    // With 7 point stencil and symmetry, we only have 4 nonzeros per row. We 
-    // can assume ~2 will be in the diagonal block and ~2 will be outside it.
-    // Pad each by 1 to avoid underallocation. PETSc requires us to use a 
-    // blocked symmetric matrix, so we set the blocksize to 1.
+    psp::FiniteDiffControl control;
+    control.stencil = psp::SEVEN_POINT;
+    control.nx = nx;
+    control.ny = ny;
+    control.nz = nz;
+    control.wx = 15;
+    control.wy = 15;
+    control.wz = 15;
+    control.omega = 10;
+    control.C = 1;
+    control.imagShift = 1;
+    control.sizeOfPML = 5;
+    control.planesPerPanel = 5;
+    control.frontBC = psp::PML;
+    control.rightBC = psp::PML;
+    control.backBC = psp::PML;
+    control.leftBC = psp::PML;
+    control.bottomBC = psp::PML;
+
+    psp::FiniteDiffSweepingPC context
+    ( PETSC_COMM_WORLD, control, solver, numProcessRows, numProcessCols );
+
+    Vec slowness;
+    const PetscInt localSize = context.GetLocalSize();
+    ierr = VecCreate(PETSC_COMM_WORLD,&slowness); CHKERRW(ierr);
+    ierr = PetscObjectSetName((PetscObject)slowness,"slowness"); CHKERRQ(ierr);
+    ierr = VecSetSizes(slowness,localSize,n); CHKERRQ(ierr);
+    // TODO: Fill slowness vector here. We should probably start with all 1's.
+
+    // Set up the approximate inverse and the original matrix
     Mat A;
-    ierr = MatCreate(PETSC_COMM_WORLD,&A); CHKERRQ(ierr);
-    ierr = MatSetType(A,MATMPISBAIJ); CHKERRQ(ierr);
-    ierr = MatMPISBAIJSetPreallocation(A,1,3,PETSC_NULL,3,PETSC_NULL); 
-    CHKERRQ(ierr);
-    PetscInt iStart, iEnd;
-    ierr = MatGetOwnershipRange(A,&iStart,&iEnd); CHKERRQ(ierr);
-
-    // TODO: Fill 7-point stencil for our index range here. We could actually
-    //       call the FiniteDiffSweepingPC::7PointSymmetricRow routine
+    context.Init( slowness, A );
 
     // Create the approx. solution (x), exact solution (u), and RHS (b) 
     // vectors
@@ -136,19 +147,8 @@ main( int argc, char* argv[] )
     PC pc;
     KSPGetPC(ksp,&pc);
     KSPSetTolerances(ksp,1.e-6,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
-    // TODO: Fill and set context here
-    // psp::FiniteDiffControl control;
-    // control.nx = nx;
-    // control.ny = ny;
-    // control.nz = nz;
-    // control.wx = ...
-    // control.wy = ...
-    // control.wz = ...
-    // control.omega = ...
-    // ...
-    // psp::FiniteDiffSweepingPC context
-    // ( control, solver, slowness, numProcessRows, numProcessCols );
     PCSetType(pc,PCSHELL);
+    PCSetContext(pc,&context);
     PCShellSetSetUp(pc,CustomPCSetUp);
     PCShellSetApply(pc,CustomPCApply);
     PCShellSetDestroy(pc,CustomPCDestroy);
