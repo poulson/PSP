@@ -232,7 +232,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         const PetscInt size = _control.nx*_control.ny*_control.nz;
 
         MatCreate( _comm, &A );
-        MatSetSizes( A, localSize, size, size, size 0 );
+        MatSetSizes( A, localSize, localSize, size, size 0 );
         MatSetType( A, MATMPISBAIJ );
         MatSetBlocksize( D, 1 );
         // TODO: Generalize this step for more stencils.
@@ -503,8 +503,11 @@ psp::FiniteDiffSweepingPC::Apply( Vec& x, Vec& y ) const
 {
     // TODO: Write the sweeping preconditioner application on x, into y
     // 
-    // However, I first need to know what the expected distributions of x and 
-    // y are.
+    // Since we are forming our Mat using local sizes ~N/p for both the rmap 
+    // and cmap layouts, these vectors should both obey the 'rod' distribution
+    // format and we should be able to cheaply call VecGetArray and perform a 
+    // single memcpy on each process in order to move data between panel, 
+    // padded panel, and full box orderings. We're getting close...
 }
 
 PetscInt
@@ -743,21 +746,6 @@ psp::FiniteDiffSweepingPC::GetPanelConnectionSize()
 {
     // TODO: Support more than just the 7-point stencil
     return 1;
-}
-
-void
-psp::FiniteDiffSweepingPC::FormPanelConnections
-( PetscInt x, PetscInt y, PetscInt z,
-  PetscInt thisPanelHeight, PetscInt nextPanelHeight,
-  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices )
-{
-    // Connection to (x,y,z+1)
-    const PetscInt firstRowInNextPanel = 
-        (_myXOffset+_myYOffset*_control.nx)*nextPanelHeight;
-    colIndices[0] = 
-        firstRowInNextPanel + (x-_myXOffset) + (y-_myYOffset)*_myXPortion;
-    // TODO: Fill in finite diff approx of (x,y,z)'s connection to (x,y,z+1) 
-    // into row[0]
 }
 
 #endif // PSP_FINITE_DIFF_SWEEPING_PC_HPP
