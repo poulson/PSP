@@ -115,7 +115,7 @@ main( int argc, char* argv[] )
     control.bottomBC = psp::PML;
 
     psp::FiniteDiffSweepingPC context
-    ( PETSC_COMM_WORLD, control, solver, numProcessRows, numProcessCols );
+    ( PETSC_COMM_WORLD, numProcessRows, numProcessCols, control, solver );
 
     Vec slowness;
     const PetscInt localSize = context.GetLocalSize();

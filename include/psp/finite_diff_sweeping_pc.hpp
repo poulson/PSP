@@ -79,14 +79,11 @@ enum SparseDirectSolver { MUMPS, MUMPS_SYMMETRIC, SUPERLU_DIST };
 
 class FiniteDiffSweepingPC
 {
-    FiniteDiffControl _control;
-    SparseDirectSolver _solver;
-
     MPI_Comm _comm;
     PetscInt _rank;
     PetscInt _numProcesses;
-    PetscInt _numProcessRows; 
-    PetscInt _numProcessCols; 
+    const PetscInt _numProcessRows;
+    const PetscInt _numProcessCols;
     PetscInt _myProcessRow;
     PetscInt _myProcessCol;
     PetscInt _xChunkSize;
@@ -96,16 +93,32 @@ class FiniteDiffSweepingPC
     PetscInt _myXPortion;
     PetscInt _myYPortion;
 
+    const FiniteDiffControl _control;
+    const SparseDirectSolver _solver;
+
+    const PetscInt _pmlSizeCubed;
+    const PetscReal _hx;
+    const PetscReal _hy;
+    const PetscReal _hz;
+
     Vec* _slowness;
     std::vector<Mat> _paddedFactors;
-    std::vector<Mat> _offDiagBlocks;
+    std::vector<Mat> _subdiagonalBlocks;
 
     bool _initialized;
 
+    PetscScalar s1Inv( PetscInt x ) const;
+    PetscScalar s2Inv( PetscInt y ) const;
+    PetscScalar s3Inv( PetscInt z ) const;
+    // Since the PML will often be pushed down the z direction, we will need
+    // a means of specifying when the PML ends somewhere different than 
+    // z=_control.pmlSize-1;
+    PetscScalar s3Inv( PetscInt z, PetscInt endOfPml ) const;
+
 public:
     FiniteDiffSweepingPC
-    ( FiniteDiffControl& control, SparseDirectSolver solver, 
-      PetscInt numProcessRows, PetscInt numProcessCols );
+    ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols, 
+      FiniteDiffControl& control, SparseDirectSolver solver );
 
     ~FiniteDiffSweepingPC();
 
@@ -121,32 +134,32 @@ public:
     PetscInt GetSymmetricRowSize() const;
 
     // Return the indices and values for each nonzero in the left side of the
-    // row defined by node (x,y,z) in the panel defined by its bottom z-location
-    // (bottomOfPanel), its height (panelHeight), and its PML height from the 
-    // bottom (pmlHeight).
+    // row defined by node (x,y,z) in the panel defined by its top z-location
+    // (topOfPanel), its height (panelHeight), and its PML height on the top
+    // (pmlHeight).
     //
     // In the cases where a connection is invalid, fill its index with -1 so 
     // that PETSc's MatSetValues will ignore it.
     void FormSymmetricRow
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
+      PetscInt topOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
       std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
 
     // Return the maximum number of nonzeros in a row
     PetscInt GetRowSize() const;
 
     // Return the indices and values for each nonzero in the 
-    // row defined by node (x,y,z) in the panel defined by its bottom z-location
-    // (bottomOfPanel), its height (panelHeight), and its PML height from the 
-    // bottom (pmlHeight)
+    // row defined by node (x,y,z) in the panel defined by its top z-location
+    // (topOfPanel), its height (panelHeight), and its PML height at the top
+    // (pmlHeight)
     //
     // In the cases where a connection is invalid, fill its index with -1 so 
     // that PETSc's MatSetValues will ignore it.
     void FormRow
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
+      PetscInt topOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
       std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
     
     // Return the maximum number of nonzeros in the connections from a node
@@ -165,16 +178,114 @@ public:
 
 } // namespace psp
 
-// Implementation begins here
+//----------------------------------------------------------------------------//
+// Implementation begins here                                                 //
+//----------------------------------------------------------------------------//
+
+// Private utility functions
+
+inline PetscScalar
+psp::FiniteDiffSweepingPC::s1Inv( PetscInt x ) const
+{
+    if( (x+1)<_control.pmlSize && _control.frontBC==PML )
+    {
+        const PetscInt delta = _control.pmlSize-(x+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hx*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( x>(_control.nx-_control.pmlSize) && _control.backBC==PML )
+    {
+        const PetscInt delta = x-(_control.nx-_control.pmlSize);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hx*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+inline PetscScalar
+psp::FiniteDiffSweepingPC::s2Inv( PetscInt y ) const
+{
+    if( (y+1)<_control.pmlSize && _control.leftBC==PML )
+    {
+        const PetscInt delta = _control.pmlSize-(y+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hy*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( y >(_control.ny-_control.pmlSize) && _control.rightBC==PML )
+    {
+        const PetscInt delta = y-(_control.ny-_control.pmlSize);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hy*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+inline PetscScalar
+psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
+{
+    if( (z+1)<_control.pmlSize )
+    {
+        const PetscInt delta = _control.pmlSize-(z+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( z>(_control.nz-_control.pmlSize) && _control.bottomBC==PML )
+    {
+        const PetscInt delta = z-(_control.nz-_control.pmlSize);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+inline PetscScalar
+psp::FiniteDiffSweepingPC::s3Inv( PetscInt z, PetscInt endOfPml ) const
+{
+    if( (z+1)<endOfPml )
+    {
+        const PetscInt delta = endOfPml-(z+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( z>(_control.nz-_control.pmlSize) && _control.bottomBC==PML )
+    {
+        const PetscInt delta = z-(_control.nz-_control.pmlSize);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.C*delta*delta/(_pmlSizeCubed*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
 
 psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
-( MPI_Comm comm,
-  psp::FiniteDiffControl& control, 
-  psp::SparseDirectSolver solver, 
-  PetscInt numProcessRows, 
-  PetscInt numProcessCols )
-: _control(control), _solver(solver), _comm(comm),
-  _numProcessRows(numProcessRows), _numProcessCols(numProcessCols), 
+( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols,
+  psp::FiniteDiffControl& control, psp::SparseDirectSolver solver )
+: _comm(comm),
+  _numProcessRows(numProcessRows), _numProcessCols(numProcessCols),
+  _control(control), _solver(solver),
+  _pmlSizeCubed(_control.pmlSize*_control.pmlSize*_control.pmlSize),
+  _hx(control.wx/(control.nx-1)),
+  _hy(control.wy/(control.ny-1)),
+  _hz(control.wz/(control.nz-1)),
   _initialized(false)
 {
     // We distribute our box using a 2d block distribution over each 
@@ -189,8 +300,8 @@ psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
     _yChunkSize = _control.ny / _numProcessRows;
     _myXOffset = _myProcessCol*_xChunkSize;
     _myYOffset = _myProcessRow*_yChunkSize;
-    _myXPortion = ( _myProcessCol==_numProcessCols-1 ? 
-                    _xChunkSize : 
+    _myXPortion = ( _myProcessCol==_numProcessCols-1 ?
+                    _xChunkSize :
                     _xChunkSize+(_control.nx%_xChunkSize) );
     _myYPortion = ( _myProcessRow==_numProcessRows-1 ?
                     _yChunkSize :
@@ -269,9 +380,9 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     //----------------------------------------------------------------//
     // TODO: Consider allowing the artificial panel PML to be of a different 
     //       size than the outer fixed PML.
-    const PetscInt nzMinusTopPML = _control.nz - _control.pmlSize;
+    const PetscInt nzMinusTopPml = _control.nz - (_control.pmlSize-1);
     const PetscInt numPanels = 
-      ( nzMinusTopPML>0 ? (nzMinusTopPML-1)/_control.pmlSize+1 : 0 );
+      ( nzMinusTopPml>0 ? (nzMinusTopPml-1)/_control.planesPerPanel+1 : 0 );
     _paddedFactors.resize( numPanels );
     if( _solver == MUMPS_SYMMETRIC )
     {
@@ -281,12 +392,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             Mat D;
             MatCreate( _comm, &D );
 
-            const PetscInt panelHeight = _control.pmlSize + 
+            const PetscInt panelHeight = (_control.pmlSize-1) + 
               ( m==numPanels-1 ? 
-                _control.nz-(m*_control.planesPerPanel+_control.pmlSize) :
+                _control.nz-(m*_control.planesPerPanel+(_control.pmlSize-1)) :
                 _control.planesPerPanel );
-            const PetscInt bottomOfPanel = 
-              ( m==0 ? 0 : m*_control.planesPerPanel );
+            const PetscInt topOfPanel = 
+              ( m==0 ? 0 : (_control.pmlSize-1)+m*_control.planesPerPanel );
 
             const PetscInt localSize = _myXPortion*_myYPortion*panelHeight;
             const PetscInt size = _control.nx*_control.ny*panelHeight;
@@ -314,13 +425,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
                 const PetscInt x = _myXOffset + localX;
                 const PetscInt y = _myYOffset + localY;
-                const PetscInt z = bottomOfPanel + localZ;
+                const PetscInt z = topOfPanel + localZ;
 
                 // Compute the left half of this row
                 FormSymmetricRow
                 ( _control.imagShift, x, y, z, 
-                  bottomOfPanel, panelHeight, _control.pmlSize, 
-                  row, colIndices );
+                  topOfPanel, panelHeight, _control.pmlSize, row, colIndices );
 
                 // Store the values into the distributed matrix
                 MatSetValues
@@ -351,12 +461,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             Mat D;
             MatCreate( _comm, &D );
 
-            const PetscInt panelHeight = _control.pmlSize + 
+            const PetscInt panelHeight = (_control.pmlSize-1) + 
               ( m==numPanels-1 ? 
-                _control.nz-(m*_control.planesPerPanel+_control.pmlSize) :
+                _control.nz-(m*_control.planesPerPanel+(_control.pmlSize-1)) :
                 _control.planesPerPanel );
-            const PetscInt bottomOfPanel = 
-              ( m==0 ? 0 : m*_control.planesPerPanel );
+            const PetscInt topOfPanel = 
+              ( m==0 ? 0 : (_control.pmlSize-1)+m*_control.planesPerPanel );
 
             const PetscInt localSize = _myXPortion*_myYPortion*panelHeight;
             const PetscInt size = _control.nx*_control.ny*panelHeight;
@@ -382,13 +492,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 const PetscInt localZ = (i-iStart) / (_myXPortion*_myYPortion);
                 const PetscInt x = _myXOffset + localX;
                 const PetscInt y = _myYOffset + localY;
-                const PetscInt z = bottomOfPanel + localZ;
+                const PetscInt z = topOfPanel + localZ;
 
                 // Compute this entire row.
                 FormRow
                 ( _control.imagShift, x, y, z, 
-                  bottomOfPanel, panelHeight, _control.pmlSize, 
-                  row, colIndices );
+                  topOfPanel, panelHeight, _control.pmlSize, row, colIndices );
 
                 // Store the row in the distributed matrix
                 MatSetValues
@@ -423,14 +532,14 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         Mat& B = _offDiagBlocks[m];
         MatCreate( _comm, &B );
 
-        const PetscInt bottomOfPanel = 
-          ( m==0 ? 0 : _control.pmlSize + m*_control.planesPerPanel );
+        const PetscInt topOfPanel = 
+          ( m==0 ? 0 : (_control.pmlSize-1) + m*_control.planesPerPanel );
 
         const PetscInt thisPanelHeight = _control.planesPerPanel;
         const PetscInt nextPanelHeight = 
             ( m==numPanels-2 ? 
               _control.planesPerPanel : 
-              _control.nz-(m+1)*_control.planesPerPanel-_control.pmlSize );
+              _control.nz-(m+1)*_control.planesPerPanel-(_control.pmlSize-1) );
         const PetscInt blockHeight = _control.nx*_control.ny*thisPanelHeight;
         const PetscInt blockWidth = _control.nx*_control.ny*nextPanelHeight;
         const PetscInt localBlockHeight = 
@@ -467,12 +576,11 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             const PetscInt localZ = thisPanelHeight-1;
             const PetscInt x = _myXOffset + localX;
             const PetscInt y = _myYOffset + localY;
-            const PetscInt z = bottomOfPanel + localZ;
+            const PetscInt z = topOfPanel + localZ;
 
             // Compute this entire row.
             FormPanelConnections
-            ( x, y, z, thisPanelHeight, nextPanelHeight,
-              row, colIndices );
+            ( x, y, z, thisPanelHeight, nextPanelHeight, row, colIndices );
 
             // Store the row in the distributed matrix
             MatSetValues
@@ -530,7 +638,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
 
         // Copy this panel's RHS, "f_m", into u[m]
         const PetscInt zOffset = 
-            ( m==0 ? 0 : _control.pmlSize+m*_control.planesPerPanel );
+            ( m==0 ? 0 : (_control.pmlSize-1)+m*_control.planesPerPanel );
         const PetscInt fOffset = _myXPortion*_myYPortion*zOffset;
         const uPanelLocalSize = VecGetLocalSize( uPanels[m] );
         std::memcpy
@@ -594,7 +702,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
         else
         {
             const PetscInt pmlSize = _control.pmlSize;
-            const PetscInt paddedOffset = _myXPortion*_myYPortion*pmlSize;
+            const PetscInt paddedOffset = _myXPortion*_myYPortion*(pmlSize-1);
 
             // Copy our panel's data into the back of the zero-padded buffer
             VecSet( paddedPanelRHS, 0.0 );
@@ -685,7 +793,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
         else
         {
             const PetscInt pmlSize = _control.pmlSize;
-            const PetscInt paddedOffset = _myXPortion*_myYPortion*pmlSize;
+            const PetscInt paddedOffset = _myXPortion*_myYPortion*(pmlSize-1);
 
             // Copy our panel's data into the back of the zero-padded buffer
             VecSet( paddedPanelRHS, 0.0 );
@@ -731,7 +839,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
 
         // Copy the panel solution into the full vector
         const PetscInt zOffset = 
-            ( m==0 ? 0 : _control.pmlSize+m*_control.planesPerPanel );
+            ( m==0 ? 0 : (_control.pmlSize-1)+m*_control.planesPerPanel );
         const PetscInt fOffset = _myXPortion*_myYPortion*zOffset;
         const uPanelLocalSize = VecGetLocalSize( uPanels[m] );
         std::memcpy
@@ -759,7 +867,7 @@ void
 psp::FiniteDiffSweepingPC::FormSymmetricRow
 ( PetscReal imagShift, 
   PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
+  PetscInt topOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
   std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
 {
     const PetscInt pillarSize = _xChunkSize*_yChunkSize*panelHeight;
@@ -769,9 +877,45 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
         _myProcessCol*pillarSize;
     const PetscInt localX = x - _myXOffset;
     const PetscInt localY = y - _myYOffset;
-    const PetscInt localZ = z - bottomOfPanel;
+    const PetscInt localZ = z - topOfPanel;
     const PetscInt rowIdx = myOffset + 
         localX + localY*_myXPortion + localZ*_myXPortion*_myYPortion;
+
+    // HERE: We need to carefully consider what the 'size' of the PML is. 
+    //       It seems to me that adding 1 layer of PML does not change the 
+    //       size of the system since the boundary nodes of a finite difference
+    //       system are not explicitly represented. Thus b layers of PML 
+    //       adds on (b-1) degrees of freedom on each side of the domain.
+    //
+    // Evaluate all of our inverse s functions
+    const PetscScalar s1InvL = s1Inv(x-1);
+    const PetscScalar s1InvM = s1Inv(x);
+    const PetscScalar s1InvR = s1Inv(x+1);
+    const PetscScalar s2InvL = s2Inv(y-1);
+    const PetscScalar s2InvM = s2Inv(y);
+    const PetscScalar s2InvR = s2Inv(y+1);
+    const PetscScalar s3InvL = s3Inv(z-1,topOfPanel+pmlHeight-1);
+    const PetscScalar s3InvM = s3Inv(z,topOfPanel+pmlHeight-1);
+    const PetscScalar s3InvR = s3Inv(z+1,topOfPanel+pmlHeight-1);
+    // Compute all of the x terms
+    const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
+    const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
+    const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
+    const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
+    const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
+    // Compute all of the y terms
+    const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
+    const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
+    const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
+    const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
+    const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
+    // Compute all of the z terms
+    const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
+    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
+    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
+    const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
+    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
+    // PAUSED HERE...
 
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
@@ -845,7 +989,7 @@ void
 psp::FiniteDiffSweepingPC::FormRow
 ( PetscReal imagShift,
   PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt bottomOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
+  PetscInt topOfPanel, PetscInt panelHeight, PetscInt pmlHeight,
   std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
 {
     const PetscInt pillarSize = _xChunkSize*_yChunkSize*panelHeight;
@@ -855,7 +999,7 @@ psp::FiniteDiffSweepingPC::FormRow
         _myProcessCol*pillarSize;
     const PetscInt localX = x - _myXOffset;
     const PetscInt localY = y - _myYOffset;
-    const PetscInt localZ = z - bottomOfPanel;
+    const PetscInt localZ = z - topOfPanel;
     const PetscInt rowIdx = myOffset + 
         localX + localY*_myXPortion + localZ*_myXPortion*_myYPortion;
 
@@ -984,6 +1128,15 @@ psp::FiniteDiffSweepingPC::GetPanelConnectionSize()
 {
     // TODO: Support more than just the 7-point stencil
     return 1;
+}
+
+void 
+psp::FiniteDiffSweepingPC::FormPanelConnections
+( PetscInt x, PetscInt y, PetscInt z, 
+  PetscInt thisPanelHeight, PetscInt nextPanelHeight,
+  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
+{
+    // TODO
 }
 
 #endif // PSP_FINITE_DIFF_SWEEPING_PC_HPP
