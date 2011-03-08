@@ -256,9 +256,9 @@ psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
 inline PetscScalar
 psp::FiniteDiffSweepingPC::s3Inv( PetscInt z, PetscInt endOfPml ) const
 {
-    if( (z+1)<endOfPml )
+    if( z<endOfPml )
     {
-        const PetscInt delta = endOfPml-(z+1);
+        const PetscInt delta = endOfPml-z;
         const PetscReal realPart = 1;
         const PetscReal imagPart =
             _control.C*delta*delta/(_pmlSizeCubed*_hz*_control.omega);
