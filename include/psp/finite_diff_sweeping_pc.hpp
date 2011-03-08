@@ -276,6 +276,8 @@ psp::FiniteDiffSweepingPC::s3Inv( PetscInt z, PetscInt endOfPml ) const
         return 1;
 }
 
+// Public member functions
+
 psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
 ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols,
   psp::FiniteDiffControl& control, psp::SparseDirectSolver solver )
