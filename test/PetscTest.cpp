@@ -104,9 +104,13 @@ main( int argc, char* argv[] )
     control.wy = 15;
     control.wz = 15;
     control.omega = 10;
-    control.C = 1;
+    control.Cx = 1;
+    control.Cy = 1;
+    control.Cz = 1;
+    control.etax = 1;
+    control.etay = 1;
+    control.etaz = 1;
     control.imagShift = 1;
-    control.sizeOfPML = 5;
     control.planesPerPanel = 5;
     control.frontBC = psp::PML;
     control.rightBC = psp::PML;

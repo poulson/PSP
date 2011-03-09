@@ -54,19 +54,15 @@ enum Stencil { SEVEN_POINT, TWENTY_SEVEN_POINT };
 struct FiniteDiffControl
 {
     Stencil stencil; // 7-point planned, only 7-point supported so far
-    PetscInt nx; // number of grid points in x direction
-    PetscInt ny; // number of grid points in y direction
-    PetscInt nz; // number of grid points in z direction
-    PetscReal wx; // width in x direction (left side at x=0)
-    PetscReal wy; // width in y direction (left side at y=0)
-    PetscReal wz; // width in z direction (left side at z=0)
+    PetscInt nx, ny, nz; // number of grid points in each direction
+    PetscReal wx, wy, wz; // width of the PML-padded box in each direction
+    PetscReal omega; // frequency of problem
 
-    PetscReal omega; // angular frequency of problem
-    PetscReal C; // coefficient for PML: basic form is C/eta * ((t-eta)/eta)^2
-    PetscReal imagShift; // stabilizing imaginary diagonal offset for PC
+    PetscReal Cx, Cy, Cz; // coefficient for PML in each direction
+    PetscReal etax, etay, etaz; // widths of PML in each direction
 
-    PetscInt sizeOfPML;
-    PetscInt planesPerPanel;
+    PetscReal imagShift; // stabilizing shift for preconditioner
+    PetscInt planesPerPanel; // number of xy planes to put into each panel
 
     BoundaryCondition frontBC;
     BoundaryCondition rightBC;
