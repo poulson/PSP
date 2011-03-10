@@ -15,7 +15,7 @@ The following configure flags were used on BG/P:
       --with-blas-lapack-lib=[/soft/apps/LAPACK/liblapack_bgp.a,/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlfmath.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlf90_r.a,/soft/apps/ibmcmp-dec2010/xlsmp/bg/1.7/bglib/libxlomp_ser.a] \
       --with-cxx=mpixlcxx_r --with-cc=mpixlc_r --with-fc='mpixlf77_r -qnosave' \
       --with-x=0 --with-batch=1 --known-mpi-shared-libraries=0 \
-      --with-scalar-type=complex --with-clanguage=c++
+      --with-scalar-type=complex 
 
 The above flags are far from optimal since it builds the debug version of PETSc.
 

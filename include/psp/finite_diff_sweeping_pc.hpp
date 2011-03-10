@@ -95,6 +95,7 @@ class FiniteDiffSweepingPC
     const PetscInt _bzPadded; // ceil(eta/h)
 
     Vec* _slowness;
+    PetscScalar* _localSlownessData;
     std::vector<Mat> _paddedFactors;
     std::vector<Mat> _subdiagonalBlocks;
 
@@ -137,7 +138,8 @@ public:
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
       PetscInt zOffset, PetscInt zSize, PetscReal pmlHeight,
-      std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
+      std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
+    const;
 
     // Return the maximum number of nonzeros in a row
     PetscInt GetRowSize() const;
@@ -153,7 +155,8 @@ public:
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
       PetscInt zOffset, PetscInt zSize, PetscReal pmlHeight,
-      std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
+      std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
+    const;
     
     // Return the maximum number of nonzeros in the connections from a node
     // in one panel to nodes in the next panel.
@@ -165,8 +168,9 @@ public:
     // in the fashion described at the top of this file. 
     void FormPanelConnections
     ( PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt zSize, PetscInt zSizeNext,
-      std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const;
+      PetscInt zSize, PetscInt zSizeNext, PetscInt rowIndex,
+      std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
+    const;
 };
 
 } // namespace psp

@@ -72,6 +72,7 @@ void
 psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 {
     _slowness = &slowness;
+    VecGetArray( _slowness, &_localSlownessData );
 
     // Check that the slowness vector is the right length
     const PetscInt N = VecGetSize( *_slowness );
@@ -98,7 +99,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         MatMPISBAIJSetPreallocation( A, 1, 3, PETSC_NULL, 3, PETSC_NULL );
 
         const PetscInt symmRowSize = GetSymmetricRowSize();
-        std::vector<PetscScalar> row(symmRowSize);
+        std::vector<PetscScalar> nonzeros(symmRowSize);
         std::vector<PetscInt> colIndices(symmRowSize);
         PetscInt iStart, iEnd;
         MatGetOwnershipRange( A, &iStart, &iEnd );
@@ -113,11 +114,13 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Compute the left half of this row
             FormSymmetricRow
-            ( 0.0, x, y, z, 0, _control.nz, _control.etaz, row, colIndices );
+            ( 0.0, x, y, z, 0, _control.nz, _control.etaz, 
+              nonzeros, colIndices );
 
             // Put this row into the distributed matrix
             MatSetValues
-            ( A, &row[0], 1, &i, symmRowSize, &colIndices[0], INSERT_VALUES );
+            ( A, &nonzeros[0], 1, &i, symmRowSize, &colIndices[0], 
+              INSERT_VALUES );
         }
         MatAssemblyBegin( A, MAT_FINAL_ASSEMBLY );
         MatAssemblyEnd( A, MAT_FINAL_ASSEMBLY );
@@ -177,7 +180,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             // Fill our portion of the distributed matrix.
             // TODO: Batch several rows together for each MatSetValues
             const PetscInt symmRowSize = GetSymmetricRowSize();
-            std::vector<PetscScalar> row(symmRowSize);
+            std::vector<PetscScalar> nonzeros(symmRowSize);
             std::vector<PetscInt> colIndices(symmRowSize);
             PetscInt iStart, iEnd;
             MatGetOwnershipRange( D, &iStart, &iEnd );
@@ -193,11 +196,11 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 // Compute the left half of this row
                 FormSymmetricRow
                 ( _control.imagShift, x, y, z, 
-                  zOffset, zSize, pmlHeight, row, colIndices );
+                  zOffset, zSize, pmlHeight, nonzeros, colIndices );
 
                 // Store the values into the distributed matrix
                 MatSetValues
-                ( D, &row[0], 1, &i, symmRowSize, &colIndices[0], 
+                ( D, &nonzeros[0], 1, &i, symmRowSize, &colIndices[0], 
                   INSERT_VALUES );
             }
             MatAssemblyBegin( D, MAT_FINAL_ASSEMBLY );
@@ -259,7 +262,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             // Fill our portion of the diagonal block
             // TODO: Batch several rows together for each MatSetValues
             const PetscInt rowSize = GetRowSize();
-            std::vector<PetscScalar> row(rowSize);
+            std::vector<PetscScalar> nonzeros(rowSize);
             std::vector<PetscInt> colIndices(rowSize);
             PetscInt iStart, iEnd;
             MatGetOwnershipRange( D, &iStart, &iEnd );
@@ -275,11 +278,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
                 // Compute this entire row.
                 FormRow
                 ( _control.imagShift, x, y, z, 
-                  zOffset, zSize, pmlHeight, row, colIndices );
+                  zOffset, zSize, pmlHeight, nonzeros, colIndices );
 
                 // Store the row in the distributed matrix
                 MatSetValues
-                ( D, &row[0], 1, &i, rowSize, &colIndices[0], INSERT_VALUES );
+                ( D, &nonzeros[0], 1, &i, rowSize, &colIndices[0], 
+                  INSERT_VALUES );
             }
             MatAssemblyBegin( D, MAT_FINAL_ASSEMBLY );
             MatAssemblyEnd( D, MAT_FINAL_ASSEMBLY );
@@ -358,8 +362,8 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         //
         // TODO: Batch together several MatSetValues calls
         const PetscInt rowSize = GetPanelConnectionSize();
-        std::vector<PetscScalar> offDiagRow(rowSize);
-        std::vector<PetscInt> offDiagColIndices(rowSize);
+        std::vector<PetscScalar> nonzeros(rowSize);
+        std::vector<PetscInt> colIndices(rowSize);
         PetscInt iStart, iEnd;
         MatGetOwnershipRange( B, &iStart, &iEnd );
         const PetscInt iStartLastPlane = 
@@ -374,11 +378,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             const PetscInt z = zOffset + zLocal;
 
             // Compute this entire row.
-            FormPanelConnections( x, y, z, zSize, zSizeNext, row, colIndices );
+            FormPanelConnections
+            ( x, y, z, zSize, zSizeNext, i, nonzeros, colIndices );
 
             // Store the row in the distributed matrix
             MatSetValues
-            ( B, &row[0], 1, &i, rowSize, &colIndices[0], INSERT_VALUES );
+            ( B, &nonzeros[0], 1, &i, rowSize, &colIndices[0], INSERT_VALUES );
         }
         MatAssemblyBegin( B, MAT_FINAL_ASSEMBLY );
         MatAssemblyEnd( B, MAT_FINAL_ASSEMBLY );
@@ -400,6 +405,7 @@ psp::FiniteDiffSweepingPC::Destroy()
         MatDestroy( _paddedFactors[m] );
     for( PetscInt m=0; m<numPanels-1; ++m )
         MatDestroy( _offDiagBlocks[m] );
+    VecRestoreArray( _slowness, &_localSlownessData );
     _initialized = false;
 }
 
@@ -683,30 +689,36 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     const PetscScalar s3InvL = s3InvArtificial(z-1,zOffset+pmlHeight-1);
     const PetscScalar s3InvM = s3InvArtificial(z,zOffset+pmlHeight-1);
     const PetscScalar s3InvR = s3InvArtificial(z+1,zOffset+pmlHeight-1);
-    // Compute all of the x terms
+    // Compute all of the x-shifted terms
     const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
     const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
     const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
     const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
     const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
-    // Compute all of the y terms
+    // Compute all of the y-shifted terms
     const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
     const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
     const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
     const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
     const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
-    // Compute all of the z terms
+    // Compute all of the z-shifted terms
     const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
     const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
     const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
     const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
     const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
-    // PAUSED HERE...
+    // Compute the center term
+    const PetscScalar shiftedOmega = 
+        std::complex<PetscReal>(_control.omega,imagShift);
+    const PetscScalar alpha = 
+        _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
+    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)/(xTempM*yTempM*zTempM);
 
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
-    colIndices[0] = rowIdx;
-    // TODO: Fill finite diff approx into row[0]
+    colIndices[entry] = rowIdx;
+    row[entry] = centerTerm;
     ++entry;
 
     // Front connection to (x-1,y,z)
@@ -722,7 +734,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
             colIndices[entry] = frontProcessOffset + (_xChunkSize-1) + 
                 yLocal*_xChunkSize + zLocal*_xChunkSize*_yChunkSize;
         }
-        // TODO: Fill finite diff approx into row[1]
+        row[entry] = xTermL;
     }
     else
     {
@@ -744,7 +756,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
             colIndices[entry] = leftProcessOffset + xLocal + 
                 (_yChunkSize-1)*_xChunkSize + zLocal*_xChunkSize*_yChunkSize;
         }
-        // TODO: Fill finite diff approx into row[2]
+        row[entry] = yTermL;
     }
     else
     {
@@ -756,7 +768,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     if( zLocal != 0 )
     {
         colIndices[entry] = rowIdx - _myXPortion*_myYPortion;
-        // TODO: Fill finite diff approx into row[3]
+        row[entry] = zTermL;
     }
     else
     {
@@ -789,10 +801,46 @@ psp::FiniteDiffSweepingPC::FormRow
     const PetscInt rowIdx = myOffset + 
         xLocal + yLocal*_myXPortion + zLocal*_myXPortion*_myYPortion;
 
+    // Evaluate all of our inverse s functions
+    const PetscScalar s1InvL = s1Inv(x-1);
+    const PetscScalar s1InvM = s1Inv(x);
+    const PetscScalar s1InvR = s1Inv(x+1);
+    const PetscScalar s2InvL = s2Inv(y-1);
+    const PetscScalar s2InvM = s2Inv(y);
+    const PetscScalar s2InvR = s2Inv(y+1);
+    const PetscScalar s3InvL = s3InvArtificial(z-1,zOffset+pmlHeight-1);
+    const PetscScalar s3InvM = s3InvArtificial(z,zOffset+pmlHeight-1);
+    const PetscScalar s3InvR = s3InvArtificial(z+1,zOffset+pmlHeight-1);
+    // Compute all of the x-shifted terms
+    const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
+    const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
+    const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
+    const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
+    const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
+    // Compute all of the y-shifted terms
+    const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
+    const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
+    const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
+    const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
+    const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
+    // Compute all of the z-shifted terms
+    const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
+    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
+    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
+    const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
+    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
+    // Compute the center term
+    const PetscScalar shiftedOmega =
+        std::complex<PetscReal>(_control.omega,imagShift);
+    const PetscScalar alpha =
+        _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
+    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)/(xTempM*yTempM*zTempM);
+
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
     colIndices[entry] = rowIdx;
-    // TODO: Fill finite diff approx into row[0]
+    row[entry] = centerTerm;
     ++entry;
 
     // Front connection to (x-1,y,z)
@@ -808,7 +856,7 @@ psp::FiniteDiffSweepingPC::FormRow
             colIndices[entry] = frontProcessOffset + (_xChunkSize-1) + 
                 yLocal*_xChunkSize + zLocal*_xChunkSize*_yChunkSize;
         }
-        // TODO: Fill finite diff approx into row[1]
+        row[entry] = xTermL;
     }
     else
     {
@@ -831,7 +879,7 @@ psp::FiniteDiffSweepingPC::FormRow
             colIndices[entry] = backProcessOffset + yLocal*backProcessXPortion +
                 zLocal*backProcessXPortion*_myYPortion;
         }
-        // TODO: Fill finite diff approx into row[2]
+        row[entry] = xTermR;
     }
     else
     {
@@ -853,7 +901,7 @@ psp::FiniteDiffSweepingPC::FormRow
             colIndices[entry] = leftProcessOffset + xLocal + 
                 (_yChunkSize-1)*_xChunkSize + zLocal*_xChunkSize*_yChunkSize;
         }
-        // TODO: Fill finite diff approx into row[3]
+        row[entry] = yTermL;
     }
     else
     {
@@ -877,7 +925,7 @@ psp::FiniteDiffSweepingPC::FormRow
             colIndices[entry] = rightProcessOffset + xLocal + 
                 zLocal*_xChunkSize*rightProcessYPortion;
         }
-        // TODO: Fill finite diff approx into row[4]
+        row[entry] = yTermR;
     }
     else
     {
@@ -889,7 +937,7 @@ psp::FiniteDiffSweepingPC::FormRow
     if( localZ != 0 )
     {
         colIndices[entry] = rowIdx - _myXPortion*_myYPortion;
-        // TODO: Fill finite diff approx into row[5]
+        row[entry] = zTermL;
     }
     else
     {
@@ -901,7 +949,7 @@ psp::FiniteDiffSweepingPC::FormRow
     if( localZ != zSize-1 )
     {
         colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
-        // TODO: Fill finite diff approx into row[6]
+        row[entry] = zTermR;
     }
     else
     {
@@ -919,8 +967,14 @@ psp::FiniteDiffSweepingPC::GetPanelConnectionSize()
 void 
 psp::FiniteDiffSweepingPC::FormPanelConnections
 ( PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt zSize, PetscInt zSizeNext,
-  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
+  PetscInt zSize, PetscInt zSizeNext, PetscInt rowIndex,
+  std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) const
 {
-    // TODO
+    // Compute the right z term
+    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
+    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
+    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
+
+    colIndices[0] = rowIndex + _myXPortion*_myYPortion;
+    nonzeros[0] = zTermR;
 }
