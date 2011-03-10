@@ -21,6 +21,7 @@
 #ifndef PSP_FINITE_DIFF_SWEEPING_PC_HPP
 #define PSP_FINITE_DIFF_SWEEPING_PC_HPP 1
 #include "petscpc.h"
+#include <cstring>
 #include <stdexcept>
 #include <vector>
 
@@ -97,7 +98,7 @@ class FiniteDiffSweepingPC
     Vec* _slowness;
     PetscScalar* _localSlownessData;
     std::vector<Mat> _paddedFactors;
-    std::vector<Mat> _subdiagonalBlocks;
+    std::vector<Mat> _offDiagBlocks;
 
     bool _initialized; // do we have an active set of factorizations?
 
@@ -107,7 +108,7 @@ class FiniteDiffSweepingPC
     // Since the PML will often be pushed down the z direction, we will need
     // a means of specifying where the artificial PML is.
     PetscScalar s3InvArtificial
-    ( PetscInt z, PetscInt startOfPml, PetscInt sizeOfPml ) const;
+    ( PetscInt z, PetscInt startOfPml, PetscReal sizeOfPml ) const;
 
 public:
     FiniteDiffSweepingPC
@@ -124,20 +125,19 @@ public:
     // Apply sweeping preconditioner to x, producing y
     void Apply( Vec& x, Vec& y ) const;
 
-    // Return the maximum number of nonzeros in the left side of each row
+    // Return the maximum number of nonzeros in the right side of each row
     PetscInt GetSymmetricRowSize() const;
 
-    // Return the indices and values for each nonzero in the left side of the
+    // Return the indices and values for each nonzero in the right side of the
     // row defined by node (x,y,z) in the panel defined by its top z-location
-    // (zOffset), its z size (zSize), and its PML height on the top
-    // (pmlHeight).
+    // (zOffset), its z size (zSize), and its PML size on the top (pmlSize).
     //
     // In the cases where a connection is invalid, fill its index with -1 so 
     // that PETSc's MatSetValues will ignore it.
     void FormSymmetricRow
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt zOffset, PetscInt zSize, PetscReal pmlHeight,
+      PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
       std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
     const;
 
@@ -146,15 +146,14 @@ public:
 
     // Return the indices and values for each nonzero in the 
     // row defined by node (x,y,z) in the panel defined by its top z-location
-    // (zOffset), its z size (zSize), and its PML height at the top
-    // (pmlHeight)
+    // (zOffset), its z size (zSize), and its PML size at the top (pmlSize).
     //
     // In the cases where a connection is invalid, fill its index with -1 so 
     // that PETSc's MatSetValues will ignore it.
     void FormRow
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
-      PetscInt zOffset, PetscInt zSize, PetscReal pmlHeight,
+      PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
       std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
     const;
     
@@ -189,7 +188,7 @@ psp::FiniteDiffSweepingPC::s1Inv( PetscInt x ) const
         const PetscReal delta = _bx-(x+1);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
+            _control.Cx*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else if( x>(_control.nx-_bx) && _control.backBC==PML )
@@ -197,7 +196,7 @@ psp::FiniteDiffSweepingPC::s1Inv( PetscInt x ) const
         const PetscReal delta = x-(_control.nx-_bx);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
+            _control.Cx*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else
@@ -212,7 +211,7 @@ psp::FiniteDiffSweepingPC::s2Inv( PetscInt y ) const
         const PetscReal delta = _by-(y+1);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_by*_by*_by*_hy*_control.omega);
+            _control.Cy*delta*delta/(_by*_by*_by*_hy*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else if( y >(_control.ny-_by) && _control.rightBC==PML )
@@ -220,7 +219,7 @@ psp::FiniteDiffSweepingPC::s2Inv( PetscInt y ) const
         const PetscReal delta = y-(_control.ny-_by);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_by*_by*_by*_hy*_control.omega);
+            _control.Cy*delta*delta/(_by*_by*_by*_hy*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else
@@ -235,7 +234,7 @@ psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
         const PetscReal delta = _bz-(z+1);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
+            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else if( z>(_control.nz-_bz) && _control.bottomBC==PML )
@@ -243,7 +242,7 @@ psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
         const PetscReal delta = z-(_control.nz-_bz);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
+            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else
@@ -252,14 +251,14 @@ psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
 
 inline PetscScalar
 psp::FiniteDiffSweepingPC::s3InvArtificial
-( PetscInt z, PetscInt startOfPml, PetscInt sizeOfPml ) const
+( PetscInt z, PetscInt startOfPml, PetscReal sizeOfPml ) const
 {
     if( z<startOfPml+sizeOfPml )
     {
-        const PetscInt delta = startOfPml+sizeOfPml-z;
+        const PetscReal delta = startOfPml+sizeOfPml-z;
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/
+            _control.Cz*delta*delta/
             (sizeOfPml*sizeOfPml*sizeOfPml*_hz*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
@@ -268,7 +267,7 @@ psp::FiniteDiffSweepingPC::s3InvArtificial
         const PetscReal delta = z-(_control.nz-_bz);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
-            _control.C*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
+            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
         return std::complex<PetscReal>(realPart,imagPart);
     }
     else

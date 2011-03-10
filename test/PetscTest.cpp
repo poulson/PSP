@@ -26,23 +26,12 @@
 
 void Usage()
 {
-    std::cout << "PetscTest <nx> <ny> <nz>\n\n"
+    std::cout << "PetscTest <nx> <ny> <nz> <numProcessRows> <numProcessCols>\n"
               << "  nx: number of vertices in x direction\n"
               << "  ny: number of vertices in y direction\n"
-              << "  nz: number of vertices in z direction" << std::endl;
-}
-
-PetscErrorCode
-CustomPCSetUp( PC pc )
-{
-    PetscErrorCode ierr;
-
-    psp::FiniteDiffSweepingPC* context;
-    ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
-
-    context->Init();
-
-    return ierr;
+              << "  nz: number of vertices in z direction\n" 
+              << "  numProcessRows\n"
+              << "  numProcessCols\n" << std::endl;
 }
 
 PetscErrorCode 
@@ -58,19 +47,6 @@ CustomPCApply(PC pc,Vec x,Vec y)
     return ierr;
 }
 
-PetscErrorCode
-CustomPCDestroy(PC pc)
-{
-    PetscErrorCode ierr;
-
-    psp::FiniteDiffSweepingPC* context;
-    ierr = PCShellGetContext( pc, (void**)&context ); CHKERRQ(ierr);
-
-    context->Destroy();
-
-    return ierr;
-}
-
 int
 main( int argc, char* argv[] )
 {
@@ -81,7 +57,7 @@ main( int argc, char* argv[] )
     ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size); CHKERRQ(ierr);
     ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank); CHKERRQ(ierr);
 
-    if( argc < 4 )
+    if( argc < 6 )
     {
         if( rank == 0 )    
 	    Usage();
@@ -94,6 +70,8 @@ main( int argc, char* argv[] )
     const PetscInt ny = atoi(argv[++argNum]);
     const PetscInt nz = atoi(argv[++argNum]);
     const PetscInt n = nx*ny*nz;
+    const PetscInt numProcessRows = atoi(argv[++argNum]);
+    const PetscInt numProcessCols = atoi(argv[++argNum]);
 
     psp::FiniteDiffControl control;
     control.stencil = psp::SEVEN_POINT;
@@ -118,12 +96,15 @@ main( int argc, char* argv[] )
     control.leftBC = psp::PML;
     control.bottomBC = psp::PML;
 
+    psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
+
     psp::FiniteDiffSweepingPC context
     ( PETSC_COMM_WORLD, numProcessRows, numProcessCols, control, solver );
 
     Vec slowness;
     const PetscInt localSize = context.GetLocalSize();
-    ierr = VecCreate(PETSC_COMM_WORLD,&slowness); CHKERRW(ierr);
+    ierr = VecCreate(PETSC_COMM_WORLD,&slowness); CHKERRQ(ierr);
+    ierr = VecSetType(slowness,VECMPI); CHKERRQ(ierr);
     ierr = PetscObjectSetName((PetscObject)slowness,"slowness"); CHKERRQ(ierr);
     ierr = VecSetSizes(slowness,localSize,n); CHKERRQ(ierr);
     // TODO: Fill slowness vector here. We should probably start with all 1's.
@@ -153,10 +134,8 @@ main( int argc, char* argv[] )
     KSPGetPC(ksp,&pc);
     KSPSetTolerances(ksp,1.e-6,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
     PCSetType(pc,PCSHELL);
-    PCSetContext(pc,&context);
-    PCShellSetSetUp(pc,CustomPCSetUp);
+    PCShellSetContext(pc,&context);
     PCShellSetApply(pc,CustomPCApply);
-    PCShellSetDestroy(pc,CustomPCDestroy);
 
     // Optionally override our KSP options from the commandline. We should
     // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.
@@ -174,6 +153,7 @@ main( int argc, char* argv[] )
     PetscPrintf(PETSC_COMM_WORLD,"Norm of error %A iterations %D\n",norm,its);
 
     // Free work space
+    context.Destroy();
     KSPDestroy(ksp);
     VecDestroy(u); VecDestroy(x);
     VecDestroy(b); MatDestroy(A);

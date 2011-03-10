@@ -26,5 +26,6 @@
 #include "psp/config.h"
 
 #include "psp/finite_diff_control.hpp"
+#include "psp/finite_diff_sweeping_pc.hpp"
 
 #endif // PSP_H

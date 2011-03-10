@@ -251,7 +251,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
-  set(TESTS PanelTest PetscTest)
+  set(TESTS PetscTest)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries

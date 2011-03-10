@@ -26,7 +26,7 @@ PSP can then be built using:
     cd build
     cmake -DCMAKE_CXX_COMPILER=`which mpicxx` -DCMAKE_C_COMPILER=`which mpicc` \
       -DPETSC_DIR=/path/to/top/of/petsc-dev \
-      -DPETSC_ARCH_DIR=/path/to/top/of/petsc-dev/arch
+      -DPETSC_ARCH_DIR=/path/to/top/of/petsc-dev/arch ..
     make
 
 If something other than the reference BLAS/LAPACK libs are desired for PSP, 
