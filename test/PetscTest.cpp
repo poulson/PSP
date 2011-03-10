@@ -43,7 +43,7 @@ void Usage()
 }
 
 PetscErrorCode 
-CustomPCApply(PC pc,Vec x,Vec y)
+CustomPCApply( PC pc, Vec x, Vec y )
 {
     PetscErrorCode ierr;
 
@@ -60,17 +60,16 @@ main( int argc, char* argv[] )
 {
     PetscInitialize( &argc, &argv, PETSC_NULL, PETSC_NULL );
 
-    PetscErrorCode ierr;
     PetscMPIInt size, rank;
-    ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size); CHKERRQ(ierr);
-    ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank); CHKERRQ(ierr);
+    MPI_Comm_size( PETSC_COMM_WORLD, &size );
+    MPI_Comm_rank( PETSC_COMM_WORLD, &rank ); 
 
     if( argc < 13 )
     {
         if( rank == 0 )    
-	    Usage();
-	PetscFinalize();
-	return 0;
+            Usage();
+        PetscFinalize();
+        return 0;
     }
 
     PetscInt argNum = 0;
@@ -116,13 +115,12 @@ main( int argc, char* argv[] )
     psp::FiniteDiffSweepingPC context
     ( PETSC_COMM_WORLD, numProcessRows, numProcessCols, control, solver );
 
-    Vec slowness;
     const PetscInt localSize = context.GetLocalSize();
-    std::cout << "rank=" << rank << ", localSize=" << localSize << std::endl;
-    ierr = VecCreate(PETSC_COMM_WORLD,&slowness); CHKERRQ(ierr);
-    ierr = VecSetSizes(slowness,localSize,n); CHKERRQ(ierr);
-    ierr = VecSetType(slowness,VECMPI); CHKERRQ(ierr);
-    ierr = PetscObjectSetName((PetscObject)slowness,"slowness"); CHKERRQ(ierr);
+    Vec slowness;
+    VecCreate( PETSC_COMM_WORLD, &slowness );
+    VecSetSizes( slowness, localSize, n ); 
+    VecSetType( slowness, VECMPI ); 
+    PetscObjectSetName( (PetscObject)slowness, "slowness" );
 
     // TODO: Fill slowness vector here. We should probably start with all 1's.
     VecSet(slowness,1.0);
@@ -134,46 +132,79 @@ main( int argc, char* argv[] )
     // Create the approx. solution (x), exact solution (u), and RHS (b) 
     // vectors
     Vec x, u, b;
-    ierr = VecCreate(PETSC_COMM_WORLD,&b); CHKERRQ(ierr);
-    ierr = PetscObjectSetName((PetscObject)b,"RHS"); CHKERRQ(ierr);
-    ierr = VecSetSizes(b,PETSC_DECIDE,n); CHKERRQ(ierr);
-    ierr = VecSetFromOptions(b); CHKERRQ(ierr);
-    ierr = VecDuplicate(b,&x); CHKERRQ(ierr);
-    ierr = VecDuplicate(b,&u); CHKERRQ(ierr);
-    VecSet(u,1.0);
-    MatMult(A,u,b);
+    MatGetVecs( A, &x, PETSC_NULL );
+    VecDuplicate( x, &u );
+    VecDuplicate( x, &b );
+    PetscObjectSetName( (PetscObject)x, "approx solution" );
+    PetscObjectSetName( (PetscObject)u, "solution" );
+    PetscObjectSetName( (PetscObject)b, "RHS" );
+    VecSet( u, 1.0 );
+    MatMult( A, u, b );
 
-    // Set up the Krylov solver
+    // Set up the Krylov solver with a preconditioner
     KSP ksp;
-    ierr = KSPCreate(PETSC_COMM_WORLD,&ksp); CHKERRQ(ierr);
-    ierr = KSPSetOperators(ksp,A,A,DIFFERENT_NONZERO_PATTERN);
+    KSPCreate( PETSC_COMM_WORLD, &ksp );
+    KSPSetOperators( ksp, A, A, DIFFERENT_NONZERO_PATTERN );
     PC pc;
-    KSPGetPC(ksp,&pc);
-    KSPSetTolerances(ksp,1.e-6,PETSC_DEFAULT,PETSC_DEFAULT,PETSC_DEFAULT);
-    PCSetType(pc,PCSHELL);
-    PCShellSetContext(pc,&context);
-    PCShellSetApply(pc,CustomPCApply);
+    KSPGetPC( ksp, &pc );
+    KSPSetTolerances( ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT );
+    PCSetType( pc, PCSHELL );
+    PCShellSetContext( pc, &context );
+    PCShellSetApply( pc, CustomPCApply );
 
     // Optionally override our KSP options from the commandline. We should
     // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.
-    KSPSetFromOptions(ksp);
+    KSPSetFromOptions( ksp );
 
-    // Solve the system
-    KSPSolve(ksp,b,x);
+    // Solve the system with a preconditioner
+    KSPSolve( ksp, b, x );
 
     // Check the solution
-    VecAXPY(x,-1.0,u);
+    VecAXPY( x, -1.0, u );
     PetscReal norm;
-    VecNorm(x,NORM_2,&norm);
+    VecNorm( x, NORM_2, &norm );
     PetscInt its;
-    KSPGetIterationNumber(ksp,&its);
-    PetscPrintf(PETSC_COMM_WORLD,"Norm of error %A iterations %D\n",norm,its);
+    KSPGetIterationNumber( ksp, &its );
+    PetscPrintf
+    ( PETSC_COMM_WORLD, "Norm of error %A iterations %D\n", norm, its );
+
+    // Reset u and b
+    VecSet( u, 1.0 );
+    MatMult( A, u, b );
+
+    // Set up the Krylov solver WITHOUT a preconditioner
+    KSP kspWithout;
+    KSPCreate( PETSC_COMM_WORLD, &kspWithout );
+    KSPSetOperators( kspWithout, A, A, DIFFERENT_NONZERO_PATTERN );
+    KSPSetTolerances
+    ( kspWithout, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT );
+    PC pcWithout;
+    KSPGetPC( kspWithout, &pcWithout );
+    PCSetType( pcWithout, PCNONE );
+
+    // Optionally override our KSP options from the commandline. We should
+    // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.
+    KSPSetFromOptions( kspWithout );
+
+    // Solve the system with a preconditioner
+    KSPSolve( kspWithout, b, x );
+
+    // Check the solution
+    VecAXPY( x, -1.0, u );
+    VecNorm( x, NORM_2, &norm );
+    KSPGetIterationNumber( kspWithout, &its );
+    PetscPrintf
+    ( PETSC_COMM_WORLD, "Norm of error %A iterations %D\n", norm, its );
+
 
     // Free work space
     context.Destroy();
-    KSPDestroy(ksp);
-    VecDestroy(u); VecDestroy(x);
-    VecDestroy(b); MatDestroy(A);
+    KSPDestroy( ksp );
+    KSPDestroy( kspWithout );
+    VecDestroy( u ); 
+    VecDestroy( x );
+    VecDestroy( b ); 
+    MatDestroy( A );
 
     PetscFinalize();
     return 0;

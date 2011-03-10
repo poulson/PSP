@@ -97,6 +97,12 @@ class FiniteDiffSweepingPC
 
     Vec* _slowness;
     PetscScalar* _localSlownessData;
+    std::vector<PetscInt> _zSizesOfPanels;
+    std::vector<PetscInt> _zSizesOfPaddedPanels;
+    std::vector<PetscInt> _zOffsetsOfPanels;
+    std::vector<PetscInt> _zOffsetsOfPaddedPanels;
+    std::vector<PetscReal> _zPmlSizesOfPanels;
+    std::vector<PetscReal> _zPmlSizesOfPaddedPanels;
     std::vector<Mat> _paddedFactors;
     std::vector<Mat> _offDiagBlocks;
 
@@ -134,7 +140,7 @@ public:
     //
     // In the cases where a connection is invalid, fill its index with -1 so 
     // that PETSc's MatSetValues will ignore it.
-    void FormSymmetricRow
+    PetscInt FormSymmetricRow
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
       PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
@@ -150,7 +156,7 @@ public:
     //
     // In the cases where a connection is invalid, fill its index with -1 so 
     // that PETSc's MatSetValues will ignore it.
-    void FormRow
+    PetscInt FormRow
     ( PetscReal imagShift,
       PetscInt x, PetscInt y, PetscInt z, 
       PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
@@ -165,7 +171,7 @@ public:
     // off-diagonal block defined by node (x,y,z). The ordering of the 
     // off-diagonal block is constrained by the diagonal blocks being ordered 
     // in the fashion described at the top of this file. 
-    void FormPanelConnections
+    PetscInt FormPanelConnections
     ( PetscInt x, PetscInt y, PetscInt z, 
       PetscInt zSize, PetscInt zSizeNext, PetscInt rowIndex,
       std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
