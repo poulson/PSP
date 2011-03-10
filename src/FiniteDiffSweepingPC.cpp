@@ -968,9 +968,9 @@ psp::FiniteDiffSweepingPC::FormPanelConnections
     // This should eventually be moved outside of this loop since it is 
     // almost as expensive as the floating point computation and only needs
     // to be performed once per off-diagonal block.
-    const PetscInt pillarSizeOfMyRow = _xChunkSize*_myYPortion*zSize;
+    const PetscInt pillarSizeOfMyRow = _xChunkSize*_myYPortion*zSizeNext;
     const PetscInt myColOffset = 
-        _myProcessRow*_control.nx*_yChunkSize*zSize + 
+        _myProcessRow*_control.nx*_yChunkSize*zSizeNext + 
         _myProcessCol*pillarSizeOfMyRow;
 
     const PetscInt xLocal = x - _myXOffset;

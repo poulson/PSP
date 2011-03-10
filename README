@@ -12,10 +12,19 @@ The following configure flags were used on BG/P:
     ./config/configure.py --with-clanguage=cxx --download-mumps=1 \
       --download-parmetis=1 --download-superlu_dist=1 --with-parmetis=1 \
       --download-scalapack=1 --download-blacs=1 \
-      --with-blas-lapack-lib=[/soft/apps/LAPACK/liblapack_bgp.a,/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlfmath.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlf90_r.a,/soft/apps/ibmcmp-dec2010/xlsmp/bg/1.7/bglib/libxlomp_ser.a] \
+      --with-blas-lapack-lib="[/soft/apps/LAPACK/liblapack_bgp.a,/soft/apps/ESSL-4.3.1-1/lib/libesslbg.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlfmath.a,/soft/apps/ibmcmp-dec2010/xlf/bg/11.1/bglib/libxlf90_r.a,/soft/apps/ibmcmp-dec2010/xlsmp/bg/1.7/bglib/libxlomp_ser.a]" \
       --with-cxx=mpixlcxx_r --with-cc=mpixlc_r --with-fc='mpixlf77_r -qnosave' \
       --with-x=0 --with-batch=1 --known-mpi-shared-libraries=0 \
       --with-scalar-type=complex 
+
+and in Ubuntu with BLAS/LAPACK in /usr/lib:
+
+    ./config/configure.py --with-clanguage=cxx --download-mumps=1 \
+      --download-parmetis=1 --download-superlu_dist=1 --with-parmetis=1 \
+      --download-scalapack=1 --download-blacs=1 \
+      --with-blas-lapack-lib="[-L/usr/lib,-llapack,-lblas,-lgfortran]" \
+      --with-cxx=mpicxx --with-cc=mpicc --with-fc=mpif90 --with-x=0 \
+      --with-scalar-type=complex --with-c2html=0
 
 The above flags are far from optimal since it builds the debug version of PETSc.
 

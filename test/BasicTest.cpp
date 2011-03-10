@@ -165,8 +165,12 @@ main( int argc, char* argv[] )
     VecNorm( x, NORM_2, &norm );
     PetscInt its;
     KSPGetIterationNumber( ksp, &its );
-    PetscPrintf
-    ( PETSC_COMM_WORLD, "Norm of error %A iterations %D\n", norm, its );
+    if( rank == 0 )
+    {
+        std::cout << "Using sweeping preconditioner:\n"
+                  << "Norm of error = " << norm 
+                  << ", # of iterations = " << its << "\n" << std::endl;
+    }
 
     // Reset u and b
     VecSet( u, 1.0 );
@@ -193,9 +197,12 @@ main( int argc, char* argv[] )
     VecAXPY( x, -1.0, u );
     VecNorm( x, NORM_2, &norm );
     KSPGetIterationNumber( kspWithout, &its );
-    PetscPrintf
-    ( PETSC_COMM_WORLD, "Norm of error %A iterations %D\n", norm, its );
-
+    if( rank == 0 )
+    {
+        std::cout << "With no preconditioner:\n"
+                  << "Norm of error = " << norm 
+                  << ", # of iterations = " << its << "\n" << std::endl;
+    }
 
     // Free work space
     context.Destroy();
