@@ -145,16 +145,13 @@ main( int argc, char* argv[] )
     KSP ksp;
     KSPCreate( PETSC_COMM_WORLD, &ksp );
     KSPSetOperators( ksp, A, A, DIFFERENT_NONZERO_PATTERN );
+    KSPSetType( ksp, KSPGMRES );
     PC pc;
     KSPGetPC( ksp, &pc );
     KSPSetTolerances( ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT );
     PCSetType( pc, PCSHELL );
     PCShellSetContext( pc, &context );
     PCShellSetApply( pc, CustomPCApply );
-
-    // Optionally override our KSP options from the commandline. We should
-    // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.
-    KSPSetFromOptions( ksp );
 
     // Solve the system with a preconditioner
     KSPSolve( ksp, b, x );
@@ -180,15 +177,12 @@ main( int argc, char* argv[] )
     KSP kspWithout;
     KSPCreate( PETSC_COMM_WORLD, &kspWithout );
     KSPSetOperators( kspWithout, A, A, DIFFERENT_NONZERO_PATTERN );
+    KSPSetType( kspWithout, KSPGMRES );
     KSPSetTolerances
     ( kspWithout, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT );
     PC pcWithout;
     KSPGetPC( kspWithout, &pcWithout );
     PCSetType( pcWithout, PCNONE );
-
-    // Optionally override our KSP options from the commandline. We should
-    // specify GMRES vs. TFQMR from the commandline rather than hardcoding it.
-    KSPSetFromOptions( kspWithout );
 
     // Solve the system with a preconditioner
     KSPSolve( kspWithout, b, x );
