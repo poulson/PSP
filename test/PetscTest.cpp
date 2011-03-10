@@ -26,10 +26,18 @@
 
 void Usage()
 {
-    std::cout << "PetscTest <nx> <ny> <nz> <numProcessRows> <numProcessCols>\n"
+    std::cout << "PetscTest <nx> <ny> <nz> <wx> <wy> <wz> <etax> <etay> <etaz> "
+              << "\n          <planesPerPanel> <numProcRows> <numProcCols>\n"
               << "  nx: number of vertices in x direction\n"
               << "  ny: number of vertices in y direction\n"
               << "  nz: number of vertices in z direction\n" 
+              << "  wx: width of box in x direction\n"
+              << "  wy: width of box in y direction\n"
+              << "  wz: width of box in z direction\n"
+              << "  etax: width of PML in x direction\n"
+              << "  etay: width of PML in y direction\n"
+              << "  etaz: width of PML in z direction\n"
+              << "  planesPerPanel: number of xy planes to process per panel\n"
               << "  numProcessRows\n"
               << "  numProcessCols\n" << std::endl;
 }
@@ -57,7 +65,7 @@ main( int argc, char* argv[] )
     ierr = MPI_Comm_size(PETSC_COMM_WORLD,&size); CHKERRQ(ierr);
     ierr = MPI_Comm_rank(PETSC_COMM_WORLD,&rank); CHKERRQ(ierr);
 
-    if( argc < 6 )
+    if( argc < 13 )
     {
         if( rank == 0 )    
 	    Usage();
@@ -70,6 +78,13 @@ main( int argc, char* argv[] )
     const PetscInt ny = atoi(argv[++argNum]);
     const PetscInt nz = atoi(argv[++argNum]);
     const PetscInt n = nx*ny*nz;
+    const PetscReal wx = atof(argv[++argNum]);
+    const PetscReal wy = atof(argv[++argNum]);
+    const PetscReal wz = atof(argv[++argNum]);
+    const PetscReal etax = atof(argv[++argNum]);
+    const PetscReal etay = atof(argv[++argNum]);
+    const PetscReal etaz = atof(argv[++argNum]);
+    const PetscInt planesPerPanel = atoi(argv[++argNum]);
     const PetscInt numProcessRows = atoi(argv[++argNum]);
     const PetscInt numProcessCols = atoi(argv[++argNum]);
 
@@ -78,18 +93,18 @@ main( int argc, char* argv[] )
     control.nx = nx;
     control.ny = ny;
     control.nz = nz;
-    control.wx = 15;
-    control.wy = 15;
-    control.wz = 15;
+    control.wx = wx;
+    control.wy = wy;
+    control.wz = wz;
     control.omega = 10;
     control.Cx = 1;
     control.Cy = 1;
     control.Cz = 1;
-    control.etax = 1;
-    control.etay = 1;
-    control.etaz = 1;
+    control.etax = etax;
+    control.etay = etay;
+    control.etaz = etaz;
     control.imagShift = 1;
-    control.planesPerPanel = 5;
+    control.planesPerPanel = planesPerPanel;
     control.frontBC = psp::PML;
     control.rightBC = psp::PML;
     control.backBC = psp::PML;
@@ -103,10 +118,12 @@ main( int argc, char* argv[] )
 
     Vec slowness;
     const PetscInt localSize = context.GetLocalSize();
+    std::cout << "rank=" << rank << ", localSize=" << localSize << std::endl;
     ierr = VecCreate(PETSC_COMM_WORLD,&slowness); CHKERRQ(ierr);
+    ierr = VecSetSizes(slowness,localSize,n); CHKERRQ(ierr);
     ierr = VecSetType(slowness,VECMPI); CHKERRQ(ierr);
     ierr = PetscObjectSetName((PetscObject)slowness,"slowness"); CHKERRQ(ierr);
-    ierr = VecSetSizes(slowness,localSize,n); CHKERRQ(ierr);
+
     // TODO: Fill slowness vector here. We should probably start with all 1's.
     VecSet(slowness,1.0);
 

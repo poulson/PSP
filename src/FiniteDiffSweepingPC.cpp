@@ -19,6 +19,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
+// TODO: Remove these includes after debugging
+#include <iostream>
+#include <sstream>
 
 psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
 ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols,
@@ -49,11 +52,18 @@ psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
     _myXOffset = _myProcessCol*_xChunkSize;
     _myYOffset = _myProcessRow*_yChunkSize;
     _myXPortion = ( _myProcessCol==_numProcessCols-1 ?
-                    _xChunkSize :
-                    _xChunkSize+(_control.nx%_xChunkSize) );
+                    _xChunkSize+(_control.nx%_numProcessCols) :
+                    _xChunkSize );
+
     _myYPortion = ( _myProcessRow==_numProcessRows-1 ?
-                    _yChunkSize :
-                    _yChunkSize+(_control.ny%_yChunkSize) );
+                    _yChunkSize+(_control.ny%_numProcessRows) :
+                    _yChunkSize );
+
+    std::ostringstream s;
+    s << "rank=" << _rank << ", row=" << _myProcessRow 
+      << ", col=" << _myProcessCol << ", xPortion=" << _myXPortion
+      << ", yPortion=" << _myYPortion << std::endl;
+    std::cout << s.str();
 }
 
 psp::FiniteDiffSweepingPC::~FiniteDiffSweepingPC()
