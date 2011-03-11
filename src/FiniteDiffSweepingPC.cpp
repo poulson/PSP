@@ -21,6 +21,440 @@
 #include "psp.hpp"
 #include <sstream>
 
+//----------------------------------------------------------------------------//
+// Private functions                                                          //
+//----------------------------------------------------------------------------//
+
+PetscScalar
+psp::FiniteDiffSweepingPC::s1Inv( PetscInt x ) const
+{
+    if( (x+1)<_bx && _control.frontBC==PML )
+    {
+        const PetscReal delta = _bx-(x+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cx*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( x>(_control.nx-_bx) && _control.backBC==PML )
+    {
+        const PetscReal delta = x-(_control.nx-_bx);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cx*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+PetscScalar
+psp::FiniteDiffSweepingPC::s2Inv( PetscInt y ) const
+{
+    if( (y+1)<_by && _control.leftBC==PML )
+    {
+        const PetscReal delta = _by-(y+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cy*delta*delta/(_by*_by*_by*_hy*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( y >(_control.ny-_by) && _control.rightBC==PML )
+    {
+        const PetscReal delta = y-(_control.ny-_by);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cy*delta*delta/(_by*_by*_by*_hy*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+PetscScalar
+psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
+{
+    if( (z+1)<_bz )
+    {
+        const PetscReal delta = _bz-(z+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( z>(_control.nz-_bz) && _control.bottomBC==PML )
+    {
+        const PetscReal delta = z-(_control.nz-_bz);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+PetscScalar
+psp::FiniteDiffSweepingPC::s3InvArtificial
+( PetscInt z, PetscInt zOffset, PetscReal sizeOfPml ) const
+{
+    if( (z+1)<zOffset+sizeOfPml )
+    {
+        const PetscReal delta = zOffset+sizeOfPml-(z+1);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cz*delta*delta/
+            (sizeOfPml*sizeOfPml*sizeOfPml*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else if( z>(_control.nz-_bz) && _control.bottomBC==PML )
+    {
+        const PetscReal delta = z-(_control.nz-_bz);
+        const PetscReal realPart = 1;
+        const PetscReal imagPart =
+            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
+        return std::complex<PetscReal>(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::GetSymmetricRowSize() const
+{
+    // TODO: Support more than just the 7-point stencil
+    return 4;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::FormSymmetricRow
+( PetscReal imagShift, 
+  PetscInt x, PetscInt y, PetscInt z, 
+  PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
+  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
+{
+    const PetscInt myOffset = 
+        _myProcessRow*_control.nx*_yChunkSize*zSize + 
+        _myProcessCol*_xChunkSize*_myYPortion*zSize;
+    const PetscInt xLocal = x - _myXOffset;
+    const PetscInt yLocal = y - _myYOffset;
+    const PetscInt zLocal = z - zOffset;
+    const PetscInt rowIdx = myOffset + 
+        xLocal + _myXPortion*yLocal + _myXPortion*_myYPortion*zLocal;
+
+    // Evaluate all of our inverse s functions
+    const PetscScalar s1InvL = s1Inv(x-1);
+    const PetscScalar s1InvM = s1Inv(x);
+    const PetscScalar s1InvR = s1Inv(x+1);
+    const PetscScalar s2InvL = s2Inv(y-1);
+    const PetscScalar s2InvM = s2Inv(y);
+    const PetscScalar s2InvR = s2Inv(y+1);
+    const PetscScalar s3InvL = s3InvArtificial(z-1,zOffset,pmlSize);
+    const PetscScalar s3InvM = s3InvArtificial(z,zOffset,pmlSize);
+    const PetscScalar s3InvR = s3InvArtificial(z+1,zOffset,pmlSize);
+    // Compute all of the x-shifted terms
+    const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
+    const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
+    const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
+    const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
+    const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
+    // Compute all of the y-shifted terms
+    const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
+    const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
+    const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
+    const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
+    const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
+    // Compute all of the z-shifted terms
+    const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
+    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
+    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
+    const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
+    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
+    // Compute the center term
+    const PetscScalar shiftedOmega = 
+        std::complex<PetscReal>(_control.omega,imagShift);
+    const PetscScalar alpha = 
+        _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
+    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
+
+    // Fill in value and local index for the diagonal entry in this panel + PML
+    PetscInt entry = 0;
+    colIndices[entry] = rowIdx;
+    row[entry] = centerTerm;
+    ++entry;
+
+    // Back connection to (x+1,y,z)
+    if( x != _control.nx-1 )
+    {
+        if( xLocal != _myXPortion-1 )
+        {
+            colIndices[entry] = rowIdx+1;
+        }
+        else
+        {
+            const PetscInt backProcessOffset =
+                _myProcessRow*_control.nx*_yChunkSize*zSize +
+                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
+            const PetscInt backProcessXPortion = 
+                ( _myProcessCol+1==_numProcessCols-1 ? 
+                  _xChunkSize + (_control.nx%_numProcessCols) :
+                  _xChunkSize );
+            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
+                backProcessXPortion*_myYPortion*zLocal;
+        }
+        row[entry] = xTermR;
+        ++entry;
+    }
+
+    // Right connection to (x,y+1,z)
+    if( y != _control.ny-1 )
+    {
+        if( yLocal != _myYPortion-1 )
+        {
+            colIndices[entry] = rowIdx + _myXPortion;
+        }
+        else
+        {
+            const PetscInt rightProcessYPortion = 
+                ( _myProcessRow+1==_numProcessRows-1 ? 
+                  _yChunkSize + (_control.ny%_numProcessRows) :
+                  _yChunkSize );
+            const PetscInt rightProcessOffset =
+                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
+                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
+            colIndices[entry] = rightProcessOffset + xLocal + 
+                _xChunkSize*rightProcessYPortion*zLocal;
+        }
+        row[entry] = yTermR;
+        ++entry;
+    }
+
+    // Bottom connection to (x,y,z+1)
+    if( zLocal != zSize-1 )
+    {
+        colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
+        row[entry] = zTermR;
+        ++entry;
+    }
+
+    return entry;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::GetRowSize() const
+{
+    // TODO: Support more than just the 7-point stencil
+    return 7;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::FormRow
+( PetscReal imagShift,
+  PetscInt x, PetscInt y, PetscInt z, 
+  PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
+  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
+{
+    const PetscInt myOffset = 
+        _myProcessRow*_control.nx*_yChunkSize*zSize + 
+        _myProcessCol*_xChunkSize*_myYPortion*zSize;
+    const PetscInt xLocal = x - _myXOffset;
+    const PetscInt yLocal = y - _myYOffset;
+    const PetscInt zLocal = z - zOffset;
+    const PetscInt rowIdx = myOffset + 
+        xLocal + _myXPortion*yLocal + _myXPortion*_myYPortion*zLocal;
+
+    // Evaluate all of our inverse s functions
+    const PetscScalar s1InvL = s1Inv(x-1);
+    const PetscScalar s1InvM = s1Inv(x);
+    const PetscScalar s1InvR = s1Inv(x+1);
+    const PetscScalar s2InvL = s2Inv(y-1);
+    const PetscScalar s2InvM = s2Inv(y);
+    const PetscScalar s2InvR = s2Inv(y+1);
+    const PetscScalar s3InvL = s3InvArtificial(z-1,zOffset,pmlSize);
+    const PetscScalar s3InvM = s3InvArtificial(z,zOffset,pmlSize);
+    const PetscScalar s3InvR = s3InvArtificial(z+1,zOffset,pmlSize);
+    // Compute all of the x-shifted terms
+    const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
+    const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
+    const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
+    const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
+    const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
+    // Compute all of the y-shifted terms
+    const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
+    const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
+    const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
+    const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
+    const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
+    // Compute all of the z-shifted terms
+    const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
+    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
+    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
+    const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
+    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
+    // Compute the center term
+    const PetscScalar shiftedOmega =
+        std::complex<PetscReal>(_control.omega,imagShift);
+    const PetscScalar alpha =
+        _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
+    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
+
+    // Fill in value and local index for the diagonal entry in this panel + PML
+    PetscInt entry = 0;
+    colIndices[entry] = rowIdx;
+    row[entry] = centerTerm;
+    ++entry;
+
+    // Front connection to (x-1,y,z)
+    if( x != 0 )
+    {
+        if( xLocal != 0 )
+        {
+            colIndices[entry] = rowIdx - 1;
+        }
+        else
+        {
+            const PetscInt frontProcessOffset =
+                _myProcessRow*_control.nx*_yChunkSize*zSize +
+                (_myProcessCol-1)*_xChunkSize*_myYPortion*zSize;
+            colIndices[entry] = frontProcessOffset + (_xChunkSize-1) + 
+                _xChunkSize*yLocal + _xChunkSize*_myYPortion*zLocal;
+        }
+        row[entry] = xTermL;
+        ++entry;
+    }
+
+    // Back connection to (x+1,y,z)
+    if( x != _control.nx-1 )
+    {
+        if( xLocal != _myXPortion-1 )
+        {
+            colIndices[entry] = rowIdx+1;
+        }
+        else
+        {
+            const PetscInt backProcessOffset =
+                _myProcessRow*_control.nx*_yChunkSize*zSize +
+                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
+            const PetscInt backProcessXPortion = 
+                ( _myProcessCol+1==_numProcessCols-1 ? 
+                  _xChunkSize + (_control.nx%_numProcessCols) :
+                  _xChunkSize );
+            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
+                backProcessXPortion*_myYPortion*zLocal;
+        }
+        row[entry] = xTermR;
+        ++entry;
+    }
+
+    // Left connection to (x,y-1,z)
+    if( y != 0 )
+    {
+        if( yLocal != 0 )
+        {
+            colIndices[entry] = rowIdx - _myXPortion;
+        }
+        else
+        {
+            const PetscInt leftProcessOffset =
+                (_myProcessRow-1)*_control.nx*_yChunkSize*zSize +
+                _myProcessCol*_xChunkSize*_yChunkSize*zSize;
+            colIndices[entry] = leftProcessOffset + xLocal + 
+                _xChunkSize*(_yChunkSize-1) + _xChunkSize*_yChunkSize*zLocal;
+        }
+        row[entry] = yTermL;
+        ++entry;
+    }
+
+    // Right connection to (x,y+1,z)
+    if( y != _control.ny-1 )
+    {
+        if( yLocal != _myYPortion-1 )
+        {
+            colIndices[entry] = rowIdx + _myXPortion;
+        }
+        else
+        {
+            const PetscInt rightProcessYPortion = 
+                ( _myProcessRow+1==_numProcessRows-1 ? 
+                  _yChunkSize + (_control.ny%_numProcessRows) :
+                  _yChunkSize );
+            const PetscInt rightProcessOffset =
+                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
+                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
+            colIndices[entry] = rightProcessOffset + xLocal + 
+                _xChunkSize*rightProcessYPortion*zLocal;
+        }
+        row[entry] = yTermR;
+        ++entry;
+    }
+
+    // Top connection to (x,y,z-1)
+    if( zLocal != 0 )
+    {
+        colIndices[entry] = rowIdx - _myXPortion*_myYPortion;
+        row[entry] = zTermL;
+        ++entry;
+    }
+
+    // Bottom connection to (x,y,z+1)
+    if( zLocal != zSize-1 )
+    {
+        colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
+        row[entry] = zTermR;
+        ++entry;
+    }
+
+    return entry;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::GetPanelConnectionSize() const
+{
+    // TODO: Support more than just the 7-point stencil
+    return 1;
+}
+
+PetscInt 
+psp::FiniteDiffSweepingPC::FormPanelConnections
+( PetscInt x, PetscInt y, PetscInt z, 
+  PetscInt zSize, PetscInt zSizeNext, PetscInt rowIndex,
+  std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) const
+{
+    // Compute the right z term
+    const PetscScalar s1InvM = s1Inv(x);
+    const PetscScalar s2InvM = s2Inv(y);
+    const PetscScalar s3InvM = s3Inv(z);
+    const PetscScalar s3InvR = s3Inv(z+1);
+    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
+    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
+    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
+
+    // This should eventually be moved outside of this loop since it is 
+    // almost as expensive as the floating point computation and only needs
+    // to be performed once per off-diagonal block.
+    const PetscInt myColOffset = 
+        _myProcessRow*_control.nx*_yChunkSize*zSizeNext + 
+        _myProcessCol*_xChunkSize*_myYPortion*zSizeNext;
+
+    const PetscInt xLocal = x - _myXOffset;
+    const PetscInt yLocal = y - _myYOffset;
+
+    // The 7-point stencil will only touch the first xy plane of the next 
+    // panel (so that zLocal=0)
+    PetscInt entry = 0;
+    colIndices[entry] = myColOffset + xLocal + yLocal*_myXPortion;
+    nonzeros[entry] = zTermR;
+    ++entry;
+
+    return entry;
+}
+
+//----------------------------------------------------------------------------//
+// Public functions                                                           //
+//----------------------------------------------------------------------------//
+
 psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
 ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols,
   psp::FiniteDiffControl& control, psp::SparseDirectSolver solver )
@@ -97,13 +531,33 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         MatSetType( A, MATMPISBAIJ );
         MatSetBlockSize( A, 1 );
         // TODO: Generalize this step for more stencils.
-        MatMPISBAIJSetPreallocation( A, 1, 3, PETSC_NULL, 3, PETSC_NULL );
+        MatMPISBAIJSetPreallocation( A, 1, 4, PETSC_NULL, 3, PETSC_NULL );
 
         const PetscInt symmRowSize = GetSymmetricRowSize();
         std::vector<PetscScalar> nonzeros(symmRowSize);
         std::vector<PetscInt> colIndices(symmRowSize);
         PetscInt iStart, iEnd;
         MatGetOwnershipRange( A, &iStart, &iEnd );
+#ifndef RELEASE
+        const PetscInt myOffset = 
+            _myProcessRow*_control.nx*_yChunkSize*_control.nz + 
+            _myProcessCol*_xChunkSize*_myYPortion*_control.nz;
+        const PetscInt myEndPoint = 
+            myOffset + _myXPortion*_myYPortion*_control.nz;
+        if( myOffset != iStart )
+        {
+            std::ostringstream s;
+            s << _rank << ": myOffset=" << myOffset << ", iStart=" << iStart;
+            throw std::logic_error( s.str().c_str() );
+        }
+        if( myEndPoint != iEnd )
+        {
+            std::ostringstream s;
+            s << _rank << ": myEndPoint=" << myEndPoint 
+              << ", iEnd=" << iEnd;
+            throw std::logic_error( s.str().c_str() );
+        }
+#endif
         for( PetscInt i=iStart; i<iEnd; ++i )
         {
             const PetscInt localX = (i-iStart) % _myXPortion;
@@ -223,7 +677,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Preallocate memory. This should be an upper bound for 7-point.
             // TODO: Generalize this for more stencils.
-            MatMPISBAIJSetPreallocation( D, 1, 3, PETSC_NULL, 3, PETSC_NULL );
+            MatMPISBAIJSetPreallocation( D, 1, 4, PETSC_NULL, 3, PETSC_NULL );
 
             // Fill our portion of the distributed matrix.
             // TODO: Batch several rows together for each MatSetValues
@@ -303,7 +757,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Preallocate memory
             // TODO: Generalize this for more general stencils.
-            MatMPIAIJSetPreallocation( D, 5, PETSC_NULL, 5, PETSC_NULL );
+            MatMPIAIJSetPreallocation( D, 7, PETSC_NULL, 3, PETSC_NULL );
 
             // Fill our portion of the diagonal block
             // TODO: Batch several rows together for each MatSetValues
@@ -743,335 +1197,12 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
     VecRestoreArray( u, &uLocalData );
 }
 
-PetscInt
-psp::FiniteDiffSweepingPC::GetSymmetricRowSize() const
+void
+psp::FiniteDiffSweepingPC::WriteParallelVtkFile
+( Vec& solution, const char* filename ) const
 {
-    // TODO: Support more than just the 7-point stencil
-    return 4;
-}
-
-PetscInt
-psp::FiniteDiffSweepingPC::FormSymmetricRow
-( PetscReal imagShift, 
-  PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
-  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
-{
-    const PetscInt myOffset = 
-        _myProcessRow*_control.nx*_yChunkSize*zSize + 
-        _myProcessCol*_xChunkSize*_myYPortion*zSize;
-    const PetscInt xLocal = x - _myXOffset;
-    const PetscInt yLocal = y - _myYOffset;
-    const PetscInt zLocal = z - zOffset;
-    const PetscInt rowIdx = myOffset + 
-        xLocal + _myXPortion*yLocal + _myXPortion*_myYPortion*zLocal;
-
-    // Evaluate all of our inverse s functions
-    const PetscScalar s1InvL = s1Inv(x-1);
-    const PetscScalar s1InvM = s1Inv(x);
-    const PetscScalar s1InvR = s1Inv(x+1);
-    const PetscScalar s2InvL = s2Inv(y-1);
-    const PetscScalar s2InvM = s2Inv(y);
-    const PetscScalar s2InvR = s2Inv(y+1);
-    const PetscScalar s3InvL = s3InvArtificial(z-1,zOffset,pmlSize);
-    const PetscScalar s3InvM = s3InvArtificial(z,zOffset,pmlSize);
-    const PetscScalar s3InvR = s3InvArtificial(z+1,zOffset,pmlSize);
-    // Compute all of the x-shifted terms
-    const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
-    const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
-    const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
-    const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
-    const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
-    // Compute all of the y-shifted terms
-    const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
-    const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
-    const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
-    const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
-    const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
-    // Compute all of the z-shifted terms
-    const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
-    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
-    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
-    const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
-    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
-    // Compute the center term
-    const PetscScalar shiftedOmega = 
-        std::complex<PetscReal>(_control.omega,imagShift);
-    const PetscScalar alpha = 
-        _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
-    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
-        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
-
-    // Fill in value and local index for the diagonal entry in this panel + PML
-    PetscInt entry = 0;
-    colIndices[entry] = rowIdx;
-    row[entry] = centerTerm;
-    ++entry;
-
-    // Back connection to (x+1,y,z)
-    if( x != _control.nx-1 )
-    {
-        if( xLocal != _myXPortion-1 )
-        {
-            colIndices[entry] = rowIdx+1;
-        }
-        else
-        {
-            const PetscInt backProcessOffset =
-                _myProcessRow*_control.nx*_yChunkSize*zSize +
-                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
-            const PetscInt backProcessXPortion = 
-                ( _myProcessCol+1==_numProcessCols-1 ? 
-                  _xChunkSize + (_control.nx%_numProcessCols) :
-                  _xChunkSize );
-            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
-                backProcessXPortion*_myYPortion*zLocal;
-        }
-        row[entry] = xTermR;
-        ++entry;
-    }
-
-    // Right connection to (x,y+1,z)
-    if( y != _control.ny-1 )
-    {
-        if( yLocal != _myYPortion-1 )
-        {
-            colIndices[entry] = rowIdx + _myXPortion;
-        }
-        else
-        {
-            const PetscInt rightProcessYPortion = 
-                ( _myProcessRow+1==_numProcessRows-1 ? 
-                  _yChunkSize + (_control.ny%_numProcessRows) :
-                  _yChunkSize );
-            const PetscInt rightProcessOffset =
-                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
-                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
-            colIndices[entry] = rightProcessOffset + xLocal + 
-                _xChunkSize*rightProcessYPortion*zLocal;
-        }
-        row[entry] = yTermR;
-        ++entry;
-    }
-
-    // Bottom connection to (x,y,z+1)
-    if( zLocal != zSize-1 )
-    {
-        colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
-        row[entry] = zTermR;
-        ++entry;
-    }
-
-    return entry;
-}
-
-PetscInt
-psp::FiniteDiffSweepingPC::GetRowSize() const
-{
-    // TODO: Support more than just the 7-point stencil
-    return 7;
-}
-
-PetscInt
-psp::FiniteDiffSweepingPC::FormRow
-( PetscReal imagShift,
-  PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
-  std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
-{
-    const PetscInt myOffset = 
-        _myProcessRow*_control.nx*_yChunkSize*zSize + 
-        _myProcessCol*_xChunkSize*_myYPortion*zSize;
-    const PetscInt xLocal = x - _myXOffset;
-    const PetscInt yLocal = y - _myYOffset;
-    const PetscInt zLocal = z - zOffset;
-    const PetscInt rowIdx = myOffset + 
-        xLocal + _myXPortion*yLocal + _myXPortion*_myYPortion*zLocal;
-
-    // Evaluate all of our inverse s functions
-    const PetscScalar s1InvL = s1Inv(x-1);
-    const PetscScalar s1InvM = s1Inv(x);
-    const PetscScalar s1InvR = s1Inv(x+1);
-    const PetscScalar s2InvL = s2Inv(y-1);
-    const PetscScalar s2InvM = s2Inv(y);
-    const PetscScalar s2InvR = s2Inv(y+1);
-    const PetscScalar s3InvL = s3InvArtificial(z-1,zOffset,pmlSize);
-    const PetscScalar s3InvM = s3InvArtificial(z,zOffset,pmlSize);
-    const PetscScalar s3InvR = s3InvArtificial(z+1,zOffset,pmlSize);
-    // Compute all of the x-shifted terms
-    const PetscScalar xTempL = s2InvM*s3InvM/s1InvL;
-    const PetscScalar xTempM = s2InvM*s3InvM/s1InvM;
-    const PetscScalar xTempR = s2InvM*s3InvM/s1InvR;
-    const PetscScalar xTermL = (xTempL+xTempM)/(2*_hx*_hx);
-    const PetscScalar xTermR = (xTempR+xTempM)/(2*_hx*_hx);
-    // Compute all of the y-shifted terms
-    const PetscScalar yTempL = s1InvM*s3InvM/s2InvL;
-    const PetscScalar yTempM = s1InvM*s3InvM/s2InvM;
-    const PetscScalar yTempR = s1InvM*s3InvM/s2InvR;
-    const PetscScalar yTermL = (yTempL+yTempM)/(2*_hy*_hy);
-    const PetscScalar yTermR = (yTempR+yTempM)/(2*_hy*_hy);
-    // Compute all of the z-shifted terms
-    const PetscScalar zTempL = s1InvM*s2InvM/s3InvL;
-    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
-    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
-    const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
-    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
-    // Compute the center term
-    const PetscScalar shiftedOmega =
-        std::complex<PetscReal>(_control.omega,imagShift);
-    const PetscScalar alpha =
-        _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
-    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
-        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
-
-    // Fill in value and local index for the diagonal entry in this panel + PML
-    PetscInt entry = 0;
-    colIndices[entry] = rowIdx;
-    row[entry] = centerTerm;
-    ++entry;
-
-    // Front connection to (x-1,y,z)
-    if( x != 0 )
-    {
-        if( xLocal != 0 )
-        {
-            colIndices[entry] = rowIdx - 1;
-        }
-        else
-        {
-            const PetscInt frontProcessOffset =
-                _myProcessRow*_control.nx*_yChunkSize*zSize +
-                (_myProcessCol-1)*_xChunkSize*_myYPortion*zSize;
-            colIndices[entry] = frontProcessOffset + (_xChunkSize-1) + 
-                _xChunkSize*yLocal + _xChunkSize*_myYPortion*zLocal;
-        }
-        row[entry] = xTermL;
-        ++entry;
-    }
-
-    // Back connection to (x+1,y,z)
-    if( x != _control.nx-1 )
-    {
-        if( xLocal != _myXPortion-1 )
-        {
-            colIndices[entry] = rowIdx+1;
-        }
-        else
-        {
-            const PetscInt backProcessOffset =
-                _myProcessRow*_control.nx*_yChunkSize*zSize +
-                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
-            const PetscInt backProcessXPortion = 
-                ( _myProcessCol+1==_numProcessCols-1 ? 
-                  _xChunkSize + (_control.nx%_numProcessCols) :
-                  _xChunkSize );
-            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
-                backProcessXPortion*_myYPortion*zLocal;
-        }
-        row[entry] = xTermR;
-        ++entry;
-    }
-
-    // Left connection to (x,y-1,z)
-    if( y != 0 )
-    {
-        if( yLocal != 0 )
-        {
-            colIndices[entry] = rowIdx - _myXPortion;
-        }
-        else
-        {
-            const PetscInt leftProcessOffset =
-                (_myProcessRow-1)*_control.nx*_yChunkSize*zSize +
-                _myProcessCol*_xChunkSize*_yChunkSize*zSize;
-            colIndices[entry] = leftProcessOffset + xLocal + 
-                _xChunkSize*(_yChunkSize-1) + _xChunkSize*_yChunkSize*zLocal;
-        }
-        row[entry] = yTermL;
-        ++entry;
-    }
-
-    // Right connection to (x,y+1,z)
-    if( y != _control.ny-1 )
-    {
-        if( yLocal != _myYPortion-1 )
-        {
-            colIndices[entry] = rowIdx + _myXPortion;
-        }
-        else
-        {
-            const PetscInt rightProcessYPortion = 
-                ( _myProcessRow+1==_numProcessRows-1 ? 
-                  _yChunkSize + (_control.ny%_numProcessRows) :
-                  _yChunkSize );
-            const PetscInt rightProcessOffset =
-                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
-                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
-            colIndices[entry] = rightProcessOffset + xLocal + 
-                _xChunkSize*rightProcessYPortion*zLocal;
-        }
-        row[entry] = yTermR;
-        ++entry;
-    }
-
-    // Top connection to (x,y,z-1)
-    if( zLocal != 0 )
-    {
-        colIndices[entry] = rowIdx - _myXPortion*_myYPortion;
-        row[entry] = zTermL;
-        ++entry;
-    }
-
-    // Bottom connection to (x,y,z+1)
-    if( zLocal != zSize-1 )
-    {
-        colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
-        row[entry] = zTermR;
-        ++entry;
-    }
-
-    return entry;
-}
-
-PetscInt
-psp::FiniteDiffSweepingPC::GetPanelConnectionSize() const
-{
-    // TODO: Support more than just the 7-point stencil
-    return 1;
-}
-
-PetscInt 
-psp::FiniteDiffSweepingPC::FormPanelConnections
-( PetscInt x, PetscInt y, PetscInt z, 
-  PetscInt zSize, PetscInt zSizeNext, PetscInt rowIndex,
-  std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) const
-{
-    // Compute the right z term
-    const PetscScalar s1InvM = s1Inv(x);
-    const PetscScalar s2InvM = s2Inv(y);
-    const PetscScalar s3InvM = s3Inv(z);
-    const PetscScalar s3InvR = s3Inv(z+1);
-    const PetscScalar zTempM = s1InvM*s2InvM/s3InvM;
-    const PetscScalar zTempR = s1InvM*s2InvM/s3InvR;
-    const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
-
-    // This should eventually be moved outside of this loop since it is 
-    // almost as expensive as the floating point computation and only needs
-    // to be performed once per off-diagonal block.
-    const PetscInt myColOffset = 
-        _myProcessRow*_control.nx*_yChunkSize*zSizeNext + 
-        _myProcessCol*_xChunkSize*_myYPortion*zSizeNext;
-
-    const PetscInt xLocal = x - _myXOffset;
-    const PetscInt yLocal = y - _myYOffset;
-
-    // The 7-point stencil will only touch the first xy plane of the next 
-    // panel (so that zLocal=0)
-    PetscInt entry = 0;
-    colIndices[entry] = myColOffset + xLocal + yLocal*_myXPortion;
-    nonzeros[entry] = zTermR;
-    ++entry;
-
-    return entry;
+    // TODO
+    throw std::runtime_error
+    ("Have not yet written routine for creating VTK files");
 }
 

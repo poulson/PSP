@@ -109,28 +109,16 @@ class FiniteDiffSweepingPC
 
     bool _initialized; // do we have an active set of factorizations?
 
+    // These functions return the inverse of the 's' functions associated with
+    // PML in each of the three dimensions.
     PetscScalar s1Inv( PetscInt x ) const;
     PetscScalar s2Inv( PetscInt y ) const;
     PetscScalar s3Inv( PetscInt z ) const;
+
     // Since the PML will often be pushed down the z direction, we will need
-    // a means of specifying where the artificial PML is.
+    // a means of specifying where the artificial PML is in the z direction.
     PetscScalar s3InvArtificial
     ( PetscInt z, PetscInt zOffset, PetscReal sizeOfPml ) const;
-
-public:
-    FiniteDiffSweepingPC
-    ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols, 
-      FiniteDiffControl& control, SparseDirectSolver solver );
-
-    ~FiniteDiffSweepingPC();
-
-    PetscInt GetLocalSize() const;
-
-    void Init( Vec& slowness, Mat& A );
-    void Destroy();
-
-    // Apply sweeping preconditioner to x, producing y
-    void Apply( Vec& x, Vec& y ) const;
 
     // Return the maximum number of nonzeros in the right side of each row
     PetscInt GetSymmetricRowSize() const;
@@ -177,108 +165,31 @@ public:
       PetscInt zSize, PetscInt zSizeNext, PetscInt rowIndex,
       std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
     const;
+
+public:
+    FiniteDiffSweepingPC
+    ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols, 
+      FiniteDiffControl& control, SparseDirectSolver solver );
+
+    ~FiniteDiffSweepingPC();
+
+    // Return the number of entries our process will own of parallel vectors
+    // that are conformal with our forward operator
+    PetscInt GetLocalSize() const;
+
+    // Form the forward operator A and set up the preconditioner
+    void Init( Vec& slowness, Mat& A );
+
+    // Free all of the resources allocated during Init
+    void Destroy();
+
+    // Apply sweeping preconditioner to x, producing y
+    void Apply( Vec& x, Vec& y ) const;
+
+    // Form a Parallel VTK VTI file from the solution vector.
+    void WriteParallelVtkFile( Vec& solution, const char* filename ) const;
 };
 
 } // namespace psp
-
-//----------------------------------------------------------------------------//
-// Implementation begins here                                                 //
-//----------------------------------------------------------------------------//
-
-// Private utility functions
-
-inline PetscScalar
-psp::FiniteDiffSweepingPC::s1Inv( PetscInt x ) const
-{
-    if( (x+1)<_bx && _control.frontBC==PML )
-    {
-        const PetscReal delta = _bx-(x+1);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cx*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else if( x>(_control.nx-_bx) && _control.backBC==PML )
-    {
-        const PetscReal delta = x-(_control.nx-_bx);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cx*delta*delta/(_bx*_bx*_bx*_hx*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else
-        return 1;
-}
-
-inline PetscScalar
-psp::FiniteDiffSweepingPC::s2Inv( PetscInt y ) const
-{
-    if( (y+1)<_by && _control.leftBC==PML )
-    {
-        const PetscReal delta = _by-(y+1);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cy*delta*delta/(_by*_by*_by*_hy*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else if( y >(_control.ny-_by) && _control.rightBC==PML )
-    {
-        const PetscReal delta = y-(_control.ny-_by);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cy*delta*delta/(_by*_by*_by*_hy*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else
-        return 1;
-}
-
-inline PetscScalar
-psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
-{
-    if( (z+1)<_bz )
-    {
-        const PetscReal delta = _bz-(z+1);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else if( z>(_control.nz-_bz) && _control.bottomBC==PML )
-    {
-        const PetscReal delta = z-(_control.nz-_bz);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else
-        return 1;
-}
-
-inline PetscScalar
-psp::FiniteDiffSweepingPC::s3InvArtificial
-( PetscInt z, PetscInt zOffset, PetscReal sizeOfPml ) const
-{
-    if( (z+1)<zOffset+sizeOfPml )
-    {
-        const PetscReal delta = zOffset+sizeOfPml-(z+1);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cz*delta*delta/
-            (sizeOfPml*sizeOfPml*sizeOfPml*_hz*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else if( z>(_control.nz-_bz) && _control.bottomBC==PML )
-    {
-        const PetscReal delta = z-(_control.nz-_bz);
-        const PetscReal realPart = 1;
-        const PetscReal imagPart =
-            _control.Cz*delta*delta/(_bz*_bz*_bz*_hz*_control.omega);
-        return std::complex<PetscReal>(realPart,imagPart);
-    }
-    else
-        return 1;
-}
 
 #endif // PSP_FINITE_DIFF_SWEEPING_PC_HPP
