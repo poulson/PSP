@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
+#include <fstream>
 #include <sstream>
 
 //----------------------------------------------------------------------------//
@@ -1208,10 +1209,115 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
 
 void
 psp::FiniteDiffSweepingPC::WriteParallelVtkFile
-( Vec& solution, const char* filename ) const
+( Vec& v, const char* basename ) const
 {
-    // TODO
-    throw std::runtime_error
-    ("Have not yet written routine for creating VTK files");
+    // Have the root process right out the parallel XML description of the data
+    if( _rank == 0 )
+    {
+        std::ofstream realFile, imagFile;
+        std::ostringstream os;
+        os << basename << "_real.pvti";
+        realFile.open( os.str().c_str() );
+        os.clear(); os.str("");
+        os << basename << "_imag.pvti";
+        imagFile.open( os.str().c_str() );
+        os.clear(); os.str("");
+        os << "<?xml version=\"1.0\"?>\n"
+           << "<VTKFile type=\"PImageData\" version=\"0.1\">\n"
+           << " <PImageData WholeExtent=\""
+           << _control.nx << " " << _control.ny << " " << _control.nz 
+           << "\" Origin=\"0 0 0\" Spacing=\"" 
+           << _hx << " " << _hy << " " << _hz
+           << "\" GhostLevel=\"0\">\n"
+           << "  <PCellData Scalars=\"cell_scalars\">\n"
+           << "   <PDataArray type=\"Float32\" Name=\"cell_scalars\"/>\n"
+           << "  </PCellData>\n";
+        for( PetscInt i=0; i<_numProcessRows; ++i )
+        {
+            const PetscInt yPortion = 
+                ( i==_numProcessRows-1 ?
+                  _yChunkSize+(_control.ny%_numProcessRows) :
+                  _yChunkSize );
+            const PetscInt yOffset = i*_yChunkSize;
+            for( PetscInt j=0; j<_numProcessCols; ++j )
+            {
+                const PetscInt xPortion = 
+                    ( j==_numProcessCols-1 ? 
+                      _xChunkSize+(_control.nx%_numProcessCols) : 
+                      _xChunkSize );
+                const PetscInt xOffset = j*_xChunkSize;
+
+                os << "  <Piece Extent=\"" 
+                   << xOffset << " " << xOffset+xPortion << " "
+                   << yOffset << " " << yOffset+yPortion << " "
+                   << "0 " << _control.nz << "\" ";
+                realFile << os.str();
+                imagFile << os.str();
+                os.clear(); os.str("");
+                realFile << "Source=\"" << basename << "_real_"
+                         << i << "_" << j << ".vti\"/>\n";
+                imagFile << "Source=\"" << basename << "_imag_"
+                         << i << "_" << j << ".vti\"/>\n";
+            }
+            os << " </PImageData>\n"
+               << "</VTKFile>" << std::endl;
+            realFile << os.str();
+            imagFile << os.str();
+            realFile.close();
+            imagFile.close();
+        }
+    }
+
+    // Have each process write out their local data
+    std::ofstream realFile, imagFile;
+    std::ostringstream os;
+    os << basename << "_real_" << _myProcessRow << "_" << _myProcessCol 
+       << ".vti";
+    realFile.open( os.str().c_str() );
+    os.clear(); os.str("");
+    os << basename << "_imag_" << _myProcessRow << "_" << _myProcessCol
+       << ".vti";
+    imagFile.open( os.str().c_str() );
+    os.clear(); os.str("");
+    os << "<?xml version=\"1.0\"?>\n"
+       << "<VTKFile type=\"ImageData\" version=\"0.1\">\n"
+       << " <ImageData WholeExtent=\""
+       << _control.nx << " " << _control.ny << " " << _control.nz
+       << "\" Origin=\"0 0 0\" Spacing=\"" << _hx << " " << _hy << " " << _hz 
+       << "\">\n"
+       << "  <Piece Extent=\"" 
+       << _myXOffset << " " << _myXOffset + _myXPortion << " "
+       << _myYOffset << " " << _myYOffset + _myYPortion << " "
+       << "0 " << _control.nz << "\">\n"
+       << "   <CellData Scalars=\"cell_scalars\">\n"
+       << "    <DataArray type=\"Float32\" Name=\"cell_scalars\""
+       << " format=\"ascii\">\n";
+    realFile << os.str();
+    imagFile << os.str();
+    os.clear(); os.str("");
+    const PetscInt myPanelSize = _myXPortion*_myYPortion;
+    PetscScalar* vLocalData;
+    VecGetArray( v, &vLocalData );
+    for( PetscInt z=0; z<_control.nz; ++z )
+    {
+        for( PetscInt k=0; k<_myXPortion*_myYPortion; ++k )
+        {
+            std::complex<PetscReal> u = vLocalData[k+z*myPanelSize];
+            realFile << (float)std::real(u) << " "; 
+            imagFile << (float)std::imag(u) << " ";
+        }
+        realFile << "\n";
+        imagFile << "\n";
+    }
+    VecRestoreArray( v, &vLocalData );
+    os << "    </DataArray>\n"
+       << "   </CellData>\n"
+       << "  </Piece>\n"
+       << " </ImageData>\n"
+       << "</VTKFile>" << std::endl;
+    realFile << os.str();
+    imagFile << os.str();
+    realFile.close();
+    imagFile.close();
 }
 

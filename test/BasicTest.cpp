@@ -27,7 +27,8 @@
 void Usage()
 {
     std::cout << "PetscTest <nx> <ny> <nz> <wx> <wy> <wz> <etax> <etay> <etaz> "
-              << "\n          <planesPerPanel> <numProcRows> <numProcCols>\n"
+              << "\n          <planesPerPanel> <numProcRows> <numProcCols> "
+              << "\n          <storeSlowness?> <storeRhs?> <storeSolution?>\n"
               << "  nx: number of vertices in x direction\n"
               << "  ny: number of vertices in y direction\n"
               << "  nz: number of vertices in z direction\n" 
@@ -64,7 +65,7 @@ main( int argc, char* argv[] )
     MPI_Comm_size( PETSC_COMM_WORLD, &size );
     MPI_Comm_rank( PETSC_COMM_WORLD, &rank ); 
 
-    if( argc < 13 )
+    if( argc < 16 )
     {
         if( rank == 0 )    
             Usage();
@@ -86,6 +87,9 @@ main( int argc, char* argv[] )
     const PetscInt planesPerPanel = atoi(argv[++argNum]);
     const PetscInt numProcessRows = atoi(argv[++argNum]);
     const PetscInt numProcessCols = atoi(argv[++argNum]);
+    const bool storeSlowness = atoi(argv[++argNum]);
+    const bool storeRhs = atoi(argv[++argNum]);
+    const bool storeSolution = atoi(argv[++argNum]);
 
     psp::FiniteDiffControl control;
     control.stencil = psp::SEVEN_POINT;
@@ -125,6 +129,17 @@ main( int argc, char* argv[] )
 
     // TODO: Fill slowness vector here. We should probably start with all 1's.
     VecSet(slowness,1.0);
+    if( storeSlowness )
+    {
+        if( rank == 0 )
+        {
+            std::cout << "Writing slowness vector to file...";
+            std::cout.flush();
+        }
+        context.WriteParallelVtkFile( slowness, "slowness" );
+        if( rank == 0 )
+            std::cout << "done." << std::endl;
+    }
 
     // Set up the approximate inverse and the original matrix
     Mat A;
@@ -157,6 +172,17 @@ main( int argc, char* argv[] )
     PetscObjectSetName( (PetscObject)b, "RHS" );
     VecSet( u, 1.0 );
     MatMult( A, u, b );
+    if( storeRhs )
+    {
+        if( rank == 0 )
+        {
+            std::cout << "Writing RHS vector to file...";
+            std::cout.flush();
+        }
+        context.WriteParallelVtkFile( b, "rhs" );
+        if( rank == 0 )
+            std::cout << "done." << std::endl;
+    }
 
     // Set up the Krylov solver with a preconditioner
     KSP ksp;
@@ -179,6 +205,17 @@ main( int argc, char* argv[] )
     KSPSolve( ksp, b, x );
     if( rank == 0 )
         std::cout << "done." << std::endl;
+    if( storeSolution )
+    {
+        if( rank == 0 )
+        {
+            std::cout << "Writing solution vector to file...";
+            std::cout.flush();
+        }
+        context.WriteParallelVtkFile( x, "solution" );
+        if( rank == 0 )
+            std::cout << "done." << std::endl;
+    }
 
     // Check the solution
     VecAXPY( x, -1.0, u );

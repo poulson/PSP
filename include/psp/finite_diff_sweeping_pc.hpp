@@ -186,8 +186,8 @@ public:
     // Apply sweeping preconditioner to x, producing y
     void Apply( Vec& x, Vec& y ) const;
 
-    // Form a Parallel VTK VTI file from the solution vector.
-    void WriteParallelVtkFile( Vec& solution, const char* filename ) const;
+    // Form a Parallel VTK VTI file from a conformal vector.
+    void WriteParallelVtkFile( Vec& v, const char* basename ) const;
 };
 
 } // namespace psp
