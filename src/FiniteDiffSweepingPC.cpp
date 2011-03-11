@@ -757,11 +757,9 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
   PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
   std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
 {
-    const PetscInt pillarSizeOfMyRow = _xChunkSize*_myYPortion*zSize;
-
     const PetscInt myOffset = 
         _myProcessRow*_control.nx*_yChunkSize*zSize + 
-        _myProcessCol*pillarSizeOfMyRow;
+        _myProcessCol*_xChunkSize*_myYPortion*zSize;
     const PetscInt xLocal = x - _myXOffset;
     const PetscInt yLocal = y - _myYOffset;
     const PetscInt zLocal = z - zOffset;
@@ -819,11 +817,15 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
         }
         else
         {
-            const PetscInt backProcessOffset = myOffset + pillarSizeOfMyRow;
+            const PetscInt backProcessOffset =
+                _myProcessRow*_control.nx*_yChunkSize*zSize +
+                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
             const PetscInt backProcessXPortion = 
-                std::min( _xChunkSize, _control.nx-(_myXOffset+_xChunkSize) );
-            colIndices[entry] = backProcessOffset + yLocal*backProcessXPortion +
-                zLocal*backProcessXPortion*_myYPortion;
+                ( _myProcessCol+1==_numProcessCols-1 ? 
+                  _xChunkSize + (_control.nx%_numProcessCols) :
+                  _xChunkSize );
+            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
+                backProcessXPortion*_myYPortion*zLocal;
         }
         row[entry] = xTermR;
         ++entry;
@@ -838,12 +840,15 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
         }
         else
         {
-            const PetscInt rightProcessYPortion =
-                std::min( _yChunkSize, _control.ny-(_myYOffset+_yChunkSize) );
-            const PetscInt rightProcessOffset = 
-                myOffset + _control.nx*rightProcessYPortion*zSize;
+            const PetscInt rightProcessYPortion = 
+                ( _myProcessRow+1==_numProcessRows-1 ? 
+                  _yChunkSize + (_control.ny%_numProcessRows) :
+                  _yChunkSize );
+            const PetscInt rightProcessOffset =
+                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
+                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
             colIndices[entry] = rightProcessOffset + xLocal + 
-                zLocal*_xChunkSize*rightProcessYPortion;
+                _xChunkSize*rightProcessYPortion*zLocal;
         }
         row[entry] = yTermR;
         ++entry;
@@ -874,16 +879,14 @@ psp::FiniteDiffSweepingPC::FormRow
   PetscInt zOffset, PetscInt zSize, PetscReal pmlSize,
   std::vector<PetscScalar>& row, std::vector<PetscInt>& colIndices ) const
 {
-    const PetscInt pillarSizeOfMyRow = _xChunkSize*_myYPortion*zSize;
-
     const PetscInt myOffset = 
         _myProcessRow*_control.nx*_yChunkSize*zSize + 
-        _myProcessCol*pillarSizeOfMyRow;
+        _myProcessCol*_xChunkSize*_myYPortion*zSize;
     const PetscInt xLocal = x - _myXOffset;
     const PetscInt yLocal = y - _myYOffset;
     const PetscInt zLocal = z - zOffset;
     const PetscInt rowIdx = myOffset + 
-        xLocal + yLocal*_myXPortion + zLocal*_myXPortion*_myYPortion;
+        xLocal + _myXPortion*yLocal + _myXPortion*_myYPortion*zLocal;
 
     // Evaluate all of our inverse s functions
     const PetscScalar s1InvL = s1Inv(x-1);
@@ -936,9 +939,11 @@ psp::FiniteDiffSweepingPC::FormRow
         }
         else
         {
-            const PetscInt frontProcessOffset = myOffset - pillarSizeOfMyRow;
+            const PetscInt frontProcessOffset =
+                _myProcessRow*_control.nx*_yChunkSize*zSize +
+                (_myProcessCol-1)*_xChunkSize*_myYPortion*zSize;
             colIndices[entry] = frontProcessOffset + (_xChunkSize-1) + 
-                yLocal*_xChunkSize + zLocal*_xChunkSize*_yChunkSize;
+                _xChunkSize*yLocal + _xChunkSize*_myYPortion*zLocal;
         }
         row[entry] = xTermL;
         ++entry;
@@ -953,11 +958,15 @@ psp::FiniteDiffSweepingPC::FormRow
         }
         else
         {
-            const PetscInt backProcessOffset = myOffset + pillarSizeOfMyRow;
+            const PetscInt backProcessOffset =
+                _myProcessRow*_control.nx*_yChunkSize*zSize +
+                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
             const PetscInt backProcessXPortion = 
-                std::min( _xChunkSize, _control.nx-(_myXOffset+_xChunkSize) );
-            colIndices[entry] = backProcessOffset + yLocal*backProcessXPortion +
-                zLocal*backProcessXPortion*_myYPortion;
+                ( _myProcessCol+1==_numProcessCols-1 ? 
+                  _xChunkSize + (_control.nx%_numProcessCols) :
+                  _xChunkSize );
+            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
+                backProcessXPortion*_myYPortion*zLocal;
         }
         row[entry] = xTermR;
         ++entry;
@@ -972,10 +981,11 @@ psp::FiniteDiffSweepingPC::FormRow
         }
         else
         {
-            const PetscInt leftProcessOffset = 
-                myOffset - _control.nx*_yChunkSize*zSize;
+            const PetscInt leftProcessOffset =
+                (_myProcessRow-1)*_control.nx*_yChunkSize*zSize +
+                _myProcessCol*_xChunkSize*_yChunkSize*zSize;
             colIndices[entry] = leftProcessOffset + xLocal + 
-                (_yChunkSize-1)*_xChunkSize + zLocal*_xChunkSize*_yChunkSize;
+                _xChunkSize*(_yChunkSize-1) + _xChunkSize*_yChunkSize*zLocal;
         }
         row[entry] = yTermL;
         ++entry;
@@ -990,12 +1000,15 @@ psp::FiniteDiffSweepingPC::FormRow
         }
         else
         {
-            const PetscInt rightProcessYPortion =
-                std::min( _yChunkSize, _control.ny-(_myYOffset+_yChunkSize) );
-            const PetscInt rightProcessOffset = 
-                myOffset + _control.nx*rightProcessYPortion*zSize;
+            const PetscInt rightProcessYPortion = 
+                ( _myProcessRow+1==_numProcessRows-1 ? 
+                  _yChunkSize + (_control.ny%_numProcessRows) :
+                  _yChunkSize );
+            const PetscInt rightProcessOffset =
+                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
+                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
             colIndices[entry] = rightProcessOffset + xLocal + 
-                zLocal*_xChunkSize*rightProcessYPortion;
+                _xChunkSize*rightProcessYPortion*zLocal;
         }
         row[entry] = yTermR;
         ++entry;
@@ -1045,10 +1058,9 @@ psp::FiniteDiffSweepingPC::FormPanelConnections
     // This should eventually be moved outside of this loop since it is 
     // almost as expensive as the floating point computation and only needs
     // to be performed once per off-diagonal block.
-    const PetscInt pillarSizeOfMyRow = _xChunkSize*_myYPortion*zSizeNext;
     const PetscInt myColOffset = 
         _myProcessRow*_control.nx*_yChunkSize*zSizeNext + 
-        _myProcessCol*pillarSizeOfMyRow;
+        _myProcessCol*_xChunkSize*_myYPortion*zSizeNext;
 
     const PetscInt xLocal = x - _myXOffset;
     const PetscInt yLocal = y - _myYOffset;

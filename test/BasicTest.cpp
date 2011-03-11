@@ -136,6 +136,15 @@ main( int argc, char* argv[] )
     context.Init( slowness, A );
     if( rank == 0 )
         std::cout << "done." << std::endl;
+    const PetscReal oneNorm = MatNorm( A, NORM_1 );
+    const PetscReal infNorm = MatNorm( A, NORM_INFINITY );
+    const PetscReal frobNorm = MatNorm( A, NORM_FROBENIUS );
+    if( rank == 0 )
+    {
+        std::cout << "||A||_1  = " << oneNorm << "\n"
+                  << "||A||_oo = " << infNorm << "\n"
+                  << "||A||_F  = " << frobNorm << std::endl;
+    }
 
     // Create the approx. solution (x), exact solution (u), and RHS (b) 
     // vectors

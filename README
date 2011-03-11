@@ -1,6 +1,3 @@
-This project is only just getting started, so please be patient. We are 
-targeting a working version sometime in March.
-
 The scientific dependencies (MUMPS,ScaLAPACK,BLACS,Metis,ParMetis) have been 
 moved to PETSc since PETSc's GMRES is going to be used anyway. Since ParMetis 
 is not used by typical PETSc installations from MUMPS, petsc-dev should be used.
