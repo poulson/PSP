@@ -115,7 +115,7 @@ class FiniteDiffSweepingPC
     // Since the PML will often be pushed down the z direction, we will need
     // a means of specifying where the artificial PML is.
     PetscScalar s3InvArtificial
-    ( PetscInt z, PetscInt startOfPml, PetscReal sizeOfPml ) const;
+    ( PetscInt z, PetscInt zOffset, PetscReal sizeOfPml ) const;
 
 public:
     FiniteDiffSweepingPC
@@ -258,11 +258,11 @@ psp::FiniteDiffSweepingPC::s3Inv( PetscInt z ) const
 
 inline PetscScalar
 psp::FiniteDiffSweepingPC::s3InvArtificial
-( PetscInt z, PetscInt startOfPml, PetscReal sizeOfPml ) const
+( PetscInt z, PetscInt zOffset, PetscReal sizeOfPml ) const
 {
-    if( z<startOfPml+sizeOfPml )
+    if( (z+1)<zOffset+sizeOfPml )
     {
-        const PetscReal delta = startOfPml+sizeOfPml-z;
+        const PetscReal delta = zOffset+sizeOfPml-(z+1);
         const PetscReal realPart = 1;
         const PetscReal imagPart =
             _control.Cz*delta*delta/

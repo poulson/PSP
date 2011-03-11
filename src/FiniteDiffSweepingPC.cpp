@@ -145,8 +145,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Compute the right half of this row
             const PetscInt validEntries = FormSymmetricRow
-            ( 0.0, x, y, z, 0, _control.nz, _control.etaz, 
-              nonzeros, colIndices );
+            ( 0.0, x, y, z, 0, _control.nz, _bz, nonzeros, colIndices ); 
 
             // Put this row into the distributed matrix
             MatSetValues
@@ -818,7 +817,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     const PetscScalar alpha = 
         _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
     const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
-        (shiftedOmega*alpha)*(shiftedOmega*alpha)/(xTempM*yTempM*zTempM);
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
 
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
@@ -935,7 +934,7 @@ psp::FiniteDiffSweepingPC::FormRow
     const PetscScalar alpha =
         _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
     const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
-        (shiftedOmega*alpha)*(shiftedOmega*alpha)/(xTempM*yTempM*zTempM);
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
 
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
