@@ -19,10 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
-#ifdef VIEW_MATRICES
-#include <iostream>
 #include <sstream>
-#endif
 
 psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
 ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols,
@@ -87,33 +84,6 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     const PetscInt localN = VecGetLocalSize( *_slowness );
     if( localN != _myXPortion*_myYPortion*_control.nz )
         throw std::runtime_error("Slowness is not properly distributed");
-
-#ifdef VIEW_MATRICES
-    // Print out the inverses of the PML s functions over the grid points
-    if( _rank == 0 )
-    {
-        std::ostringstream s1Msg;
-        s1Msg << "s1Inv:\n";
-        for( PetscInt j=0; j<_control.nx; ++j )
-            s1Msg << s1Inv( j ) << "\n";
-        s1Msg << std::endl;
-        std::cout << s1Msg.str();
-
-        std::ostringstream s2Msg;
-        s2Msg << "s2Inv:\n";
-        for( PetscInt j=0; j<_control.ny; ++j )
-            s2Msg << s2Inv( j ) << "\n";
-        s2Msg << std::endl;
-        std::cout << s2Msg.str();
-
-        std::ostringstream s3Msg;
-        s3Msg << "s3Inv:\n";
-        for( PetscInt j=0; j<_control.nz; ++j )
-            s3Msg << s3Inv( j ) << "\n";
-        s3Msg << std::endl;
-        std::cout << s3Msg.str();
-    }
-#endif
 
     //-----------------------------------//
     // Form the full forward operator, A //
@@ -304,8 +274,8 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             Mat& F = _paddedFactors[m];
             MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_CHOLESKY, &F );
             MatFactorInfo cholInfo;
-            cholInfo.fill = 3.0; // TODO: Tweak/expose this
-            cholInfo.dtcol = 0.5; // TODO: Tweak/expose this
+            cholInfo.fill = 10.0; // TODO: Tweak/expose this
+            cholInfo.dtcol = PETSC_DEFAULT; // irrelevant for us
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
             MatCholeskyFactorSymbolic( F, D, perm, &cholInfo );
@@ -387,8 +357,8 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             else
                 MatGetFactor( D, MATSOLVERSUPERLU_DIST, MAT_FACTOR_LU, &F );
             MatFactorInfo luInfo;
-            luInfo.fill = 3.0; // TODO: Tweak/expose this
-            luInfo.dtcol = 0.5; // TODO: Tweak/expose this
+            luInfo.fill = 10.0; // TODO: Tweak/expose this
+            luInfo.dtcol = PETSC_DEFAULT; // irrelevant for us
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
             MatLUFactorSymbolic( F, D, perm, perm, &luInfo );
@@ -541,8 +511,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
         VecGetArray( uPanels[m], &uPanelLocalData );
 
         // Copy this panel's RHS, "f_m", into u[m]
-        const PetscInt zOffset = 
-            ( m==0 ? 0 : m*_control.planesPerPanel + (_bzPadded-1) );
+        const PetscInt zOffset = _zOffsetsOfPanels[m];
         const PetscInt fOffset = _myXPortion*_myYPortion*zOffset;
         const PetscInt uPanelLocalSize = VecGetLocalSize( uPanels[m] );
         std::memcpy
@@ -599,20 +568,36 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
             PetscScalar* paddedPanelSolLocalData;
             VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
             std::memcpy
-            ( uPanelLocalData, paddedPanelRHSLocalData,
+            ( uPanelLocalData, paddedPanelSolLocalData,
               uPanelLocalSize*sizeof(PetscScalar) );
             VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
         }
         else
         {
-            const PetscInt paddingSize = _myXPortion*_myYPortion*(_bzPadded-1);
+#ifndef RELEASE
+            if( _zPmlSizesOfPanels[m] != 0 )
+                throw std::logic_error("Nonsensical PML size.");
+#endif
+            const PetscInt zDimsAdded = _zPmlSizesOfPaddedPanels[m]-1;
+            const PetscInt padding = _myXPortion*_myYPortion*zDimsAdded;
+#ifndef RELEASE
+            const PetscInt localRHSSize = VecGetLocalSize( paddedPanelRHS );
+            if( padding + uPanelLocalSize != localRHSSize )
+            {
+                std::ostringstream s;
+                s << _rank << ": m=" << m << ", padding=" << padding 
+                  << ", uPanelLocalSize=" << uPanelLocalSize 
+                  << ", localRHSSize=" << localRHSSize;
+                throw std::logic_error( s.str().c_str() );
+            }
+#endif
 
             // Copy our panel's data into the back of the zero-padded buffer
             VecSet( paddedPanelRHS, 0.0 );
             PetscScalar* paddedPanelRHSLocalData;
             VecGetArray( paddedPanelRHS, &paddedPanelRHSLocalData );
             std::memcpy
-            ( &paddedPanelRHSLocalData[paddingSize], uPanelLocalData,
+            ( &paddedPanelRHSLocalData[padding], uPanelLocalData,
               uPanelLocalSize*sizeof(PetscScalar) );
             VecRestoreArray( paddedPanelRHS, &paddedPanelRHSLocalData );
 
@@ -623,7 +608,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
             PetscScalar* paddedPanelSolLocalData;
             VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
             std::memcpy
-            ( uPanelLocalData, &paddedPanelSolLocalData[paddingSize],
+            ( uPanelLocalData, &paddedPanelSolLocalData[padding],
               uPanelLocalSize*sizeof(PetscScalar) );
             VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
         }
@@ -689,20 +674,21 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
             PetscScalar* paddedPanelSolLocalData;
             VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
             std::memcpy
-            ( workLocalData, paddedPanelRHSLocalData,
+            ( workLocalData, paddedPanelSolLocalData,
               workLocalSize*sizeof(PetscScalar) );
             VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
         }
         else
         {
-            const PetscInt paddingSize = _myXPortion*_myYPortion*(_bzPadded-1);
+            const PetscInt zDimsAdded = _zPmlSizesOfPaddedPanels[m]-1;
+            const PetscInt padding = _myXPortion*_myYPortion*zDimsAdded;
 
             // Copy our panel's data into the back of the zero-padded buffer
             VecSet( paddedPanelRHS, 0.0 );
             PetscScalar* paddedPanelRHSLocalData;
             VecGetArray( paddedPanelRHS, &paddedPanelRHSLocalData );
             std::memcpy
-            ( &paddedPanelRHSLocalData[paddingSize], workLocalData,
+            ( &paddedPanelRHSLocalData[padding], workLocalData,
               workLocalSize*sizeof(PetscScalar) );
             VecRestoreArray( paddedPanelRHS, &paddedPanelRHSLocalData );
 
@@ -713,7 +699,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
             PetscScalar* paddedPanelSolLocalData;
             VecGetArray( paddedPanelSol, &paddedPanelSolLocalData );
             std::memcpy
-            ( workLocalData, &paddedPanelSolLocalData[paddingSize],
+            ( workLocalData, &paddedPanelSolLocalData[padding],
               workLocalSize*sizeof(PetscScalar) );
             VecRestoreArray( paddedPanelSol, &paddedPanelSolLocalData );
         }
@@ -740,8 +726,7 @@ psp::FiniteDiffSweepingPC::Apply( Vec& f, Vec& u ) const
         VecGetArray( uPanels[m], &uPanelLocalData );
 
         // Copy the panel solution into the full vector
-        const PetscInt zOffset = 
-            ( m==0 ? 0 : m*_control.planesPerPanel + (_bzPadded-1) );
+        const PetscInt zOffset = _zOffsetsOfPanels[m];
         const PetscInt fOffset = _myXPortion*_myYPortion*zOffset;
         const PetscInt uPanelLocalSize = VecGetLocalSize( uPanels[m] );
         std::memcpy

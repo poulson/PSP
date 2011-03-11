@@ -24,6 +24,7 @@ project(PSP)
 set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 1)
 
+option(RELEASE "Avoid unnecessary assertions." ON)
 option(VIEW_MATRICES "Print/draw the preconditioner matrices." OFF)
 option(BUILT_PETSC_WITH_X11 "Was petsc-dev built with X11 support?" OFF)
 

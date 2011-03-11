@@ -89,32 +89,26 @@ main( int argc, char* argv[] )
 
     psp::FiniteDiffControl control;
     control.stencil = psp::SEVEN_POINT;
-    //control.nx = nx;
-    //control.ny = ny;
-    //control.nz = nz;
-    //control.wx = wx;
-    //control.wy = wy;
-    //control.wz = wz;
+    control.nx = nx;
+    control.ny = ny;
+    control.nz = nz;
+    control.wx = wx;
+    control.wy = wy;
+    control.wz = wz;
     control.omega = 4*M_PI;
     control.Cx = 1.5*(2*M_PI);
     control.Cy = 1.5*(2*M_PI);
     control.Cz = 1.5*(2*M_PI);
-    //control.etax = etax;
-    //control.etay = etay;
-    //control.etaz = etaz;
+    control.etax = etax;
+    control.etay = etay;
+    control.etaz = etaz;
     control.imagShift = 1;
-    //control.planesPerPanel = planesPerPanel;
+    control.planesPerPanel = planesPerPanel;
     control.frontBC = psp::PML;
     control.rightBC = psp::PML;
     control.backBC = psp::PML;
     control.leftBC = psp::PML;
     control.bottomBC = psp::PML;
-
-    // Forced variables
-    control.nx = control.ny = control.nz = 15;
-    control.wx = control.wy = control.wz = 1;
-    control.etax = control.etay = control.etaz = 5./16.;
-    control.planesPerPanel = 3;
 
     //psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
     psp::SparseDirectSolver solver = psp::MUMPS;
@@ -164,8 +158,8 @@ main( int argc, char* argv[] )
     KSPGetPC( ksp, &pc );
     KSPSetTolerances( ksp, 1.e-6, PETSC_DEFAULT, PETSC_DEFAULT, PETSC_DEFAULT );
     PCSetType( pc, PCSHELL );
-    PCShellSetContext( pc, &context );
     PCShellSetApply( pc, CustomPCApply );
+    PCShellSetContext( pc, &context );
 
     // Solve the system with a preconditioner
     if( rank == 0 )
