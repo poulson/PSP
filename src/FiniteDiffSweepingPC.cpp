@@ -224,7 +224,16 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
                 (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
                 _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
             colIndices[entry] = rightProcessOffset + xLocal + 
-                _xChunkSize*rightProcessYPortion*zLocal;
+                _myXPortion*rightProcessYPortion*zLocal;
+            if( x == 3 && y == 1 && z == 1 )
+            {
+                std::ostringstream s;
+                s << "rightProcessOffset=" << rightProcessOffset
+                  << ",rightProcessYPortion=" << rightProcessYPortion
+                  << ",xChunkSize=" << _xChunkSize
+                  << ",yChunkSize=" << _yChunkSize << std::endl;
+                std::cout << s.str().c_str();
+            }
         }
         row[entry] = yTermR;
         ++entry;
@@ -361,7 +370,7 @@ psp::FiniteDiffSweepingPC::FormRow
                 (_myProcessRow-1)*_control.nx*_yChunkSize*zSize +
                 _myProcessCol*_xChunkSize*_yChunkSize*zSize;
             colIndices[entry] = leftProcessOffset + xLocal + 
-                _xChunkSize*(_yChunkSize-1) + _xChunkSize*_yChunkSize*zLocal;
+                _myXPortion*(_yChunkSize-1) + _myXPortion*_yChunkSize*zLocal;
         }
         row[entry] = yTermL;
         ++entry;
@@ -384,7 +393,7 @@ psp::FiniteDiffSweepingPC::FormRow
                 (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
                 _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
             colIndices[entry] = rightProcessOffset + xLocal + 
-                _xChunkSize*rightProcessYPortion*zLocal;
+                _myXPortion*rightProcessYPortion*zLocal;
         }
         row[entry] = yTermR;
         ++entry;
