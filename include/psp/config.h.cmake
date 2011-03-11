@@ -24,5 +24,7 @@
 /* Basic variables */
 #define PSP_VERSION_MAJOR @PSP_VERSION_MAJOR@
 #define PSP_VERSION_MINOR @PSP_VERSION_MINOR@
+#cmakedefine VIEW_MATRICES
+#cmakedefine BUILT_PETSC_WITH_X11
 
 #endif /* PSP_CONFIG_H */

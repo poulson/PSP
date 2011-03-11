@@ -19,6 +19,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
+#ifdef VIEW_MATRICES
+#include <iostream>
+#include <sstream>
+#endif
 
 psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
 ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols,
@@ -84,6 +88,33 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     if( localN != _myXPortion*_myYPortion*_control.nz )
         throw std::runtime_error("Slowness is not properly distributed");
 
+#ifdef VIEW_MATRICES
+    // Print out the inverses of the PML s functions over the grid points
+    if( _rank == 0 )
+    {
+        std::ostringstream s1Msg;
+        s1Msg << "s1Inv:\n";
+        for( PetscInt j=0; j<_control.nx; ++j )
+            s1Msg << s1Inv( j ) << "\n";
+        s1Msg << std::endl;
+        std::cout << s1Msg.str();
+
+        std::ostringstream s2Msg;
+        s2Msg << "s2Inv:\n";
+        for( PetscInt j=0; j<_control.ny; ++j )
+            s2Msg << s2Inv( j ) << "\n";
+        s2Msg << std::endl;
+        std::cout << s2Msg.str();
+
+        std::ostringstream s3Msg;
+        s3Msg << "s3Inv:\n";
+        for( PetscInt j=0; j<_control.nz; ++j )
+            s3Msg << s3Inv( j ) << "\n";
+        s3Msg << std::endl;
+        std::cout << s3Msg.str();
+    }
+#endif
+
     //-----------------------------------//
     // Form the full forward operator, A //
     //-----------------------------------//
@@ -124,6 +155,20 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         }
         MatAssemblyBegin( A, MAT_FINAL_ASSEMBLY );
         MatAssemblyEnd( A, MAT_FINAL_ASSEMBLY );
+#ifdef VIEW_MATRICES
+        // Write the forward operator to file in ASCII
+        PetscViewer viewer;
+        PetscViewerCreate( _comm, &viewer );
+        PetscViewerSetType( viewer, PETSCVIEWERASCII );
+        PetscViewerSetFormat( viewer, PETSC_VIEWER_DEFAULT );
+        PetscViewerFileSetName( viewer, "fullOperator.dat" );
+        MatView( A, viewer );
+
+#ifdef BUILT_PETSC_WITH_X11
+        // Draw a picture of the sparsity structure
+        MatView( A, PETSC_VIEWER_DRAW_WORLD );
+#endif // BUILT_PETSC_WITH_X11
+#endif // VIEW_MATRICES
     }
 
     // Determine the z sizes and offsets of the padded and unpadded panels
@@ -239,6 +284,22 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             }
             MatAssemblyBegin( D, MAT_FINAL_ASSEMBLY );
             MatAssemblyEnd( D, MAT_FINAL_ASSEMBLY );
+#ifdef VIEW_MATRICES
+            // Write the approximate diagonal block to file
+            PetscViewer viewer;
+            PetscViewerCreate( _comm, &viewer );
+            PetscViewerSetType( viewer, PETSCVIEWERASCII );
+            PetscViewerSetFormat( viewer, PETSC_VIEWER_DEFAULT );
+            std::ostringstream name;
+            name << "diagBlock-" << m << ".dat"; 
+            PetscViewerFileSetName( viewer, name.str().c_str() );
+            MatView( D, viewer );
+
+#ifdef BUILT_PETSC_WITH_X11
+            // Draw a picture of the sparsity structure
+            MatView( D, PETSC_VIEWER_DRAW_WORLD );
+#endif // BUILT_PETSC_WITH_X11
+#endif // VIEW_MATRICES
 
             // Factor the matrix
             Mat& F = _paddedFactors[m];
@@ -303,6 +364,22 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             }
             MatAssemblyBegin( D, MAT_FINAL_ASSEMBLY );
             MatAssemblyEnd( D, MAT_FINAL_ASSEMBLY );
+#ifdef VIEW_MATRICES
+            // Write the approximate diagonal block to file
+            PetscViewer viewer;
+            PetscViewerCreate( _comm, &viewer );
+            PetscViewerSetType( viewer, PETSCVIEWERASCII );
+            PetscViewerSetFormat( viewer, PETSC_VIEWER_DEFAULT );
+            std::ostringstream name;
+            name << "diagBlock-" << m << ".dat"; 
+            PetscViewerFileSetName( viewer, name.str().c_str() );
+            MatView( D, viewer );
+
+#ifdef BUILT_PETSC_WITH_X11
+            // Draw a picture of the sparsity structure
+            MatView( D, PETSC_VIEWER_DRAW_WORLD );
+#endif // BUILT_PETSC_WITH_X11
+#endif // VIEW_MATRICES
 
             // Factor the matrix
             Mat& F = _paddedFactors[m];
@@ -381,6 +458,22 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         }
         MatAssemblyBegin( B, MAT_FINAL_ASSEMBLY );
         MatAssemblyEnd( B, MAT_FINAL_ASSEMBLY );
+#ifdef VIEW_MATRICES
+        // Write the approximate diagonal block to file
+        PetscViewer viewer;
+        PetscViewerCreate( _comm, &viewer );
+        PetscViewerSetType( viewer, PETSCVIEWERASCII );
+        PetscViewerSetFormat( viewer, PETSC_VIEWER_DEFAULT );
+        std::ostringstream name;
+        name << "offDiagBlock-" << m << ".dat"; 
+        PetscViewerFileSetName( viewer, name.str().c_str() );
+        MatView( B, viewer );
+
+#ifdef BUILT_PETSC_WITH_X11
+        // Draw a picture of the sparsity structure
+        MatView( B, PETSC_VIEWER_DRAW_WORLD );
+#endif // BUILT_PETSC_WITH_X11
+#endif // VIEW_MATRICES
     }
     
     _initialized = true;

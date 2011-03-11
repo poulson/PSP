@@ -89,28 +89,35 @@ main( int argc, char* argv[] )
 
     psp::FiniteDiffControl control;
     control.stencil = psp::SEVEN_POINT;
-    control.nx = nx;
-    control.ny = ny;
-    control.nz = nz;
-    control.wx = wx;
-    control.wy = wy;
-    control.wz = wz;
-    control.omega = 10;
-    control.Cx = 1;
-    control.Cy = 1;
-    control.Cz = 1;
-    control.etax = etax;
-    control.etay = etay;
-    control.etaz = etaz;
+    //control.nx = nx;
+    //control.ny = ny;
+    //control.nz = nz;
+    //control.wx = wx;
+    //control.wy = wy;
+    //control.wz = wz;
+    control.omega = 4*M_PI;
+    control.Cx = 1.5*(2*M_PI);
+    control.Cy = 1.5*(2*M_PI);
+    control.Cz = 1.5*(2*M_PI);
+    //control.etax = etax;
+    //control.etay = etay;
+    //control.etaz = etaz;
     control.imagShift = 1;
-    control.planesPerPanel = planesPerPanel;
+    //control.planesPerPanel = planesPerPanel;
     control.frontBC = psp::PML;
     control.rightBC = psp::PML;
     control.backBC = psp::PML;
     control.leftBC = psp::PML;
     control.bottomBC = psp::PML;
 
-    psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
+    // Forced variables
+    control.nx = control.ny = control.nz = 15;
+    control.wx = control.wy = control.wz = 1;
+    control.etax = control.etay = control.etaz = 5./16.;
+    control.planesPerPanel = 3;
+
+    //psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
+    psp::SparseDirectSolver solver = psp::MUMPS;
 
     psp::FiniteDiffSweepingPC context
     ( PETSC_COMM_WORLD, numProcessRows, numProcessCols, control, solver );
@@ -127,7 +134,14 @@ main( int argc, char* argv[] )
 
     // Set up the approximate inverse and the original matrix
     Mat A;
+    if( rank == 0 )
+    {
+        std::cout << "Initializing preconditioner...";
+        std::cout.flush();
+    }
     context.Init( slowness, A );
+    if( rank == 0 )
+        std::cout << "done." << std::endl;
 
     // Create the approx. solution (x), exact solution (u), and RHS (b) 
     // vectors
@@ -154,7 +168,14 @@ main( int argc, char* argv[] )
     PCShellSetApply( pc, CustomPCApply );
 
     // Solve the system with a preconditioner
+    if( rank == 0 )
+    {
+        std::cout << "Solving with a preconditioner...";
+        std::cout.flush();
+    }
     KSPSolve( ksp, b, x );
+    if( rank == 0 )
+        std::cout << "done." << std::endl;
 
     // Check the solution
     VecAXPY( x, -1.0, u );
@@ -184,8 +205,15 @@ main( int argc, char* argv[] )
     KSPGetPC( kspWithout, &pcWithout );
     PCSetType( pcWithout, PCNONE );
 
-    // Solve the system with a preconditioner
+    // Solve the system WITHOUT a preconditioner
+    if( rank == 0 )
+    {
+        std::cout << "Solving WITHOUT a preconditioner...";
+        std::cout.flush();
+    }
     KSPSolve( kspWithout, b, x );
+    if( rank == 0 )
+        std::cout << "done." << std::endl;
 
     // Check the solution
     VecAXPY( x, -1.0, u );

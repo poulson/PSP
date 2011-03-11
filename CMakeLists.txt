@@ -24,6 +24,9 @@ project(PSP)
 set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 1)
 
+option(VIEW_MATRICES "Print/draw the preconditioner matrices." OFF)
+option(BUILT_PETSC_WITH_X11 "Was petsc-dev built with X11 support?" OFF)
+
 if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
   message(WARNING "CXX compiler, ${CMAKE_CXX_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CXX or through the '-DCMAKE_CXX_COMPILER' cmake flag. You should probably also clean this build folder first.")
 endif(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
@@ -117,6 +120,16 @@ if(NOT BLACS_LIB)
     "Could not find BLACS using PETSC_ARCH_DIR. Make sure PETSc build it."
   )
 endif(NOT BLACS_LIB)
+
+# X11 library
+find_library(X11_LIB NAMES X11)
+if(NOT X11_LIB)
+  if(BUILT_PETSC_WITH_X11)
+    message(FATAL_ERROR "Could not find X11 lib.")
+  else(BUILT_PETSC_WITH_X11)
+    message(WARNING "Could not find X11 lib.")
+  endif(BUILT_PETSC_WITH_X11)
+endif(NOT X11_LIB)
 
 # Dynamic library
 find_library(DL_LIB NAMES dl)
@@ -264,6 +277,7 @@ list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
 list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
 list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIB}")
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
+list(APPEND EXTERNAL_LIBS "${X11_LIB}")
 list(APPEND EXTERNAL_LIBS "${DL_LIB}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 

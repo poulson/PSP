@@ -22,6 +22,7 @@
 #define PSP_FINITE_DIFF_SWEEPING_PC_HPP 1
 #include "petscpc.h"
 #include <cstring>
+#include <iostream>
 #include <stdexcept>
 #include <vector>
 
