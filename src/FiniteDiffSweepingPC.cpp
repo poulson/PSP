@@ -1225,7 +1225,8 @@ psp::FiniteDiffSweepingPC::WriteParallelVtkFile
         os << "<?xml version=\"1.0\"?>\n"
            << "<VTKFile type=\"PImageData\" version=\"0.1\">\n"
            << " <PImageData WholeExtent=\""
-           << _control.nx << " " << _control.ny << " " << _control.nz 
+           << "0 " << _control.nx << " 0 " << _control.ny 
+           << " 0 " << _control.nz 
            << "\" Origin=\"0 0 0\" Spacing=\"" 
            << _hx << " " << _hy << " " << _hz
            << "\" GhostLevel=\"0\">\n"
@@ -1282,7 +1283,7 @@ psp::FiniteDiffSweepingPC::WriteParallelVtkFile
     os << "<?xml version=\"1.0\"?>\n"
        << "<VTKFile type=\"ImageData\" version=\"0.1\">\n"
        << " <ImageData WholeExtent=\""
-       << _control.nx << " " << _control.ny << " " << _control.nz
+       << "0 " << _control.nx << " 0 " << _control.ny << " 0 " << _control.nz
        << "\" Origin=\"0 0 0\" Spacing=\"" << _hx << " " << _hy << " " << _hz 
        << "\">\n"
        << "  <Piece Extent=\"" 
