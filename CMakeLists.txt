@@ -128,7 +128,7 @@ if(NOT X11_LIB)
   if(BUILT_PETSC_WITH_X11)
     message(FATAL_ERROR "Could not find X11 lib.")
   else(BUILT_PETSC_WITH_X11)
-    message(WARNING "Could not find X11 lib.")
+    set(X11_LIB "")
   endif(BUILT_PETSC_WITH_X11)
 endif(NOT X11_LIB)
 

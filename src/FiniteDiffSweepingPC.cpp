@@ -513,6 +513,48 @@ psp::FiniteDiffSweepingPC::GetLocalSize() const
     return _myXPortion*_myYPortion*_control.nz;
 }
 
+PetscInt
+psp::FiniteDiffSweepingPC::GetMyXOffset() const
+{
+    return _myXOffset;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::GetMyYOffset() const
+{
+    return _myYOffset;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::GetMyXPortion() const
+{
+    return _myXPortion;
+}
+
+PetscInt
+psp::FiniteDiffSweepingPC::GetMyYPortion() const
+{
+    return _myYPortion;
+}
+
+PetscReal
+psp::FiniteDiffSweepingPC::GetXSpacing() const
+{ 
+    return _hx;
+}
+
+PetscReal
+psp::FiniteDiffSweepingPC::GetYSpacing() const
+{
+    return _hy;
+}
+
+PetscReal
+psp::FiniteDiffSweepingPC::GetZSpacing() const
+{
+    return _hz;
+}
+
 void
 psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 {

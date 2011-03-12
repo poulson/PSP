@@ -26,8 +26,9 @@
 
 void Usage()
 {
-    std::cout << "PetscTest <nx> <ny> <nz> <wx> <wy> <wz> <etax> <etay> <etaz> "
-              << "\n          <planesPerPanel> <numProcRows> <numProcCols> "
+    std::cout << "BasicTest <nx> <ny> <nz> <wx> <wy> <wz> <omega> "
+              << "\n          <etax> <etay> <etaz> <planesPerPanel>"
+              << "\n          <numProcRows> <numProcCols> "
               << "\n          <storeSlowness?> <storeRhs?> <storeSolution?>\n"
               << "  nx: number of vertices in x direction\n"
               << "  ny: number of vertices in y direction\n"
@@ -35,12 +36,17 @@ void Usage()
               << "  wx: width of box in x direction\n"
               << "  wy: width of box in y direction\n"
               << "  wz: width of box in z direction\n"
+              << "  omega: frequency of the problem\n"
               << "  etax: width of PML in x direction\n"
               << "  etay: width of PML in y direction\n"
               << "  etaz: width of PML in z direction\n"
               << "  planesPerPanel: number of xy planes to process per panel\n"
               << "  numProcessRows\n"
-              << "  numProcessCols\n" << std::endl;
+              << "  numProcessCols\n" 
+              << "  storeSlowness?: store slowness vec in parallel VTK file?\n"
+              << "  storeRhs?: store RHS vec in parallel VTK file?\n"
+              << "  storeSolution?: store solution vec in parallel VTK file?\n"
+              << std::endl;
 }
 
 PetscErrorCode 
@@ -65,7 +71,7 @@ main( int argc, char* argv[] )
     MPI_Comm_size( PETSC_COMM_WORLD, &size );
     MPI_Comm_rank( PETSC_COMM_WORLD, &rank ); 
 
-    if( argc < 16 )
+    if( argc < 17 )
     {
         if( rank == 0 )    
             Usage();
@@ -81,6 +87,7 @@ main( int argc, char* argv[] )
     const PetscReal wx = atof(argv[++argNum]);
     const PetscReal wy = atof(argv[++argNum]);
     const PetscReal wz = atof(argv[++argNum]);
+    const PetscReal omega = atof(argv[++argNum]);
     const PetscReal etax = atof(argv[++argNum]);
     const PetscReal etay = atof(argv[++argNum]);
     const PetscReal etaz = atof(argv[++argNum]);
@@ -99,7 +106,7 @@ main( int argc, char* argv[] )
     control.wx = wx;
     control.wy = wy;
     control.wz = wz;
-    control.omega = 4*M_PI;
+    control.omega = omega;
     control.Cx = 1.5*(2*M_PI);
     control.Cy = 1.5*(2*M_PI);
     control.Cz = 1.5*(2*M_PI);
@@ -126,9 +133,39 @@ main( int argc, char* argv[] )
     VecSetSizes( slowness, localSize, n ); 
     VecSetType( slowness, VECMPI ); 
     PetscObjectSetName( (PetscObject)slowness, "slowness" );
+    
+    // Fill the slowness with a Gaussian
+    {
+        PetscScalar* slownessLocalData;
+        VecGetArray( slowness, &slownessLocalData );
 
-    // TODO: Fill slowness vector here. We should probably start with all 1's.
-    VecSet(slowness,1.0);
+        const PetscInt myXOffset  = context.GetMyXOffset();
+        const PetscInt myYOffset  = context.GetMyYOffset();
+        const PetscInt myXPortion = context.GetMyXPortion();
+        const PetscInt myYPortion = context.GetMyYPortion();
+        const PetscReal hx = context.GetXSpacing();
+        const PetscReal hy = context.GetYSpacing();
+        const PetscReal hz = context.GetZSpacing();
+        for( PetscInt z=0; z<control.nz; ++z )
+        {
+            const PetscReal Z = z*hz - 0.5;
+            for( PetscInt yLocal=0; yLocal<myYPortion; ++yLocal )
+            {
+                const PetscInt y = myYOffset + yLocal;
+                const PetscReal Y = y*hy - 0.5;
+                for( PetscInt xLocal=0; xLocal<myXPortion; ++xLocal )
+                {
+                    const PetscInt x = myXOffset + xLocal;
+                    const PetscReal X = x*hx - 0.5;
+                    PetscScalar gamma = 1 - 0.5*std::exp(-32*(X*X+Y*Y+Z*Z));
+                    slownessLocalData[xLocal+myXPortion*yLocal+
+                                      myXPortion*myYPortion*z] = gamma;
+                }
+            }
+        }
+
+        VecRestoreArray( slowness, &slownessLocalData );
+    }
     if( storeSlowness )
     {
         if( rank == 0 )
@@ -143,14 +180,20 @@ main( int argc, char* argv[] )
 
     // Set up the approximate inverse and the original matrix
     Mat A;
+    MPI_Barrier( PETSC_COMM_WORLD );
+    const PetscReal initStartTime = MPI_Wtime();
     if( rank == 0 )
     {
         std::cout << "Initializing preconditioner...";
         std::cout.flush();
     }
     context.Init( slowness, A );
+    MPI_Barrier( PETSC_COMM_WORLD );
     if( rank == 0 )
-        std::cout << "done." << std::endl;
+    {
+        const PetscReal initStopTime = MPI_Wtime();
+        std::cout << "done, time=" << initStopTime-initStartTime << std::endl;
+    }
     const PetscReal oneNorm = MatNorm( A, NORM_1 );
     const PetscReal infNorm = MatNorm( A, NORM_INFINITY );
     const PetscReal frobNorm = MatNorm( A, NORM_FROBENIUS );
@@ -159,29 +202,6 @@ main( int argc, char* argv[] )
         std::cout << "||A||_1  = " << oneNorm << "\n"
                   << "||A||_oo = " << infNorm << "\n"
                   << "||A||_F  = " << frobNorm << std::endl;
-    }
-
-    // Create the approx. solution (x), exact solution (u), and RHS (b) 
-    // vectors
-    Vec x, u, b;
-    MatGetVecs( A, &x, PETSC_NULL );
-    VecDuplicate( x, &u );
-    VecDuplicate( x, &b );
-    PetscObjectSetName( (PetscObject)x, "approx solution" );
-    PetscObjectSetName( (PetscObject)u, "solution" );
-    PetscObjectSetName( (PetscObject)b, "RHS" );
-    VecSet( u, 1.0 );
-    MatMult( A, u, b );
-    if( storeRhs )
-    {
-        if( rank == 0 )
-        {
-            std::cout << "Writing RHS vector to file...";
-            std::cout.flush();
-        }
-        context.WriteParallelVtkFile( b, "rhs" );
-        if( rank == 0 )
-            std::cout << "done." << std::endl;
     }
 
     // Set up the Krylov solver with a preconditioner
@@ -196,15 +216,74 @@ main( int argc, char* argv[] )
     PCShellSetApply( pc, CustomPCApply );
     PCShellSetContext( pc, &context );
 
+    // Build an RHS and solve
+    Vec x, b;
+    MatGetVecs( A, &x, PETSC_NULL );
+    VecDuplicate( x, &b );
+    PetscObjectSetName( (PetscObject)x, "approx solution" );
+    PetscObjectSetName( (PetscObject)b, "RHS" );
+    {
+        PetscScalar* bLocalData;
+        VecGetArray( b, &bLocalData );
+
+        const PetscInt myXOffset  = context.GetMyXOffset();
+        const PetscInt myYOffset  = context.GetMyYOffset();
+        const PetscInt myXPortion = context.GetMyXPortion();
+        const PetscInt myYPortion = context.GetMyYPortion();
+        const PetscReal hx = context.GetXSpacing();
+        const PetscReal hy = context.GetYSpacing();
+        const PetscReal hz = context.GetZSpacing();
+        for( PetscInt z=0; z<control.nz; ++z )
+        {
+            const PetscReal Z = z*hz - 0.5;
+            for( PetscInt yLocal=0; yLocal<myYPortion; ++yLocal )
+            {
+                const PetscInt y = myYOffset + yLocal;
+                const PetscReal Y = y*hy - 0.5;
+                for( PetscInt xLocal=0; xLocal<myXPortion; ++xLocal )
+                {
+                    const PetscInt x = myXOffset + xLocal;
+                    const PetscReal X = x*hx - 0.5;
+                    PetscScalar gamma = 
+                      std::exp(-control.nx*control.nx*(X*X+Y*Y+Z*Z));
+                    bLocalData[xLocal+myXPortion*yLocal+
+                               myXPortion*myYPortion*z] = gamma;
+                }
+            }
+        }
+
+        VecRestoreArray( b, &bLocalData );
+    }
+    if( storeRhs )
+    {
+        if( rank == 0 )
+        {
+            std::cout << "Writing RHS vector to file...";
+            std::cout.flush();
+        }
+        context.WriteParallelVtkFile( b, "rhs" );
+        if( rank == 0 )
+            std::cout << "done." << std::endl;
+    }
+
     // Solve the system with a preconditioner
+    MPI_Barrier( PETSC_COMM_WORLD );
+    const PetscReal solveStartTime = MPI_Wtime();
     if( rank == 0 )
     {
         std::cout << "Solving with a preconditioner...";
         std::cout.flush();
     }
     KSPSolve( ksp, b, x );
+    PetscInt its;
+    KSPGetIterationNumber( ksp, &its );
+    MPI_Barrier( PETSC_COMM_WORLD );
     if( rank == 0 )
-        std::cout << "done." << std::endl;
+    {
+        const PetscReal solveStopTime = MPI_Wtime();
+        std::cout << "needed " << its << " its and " 
+                  << solveStopTime-solveStartTime << " secs." << std::endl;
+    }
     if( storeSolution )
     {
         if( rank == 0 )
@@ -217,11 +296,27 @@ main( int argc, char* argv[] )
             std::cout << "done." << std::endl;
     }
 
+    // Manufacture an RHS from a chosen solution
+    Vec u;
+    VecDuplicate( x, &u );
+    PetscObjectSetName( (PetscObject)u, "solution" );
+    VecSet( u, 1.0 );
+    MatMult( A, u, b );
+
+    // Solve the system with a preconditioner
+    if( rank == 0 )
+    {
+        std::cout << "Solving using manufactured RHS with a preconditioner...";
+        std::cout.flush();
+    }
+    KSPSolve( ksp, b, x );
+    if( rank == 0 )
+        std::cout << "done." << std::endl;
+
     // Check the solution
     VecAXPY( x, -1.0, u );
     PetscReal norm;
     VecNorm( x, NORM_2, &norm );
-    PetscInt its;
     KSPGetIterationNumber( ksp, &its );
     if( rank == 0 )
     {
@@ -246,14 +341,21 @@ main( int argc, char* argv[] )
     PCSetType( pcWithout, PCNONE );
 
     // Solve the system WITHOUT a preconditioner
+    MPI_Barrier( PETSC_COMM_WORLD );
+    const PetscReal noPrecSolveStartTime = MPI_Wtime();
     if( rank == 0 )
     {
         std::cout << "Solving WITHOUT a preconditioner...";
         std::cout.flush();
     }
     KSPSolve( kspWithout, b, x );
+    MPI_Barrier( PETSC_COMM_WORLD );
     if( rank == 0 )
-        std::cout << "done." << std::endl;
+    {
+        const PetscReal noPrecSolveStopTime = MPI_Wtime();
+        std::cout << "done, time=" << noPrecSolveStopTime-noPrecSolveStartTime 
+                  << std::endl;
+    }
 
     // Check the solution
     VecAXPY( x, -1.0, u );

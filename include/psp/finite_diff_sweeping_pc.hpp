@@ -177,6 +177,17 @@ public:
     // that are conformal with our forward operator
     PetscInt GetLocalSize() const;
 
+    // Return properties about our local rod of data
+    PetscInt GetMyXOffset() const;
+    PetscInt GetMyYOffset() const;
+    PetscInt GetMyXPortion() const;
+    PetscInt GetMyYPortion() const;
+
+    // Return the mesh spacings
+    PetscReal GetXSpacing() const;
+    PetscReal GetYSpacing() const;
+    PetscReal GetZSpacing() const;
+
     // Form the forward operator A and set up the preconditioner
     void Init( Vec& slowness, Mat& A );
 
