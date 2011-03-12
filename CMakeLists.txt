@@ -92,12 +92,6 @@ endif(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB
 set(MUMPS_LIBS 
   "${CMUMPS_LIB};${DMUMPS_LIB};${SMUMPS_LIB};${ZMUMPS_LIB};${MUMPS_COMMON_LIB}")
 
-# SuperLU Dist
-find_library(SUPERLU_DIST_LIB NAMES superlu_dist_2.5 HINTS ${PETSC_LIB_DIR})
-if(NOT SUPERLU_DIST_LIB)
-  message(FATAL_ERROR "Could not find SuperLU_Dist in PETSC_ARCH_DIR.")
-endif(NOT SUPERLU_DIST_LIB)
-
 # PORD (linked but not used)
 find_library(PORD_LIB NAMES pord HINTS ${PETSC_LIB_DIR})
 if(NOT PORD_LIB)
@@ -272,7 +266,6 @@ endif(BUILD_TESTS)
 # to be linked last
 add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 set(EXTERNAL_LIBS "${PETSC_LIB}")
-list(APPEND EXTERNAL_LIBS "${SUPERLU_DIST_LIB}")
 list(APPEND EXTERNAL_LIBS "${MUMPS_LIBS}")
 list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
 list(APPEND EXTERNAL_LIBS "${PORD_LIB}")

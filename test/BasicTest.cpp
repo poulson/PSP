@@ -121,8 +121,8 @@ main( int argc, char* argv[] )
     control.leftBC = psp::PML;
     control.bottomBC = psp::PML;
 
-    //psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
-    psp::SparseDirectSolver solver = psp::MUMPS;
+    psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
+    //psp::SparseDirectSolver solver = psp::MUMPS;
 
     psp::FiniteDiffSweepingPC context
     ( PETSC_COMM_WORLD, numProcessRows, numProcessCols, control, solver );

@@ -789,7 +789,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatDestroy( D );
         }
     }
-    else // _solver == MUMPS or _solver == SUPERLU_DIST
+    else // _solver == MUMPS
     {
         // Our solver does not support symmetry, fill the entire matrices
         for( PetscInt m=0; m<numPanels; ++m )
@@ -858,10 +858,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Factor the matrix
             Mat& F = _paddedFactors[m];
-            if( _solver == MUMPS )
-                MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
-            else
-                MatGetFactor( D, MATSOLVERSUPERLU_DIST, MAT_FACTOR_LU, &F );
+            MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
             MatFactorInfo luInfo;
             luInfo.fill = 10.0; // TODO: Tweak/expose this
             luInfo.dtcol = PETSC_DEFAULT; // irrelevant for us

@@ -28,7 +28,7 @@
 
 namespace psp {
 
-enum SparseDirectSolver { MUMPS, MUMPS_SYMMETRIC, SUPERLU_DIST };
+enum SparseDirectSolver { MUMPS, MUMPS_SYMMETRIC };
 
 // This class is being designed to serve as the context for a PETSc PCShell 
 // preconditioner. 
