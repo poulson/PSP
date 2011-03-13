@@ -22,6 +22,32 @@
 #include <fstream>
 #include <sstream>
 
+
+#define PETSCMAT_DLL
+#include "../src/mat/impls/aij/mpi/mpiaij.h" /*I  "petscmat.h"  I*/
+#include "../src/mat/impls/sbaij/mpi/mpisbaij.h"
+extern "C" {
+#include "zmumps_c.h"
+}
+// This is defined so that we can reach into the PETSc MUMPS interface and 
+// manually specify the reordering information
+typedef struct {
+#if defined(PETSC_USE_COMPLEX)
+  ZMUMPS_STRUC_C id;
+#else
+  DMUMPS_STRUC_C id;
+#endif  MatStructure   matstruc;
+  PetscMPIInt    myid,size;
+  PetscInt       *irn,*jcn,nz,sym,nSolve;
+  PetscScalar    *val;
+  MPI_Comm       comm_mumps;
+  VecScatter     scat_rhs, scat_sol;
+  PetscBool      isAIJ,CleanUpMUMPS;
+  Vec            b_seq,x_seq;
+  PetscErrorCode (*MatDestroy)(Mat);
+  PetscErrorCode (*ConvertToTriples)(Mat, int, MatReuse, int*, int**, int**, PetscScalar**);
+} Mat_MUMPS;
+
 //----------------------------------------------------------------------------//
 // Private functions                                                          //
 //----------------------------------------------------------------------------//
@@ -188,22 +214,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     // Back connection to (x+1,y,z)
     if( x != _control.nx-1 )
     {
-        if( xLocal != _myXPortion-1 )
-        {
-            colIndices[entry] = rowIdx+1;
-        }
-        else
-        {
-            const PetscInt backProcessOffset =
-                _myProcessRow*_control.nx*_yChunkSize*zSize +
-                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
-            const PetscInt backProcessXPortion = 
-                ( _myProcessCol+1==_numProcessCols-1 ? 
-                  _xChunkSize + (_control.nx%_numProcessCols) :
-                  _xChunkSize );
-            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
-                backProcessXPortion*_myYPortion*zLocal;
-        }
+        colIndices[entry] = MapNaturalToParallel( x+1, y, zLocal, zSize );
         row[entry] = xTermR;
         ++entry;
     }
@@ -211,31 +222,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     // Right connection to (x,y+1,z)
     if( y != _control.ny-1 )
     {
-        if( yLocal != _myYPortion-1 )
-        {
-            colIndices[entry] = rowIdx + _myXPortion;
-        }
-        else
-        {
-            const PetscInt rightProcessYPortion = 
-                ( _myProcessRow+1==_numProcessRows-1 ? 
-                  _yChunkSize + (_control.ny%_numProcessRows) :
-                  _yChunkSize );
-            const PetscInt rightProcessOffset =
-                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
-                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
-            colIndices[entry] = rightProcessOffset + xLocal + 
-                _myXPortion*rightProcessYPortion*zLocal;
-            if( x == 3 && y == 1 && z == 1 )
-            {
-                std::ostringstream s;
-                s << "rightProcessOffset=" << rightProcessOffset
-                  << ",rightProcessYPortion=" << rightProcessYPortion
-                  << ",xChunkSize=" << _xChunkSize
-                  << ",yChunkSize=" << _yChunkSize << std::endl;
-                std::cout << s.str().c_str();
-            }
-        }
+        colIndices[entry] = MapNaturalToParallel( x, y+1, zLocal, zSize );
         row[entry] = yTermR;
         ++entry;
     }
@@ -243,6 +230,7 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     // Bottom connection to (x,y,z+1)
     if( zLocal != zSize-1 )
     {
+        // Short-circuit the MapNaturalToParallel routine
         colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
         row[entry] = zTermR;
         ++entry;
@@ -319,18 +307,7 @@ psp::FiniteDiffSweepingPC::FormRow
     // Front connection to (x-1,y,z)
     if( x != 0 )
     {
-        if( xLocal != 0 )
-        {
-            colIndices[entry] = rowIdx - 1;
-        }
-        else
-        {
-            const PetscInt frontProcessOffset =
-                _myProcessRow*_control.nx*_yChunkSize*zSize +
-                (_myProcessCol-1)*_xChunkSize*_myYPortion*zSize;
-            colIndices[entry] = frontProcessOffset + (_xChunkSize-1) + 
-                _xChunkSize*yLocal + _xChunkSize*_myYPortion*zLocal;
-        }
+        colIndices[entry] = MapNaturalToParallel( x-1, y, zLocal, zSize );
         row[entry] = xTermL;
         ++entry;
     }
@@ -338,22 +315,7 @@ psp::FiniteDiffSweepingPC::FormRow
     // Back connection to (x+1,y,z)
     if( x != _control.nx-1 )
     {
-        if( xLocal != _myXPortion-1 )
-        {
-            colIndices[entry] = rowIdx+1;
-        }
-        else
-        {
-            const PetscInt backProcessOffset =
-                _myProcessRow*_control.nx*_yChunkSize*zSize +
-                (_myProcessCol+1)*_xChunkSize*_myYPortion*zSize;
-            const PetscInt backProcessXPortion = 
-                ( _myProcessCol+1==_numProcessCols-1 ? 
-                  _xChunkSize + (_control.nx%_numProcessCols) :
-                  _xChunkSize );
-            colIndices[entry] = backProcessOffset + backProcessXPortion*yLocal +
-                backProcessXPortion*_myYPortion*zLocal;
-        }
+        colIndices[entry] = MapNaturalToParallel( x+1, y, zLocal, zSize );
         row[entry] = xTermR;
         ++entry;
     }
@@ -361,18 +323,7 @@ psp::FiniteDiffSweepingPC::FormRow
     // Left connection to (x,y-1,z)
     if( y != 0 )
     {
-        if( yLocal != 0 )
-        {
-            colIndices[entry] = rowIdx - _myXPortion;
-        }
-        else
-        {
-            const PetscInt leftProcessOffset =
-                (_myProcessRow-1)*_control.nx*_yChunkSize*zSize +
-                _myProcessCol*_xChunkSize*_yChunkSize*zSize;
-            colIndices[entry] = leftProcessOffset + xLocal + 
-                _myXPortion*(_yChunkSize-1) + _myXPortion*_yChunkSize*zLocal;
-        }
+        colIndices[entry] = MapNaturalToParallel( x, y-1, zLocal, zSize );
         row[entry] = yTermL;
         ++entry;
     }
@@ -380,22 +331,7 @@ psp::FiniteDiffSweepingPC::FormRow
     // Right connection to (x,y+1,z)
     if( y != _control.ny-1 )
     {
-        if( yLocal != _myYPortion-1 )
-        {
-            colIndices[entry] = rowIdx + _myXPortion;
-        }
-        else
-        {
-            const PetscInt rightProcessYPortion = 
-                ( _myProcessRow+1==_numProcessRows-1 ? 
-                  _yChunkSize + (_control.ny%_numProcessRows) :
-                  _yChunkSize );
-            const PetscInt rightProcessOffset =
-                (_myProcessRow+1)*_control.nx*_yChunkSize*zSize +
-                _myProcessCol*_xChunkSize*rightProcessYPortion*zSize;
-            colIndices[entry] = rightProcessOffset + xLocal + 
-                _myXPortion*rightProcessYPortion*zLocal;
-        }
+        colIndices[entry] = MapNaturalToParallel( x, y+1, zLocal, zSize );
         row[entry] = yTermR;
         ++entry;
     }
@@ -403,6 +339,7 @@ psp::FiniteDiffSweepingPC::FormRow
     // Top connection to (x,y,z-1)
     if( zLocal != 0 )
     {
+        // Short-circuit the MapNaturalToParallel routine
         colIndices[entry] = rowIdx - _myXPortion*_myYPortion;
         row[entry] = zTermL;
         ++entry;
@@ -411,6 +348,7 @@ psp::FiniteDiffSweepingPC::FormRow
     // Bottom connection to (x,y,z+1)
     if( zLocal != zSize-1 )
     {
+        // Short-circuit the MapNaturalToParallel routine
         colIndices[entry] = rowIdx + _myXPortion*_myYPortion;
         row[entry] = zTermR;
         ++entry;
@@ -454,11 +392,78 @@ psp::FiniteDiffSweepingPC::FormPanelConnections
     // The 7-point stencil will only touch the first xy plane of the next 
     // panel (so that zLocal=0)
     PetscInt entry = 0;
+    // Short-circuit the MapNaturalToParallel routine
     colIndices[entry] = myColOffset + xLocal + yLocal*_myXPortion;
     nonzeros[entry] = zTermR;
     ++entry;
 
     return entry;
+}
+
+void
+psp::FiniteDiffSweepingPC::RecursiveReordering
+( PetscInt xOffset, PetscInt xSize, PetscInt yOffset, PetscInt ySize,
+  PetscInt zSize, PetscInt* reordering ) const
+{
+    if( xSize <= zSize && ySize <= zSize )
+    {
+        // Write the leaf
+        for( PetscInt x=xOffset; x<xOffset+xSize; ++x )
+        {
+            for( PetscInt y=yOffset; y<yOffset+ySize; ++y )
+            {
+                const PetscInt index = MapNaturalToParallel( x, y, 0, zSize );
+                for( PetscInt z=0; z<zSize; ++z )
+                    reordering[(x-xOffset)*ySize*zSize+(y-yOffset)*zSize+z] = 
+                        index + z + 1; 
+            }
+        }
+    }
+    else if( xSize >= ySize )
+    {
+        // Cut the x dimension and write the separator
+        const PetscInt xLeftSize = (xSize-1) / 2;
+        const PetscInt separatorSize = ySize*zSize;
+        PetscInt* separatorSection = 
+            &reordering[xSize*ySize*zSize-separatorSize];
+
+        for( PetscInt y=yOffset; y<yOffset+ySize; ++y )
+        {
+            const PetscInt index = 
+                MapNaturalToParallel( xOffset+xLeftSize, y, 0, zSize );
+            for( PetscInt z=0; z<zSize; ++z )
+                separatorSection[(y-yOffset)*zSize+z] = index + z + 1;
+        }
+        // Recurse on the left side of the x cut
+        RecursiveReordering
+        ( xOffset, xLeftSize, yOffset, ySize, zSize, reordering );
+        // Recurse on the right side of the x cut
+        RecursiveReordering
+        ( xOffset+(xLeftSize+1), xSize-(xLeftSize+1), yOffset, ySize, zSize,
+          &reordering[xLeftSize*ySize*zSize] );
+    }
+    else
+    {
+        // Cut the y dimension and write the separator
+        const PetscInt yLeftSize = (ySize-1) / 2;
+        const PetscInt separatorSize = xSize*zSize;
+        PetscInt* separatorSection = 
+            &reordering[xSize*ySize*zSize-separatorSize];
+        for( PetscInt x=xOffset; x<xOffset+xSize; ++x )
+        {
+            const PetscInt index = 
+                MapNaturalToParallel( x, yOffset+yLeftSize, 0, zSize );
+            for( PetscInt z=0; z<zSize; ++z )
+                separatorSection[(x-xOffset)*zSize+z] = index + z + 1;
+        }
+        // Recurse on the left side of the y cut
+        RecursiveReordering
+        ( xOffset, xSize, yOffset, yLeftSize, zSize, reordering );
+        // Recurse on the right side of the y cut
+        RecursiveReordering
+        ( xOffset, xSize, yOffset+(yLeftSize+1), ySize-(yLeftSize+1), zSize,
+          &reordering[xSize*yLeftSize*zSize] );
+    }
 }
 
 //----------------------------------------------------------------------------//
@@ -491,14 +496,14 @@ psp::FiniteDiffSweepingPC::FiniteDiffSweepingPC
     _myProcessCol = _rank % _numProcessCols;
     _xChunkSize = _control.nx / _numProcessCols;
     _yChunkSize = _control.ny / _numProcessRows;
+    _xLastSize = _xChunkSize + (_control.nx % _numProcessCols);
+    _yLastSize = _yChunkSize + (_control.ny % _numProcessRows);
     _myXOffset = _myProcessCol*_xChunkSize;
     _myYOffset = _myProcessRow*_yChunkSize;
-    _myXPortion = ( _myProcessCol==_numProcessCols-1 ?
-                    _xChunkSize+(_control.nx%_numProcessCols) :
-                    _xChunkSize );
-    _myYPortion = ( _myProcessRow==_numProcessRows-1 ?
-                    _yChunkSize+(_control.ny%_numProcessRows) :
-                    _yChunkSize );
+    _myXPortion = 
+      ( _myProcessCol==_numProcessCols-1 ? _xLastSize : _xChunkSize );
+    _myYPortion = 
+      ( _myProcessRow==_numProcessRows-1 ? _yLastSize : _yChunkSize );
 }
 
 psp::FiniteDiffSweepingPC::~FiniteDiffSweepingPC()
@@ -784,7 +789,20 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             cholInfo.dtcol = PETSC_DEFAULT; // irrelevant for us
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
+            // For now, manually force MUMPS to allow for our manual ordering
+            Mat_MUMPS* chol = (Mat_MUMPS*)F->spptr;
+            chol->id.icntl[6] = 1;
+            std::vector<PetscInt> reordering;
+            if( _rank == 0 )
+            {
+                reordering.resize( _control.nx*_control.ny*zSize );
+                RecursiveReordering
+                ( 0, _control.nx, 0, _control.ny, zSize, &reordering[0] );
+                chol->id.perm_in = &reordering[0];
+            }
             MatCholeskyFactorSymbolic( F, D, perm, &cholInfo );
+            if( _rank == 0 )
+                reordering.clear();
             MatCholeskyFactorNumeric( F, D, &cholInfo );
             MatDestroy( D );
         }
@@ -864,7 +882,20 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             luInfo.dtcol = PETSC_DEFAULT; // irrelevant for us
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
+            // For now, force MUMPS to use a manual ordering
+            Mat_MUMPS* lu = (Mat_MUMPS*)F->spptr;
+            lu->id.icntl[6] = 1;
+            std::vector<PetscInt> reordering;
+            if( _rank == 0 )
+            {
+                reordering.resize( _control.nx*_control.ny*zSize );
+                RecursiveReordering
+                ( 0, _control.nx, 0, _control.ny, zSize, &reordering[0] );
+                lu->id.perm_in = &reordering[0];
+            }
             MatLUFactorSymbolic( F, D, perm, perm, &luInfo );
+            if( _rank == 0 )
+                reordering.clear();
             MatLUFactorNumeric( F, D, &luInfo );
             MatDestroy( D );
         }
@@ -1274,17 +1305,11 @@ psp::FiniteDiffSweepingPC::WriteParallelVtkFile
            << "  </PCellData>\n";
         for( PetscInt i=0; i<_numProcessRows; ++i )
         {
-            const PetscInt yPortion = 
-                ( i==_numProcessRows-1 ?
-                  _yChunkSize+(_control.ny%_numProcessRows) :
-                  _yChunkSize );
+            const PetscInt yPortion = GetProcessRowYPortion( i );
             const PetscInt yOffset = i*_yChunkSize;
             for( PetscInt j=0; j<_numProcessCols; ++j )
             {
-                const PetscInt xPortion = 
-                    ( j==_numProcessCols-1 ? 
-                      _xChunkSize+(_control.nx%_numProcessCols) : 
-                      _xChunkSize );
+                const PetscInt xPortion = GetProcessColXPortion( j );
                 const PetscInt xOffset = j*_xChunkSize;
 
                 os << "  <Piece Extent=\"" 

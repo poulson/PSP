@@ -86,6 +86,7 @@ class FiniteDiffSweepingPC
     const PetscInt _numProcessRows, _numProcessCols;
     PetscInt _myProcessRow, _myProcessCol;
     PetscInt _xChunkSize, _yChunkSize;
+    PetscInt _xLastSize, _yLastSize;
     PetscInt _myXOffset, _myYOffset;
     PetscInt _myXPortion, _myYPortion;
 
@@ -166,6 +167,27 @@ class FiniteDiffSweepingPC
       std::vector<PetscScalar>& nonzeros, std::vector<PetscInt>& colIndices ) 
     const;
 
+    PetscInt GetProcessColXPortion( PetscInt processCol ) const;
+    PetscInt GetProcessRowYPortion( PetscInt processRow ) const;
+
+    // A helper function for mapping a process's 2d coordinates to its 
+    // parallel global offset in a panel of given z size.
+    PetscInt GetProcessOffset
+    ( PetscInt processRow, PetscInt processCol, PetscInt zSize ) const;
+
+    // A helper function for mapping a panel's (x,y,z) coordinates to the 
+    // global coordinates given that the z size is zSize
+    PetscInt MapNaturalToParallel
+    ( PetscInt x, PetscInt y, PetscInt z, PetscInt zSize ) const;
+
+    // A helper depth-first recursive function for forming a manual nested 
+    // dissection on our structured panel grids in the x and y dimensions.
+    // (We stop recursing when the x and y dims are both <= the z dimension of 
+    // the panel.)
+    void RecursiveReordering
+    ( PetscInt xOffset, PetscInt xSize, PetscInt yOffset, PetscInt ySize,
+      PetscInt zSize, PetscInt* reordering ) const;
+
 public:
     FiniteDiffSweepingPC
     ( MPI_Comm comm, PetscInt numProcessRows, PetscInt numProcessCols, 
@@ -202,5 +224,42 @@ public:
 };
 
 } // namespace psp
+
+// Implementations begin here
+
+inline PetscInt 
+psp::FiniteDiffSweepingPC::GetProcessColXPortion( PetscInt processCol ) const
+{
+    return ( processCol==_numProcessCols-1 ? _xLastSize : _xChunkSize );
+}
+
+inline PetscInt
+psp::FiniteDiffSweepingPC::GetProcessRowYPortion( PetscInt processRow ) const
+{
+    return ( processRow==_numProcessRows-1 ? _yLastSize : _yChunkSize );
+}
+
+inline PetscInt
+psp::FiniteDiffSweepingPC::GetProcessOffset
+( PetscInt processRow, PetscInt processCol, PetscInt zSize ) const
+{
+    const PetscInt yPortion = GetProcessRowYPortion( processRow );
+    return processRow*_control.nx*_yChunkSize*zSize + 
+           processCol*_xChunkSize*yPortion*zSize;
+}
+
+inline PetscInt
+psp::FiniteDiffSweepingPC::MapNaturalToParallel
+( PetscInt x, PetscInt y, PetscInt z, PetscInt zSize ) const
+{
+    const PetscInt processCol = std::min(x/_xChunkSize,_numProcessCols-1);
+    const PetscInt processRow = std::min(y/_yChunkSize,_numProcessRows-1);
+    const PetscInt offset = GetProcessOffset( processRow, processCol, zSize );
+    const PetscInt xLocal = x - processCol*_xChunkSize;
+    const PetscInt yLocal = y - processRow*_yChunkSize;
+    const PetscInt xPortion = GetProcessColXPortion( processCol );
+    const PetscInt yPortion = GetProcessRowYPortion( processRow );
+    return offset + xLocal + xPortion*yLocal + xPortion*yPortion*z;
+}
 
 #endif // PSP_FINITE_DIFF_SWEEPING_PC_HPP
