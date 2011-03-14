@@ -813,9 +813,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             cholInfo.dtcol = 1.e-6; // irrelevant for us?
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
-            // The manual ordering does not seem to work very well, so try 
-            // using SCOTCH instead of MeTiS or AMF.
-            //
+            // The manual ordering does not seem to work very well...
             //Mat_MUMPS* chol = (Mat_MUMPS*)F->spptr;
             //chol->id.icntl[6] = 1;
             //chol->id.icntl[27] = 1;
@@ -850,7 +848,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             }
         }
     }
-    else // _solver == MUMPS
+    else // _solver == MUMPS || _solver == SUPERLU_DIST
     {
         // Our solver does not support symmetry, fill the entire matrices
         for( PetscInt m=0; m<numPanels; ++m )
@@ -918,15 +916,16 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Factor the matrix
             Mat& F = _paddedFactors[m];
-            MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
+            if( _solver == MUMPS )
+                MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
+            else
+                MatGetFactor( D, MATSOLVERSUPERLU_DIST, MAT_FACTOR_LU, &F );
             MatFactorInfo luInfo;
             luInfo.fill = 10.0; // TODO: Tweak/expose this
             luInfo.dtcol = 1.e-6; // irrelevant for us?
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
-            // The manual ordering does not seem to work very well, so try 
-            // using SCOTCH instead of MeTiS or AMF.
-            //
+            // The manual ordering does not seem to work very well...
             //Mat_MUMPS* lu = (Mat_MUMPS*)F->spptr;
             //lu->id.icntl[6] = 1;
             //lu->id.icntl[27] = 1;
@@ -1390,13 +1389,13 @@ psp::FiniteDiffSweepingPC::WriteParallelVtkFile
                 imagFile << "Source=\"" << basename << "_imag_"
                          << i << "_" << j << ".vti\"/>\n";
             }
-            os << " </PImageData>\n"
-               << "</VTKFile>" << std::endl;
-            realFile << os.str();
-            imagFile << os.str();
-            realFile.close();
-            imagFile.close();
         }
+        os << " </PImageData>\n"
+           << "</VTKFile>" << std::endl;
+        realFile << os.str();
+        imagFile << os.str();
+        realFile.close();
+        imagFile.close();
     }
 
     // Have each process write out their local data
