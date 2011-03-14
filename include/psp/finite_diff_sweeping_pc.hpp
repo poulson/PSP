@@ -186,7 +186,8 @@ class FiniteDiffSweepingPC
     // the panel.)
     void RecursiveReordering
     ( PetscInt xOffset, PetscInt xSize, PetscInt yOffset, PetscInt ySize,
-      PetscInt zSize, PetscInt* reordering ) const;
+      PetscInt zOffset, PetscInt zSize, PetscInt zSizePanel, PetscInt minSize,
+      PetscInt* reordering ) const;
 
 public:
     FiniteDiffSweepingPC

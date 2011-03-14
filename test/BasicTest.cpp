@@ -134,7 +134,7 @@ main( int argc, char* argv[] )
     VecSetType( slowness, VECMPI ); 
     PetscObjectSetName( (PetscObject)slowness, "slowness" );
     
-    // Fill the slowness with a Gaussian
+    // Fill the slowness with a Gaussian perturbation from unity.
     {
         PetscScalar* slownessLocalData;
         VecGetArray( slowness, &slownessLocalData );
@@ -148,24 +148,25 @@ main( int argc, char* argv[] )
         const PetscReal hz = context.GetZSpacing();
         for( PetscInt z=0; z<control.nz; ++z )
         {
-            const PetscReal Z = z*hz - 0.5;
+            const PetscReal Z = (z+1)*hz - 0.5;
             for( PetscInt yLocal=0; yLocal<myYPortion; ++yLocal )
             {
                 const PetscInt y = myYOffset + yLocal;
-                const PetscReal Y = y*hy - 0.5;
+                const PetscReal Y = (y+1)*hy - 0.5;
                 for( PetscInt xLocal=0; xLocal<myXPortion; ++xLocal )
                 {
                     const PetscInt x = myXOffset + xLocal;
-                    const PetscReal X = x*hx - 0.5;
-                    PetscScalar gamma = 1 - 0.5*std::exp(-32*(X*X+Y*Y+Z*Z));
+                    const PetscReal X = (x+1)*hx - 0.5;
+                    PetscScalar gamma = 1 - 0.4*std::exp(-32*(X*X+Y*Y+Z*Z));
                     slownessLocalData[xLocal+myXPortion*yLocal+
-                                      myXPortion*myYPortion*z] = gamma;
+                                      myXPortion*myYPortion*z] = 1./gamma;
                 }
             }
         }
 
         VecRestoreArray( slowness, &slownessLocalData );
     }
+    //VecSet( slowness, 1.0 );
     if( storeSlowness )
     {
         if( rank == 0 )
@@ -235,15 +236,15 @@ main( int argc, char* argv[] )
         const PetscReal hz = context.GetZSpacing();
         for( PetscInt z=0; z<control.nz; ++z )
         {
-            const PetscReal Z = z*hz - 0.5;
+            const PetscReal Z = (z+1)*hz - 0.25;
             for( PetscInt yLocal=0; yLocal<myYPortion; ++yLocal )
             {
                 const PetscInt y = myYOffset + yLocal;
-                const PetscReal Y = y*hy - 0.5;
+                const PetscReal Y = (y+1)*hy - 0.5;
                 for( PetscInt xLocal=0; xLocal<myXPortion; ++xLocal )
                 {
                     const PetscInt x = myXOffset + xLocal;
-                    const PetscReal X = x*hx - 0.5;
+                    const PetscReal X = (x+1)*hx - 0.5;
                     PetscScalar gamma = 
                       std::exp(-control.nx*control.nx*(X*X+Y*Y+Z*Z));
                     bLocalData[xLocal+myXPortion*yLocal+

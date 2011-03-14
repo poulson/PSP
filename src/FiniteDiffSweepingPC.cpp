@@ -36,7 +36,8 @@ typedef struct {
   ZMUMPS_STRUC_C id;
 #else
   DMUMPS_STRUC_C id;
-#endif  MatStructure   matstruc;
+#endif 
+  MatStructure   matstruc;
   PetscMPIInt    myid,size;
   PetscInt       *irn,*jcn,nz,sym,nSolve;
   PetscScalar    *val;
@@ -198,12 +199,20 @@ psp::FiniteDiffSweepingPC::FormSymmetricRow
     const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
     const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
     // Compute the center term
-    const PetscScalar shiftedOmega = 
-        std::complex<PetscReal>(_control.omega,imagShift);
     const PetscScalar alpha = 
         _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
+    // Avoid the formula shown in the slides in favor of what's in the serial
+    // code, i.e., use (w^2*a^2 + i s) instead of (w + i s)^2*a^2, where 
+    // s is the imaginary shift.
+    /*
+    const PetscScalar shiftedOmega = 
+        std::complex<PetscReal>(_control.omega,imagShift);
     const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
         (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
+    */
+    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
+        (_control.omega*alpha)*(_control.omega*alpha)*s1InvM*s2InvM*s3InvM+
+        std::complex<PetscReal>(0,imagShift);
 
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
@@ -291,12 +300,20 @@ psp::FiniteDiffSweepingPC::FormRow
     const PetscScalar zTermL = (zTempL+zTempM)/(2*_hz*_hz);
     const PetscScalar zTermR = (zTempR+zTempM)/(2*_hz*_hz);
     // Compute the center term
-    const PetscScalar shiftedOmega =
-        std::complex<PetscReal>(_control.omega,imagShift);
-    const PetscScalar alpha =
+    const PetscScalar alpha = 
         _localSlownessData[xLocal+_myXPortion*yLocal+_myXPortion*_myYPortion*z];
+    // Avoid the formula shown in the slides in favor of what's in the serial
+    // code, i.e., use (w^2*a^2 + i s) instead of (w + i s)^2*a^2, where 
+    // s is the imaginary shift.
+    /*
+    const PetscScalar shiftedOmega = 
+        std::complex<PetscReal>(_control.omega,imagShift);
     const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
         (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
+    */
+    const PetscScalar centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR)+
+        (_control.omega*alpha)*(_control.omega*alpha)*s1InvM*s2InvM*s3InvM+
+        std::complex<PetscReal>(0,imagShift);
 
     // Fill in value and local index for the diagonal entry in this panel + PML
     PetscInt entry = 0;
@@ -402,47 +419,44 @@ psp::FiniteDiffSweepingPC::FormPanelConnections
 
 void
 psp::FiniteDiffSweepingPC::RecursiveReordering
-( PetscInt xOffset, PetscInt xSize, PetscInt yOffset, PetscInt ySize,
-  PetscInt zSize, PetscInt* reordering ) const
+( PetscInt xOffset, PetscInt xSize, 
+  PetscInt yOffset, PetscInt ySize,
+  PetscInt zOffset, PetscInt zSize, PetscInt zSizePanel,
+  PetscInt minSize, PetscInt* reordering ) const
 {
-    if( xSize <= zSize && ySize <= zSize )
+    if( xSize <= minSize && ySize <= minSize && zSize <= minSize )
     {
         // Write the leaf
         for( PetscInt x=xOffset; x<xOffset+xSize; ++x )
-        {
             for( PetscInt y=yOffset; y<yOffset+ySize; ++y )
-            {
-                const PetscInt index = MapNaturalToParallel( x, y, 0, zSize );
-                for( PetscInt z=0; z<zSize; ++z )
-                    reordering[(x-xOffset)*ySize*zSize+(y-yOffset)*zSize+z] = 
-                        index + z + 1; 
-            }
-        }
+                for( PetscInt z=zOffset; z<zOffset+zSize; ++z )
+                    reordering[(x-xOffset)*ySize*zSize+
+                               (y-yOffset)*zSize+
+                               (z-zOffset)] = 
+                        MapNaturalToParallel(x,y,z,zSizePanel)+1;
     }
-    else if( xSize >= ySize )
+    else if( xSize >= ySize && xSize >= zSize )
     {
         // Cut the x dimension and write the separator
         const PetscInt xLeftSize = (xSize-1) / 2;
         const PetscInt separatorSize = ySize*zSize;
         PetscInt* separatorSection = 
             &reordering[xSize*ySize*zSize-separatorSize];
-
         for( PetscInt y=yOffset; y<yOffset+ySize; ++y )
-        {
-            const PetscInt index = 
-                MapNaturalToParallel( xOffset+xLeftSize, y, 0, zSize );
-            for( PetscInt z=0; z<zSize; ++z )
-                separatorSection[(y-yOffset)*zSize+z] = index + z + 1;
-        }
+            for( PetscInt z=zOffset; z<zOffset+zSize; ++z )
+                separatorSection[(y-yOffset)*zSize+(z-zOffset)] = 
+                    MapNaturalToParallel(xOffset+xLeftSize,y,z,zSizePanel)+1;
         // Recurse on the left side of the x cut
         RecursiveReordering
-        ( xOffset, xLeftSize, yOffset, ySize, zSize, reordering );
+        ( xOffset, xLeftSize, yOffset, ySize, zOffset, zSize, zSizePanel,
+          minSize, reordering );
         // Recurse on the right side of the x cut
         RecursiveReordering
-        ( xOffset+(xLeftSize+1), xSize-(xLeftSize+1), yOffset, ySize, zSize,
+        ( xOffset+(xLeftSize+1), xSize-(xLeftSize+1), yOffset, ySize, 
+          zOffset, zSize, zSizePanel, minSize, 
           &reordering[xLeftSize*ySize*zSize] );
     }
-    else
+    else if( ySize >= zSize )
     {
         // Cut the y dimension and write the separator
         const PetscInt yLeftSize = (ySize-1) / 2;
@@ -450,19 +464,39 @@ psp::FiniteDiffSweepingPC::RecursiveReordering
         PetscInt* separatorSection = 
             &reordering[xSize*ySize*zSize-separatorSize];
         for( PetscInt x=xOffset; x<xOffset+xSize; ++x )
-        {
-            const PetscInt index = 
-                MapNaturalToParallel( x, yOffset+yLeftSize, 0, zSize );
-            for( PetscInt z=0; z<zSize; ++z )
-                separatorSection[(x-xOffset)*zSize+z] = index + z + 1;
-        }
+            for( PetscInt z=zOffset; z<zOffset+zSize; ++z )
+                separatorSection[(x-xOffset)*zSize+(z-zOffset)] = 
+                    MapNaturalToParallel(x,yOffset+yLeftSize,z,zSizePanel)+1;
         // Recurse on the left side of the y cut
         RecursiveReordering
-        ( xOffset, xSize, yOffset, yLeftSize, zSize, reordering );
+        ( xOffset, xSize, yOffset, yLeftSize, zOffset, zSize, zSizePanel,
+          minSize, reordering );
         // Recurse on the right side of the y cut
         RecursiveReordering
-        ( xOffset, xSize, yOffset+(yLeftSize+1), ySize-(yLeftSize+1), zSize,
+        ( xOffset, xSize, yOffset+(yLeftSize+1), ySize-(yLeftSize+1), 
+          zOffset, zSize, zSizePanel, minSize, 
           &reordering[xSize*yLeftSize*zSize] );
+    }
+    else // the z dimension is the largest and is above the threshold
+    {
+        // Cut the z dimension and write the separator
+        const PetscInt zLeftSize = (zSize-1) / 2;
+        const PetscInt separatorSize = xSize*ySize;
+        PetscInt* separatorSection = 
+            &reordering[xSize*ySize*zSize-separatorSize];
+        for( PetscInt x=xOffset; x<xOffset+xSize; ++x )
+            for( PetscInt y=yOffset; y<yOffset+ySize; ++y )
+                separatorSection[(x-xOffset)*ySize+(y-yOffset)] = 
+                    MapNaturalToParallel(x,y,zOffset+zLeftSize,zSizePanel)+1;
+        // Recurse on the left side of the y cut
+        RecursiveReordering
+        ( xOffset, xSize, yOffset, ySize, zOffset, zLeftSize, zSizePanel,
+          minSize, reordering );
+        // Recurse on the right side of the y cut
+        RecursiveReordering
+        ( xOffset, xSize, yOffset, ySize, 
+          zOffset+(zLeftSize+1), zSize-(zLeftSize+1), zSizePanel, minSize,
+          &reordering[xSize*ySize*zLeftSize] );
     }
 }
 
@@ -579,6 +613,12 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
     //-----------------------------------//
     // Form the full forward operator, A //
     //-----------------------------------//
+    const double forwardStartTime = MPI_Wtime();
+    if( _rank == 0 )
+    {
+        std::cout << "\n  Forming forward operator...";
+        std::cout.flush();
+    }
     {
         const PetscInt localSize = GetLocalSize();
         const PetscInt size = _control.nx*_control.ny*_control.nz;
@@ -595,26 +635,6 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         std::vector<PetscInt> colIndices(symmRowSize);
         PetscInt iStart, iEnd;
         MatGetOwnershipRange( A, &iStart, &iEnd );
-#ifndef RELEASE
-        const PetscInt myOffset = 
-            _myProcessRow*_control.nx*_yChunkSize*_control.nz + 
-            _myProcessCol*_xChunkSize*_myYPortion*_control.nz;
-        const PetscInt myEndPoint = 
-            myOffset + _myXPortion*_myYPortion*_control.nz;
-        if( myOffset != iStart )
-        {
-            std::ostringstream s;
-            s << _rank << ": myOffset=" << myOffset << ", iStart=" << iStart;
-            throw std::logic_error( s.str().c_str() );
-        }
-        if( myEndPoint != iEnd )
-        {
-            std::ostringstream s;
-            s << _rank << ": myEndPoint=" << myEndPoint 
-              << ", iEnd=" << iEnd;
-            throw std::logic_error( s.str().c_str() );
-        }
-#endif
         for( PetscInt i=iStart; i<iEnd; ++i )
         {
             const PetscInt localX = (i-iStart) % _myXPortion;
@@ -649,6 +669,11 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         MatView( A, PETSC_VIEWER_DRAW_WORLD );
 #endif // BUILT_PETSC_WITH_X11
 #endif // VIEW_MATRICES
+    }
+    if( _rank == 0 )
+    {
+        const double forwardStopTime = MPI_Wtime();
+        std::cout << forwardStopTime-forwardStartTime << " secs." << std::endl;
     }
 
     // Determine the z sizes and offsets of the padded and unpadded panels
@@ -737,7 +762,6 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatMPISBAIJSetPreallocation( D, 1, 4, PETSC_NULL, 3, PETSC_NULL );
 
             // Fill our portion of the distributed matrix.
-            // TODO: Batch several rows together for each MatSetValues
             const PetscInt symmRowSize = GetSymmetricRowSize();
             std::vector<PetscScalar> nonzeros(symmRowSize);
             std::vector<PetscInt> colIndices(symmRowSize);
@@ -786,25 +810,44 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_CHOLESKY, &F );
             MatFactorInfo cholInfo;
             cholInfo.fill = 10.0; // TODO: Tweak/expose this
-            cholInfo.dtcol = PETSC_DEFAULT; // irrelevant for us
+            cholInfo.dtcol = 1.e-6; // irrelevant for us?
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
-            // For now, manually force MUMPS to allow for our manual ordering
-            Mat_MUMPS* chol = (Mat_MUMPS*)F->spptr;
-            chol->id.icntl[6] = 1;
-            std::vector<PetscInt> reordering;
+            // The manual ordering does not seem to work very well, so try 
+            // using SCOTCH instead of MeTiS or AMF.
+            //
+            //Mat_MUMPS* chol = (Mat_MUMPS*)F->spptr;
+            //chol->id.icntl[6] = 1;
+            //chol->id.icntl[27] = 1;
+            //std::vector<PetscInt> reordering;
+            //if( _rank == 0 )
+            //{
+            //    // For now, hardcode the minimum leaf dimension
+            //    const PetscInt minSize = 1;
+            //
+            //    reordering.resize( _control.nx*_control.ny*zSize );
+            //    RecursiveReordering
+            //    ( 0, _control.nx, 0, _control.ny, 0, zSize, zSize, minSize, 
+            //      &reordering[0] );
+            //    chol->id.perm_in = &reordering[0];
+            // }
+            const double factorStartTime = MPI_Wtime();
             if( _rank == 0 )
             {
-                reordering.resize( _control.nx*_control.ny*zSize );
-                RecursiveReordering
-                ( 0, _control.nx, 0, _control.ny, zSize, &reordering[0] );
-                chol->id.perm_in = &reordering[0];
+                std::cout << "  Factoring diagonal block " << m << "...";
+                std::cout.flush();
             }
             MatCholeskyFactorSymbolic( F, D, perm, &cholInfo );
-            if( _rank == 0 )
-                reordering.clear();
+            //if( _rank == 0 )
+            //    reordering.clear();
             MatCholeskyFactorNumeric( F, D, &cholInfo );
             MatDestroy( D );
+            if( _rank == 0 )
+            {
+                const double factorStopTime = MPI_Wtime();
+                std::cout << factorStopTime-factorStartTime << " seconds." 
+                          << std::endl;
+            }
         }
     }
     else // _solver == MUMPS
@@ -830,7 +873,6 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatMPIAIJSetPreallocation( D, 7, PETSC_NULL, 3, PETSC_NULL );
 
             // Fill our portion of the diagonal block
-            // TODO: Batch several rows together for each MatSetValues
             const PetscInt rowSize = GetRowSize();
             std::vector<PetscScalar> nonzeros(rowSize);
             std::vector<PetscInt> colIndices(rowSize);
@@ -879,31 +921,55 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
             MatFactorInfo luInfo;
             luInfo.fill = 10.0; // TODO: Tweak/expose this
-            luInfo.dtcol = PETSC_DEFAULT; // irrelevant for us
+            luInfo.dtcol = 1.e-6; // irrelevant for us?
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
-            // For now, force MUMPS to use a manual ordering
-            Mat_MUMPS* lu = (Mat_MUMPS*)F->spptr;
-            lu->id.icntl[6] = 1;
-            std::vector<PetscInt> reordering;
+            // The manual ordering does not seem to work very well, so try 
+            // using SCOTCH instead of MeTiS or AMF.
+            //
+            //Mat_MUMPS* lu = (Mat_MUMPS*)F->spptr;
+            //lu->id.icntl[6] = 1;
+            //lu->id.icntl[27] = 1;
+            //std::vector<PetscInt> reordering;
+            //if( _rank == 0 )
+            //{
+            //    // For now, hardcode the minimum leaf dimension
+            //    const PetscInt minSize = 1;
+            //
+            //    reordering.resize( _control.nx*_control.ny*zSize );
+            //    RecursiveReordering
+            //    ( 0, _control.nx, 0, _control.ny, 0, zSize, zSize, minSize, 
+            //      &reordering[0] );
+            //    lu->id.perm_in = &reordering[0];
+            //}
+            const double factorStartTime = MPI_Wtime();
             if( _rank == 0 )
             {
-                reordering.resize( _control.nx*_control.ny*zSize );
-                RecursiveReordering
-                ( 0, _control.nx, 0, _control.ny, zSize, &reordering[0] );
-                lu->id.perm_in = &reordering[0];
+                std::cout << "  Factoring diagonal block " << m << "...";
+                std::cout.flush();
             }
             MatLUFactorSymbolic( F, D, perm, perm, &luInfo );
-            if( _rank == 0 )
-                reordering.clear();
+            //if( _rank == 0 )
+            //    reordering.clear();
             MatLUFactorNumeric( F, D, &luInfo );
             MatDestroy( D );
+            if( _rank == 0 )
+            {
+                const double factorStopTime = MPI_Wtime();
+                std::cout << factorStopTime-factorStartTime << " seconds." 
+                          << std::endl;
+            }
         }
     }
 
     //---------------------------------------//
     // Form the unpadded off-diagonal blocks //
     //---------------------------------------//
+    if( _rank == 0 )
+    {
+        std::cout << "  Forming off-diagonal blocks...";
+        std::cout.flush();
+    }
     _offDiagBlocks.resize( numPanels-1 );
     for( PetscInt m=0; m<numPanels-1; ++m )
     {
@@ -932,8 +998,6 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         // Fill the connections between our nodes in the last xy plane of 
         // unpadded panel 'm' and the first xy plane of unpadded panel 
         // 'm+1'.
-        //
-        // TODO: Batch together several MatSetValues calls
         const PetscInt rowSize = GetPanelConnectionSize();
         std::vector<PetscScalar> nonzeros(rowSize);
         std::vector<PetscInt> colIndices(rowSize);
@@ -978,6 +1042,8 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 #endif // BUILT_PETSC_WITH_X11
 #endif // VIEW_MATRICES
     }
+    if( _rank == 0 )
+        std::cout << "done." << std::endl;
     
     _initialized = true;
 }
