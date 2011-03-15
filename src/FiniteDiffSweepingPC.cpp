@@ -625,7 +625,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
         MatCreate( _comm, &A );
         MatSetSizes( A, localSize, localSize, size, size );
-        MatSetType( A, MATMPISBAIJ );
+        MatSetType( A, MATSBAIJ );
         MatSetBlockSize( A, 1 );
         // TODO: Generalize this step for more stencils.
         MatMPISBAIJSetPreallocation( A, 1, 4, PETSC_NULL, 3, PETSC_NULL );
@@ -754,7 +754,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             MatSetSizes( D, localSize, localSize, size, size );
 
             // SBAIJ is required for symmetry support
-            MatSetType( D, MATMPISBAIJ ); 
+            MatSetType( D, MATSBAIJ ); 
             MatSetBlockSize( D, 1 );
 
             // Preallocate memory. This should be an upper bound for 7-point.
@@ -848,7 +848,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             }
         }
     }
-    else // _solver == MUMPS || _solver == SUPERLU_DIST
+    else // _solver in { ILU, ILUDT, MUMPS, SUPERLU_DIST }
     {
         // Our solver does not support symmetry, fill the entire matrices
         for( PetscInt m=0; m<numPanels; ++m )
@@ -864,7 +864,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
             const PetscInt size = _control.nx*_control.ny*zSize;
             MatSetSizes( D, localSize, localSize, size, size );
 
-            MatSetType( D, MATMPIAIJ );
+            MatSetType( D, MATAIJ );
 
             // Preallocate memory
             // TODO: Generalize this for more general stencils.
@@ -916,13 +916,33 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
 
             // Factor the matrix
             Mat& F = _paddedFactors[m];
-            if( _solver == MUMPS )
-                MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
-            else
-                MatGetFactor( D, MATSOLVERSUPERLU_DIST, MAT_FACTOR_LU, &F );
             MatFactorInfo luInfo;
-            luInfo.fill = 10.0; // TODO: Tweak/expose this
-            luInfo.dtcol = 1.e-6; // irrelevant for us?
+            if( _solver == ILU )
+            {
+                std::cout << "Using PETSC ILU...";
+                std::cout.flush();
+                MatGetFactor( D, MATSOLVERPETSC, MAT_FACTOR_ILU, &F );
+                luInfo.fill = 5.0; // TODO: Tweak/expose this
+                luInfo.dtcol = 0.1; // irrelevant for us?
+            }
+            else if( _solver == ILUDT )
+            {
+                MatGetFactor( D, MATSOLVERPETSC, MAT_FACTOR_ILUDT, &F );
+                luInfo.fill = 5.0; // TODO: Tweak/expose this
+                luInfo.dtcol = 0.1; // irrelevant for us?
+            }
+            else if( _solver == MUMPS )
+            {
+                MatGetFactor( D, MATSOLVERMUMPS, MAT_FACTOR_LU, &F );
+                luInfo.fill = 10.0; // TODO: Tweak/expose this
+                luInfo.dtcol = 0.1; // irrelevant for us?
+            }
+            else
+            {
+                MatGetFactor( D, MATSOLVERSUPERLU_DIST, MAT_FACTOR_LU, &F );
+                luInfo.fill = 10.0; // TODO: Tweak/expose this
+                luInfo.dtcol = 0.1; // irrelevant for us?
+            }
             IS perm;
             ISCreateStride( _comm, size, 0, 1, &perm );
             // The manual ordering does not seem to work very well...
@@ -986,7 +1006,7 @@ psp::FiniteDiffSweepingPC::Init( Vec& slowness, Mat& A )
         MatSetSizes
         ( B, localMatrixHeight, localMatrixWidth, matrixHeight, matrixWidth );
 
-        MatSetType( B, MATMPIAIJ );
+        MatSetType( B, MATAIJ );
 
         // Preallocate memory (go ahead and use one diagonal + one off-diagonal)
         // even though this is a gross overestimate (roughly factor of 10).

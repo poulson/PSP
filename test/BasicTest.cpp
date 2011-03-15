@@ -41,6 +41,8 @@ void Usage()
               << "  etay: width of PML in y direction\n"
               << "  etaz: width of PML in z direction\n"
               << "  planesPerPanel: number of xy planes to process per panel\n"
+              << "  factorization type: 0-ILU 1-ILUDT 2-MUMPS-SYMM 3-MUMPS "
+                 "4-SUPERLU_DIST\n"
               << "  numProcessRows\n"
               << "  numProcessCols\n" 
               << "  storeSlowness?: store slowness vec in parallel VTK file?\n"
@@ -71,7 +73,7 @@ main( int argc, char* argv[] )
     MPI_Comm_size( PETSC_COMM_WORLD, &size );
     MPI_Comm_rank( PETSC_COMM_WORLD, &rank ); 
 
-    if( argc < 17 )
+    if( argc < 18 )
     {
         if( rank == 0 )    
             Usage();
@@ -92,6 +94,7 @@ main( int argc, char* argv[] )
     const PetscReal etay = atof(argv[++argNum]);
     const PetscReal etaz = atof(argv[++argNum]);
     const PetscInt planesPerPanel = atoi(argv[++argNum]);
+    const PetscInt factorizationType = atoi(argv[++argNum]);
     const PetscInt numProcessRows = atoi(argv[++argNum]);
     const PetscInt numProcessCols = atoi(argv[++argNum]);
     const bool storeSlowness = atoi(argv[++argNum]);
@@ -121,9 +124,19 @@ main( int argc, char* argv[] )
     control.leftBC = psp::PML;
     control.bottomBC = psp::PML;
 
-    //psp::SparseDirectSolver solver = psp::MUMPS_SYMMETRIC;
-    //psp::SparseDirectSolver solver = psp::MUMPS;
-    psp::SparseDirectSolver solver = psp::SUPERLU_DIST;
+    psp::SparseDirectSolver solver;
+    if( factorizationType == 0 )
+        solver = psp::ILU;
+    else if( factorizationType == 1 )
+        solver = psp::ILUDT;
+    else if( factorizationType == 2 )
+        solver = psp::MUMPS_SYMMETRIC;
+    else if( factorizationType == 3 )
+        solver = psp::MUMPS;
+    else if( factorizationType == 4 )
+        solver = psp::SUPERLU_DIST;
+    else
+        throw std::logic_error("Invalid factorization type");
 
     psp::FiniteDiffSweepingPC context
     ( PETSC_COMM_WORLD, numProcessRows, numProcessCols, control, solver );
