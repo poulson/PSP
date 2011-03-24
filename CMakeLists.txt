@@ -22,7 +22,7 @@ cmake_minimum_required(VERSION 2.8)
 project(PSP)
 
 set(PSP_VERSION_MAJOR 0)
-set(PSP_VERSION_MINOR 1)
+set(PSP_VERSION_MINOR 2)
 
 option(RELEASE "Avoid unnecessary assertions." ON)
 option(VIEW_MATRICES "Print/draw the preconditioner matrices." OFF)
@@ -60,96 +60,6 @@ if(NOT PETSC_LIB)
   )
 endif(NOT PETSC_LIB)
 
-# Metis + ParMetis
-find_library(METIS_LIB NAMES metis HINTS ${PETSC_LIB_DIR})
-if(NOT METIS_LIB)
-  message(
-    FATAL_ERROR
-    "Could not find Metis library in PETSC_ARCH_DIR. Make sure PETSc built it."
-  )
-endif(NOT METIS_LIB)
-find_library(PARMETIS_LIB NAMES parmetis HINTS ${PETSC_LIB_DIR})
-if(NOT PARMETIS_LIB)
-  message(
-    FATAL_ERROR
-    "Could not find ParMetis lib in PETSC_ARCH_DIR. Make sure PETSc built it."
-  )
-endif(NOT PARMETIS_LIB)
-
-# MUMPS
-find_library(CMUMPS_LIB NAMES cmumps HINTS ${PETSC_LIB_DIR})
-find_library(DMUMPS_LIB NAMES dmumps HINTS ${PETSC_LIB_DIR})
-find_library(SMUMPS_LIB NAMES smumps HINTS ${PETSC_LIB_DIR})
-find_library(ZMUMPS_LIB NAMES zmumps HINTS ${PETSC_LIB_DIR})
-find_library(MUMPS_COMMON_LIB NAMES mumps_common HINTS ${PETSC_LIB_DIR})
-if(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
-   OR NOT MUMPS_COMMON_LIB)
-  message(
-    FATAL_ERROR "Could not find MUMPS libraries in PETSC_ARCH_DIR. Make sure they exist."
-  )
-endif(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
-      OR NOT MUMPS_COMMON_LIB)
-set(MUMPS_LIBS 
-  "${CMUMPS_LIB};${DMUMPS_LIB};${SMUMPS_LIB};${ZMUMPS_LIB};${MUMPS_COMMON_LIB}")
-
-# SuperLU
-find_library(SUPERLU_DIST_LIB NAMES superlu_dist_2.5 HINTS ${PETSC_LIB_DIR})
-if(NOT SUPERLU_DIST_LIB)
-  set(SUPERLU_DIST_LIB "")
-endif(NOT SUPERLU_DIST_LIB)
-
-# Scotch
-find_library(PTESMUMPS_LIB NAMES ptesmumps HINTS ${PETSC_LIB_DIR})
-find_library(PTSCOTCHPARMETIS_LIB NAMES ptscotchparmetis HINTS ${PETSC_LIB_DIR})
-find_library(PTSCOTCH_LIB NAMES ptscotch HINTS ${PETSC_LIB_DIR})
-find_library(PTSCOTCHERR_LIB NAMES ptscotcherr HINTS ${PETSC_LIB_DIR})
-find_library(PTSCOTCHERREXIT_LIB NAMES ptscotcherrexit HINTS ${PETSC_LIB_DIR})
-if(NOT PTESMUMPS_LIB)
-  message(FATAL_ERROR "Could not find ptesmumps lib for PT-SCOTCH")
-endif(NOT PTESMUMPS_LIB)
-if(NOT PTSCOTCHPARMETIS_LIB)
-  message(FATAL_ERROR "Could not find ptscotchparmetis lib for PT-SCOTCH")
-endif(NOT PTSCOTCHPARMETIS_LIB)
-if(NOT PTSCOTCH_LIB)
-  message(FATAL_ERROR "Could not find ptscotch lib for PT-SCOTCH")
-endif(NOT PTSCOTCH_LIB)
-if(NOT PTSCOTCHERR_LIB)
-  message(FATAL_ERROR "Could not find ptscotcherr lib for PT-SCOTCH")
-endif(NOT PTSCOTCHERR_LIB)
-if(NOT PTSCOTCHERREXIT_LIB)
-  message(FATAL_ERROR "Could not find ptscotcherrexit lib for PT-SCOTCH")
-endif(NOT PTSCOTCHERREXIT_LIB)
-set(SCOTCH_LIBS "")
-list(APPEND SCOTCH_LIBS "${PTESMUMPS_LIB}")
-list(APPEND SCOTCH_LIBS "${PTSCOTCHPARMETIS_LIB}")
-list(APPEND SCOTCH_LIBS "${PTSCOTCH_LIB}")
-list(APPEND SCOTCH_LIBS "${PTSCOTCHERR_LIB}")
-list(APPEND SCOTCH_LIBS "${PTSCOTCHERREXIT_LIB}")
-
-# PORD (linked but not used)
-find_library(PORD_LIB NAMES pord HINTS ${PETSC_LIB_DIR})
-if(NOT PORD_LIB)
-  message(WARNING "Could not find PORD using PETSC_ARCH_DIR.")
-endif(NOT PORD_LIB)
-
-# ScaLAPACK
-find_library(SCALAPACK_LIB NAMES scalapack HINTS ${PETSC_LIB_DIR})
-if(NOT SCALAPACK_LIB)
-  message(
-    FATAL_ERROR
-    "Could not find ScaLAPACK using PETSC_ARCH_DIR. Make sure PETSc built it."
-  )
-endif(NOT SCALAPACK_LIB)
-
-# BLACS
-find_library(BLACS_LIB NAMES blacs HINTS ${PETSC_LIB_DIR})
-if(NOT BLACS_LIB)
-  message(
-    FATAL_ERROR
-    "Could not find BLACS using PETSC_ARCH_DIR. Make sure PETSc build it."
-  )
-endif(NOT BLACS_LIB)
-
 # X11 library
 find_library(X11_LIB NAMES X11)
 if(NOT X11_LIB)
@@ -166,7 +76,7 @@ if(NOT DL_LIB)
   message(FATAL_ERROR "Could not find dl library.")
 endif(NOT DL_LIB)
 
-option(BUILD_TESTS "Build the test drivers" ON)
+#option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
 mark_as_advanced(AVOID_COMPLEX_MPI)
 
@@ -276,6 +186,39 @@ if(NEED_MATH)
   list(APPEND MATH_LIBS m)
 endif(NEED_MATH)
 
+# Look for restrict support
+include(CheckCXXSourceCompiles)
+set(RESTRICT_CODE
+    "int main(void)
+     {
+         int* RESTRICT a;
+         return 0;
+     }
+    ")
+set(CMAKE_REQUIRED_DEFINITIONS "-DRESTRICT=__restrict__")
+check_cxx_source_compiles("${RESTRICT_CODE}" HAVE___restrict__)
+if(HAVE___restrict__)
+  set(RESTRICT "__restrict__")
+  message(STATUS "Using __restrict__ keyword.")
+else(HAVE___restrict__)
+  set(CMAKE_REQUIRED_DEFINITIONS "-DRESTRICT=__restrict")
+  check_cxx_source_compiles("${RESTRICT_CODE}" HAVE___restrict)
+  if(HAVE___restrict)
+    set(RESTRICT "__restrict")
+    message(STATUS "Using __restrict keyword.")
+  else(HAVE___restrict)
+    set(CMAKE_REQUIRED_DEFINITIONS "-DRESTRICT=restrict")
+    check_cxx_source_compiles("${RESTRICT_CODE}" HAVE_restrict)
+    if(HAVE_restrict)
+      set(RESTRICT "restrict")
+      message(STATUS "Using restrict keyword.")
+    else(HAVE_restrict)
+      set(RESTRICT "")
+      message(STATUS "Could not find a restrict keyword.")
+    endif(HAVE_restrict)
+  endif(HAVE___restrict)
+endif(HAVE___restrict__)
+
 # Store all of our system-specific definitions
 configure_file( 
   ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
@@ -293,19 +236,13 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
-  set(TESTS BasicTest)
+  #set(TESTS BasicTest)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
 # to be linked last
 add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 set(EXTERNAL_LIBS "${PETSC_LIB}")
-list(APPEND EXTERNAL_LIBS "${MUMPS_LIBS}")
-list(APPEND EXTERNAL_LIBS "${SUPERLU_DIST_LIB}")
-list(APPEND EXTERNAL_LIBS "${SCOTCH_LIBS}")
-list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
-list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
-list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIB}")
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
 list(APPEND EXTERNAL_LIBS "${X11_LIB}")
 list(APPEND EXTERNAL_LIBS "${DL_LIB}")

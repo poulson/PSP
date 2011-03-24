@@ -18,13 +18,23 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HPP
-#define PSP_HPP 1
+#ifndef PSP_HMAT_FACTOR_MATRIX_HPP
+#define PSP_HMAT_FACTOR_MATRIX_HPP 1
 
-#include "mpi.h"
+namespace psp {
+namespace hmat {
 
-#include "psp/config.h"
+struct FactorMatrix
+{
+    PetscInt m; // height of matrix
+    PetscInt n; // width of matrix
+    PetscInt r; // rank of matrix
+    // A = U V^T
+    std::vector<PetscScalar> U; // buffer for m x r left set of vectors
+    std::vector<PetscScalar> V; // buffer for n x r right set of vectors
+};
 
-#include "psp/hmat.hpp"
+} // namespace hmat
+} // namespace psp
 
-#endif // PSP_HPP
+#endif // PSP_HMAT_FACTOR_MATRIX_HPP

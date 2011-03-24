@@ -18,13 +18,27 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HPP
-#define PSP_HPP 1
+#ifndef PSP_HMAT_SPARSE_MATRIX_HPP
+#define PSP_HMAT_SPARSE_MATRIX_HPP 1
 
-#include "mpi.h"
+namespace psp {
+namespace hmat {
 
-#include "psp/config.h"
+struct Entry
+{
+    PetscInt i;
+    PetscInt j;
+    PetscScalar value;
+};
 
-#include "psp/hmat.hpp"
+struct SparseMatrix
+{
+    PetscInt m; // height of matrix
+    PetscInt n; // width of matrix
+    std::vector<Entry> entries;
+};
 
-#endif // PSP_HPP
+} // namespace hmat
+} // namespace psp
+
+#endif // PSP_HMAT_SPARSE_MATRIX_HPP

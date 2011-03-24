@@ -28,4 +28,6 @@
 #cmakedefine VIEW_MATRICES
 #cmakedefine BUILT_PETSC_WITH_X11
 
+#define RESTRICT @RESTRICT@
+
 #endif /* PSP_CONFIG_H */

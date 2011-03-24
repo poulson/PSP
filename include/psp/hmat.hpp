@@ -18,13 +18,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HPP
-#define PSP_HPP 1
+#ifndef PSP_HMAT_HPP
+#define PSP_HMAT_HPP 1
 
-#include "mpi.h"
+#include "psp/hmat/factor_matrix.hpp"
+#include "psp/hmat/sparse_matrix.hpp"
 
-#include "psp/config.h"
-
-#include "psp/hmat.hpp"
-
-#endif // PSP_HPP
+#endif // PSP_HMAT_HPP
