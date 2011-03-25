@@ -186,6 +186,33 @@ if(NEED_MATH)
   list(APPEND MATH_LIBS m)
 endif(NEED_MATH)
 
+# Attempt to detect the BLAS/LAPACK underscore conventions. 
+# We currently only handle whether or not there is an underscore appended.
+include(CheckFunctionExists)
+set(CMAKE_REQUIRED_LIBRARIES ${MATH_LIBS})
+check_function_exists(daxpy HAVE_DAXPY)
+if(HAVE_DAXPY)
+  set(BLAS_POST FALSE)
+else(HAVE_DAXPY)
+  check_function_exists(daxpy_ HAVE_DAXPY_POST)
+  if(HAVE_DAXPY_POST)
+    set(BLAS_POST TRUE)
+  else(HAVE_DAXPY_POST)
+    message(FATAL_ERROR "Could not determine BLAS format.")
+  endif(HAVE_DAXPY_POST)
+endif(HAVE_DAXPY)
+check_function_exists(dpotrf HAVE_DPOTRF)
+if(HAVE_DPOTRF)
+  set(LAPACK_POST FALSE)
+else(HAVE_DPOTRF)
+  check_function_exists(dpotrf_ HAVE_DPOTRF_POST)
+  if(HAVE_DPOTRF_POST)
+    set(LAPACK_POST TRUE)
+  else(HAVE_DPOTRF_POST)
+    message(FATAL_ERROR "Could not determine LAPACK format.")
+  endif(HAVE_DPOTRF_POST)
+endif(HAVE_DPOTRF)
+
 # Look for restrict support
 include(CheckCXXSourceCompiles)
 set(RESTRICT_CODE

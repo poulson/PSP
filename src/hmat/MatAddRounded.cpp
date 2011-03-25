@@ -31,11 +31,13 @@
 // See Huckaby and Chan's 2004 paper:
 // "Stewart's pivoted QLP decomposition for low-rank matrices".
 //
-// TODO: 
-// Carefully consider whether or not we can avoid explicitly expanding our
-// low-rank form before performing the QR/QLP decomposition. My suspicion is no,
-// so perhaps we should instead aim for avoiding the buffer allocation cost by 
-// leaving one around.
+// The current implementation attempts to pack as many of the needed buffers
+// into one place and minimize data movement and flops as much as possible 
+// while still using BLAS3. This can be considered as most of the work towards
+// almost entirely avoiding memory allocation since we could keep a sufficiently
+// large buffer lying around and pack into it instead. This approach might be
+// overly complicated, but rounded addition is supposedly one of the most 
+// expensive parts of H-algebra.
 void psp::hmat::MatAddRounded
 ( const int maxRank,
   const PetscScalar alpha, 
@@ -173,22 +175,23 @@ void psp::hmat::MatAddRounded
     //   [r,6r): trash                                                        //
     //------------------------------------------------------------------------//
 
-    // Set up space in C
+    // Get C ready for the rounded factors
     C.m = m;
     C.n = n;
+    C.r = roundedRank;
     C.U.resize( m*roundedRank );
     C.V.resize( n*roundedRank );
 
     // Form the rounded C.U by first filling it with 
-    //  | S*U |, and then hitting it from the left with Q1
-    //  |  0  |
+    //  | S*U_Left |, and then hitting it from the left with Q1
+    //  |  0       |
     std::memset( &C.U[0], 0, m*roundedRank*sizeof(PetscScalar) );
     for( int j=0; j<roundedRank; ++j )
     {
         const PetscReal sigma = &realBuffer[j];
-        PetscScalar* UColOrig = &buffer[offset+blockSpace+j*r];
-        PetscScalar* UColScaled = &C.U[j*roundedRank];
-        for( int i=0; i<roundedRank; ++i )
+        const PetscScalar* RESTRICT UColOrig = &buffer[offset+blockSize+j*r];
+        PetscScalar* RESTRICT UColScaled = &C.U[j*m];
+        for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UColOrig[i];
     }
     // Apply Q1 and use the trashed R1 R2^H space for our work buffer
@@ -197,9 +200,20 @@ void psp::hmat::MatAddRounded
       &buffer[offset], blockSize );
 
     // Form the rounded C.V by first filling it with 
-    //  | conj(V^H) |, and then hitting it from the right with Q2
-    //  |     0     |
-    // HERE
+    //  | (VH_Top)^H |, and then hitting it from the left with Q2
+    //  |      0     |
+    std::memset( &C.V[0], 0, n*roundedRank*sizeof(PetscScalar) );
+    for( int j=0; j<roundedRank; ++j )
+    {
+        const PetscScalar* RESTRICT VRowOrig = &buffer[offset+2*blockSize+j];
+        PetscScalar* RESTRICT VColConj = &C.V[j*n];
+        for( int i=0; i<r; ++i )
+            VColConj = std::conj( VRowOrig[i*r] );
+    }
+    // Apply Q2 and use the trashed R1 R2^H space for our work buffer
+    lapack::ApplyQ
+    ( 'L', 'C', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
+      &C.V[0], C.n, &buffer[offset], blockSize );
 #endif
 }
 

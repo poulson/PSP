@@ -21,6 +21,8 @@
 #ifndef PSP_HMAT_HPP
 #define PSP_HMAT_HPP 1
 
+#include "psp/blas.hpp"
+#include "psp/lapack.hpp"
 #include "psp/hmat/factor_matrix.hpp"
 #include "psp/hmat/sparse_matrix.hpp"
 

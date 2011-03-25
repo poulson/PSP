@@ -25,6 +25,8 @@
 #define PSP_VERSION_MAJOR @PSP_VERSION_MAJOR@
 #define PSP_VERSION_MINOR @PSP_VERSION_MINOR@
 #cmakedefine RELEASE
+#cmakedefine BLAS_POST
+#cmakedefine LAPACK_POST
 #cmakedefine VIEW_MATRICES
 #cmakedefine BUILT_PETSC_WITH_X11
 

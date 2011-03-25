@@ -25,6 +25,8 @@
 
 #include "psp/config.h"
 
+#include "psp/blas.hpp"
+#include "psp/lapack.hpp"
 #include "psp/hmat.hpp"
 
 #endif // PSP_HPP
