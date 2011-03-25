@@ -22,7 +22,7 @@
 #include <cstring>
 
 // C := alpha A B
-void psp::hmat::FactorFactorMatMult
+void psp::hmat::MatMult
 ( const PetscScalar alpha, 
   const FactorMatrix& A, 
   const FactorMatrix& B, 
@@ -32,42 +32,42 @@ void psp::hmat::FactorFactorMatMult
     C.n = B.n;
     if( A.r < B.r )
     {
-        // C := A.U (alpha (A.V^T B.U) B.V^T)
+        // C := A.U (alpha (A.V^H B.U) B.V^H)
         C.r = A.r;
 
         // C.U := A.U
         C.U.resize( C.m*C.r );
         std::memcpy( &C.U[0], &A.U[0], C.m*C.r*sizeof(PetscScalar) );
 
-        // C.V := alpha B.V (B.U^T A.V)
+        // C.V := alpha B.V (B.U^H A.V)
         //
         // We need a temporary buffer of size B.r*A.r; for now, we will allocate
         // it on the fly, but eventually we may want to have a permanent buffer
         // of a fixed size.
         C.V.resize( C.n*C.r );
         std::vector<PetscScalar> W( B.r*A.r );
-        // W := B.U^T A.V
+        // W := B.U^H A.V
         Gemm
-        ( 'T', 'N', B.r, A.r, B.m, 
+        ( 'C', 'N', B.r, A.r, B.m, 
           1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
-        // C.V := alpha B.V W = alpha B.V (B.U^T A.V)
+        // C.V := alpha B.V W = alpha B.V (B.U^H A.V)
         Gemm
         ( 'N', 'N', C.n, C.r, B.r, 
           alpha, &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
     }
     else
     {
-        // C := (alpha A.U (A.V^T B.U)) B.V^T
+        // C := (alpha A.U (A.V^H B.U)) B.V^H
         C.r = B.r;
 
-        // C.U := alpha A.U (A.V^T B.U)
+        // C.U := alpha A.U (A.V^H B.U)
         C.U.resize( C.m*C.r );
         std::vector<PetscScalar> W( A.r*B.r );
-        // W := A.V^T B.U
+        // W := A.V^H B.U
         Gemm
-        ( 'T', 'N', A.r, B.r, A.n,
+        ( 'C', 'N', A.r, B.r, A.n,
           1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
-        // C.U := alpha A.U W = alpha A.U (A.V^T B.U)
+        // C.U := alpha A.U W = alpha A.U (A.V^H B.U)
         Gemm
         ( 'N', 'N', C.m, C.r, A.r,
           alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );

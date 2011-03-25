@@ -29,7 +29,7 @@ struct FactorMatrix
     PetscInt m; // height of matrix
     PetscInt n; // width of matrix
     PetscInt r; // rank of matrix
-    // A = U V^T
+    // A = U V^H
     std::vector<PetscScalar> U; // buffer for m x r left set of vectors
     std::vector<PetscScalar> V; // buffer for n x r right set of vectors
 };

@@ -22,7 +22,7 @@
 #include <cstring>
 
 // C := alpha A + beta B
-void psp::hmat::FactorFactorMatAdd
+void psp::hmat::MatAdd
 ( const PetscScalar alpha, 
   const FactorMatrix& A, 
   const PetscScalar beta,
