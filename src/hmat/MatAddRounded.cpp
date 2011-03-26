@@ -92,7 +92,7 @@ void psp::hmat::MatAddRounded
     const int lworkSVD = 4*r*r;
     std::vector<PetscScalar> buffer
     ( leftPanelSize+rightPanelSize+
-      std::max(std::max(leftPanelSize,rightPanelSize),3*blockSize+lworkSVD) );
+      std::max(std::max(leftPanelSize,rightPanelSize),2*blockSize+lworkSVD) );
 
     // Put [(alpha A.U), (beta B.U)] into the first 'leftPanelSize' entries of
     // our buffer and [A.V, B.V] into the next 'rightPanelSize' entries
@@ -129,7 +129,8 @@ void psp::hmat::MatAddRounded
     const int offset = leftPanelSize + rightPanelSize;
 
 #if defined(PIVOTED_QR)
-    // TODO: 
+    // TODO 
+    throw std::logic_error("Pivoted QR is not yet supported.");
 #else
     // Perform an unpivoted QR decomposition on [(alpha A.U), (beta B.U)]
     std::vector<PetscScalar> tauU( std::min( m, r ) );
@@ -183,20 +184,19 @@ void psp::hmat::MatAddRounded
     //  [offset,offset+blockSize): R1 R2^H                                    //
     //------------------------------------------------------------------------//
 
-    // Get the SVD of R1 R2^H
+    // Get the SVD of R1 R2^H, overwriting R1 R2^H with U
     std::vector<PetscReal> realBuffer( 6*r );
     lapack::SVD
-    ( 'A', 'A', r, r, &buffer[offset], r, &realBuffer[0], 
-      &buffer[offset+blockSize], r, &buffer[offset+2*blockSize], r, 
-      &buffer[offset+3*blockSize], lworkSVD, &realBuffer[r] );
+    ( 'O', 'A', r, r, &buffer[offset], r, 
+      &realBuffer[0], 0, 0, &buffer[offset+blockSize], r, 
+      &buffer[offset+2*blockSize], lworkSVD, &realBuffer[r] );
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
-    //  [0,leftPanelSize):                       qr([(alpha A.U),(beta B.U)]) //
-    //  [leftPanelSize,offset):                  qr([A.V, B.V])               //
-    //  [offset,offset+blockSize):               trash                        //
-    //  [offset+blockSize,offset+2*blockSize):   U of R1 R2^H                 //
-    //  [offset+2*blockSize,offset+3*blockSize): V^H of R1 R2^H               //
+    //  [0,leftPanelSize):                     qr([(alpha A.U),(beta B.U)])   //
+    //  [leftPanelSize,offset):                qr([A.V, B.V])                 //
+    //  [offset,offset+blockSize):             U of R1 R2^H                   //
+    //  [offset+blockSize,offset+2*blockSize): V^H of R1 R2^H                 //
     //                                                                        //
     // realBuffer contains:                                                   //
     //   [0,r): singular values of R1 R2^H                                    //
@@ -216,12 +216,12 @@ void psp::hmat::MatAddRounded
     for( int j=0; j<roundedRank; ++j )
     {
         const PetscReal sigma = &realBuffer[j];
-        const PetscScalar* RESTRICT UColOrig = &buffer[offset+blockSize+j*r];
+        const PetscScalar* RESTRICT UColOrig = &buffer[offset+j*r];
         PetscScalar* RESTRICT UColScaled = &C.U[j*m];
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UColOrig[i];
     }
-    // Apply Q1 and use the trashed R1 R2^H space for our work buffer
+    // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
     ( 'L', 'C', m, roundedRank, r, &buffer[0], C.m, &tauU[0], &C.U[0], C.m, 
       &buffer[offset], blockSize );
@@ -232,12 +232,12 @@ void psp::hmat::MatAddRounded
     std::memset( &C.V[0], 0, n*roundedRank*sizeof(PetscScalar) );
     for( int j=0; j<roundedRank; ++j )
     {
-        const PetscScalar* RESTRICT VRowOrig = &buffer[offset+2*blockSize+j];
+        const PetscScalar* RESTRICT VRowOrig = &buffer[offset+blockSize+j];
         PetscScalar* RESTRICT VColConj = &C.V[j*n];
         for( int i=0; i<r; ++i )
             VColConj = std::conj( VRowOrig[i*r] );
     }
-    // Apply Q2 and use the trashed R1 R2^H space for our work buffer
+    // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
     ( 'L', 'C', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
       &C.V[0], C.n, &buffer[offset], blockSize );

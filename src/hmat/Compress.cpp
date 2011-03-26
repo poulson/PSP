@@ -40,10 +40,11 @@ void psp::hmat::Compress
     const int blockSize = r*r;
     const int lworkSVD = 4*r*r;
     std::vector<PetscScalar> buffer
-    ( 3*blockSize+std::max(lworkSVD,std::max(leftPanelSize,rightPanelSize)) );
+    ( 2*blockSize+std::max(lworkSVD,std::max(leftPanelSize,rightPanelSize)) );
 
 #if defined(PIVOTED_QR)
-    // TODO: 
+    // TODO
+    throw std::logic_error("Pivoted QR is not yet supported.");
 #else
     // Perform an unpivoted QR decomposition on A.U
     std::vector<PetscScalar> tauU( std::min( m, r ) );
@@ -86,25 +87,23 @@ void psp::hmat::Compress
     //  [0,blockSize): R1 R2^H                                                //
     //------------------------------------------------------------------------//
 
-    // Get the SVD of R1 R2^H
+    // Get the SVD of R1 R2^H, overwriting R1 R2^H with U
     std::vector<PetscReal> realBuffer( 6*r );
     lapack::SVD
-    ( 'A', 'A', r, r, &buffer[0], r,
-      &realBuffer[0], &buffer[blockSize], r, &buffer[2*blockSize], r, 
-      &buffer[3*blockSize], lworkSVD, &realBuffer[r] );
+    ( 'O', 'A', r, r, &buffer[0], r, 0, 0, r, &buffer[blockSize], r, 
+      &buffer[2*blockSize], lworkSVD, &realBuffer[r] );
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
-    //  [0,blockSize):             trash                                      //
-    //  [blockSize,2*blockSize):   U of R1 R2^H                               //
-    //  [2*blockSize,3*blockSize): V^H of R1 R2^H                             //
+    //  [0,blockSize):           U of R1 R2^H                                 //
+    //  [blockSize,2*blockSize): V^H of R1 R2^H                               //
     //                                                                        //
     // realBuffer contains:                                                   //
     //   [0,r): singular values of R1 R2^H                                    //
     //------------------------------------------------------------------------//
 
     // Copy the result of the QR factorization of A.U into a temporary buffer
-    std::memcpy( &buffer[3*blockSize], &A.U[0], m*r*sizeof(PetscScalar) );
+    std::memcpy( &buffer[2*blockSize], &A.U[0], m*r*sizeof(PetscScalar) );
     // Logically shrink A.U
     A.U.resize( m*roundedRank );
     // Zero the shrunk buffer
@@ -113,18 +112,18 @@ void psp::hmat::Compress
     for( int j=0; j<roundedRank; ++j )
     {
         const PetscReal sigma = &realBuffer[j];
-        const PetscScalar* RESTRICT UColOrig = &buffer[blocksize+j*r];
+        const PetscScalar* RESTRICT UColOrig = &buffer[j*r];
         PetscScalar* RESTRICT UColScaled = &A.U[j*m];
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UColOrig[i];
     }
     // Hit the matrix from the left with Q1 from the QR decomp of the orig A.U
     lapack::ApplyQ
-    ( 'L', 'C', m, roundedRank, r, &buffer[3*blockSize], m, &tauU[0], 
+    ( 'L', 'C', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
       &A.U[0], m, &buffer[0], blockSize );
 
     // Copy the result of the QR factorization of A.V into a temporary buffer
-    std::memcpy( &buffer[3*blockSize], &A.V[0], n*r*sizeof(PetscScalar) );
+    std::memcpy( &buffer[2*blockSize], &A.V[0], n*r*sizeof(PetscScalar) );
     // Logically shrink A.V
     A.V.resize( n*roundedRank );
     // Zero the shrunk buffer
@@ -132,14 +131,14 @@ void psp::hmat::Compress
     // Copy the conj-trans of V from the SVD of R1 R2^H into the top of A.V
     for( int j=0; j<roundedRank; ++j )
     {
-        const PetscScalar* RESTRICT VRowOrig = &buffer[2*blockSize+j];
+        const PetscScalar* RESTRICT VRowOrig = &buffer[blockSize+j];
         PetscScalar* RESTRICT VColConj = &A.V[j*n];
         for( int i=0; i<r; ++i )
             VColConj = std::conj( VRowOrig[i*r] );
     }
     // Hit the matrix from the left with Q2 from the QR decomp of the orig A.V
     lapack::ApplyQ
-    ( 'L', 'C', n, roundedRank, r, &buffer[3*blockSize], n, &tauV[0],
+    ( 'L', 'C', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
       &A.V[0], n, &buffer[0], blockSize );
 #endif // PIVOTED_QR
 
