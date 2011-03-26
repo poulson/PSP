@@ -24,7 +24,7 @@
 // A :~= A
 //
 // Approximate A with a given maximum rank.
-void psp::hmat::Compress
+void psp::HMatrix::Compress
 ( int maxRank, FactorMatrix& A )
 {
     const int m = A.m;

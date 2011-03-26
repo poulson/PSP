@@ -22,7 +22,7 @@
 #include <cstring>
 
 // C := alpha A B
-void psp::hmat::MatMult
+void psp::HMatrix::MatrixMultiply
 ( PetscScalar alpha, const FactorMatrix& A, const FactorMatrix& B, 
                            FactorMatrix& C )
 {

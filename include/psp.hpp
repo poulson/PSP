@@ -27,6 +27,6 @@
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
-#include "psp/hmat.hpp"
+#include "psp/hmatrix.hpp"
 
 #endif // PSP_HPP

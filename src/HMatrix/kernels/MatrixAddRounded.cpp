@@ -38,7 +38,7 @@
 // large buffer lying around and pack into it instead. This approach might be
 // overly complicated, but rounded addition is supposedly one of the most 
 // expensive parts of H-algebra.
-void psp::hmat::MatAddRounded
+void psp::HMatrix::MatrixAddRounded
 ( int maxRank,
   PetscScalar alpha, const FactorMatrix& A, 
   PetscScalar beta,  const FactorMatrix& B, 

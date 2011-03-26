@@ -22,7 +22,7 @@
 #include <cstring>
 
 // y := alpha A x + beta y
-void psp::hmat::MatVec
+void psp::HMatrix::MatrixVector
 ( PetscScalar alpha, const FactorMatrix& A, const std::vector<PetscScalar>& x,
   PetscScalar beta,                               std::vector<PetscScalar>& y )
 {
@@ -37,7 +37,7 @@ void psp::hmat::MatVec
 }
 
 // y := alpha A x
-void psp::hmat::MatVec
+void psp::HMatrix::MatrixVector
 ( PetscScalar alpha, const FactorMatrix& A, const std::vector<PetscScalar>& x,
                                                   std::vector<PetscScalar>& y )
 {
