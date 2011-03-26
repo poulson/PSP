@@ -26,4 +26,42 @@
 #include "psp/hmat/factor_matrix.hpp"
 #include "psp/hmat/sparse_matrix.hpp"
 
+namespace psp {
+namespace hmat {
+
+// Ensure that the matrix A has a rank of at most 'maxRank'
+void Compress( int maxRank, FactorMatrix& A );
+
+// Generalized add of two factor matrices, C := alpha A + beta B
+void MatAdd
+( PetscScalar alpha, const FactorMatrix& A,
+  PetscScalar beta,  const FactorMatrix& B,
+                           FactorMatrix& C );
+
+// Generalized add of two factor matrices, C := alpha A + beta B, 
+// where C is then forced to be of rank at most 'maxRank'
+void MatAddRounded
+( int maxRank,
+  PetscScalar alpha, const FactorMatrix& A,
+  PetscScalar beta,  const FactorMatrix& B,
+                           FactorMatrix& C );
+
+// C := alpha A B
+void MatMult
+( PetscScalar alpha, const FactorMatrix& A, const FactorMatrix& B,
+                           FactorMatrix& C );
+
+// y := alpha A x + beta y
+void MatVec
+( PetscScalar alpha, const FactorMatrix& A, const std::vector<PetscScalar>& x,
+  PetscScalar beta,                               std::vector<PetscScalar>& y );
+
+// y := alpha A x
+void MatVec
+( PetscScalar alpha, const FactorMatrix& A, const std::vector<PetscScalar>& x,
+                                                  std::vector<PetscScalar>& y );
+ 
+} // namespace hmat
+} // namespace psp
+
 #endif // PSP_HMAT_HPP

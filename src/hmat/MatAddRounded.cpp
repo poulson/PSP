@@ -39,17 +39,51 @@
 // overly complicated, but rounded addition is supposedly one of the most 
 // expensive parts of H-algebra.
 void psp::hmat::MatAddRounded
-( const int maxRank,
-  const PetscScalar alpha, 
-  const FactorMatrix& A, 
-  const PetscScalar beta,
-  const FactorMatrix& B, 
-        FactorMatrix& C )
+( int maxRank,
+  PetscScalar alpha, const FactorMatrix& A, 
+  PetscScalar beta,  const FactorMatrix& B, 
+                           FactorMatrix& C )
 {
     const int m = A.m;
     const int n = A.n;
     const int r = A.r + B.r;
     const int roundedRank = std::min( r, maxRank );
+
+    // Early exit if possible
+    if( roundedRank == r )
+    {
+        C.m = m;
+        C.n = n;
+        C.r = r;
+        C.U.resize( m*r );
+        C.V.resize( n*r );
+
+        // Copy alpha A.U into the left half of C.U
+        {
+            const int Ar = A.r;
+            PetscScalar* RESTRICT packedAU = &C.U[0];
+            const PetscScalar* RESTRICT AU = &A.U[0];
+            for( int j=0; j<Ar; ++j )
+                for( int i=0; i<m; ++i )
+                    packedAU[i+j*m] = alpha*AU[i+j*m];
+        }
+        // Copy beta B.U into the right half of C.U
+        {
+            const int Br = B.r;
+            PetscScalar* RESTRICT packedBU = &C.U[m*Ar];
+            const PetscScalar* RESTRICT BU = &B.U[0];
+            for( int j=0; j<Br; ++j )
+                for( int i=0; i<m; ++i )
+                    packedBU[i+j*m] = beta*BU[i+j*m];
+        }
+
+        // Copy A.V into the left half of C.V
+        std::memcpy( &C.V[0], &A.V[0], n*A.r*sizeof(PetscScalar) );
+        // Copy B.V into the right half of C.V
+        std::memcpy( &C.V[n*A.r], &B.V[0], n*B.r*sizeof(PetscScalar) );
+
+        return;
+    }
 
     // Grab enough workspace for our entire rounded addition
     const int leftPanelSize = m*r;
@@ -67,8 +101,8 @@ void psp::hmat::MatAddRounded
         const int Ar = A.r;
         PetscScalar* RESTRICT packedAU = &buffer[0];
         const PetscScalar* RESTRICT AU = &A.U[0];
-        for( PetscInt j=0; j<Ar; ++j )
-            for( PetscInt i=0; i<m; ++i )
+        for( int j=0; j<Ar; ++j )
+            for( int i=0; i<m; ++i )
                 packedAU[i+j*m] = alpha*AU[i+j*m];
     }
     // Copy in (beta B.U)
@@ -76,8 +110,8 @@ void psp::hmat::MatAddRounded
         const int Br = B.r;
         PetscScalar* RESTRICT packedBU = &buffer[m*A.r];
         const PetscScalar* RESTRICT BU = &B.U[0];
-        for( PetscInt j=0; j<Br; ++j )
-            for( PetscInt i=0; i<m; ++i )
+        for( int j=0; j<Br; ++j )
+            for( int i=0; i<m; ++i )
                 packedBU[i+j*m] = beta*BU[i+j*m];
     }
     // Copy in A.V
@@ -95,13 +129,7 @@ void psp::hmat::MatAddRounded
     const int offset = leftPanelSize + rightPanelSize;
 
 #if defined(PIVOTED_QR)
-    // Perform a pivoted QR decomposition on A.U
-
-    // Perform a pivoted QR decomposition on A.V
-
     // TODO: 
-    // Form the compressed sum using the truncated SVD of R1 R2^H.
-
 #else
     // Perform an unpivoted QR decomposition on [(alpha A.U), (beta B.U)]
     std::vector<PetscScalar> tauU( std::min( m, r ) );
@@ -172,7 +200,6 @@ void psp::hmat::MatAddRounded
     //                                                                        //
     // realBuffer contains:                                                   //
     //   [0,r): singular values of R1 R2^H                                    //
-    //   [r,6r): trash                                                        //
     //------------------------------------------------------------------------//
 
     // Get C ready for the rounded factors
@@ -214,6 +241,6 @@ void psp::hmat::MatAddRounded
     lapack::ApplyQ
     ( 'L', 'C', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
       &C.V[0], C.n, &buffer[offset], blockSize );
-#endif
+#endif // PIVOTED_QR
 }
 

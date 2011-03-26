@@ -23,11 +23,9 @@
 
 // C := alpha A + beta B
 void psp::hmat::MatAdd
-( const PetscScalar alpha, 
-  const FactorMatrix& A, 
-  const PetscScalar beta,
-  const FactorMatrix& B, 
-        FactorMatrix& C )
+( PetscScalar alpha, const FactorMatrix& A, 
+  PetscScalar beta,  const FactorMatrix& B, 
+                           FactorMatrix& C )
 {
     C.m = A.m;
     C.n = A.n;
@@ -37,22 +35,22 @@ void psp::hmat::MatAdd
     C.U.resize( C.m*C.r );
     // Copy in (alpha A.U)
     {
-        const PetscInt r = A.r;
-        const PetscInt m = A.m;
+        const int r = A.r;
+        const int m = A.m;
         PetscScalar* RESTRICT CU_A = &C.U[0];
         const PetscScalar* RESTRICT AU = &A.U[0]; 
-        for( PetscInt j=0; j<r; ++j )
-            for( PetscInt i=0; i<m; ++i )
+        for( int j=0; j<r; ++j )
+            for( int i=0; i<m; ++i )
                 CU_A[i+j*m] = alpha*AU[i+j*m];
     }
     // Copy in (beta B.U)
     {
-        const PetscInt r = B.r;
-        const PetscInt m = A.m;
+        const int r = B.r;
+        const int m = A.m;
         PetscScalar* RESTRICT CU_B = &C.U[C.m*A.r];
         const PetscScalar* RESTRICT BU = &B.U[0];
-        for( PetscInt j=0; j<r; ++j )
-            for( PetscInt i=0; i<m; ++i )
+        for( int j=0; j<r; ++j )
+            for( int i=0; i<m; ++i )
                 CU_B[i+j*m] = beta*BU[i+j*m];
     }
 
