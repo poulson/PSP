@@ -18,16 +18,23 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HPP
-#define PSP_HPP 1
+#ifndef PSP_SPARSE_MATRIX_HPP
+#define PSP_SPARSE_MATRIX_HPP 1
 
-#include "mpi.h"
+namespace psp {
 
-#include "psp/config.h"
+// A simple Compressed Sparse Row (CSR) data structure
+struct SparseMatrix
+{
+    int m; // height of matrix
+    int n; // width of matrix
+    std::vector<PetscScalar> nonzeros;
+    std::vector<int> columnIndices;
+    std::vector<int> rowOffsets;
 
-#include "psp/blas.hpp"
-#include "psp/lapack.hpp"
-#include "psp/sparse_matrix.hpp"
-#include "psp/hmatrix.hpp"
+    // TODO: Routines for outputting in Matlab and PETSc formats?
+};
 
-#endif // PSP_HPP
+} // namespace psp
+
+#endif // PSP_SPARSE_MATRIX_HPP

@@ -23,6 +23,7 @@
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
+#include "psp/sparse_matrix.hpp"
 
 namespace psp {
 
@@ -90,22 +91,6 @@ class HMatrix
       const std::vector<int>& originalMap );
 
 public:
-
-    // For storing a single entry of a sparse matrix
-    struct Entry
-    {
-        int i;
-        int j;
-        PetscScalar value;
-    };
-
-    // A basic sparse matrix representation
-    struct SparseMatrix
-    {
-        int m; // height of matrix
-        int n; // width of matrix
-        std::vector<Entry> entries;
-    };
 
     // TODO: Application and construction/destruction routines
 
