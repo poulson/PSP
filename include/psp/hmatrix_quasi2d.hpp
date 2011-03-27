@@ -18,16 +18,15 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HMATRIX_HPP
-#define PSP_HMATRIX_HPP 1
+#ifndef PSP_HMATRIX_QUASI2D_HPP
+#define PSP_HMATRIX_QUASI2D_HPP 1
 
 #include "psp/hmatrix_tools.hpp"
 
 namespace psp {
 
-// For now will require that it be an H-matrix for a quasi-2d domain.
 template<typename Scalar>
-class HMatrix
+class HMatrixQuasi2d
 {
 
 public:
@@ -38,4 +37,4 @@ public:
 
 } // namespace psp
 
-#endif // PSP_HMATRIX_HPP
+#endif // PSP_HMATRIX_QUASI2D_HPP

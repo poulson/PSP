@@ -67,18 +67,17 @@ void RecurseOnQuadrant
 
 } // anonymous namespace
 
-// Recursively form the map from natural to hierarchical ordering
-void psp::hmatrix_tools::BuildNaturalToHierarchicalMap
-( std::vector<int>& naturalToHierarchicalMap, int numLevels, 
-  int xSize, int ySize, int zSize )
+// Recursively form the map from natural to hierarchical ordering for a quasi-2d
+// domain (i.e., we do not partition in the z dimension)
+void psp::hmatrix_tools::BuildNaturalToHierarchicalQuasi2dMap
+( std::vector<int>& map, int numLevels, int xSize, int ySize, int zSize )
 {
-    naturalToHierarchicalMap.resize( xSize*ySize*zSize );
+    map.resize( xSize*ySize*zSize );
 
     // Fill the mapping from the 'natural' x-y-z ordering
     int index = 0;
     RecurseOnQuadrant
-    ( &naturalToHierarchicalMap[0], index, 0, numLevels,
-      xSize, ySize, zSize, xSize, ySize );
+    ( &map[0], index, 0, numLevels, xSize, ySize, zSize, xSize, ySize );
 #ifndef RELEASE
     if( index != xSize*ySize*zSize )
         throw std::logic_error("Map recursion is incorrect.");

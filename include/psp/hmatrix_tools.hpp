@@ -137,9 +137,8 @@ void MatrixVector
 //----------------------------------------------------------------------------//
 // For mapping between different orderings                                    //
 //----------------------------------------------------------------------------//
-void BuildNaturalToHierarchicalMap
-( std::vector<int>& naturalToHierarchicalMap, int numLevels,
-  int xSize, int ySize, int zSize );
+void BuildNaturalToHierarchicalQuasi2dMap
+( std::vector<int>& map, int numLevels, int xSize, int ySize, int zSize );
 
 void InvertMap
 (       std::vector<int>& invertedMap,
