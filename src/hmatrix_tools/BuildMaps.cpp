@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
-#include <cstring>
 
 namespace {
 
@@ -69,7 +68,7 @@ void RecurseOnQuadrant
 } // anonymous namespace
 
 // Recursively form the map from natural to hierarchical ordering
-void psp::HMatrix::BuildNaturalToHierarchicalMap
+void psp::hmatrix_tools::BuildNaturalToHierarchicalMap
 ( std::vector<int>& naturalToHierarchicalMap, int numLevels, 
   int xSize, int ySize, int zSize )
 {
@@ -88,7 +87,7 @@ void psp::HMatrix::BuildNaturalToHierarchicalMap
 
 // We can use this to generate the hierarchical -> natural map from the 
 // natural -> hierarchical map
-void psp::HMatrix::InvertMap
+void psp::hmatrix_tools::InvertMap
 (       std::vector<int>& invertedMap, 
   const std::vector<int>& originalMap )
 {

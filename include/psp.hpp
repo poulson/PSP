@@ -22,12 +22,27 @@
 #define PSP_HPP 1
 
 #include "mpi.h"
+#include <complex>
 
 #include "psp/config.h"
 
+namespace psp {
+
+template<typename Real>
+inline Real
+Conj( const Real alpha )
+{ return alpha; }
+
+template<typename Real>
+inline std::complex<Real>
+Conj( const std::complex<Real> alpha )
+{ return std::conj( alpha ); }
+
+} // namespace psp
+
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
-#include "psp/sparse_matrix.hpp"
+#include "psp/hmatrix_tools.hpp"
 #include "psp/hmatrix.hpp"
 
 #endif // PSP_HPP

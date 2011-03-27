@@ -19,12 +19,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
-#include <cstring>
 
 // C := alpha A B
-void psp::HMatrix::MatrixMultiply
-( PetscScalar alpha, const FactorMatrix& A, const FactorMatrix& B, 
-                           FactorMatrix& C )
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixMultiply
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar>& B, 
+                      FactorMatrix<Scalar>& C )
 {
     C.m = A.m;
     C.n = B.n;
@@ -35,7 +36,7 @@ void psp::HMatrix::MatrixMultiply
 
         // C.U := A.U
         C.U.resize( C.m*C.r );
-        std::memcpy( &C.U[0], &A.U[0], C.m*C.r*sizeof(PetscScalar) );
+        std::memcpy( &C.U[0], &A.U[0], C.m*C.r*sizeof(Scalar) );
 
         // C.V := alpha B.V (B.U^H A.V)
         //
@@ -43,7 +44,7 @@ void psp::HMatrix::MatrixMultiply
         // it on the fly, but eventually we may want to have a permanent buffer
         // of a fixed size.
         C.V.resize( C.n*C.r );
-        std::vector<PetscScalar> W( B.r*A.r );
+        std::vector<Scalar> W( B.r*A.r );
         // W := B.U^H A.V
         blas::Gemm
         ( 'C', 'N', B.r, A.r, B.m, 
@@ -60,7 +61,7 @@ void psp::HMatrix::MatrixMultiply
 
         // C.U := alpha A.U (A.V^H B.U)
         C.U.resize( C.m*C.r );
-        std::vector<PetscScalar> W( A.r*B.r );
+        std::vector<Scalar> W( A.r*B.r );
         // W := A.V^H B.U
         blas::Gemm
         ( 'C', 'N', A.r, B.r, A.n,
@@ -72,7 +73,23 @@ void psp::HMatrix::MatrixMultiply
 
         // C.V := B.V
         C.V.resize( C.n*C.r );
-        std::memcpy( &C.V[0], &B.V[0], C.n*C.r*sizeof(PetscScalar) );
+        std::memcpy( &C.V[0], &B.V[0], C.n*C.r*sizeof(Scalar) );
     }
 }
 
+template void psp::hmatrix_tools::MatrixMultiply
+( float alpha, const FactorMatrix<float>& A,
+               const FactorMatrix<float>& B,
+                     FactorMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( double alpha, const FactorMatrix<double>& A,
+                const FactorMatrix<double>& B,
+                      FactorMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+                             const FactorMatrix< std::complex<float> >& B,
+                                   FactorMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+                              const FactorMatrix< std::complex<double> >& B,
+                                    FactorMatrix< std::complex<double> >& C );

@@ -19,13 +19,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
-#include <cstring>
 
 // C := alpha A + beta B
-void psp::HMatrix::MatrixAdd
-( PetscScalar alpha, const FactorMatrix& A, 
-  PetscScalar beta,  const FactorMatrix& B, 
-                           FactorMatrix& C )
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixAdd
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+  Scalar beta,  const FactorMatrix<Scalar>& B, 
+                      FactorMatrix<Scalar>& C )
 {
     C.m = A.m;
     C.n = A.n;
@@ -37,8 +37,8 @@ void psp::HMatrix::MatrixAdd
     {
         const int r = A.r;
         const int m = A.m;
-        PetscScalar* RESTRICT CU_A = &C.U[0];
-        const PetscScalar* RESTRICT AU = &A.U[0]; 
+        Scalar* RESTRICT CU_A = &C.U[0];
+        const Scalar* RESTRICT AU = &A.U[0]; 
         for( int j=0; j<r; ++j )
             for( int i=0; i<m; ++i )
                 CU_A[i+j*m] = alpha*AU[i+j*m];
@@ -47,8 +47,8 @@ void psp::HMatrix::MatrixAdd
     {
         const int r = B.r;
         const int m = A.m;
-        PetscScalar* RESTRICT CU_B = &C.U[C.m*A.r];
-        const PetscScalar* RESTRICT BU = &B.U[0];
+        Scalar* RESTRICT CU_B = &C.U[C.m*A.r];
+        const Scalar* RESTRICT BU = &B.U[0];
         for( int j=0; j<r; ++j )
             for( int i=0; i<m; ++i )
                 CU_B[i+j*m] = beta*BU[i+j*m];
@@ -56,7 +56,23 @@ void psp::HMatrix::MatrixAdd
 
     // C.V := [A.V B.V]
     C.V.resize( C.n*C.r );
-    std::memcpy( &C.V[0], &A.V[0], C.n*A.r*sizeof(PetscScalar) );
-    std::memcpy( &C.V[C.n*A.r], &B.V[0], C.n*B.r*sizeof(PetscScalar) );
+    std::memcpy( &C.V[0], &A.V[0], C.n*A.r*sizeof(Scalar) );
+    std::memcpy( &C.V[C.n*A.r], &B.V[0], C.n*B.r*sizeof(Scalar) );
 }
 
+template void psp::hmatrix_tools::MatrixAdd
+( float alpha, const FactorMatrix<float>& A,
+  float beta,  const FactorMatrix<float>& B,
+                     FactorMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( double alpha, const FactorMatrix<double>& A,
+  double beta,  const FactorMatrix<double>& B,
+                      FactorMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+  std::complex<float> beta,  const FactorMatrix< std::complex<float> >& B,
+                                   FactorMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+  std::complex<double> beta,  const FactorMatrix< std::complex<double> >& B,
+                                    FactorMatrix< std::complex<double> >& C );
