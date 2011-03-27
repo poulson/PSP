@@ -18,22 +18,23 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HMAT_HPP
-#define PSP_HMAT_HPP 1
+#ifndef PSP_HMATRIX_HPP
+#define PSP_HMATRIX_HPP 1
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
 
 namespace psp {
 
+// For now will require that it be an H-matrix for a quasi-2d domain.
 class HMatrix
 {
     // A basic low-rank matrix respresentation
     struct FactorMatrix
     {
-        PetscInt m; // height of matrix
-        PetscInt n; // width of matrix
-        PetscInt r; // rank of matrix
+        int m; // height of matrix
+        int n; // width of matrix
+        int r; // rank of matrix
         // A = U V^H
         std::vector<PetscScalar> U; // buffer for m x r left set of vectors
         std::vector<PetscScalar> V; // buffer for n x r right set of vectors
@@ -77,24 +78,34 @@ class HMatrix
                          const std::vector<PetscScalar>& x,
                                std::vector<PetscScalar>& y );
 
+    //------------------------------------------------------------------------//
+    // For mapping between different orderings                                //
+    //------------------------------------------------------------------------//
+    static void BuildNaturalToHierarchicalMap
+    ( std::vector<int>& naturalToHierarchicalMap, int numLevels,
+      int xSize, int ySize, int zSize );
+
+    static void InvertMap
+    (       std::vector<int>& invertedMap,
+      const std::vector<int>& originalMap );
+
 public:
 
     // For storing a single entry of a sparse matrix
     struct Entry
     {
-        PetscInt i;
-        PetscInt j;
+        int i;
+        int j;
         PetscScalar value;
     };
 
     // A basic sparse matrix representation
     struct SparseMatrix
     {
-        PetscInt m; // height of matrix
-        PetscInt n; // width of matrix
+        int m; // height of matrix
+        int n; // width of matrix
         std::vector<Entry> entries;
     };
-
 
     // TODO: Application and construction/destruction routines
 
