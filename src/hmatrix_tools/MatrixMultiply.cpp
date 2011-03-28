@@ -20,13 +20,62 @@
 */
 #include "psp.hpp"
 
-// C := alpha A B
+// TODO: Decide whether or not to add in tranposition options. It would seem
+//       that they are not needed for our current problem.
+
+// Dense C := alpha A B
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B, 
+                      DenseMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.n != B.m )
+        throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( A.symmetric && B.symmetric )
+        throw std::logic_error("Product of symmetric matrices not supported.");
+#endif
+    C.m = A.m;
+    C.n = B.n;
+    C.ldim = C.m;
+    C.buffer.resize( C.ldim*C.n );
+    C.symmetric = false;
+
+    if( A.symmetric )
+    {
+        blas::Symm
+        ( 'L', 'L', C.m, C.n,
+          alpha, &A.buffer[0], A.ldim, &B.buffer[0], B.ldim, 
+          0, &C.buffer[0], C.ldim );
+    }
+    else if( B.symmetric )
+    {
+        blas::Symm
+        ( 'R', 'L', C.m, C.n,
+          alpha, &B.buffer[0], B.ldim, &A.buffer[0], A.ldim,
+          0, &C.buffer[0], C.ldim );
+    }
+    else
+    {
+        blas::Gemm
+        ( 'N', 'N', C.m, C.n, A.n,
+          alpha, &A.buffer[0], A.ldim, &B.buffer[0], B.ldim,
+          0, &C.buffer[0], C.ldim );
+    }
+}
+
+// Low-rank C := alpha A B
 template<typename Scalar>
 void psp::hmatrix_tools::MatrixMultiply
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar>& B, 
                       FactorMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    if( A.n != B.m )
+        throw std::logic_error("Cannot multiply nonconformal matrices.");
+#endif
     C.m = A.m;
     C.n = B.n;
     if( A.r < B.r )
@@ -77,6 +126,106 @@ void psp::hmatrix_tools::MatrixMultiply
     }
 }
 
+// Form a factor matrix from a dense matrix times a factor matrix
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar>& B, 
+                      FactorMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.n != B.m )
+        throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( A.symmetric && A.m != A.n )
+        throw std::logic_error("Nonsquare matrices cannot be symmetric.");
+#endif
+    C.m = A.m;
+    C.n = B.n;
+    C.r = B.r;
+
+    // Form C.U := A B.U
+    if( A.symmetric )
+    {
+        blas::Symm
+        ( 'L', 'L', C.m, C.r, 
+          alpha, &A.buffer[0], A.ldim, &B.U[0], B.m, 0, &C.U[0], C.m );
+    }
+    else
+    {
+        blas::Gemm
+        ( 'N', 'N', C.m, C.r, A.n,
+          alpha, &A.buffer[0], A.ldim, &B.U[0], B.m, 0, &C.U[0], C.m );
+    }
+
+    // Form C.V := B.V
+    std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+}
+
+// Form a factor matrix from a factor matrix times a dense matrix
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixMultiply
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B, 
+                      FactorMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.n != B.m )
+        throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( B.symmetric && B.m != B.n )
+        throw std::logic_error("Nonsquare matrices cannot be symmetric.");
+#endif
+    C.m = A.m;
+    C.n = B.n;
+    C.r = A.r;
+
+    // Form C.U := A.U
+    std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+
+    // Form C.V := B' V
+    if( B.symmetric )
+    {
+        // Since B is symmetric, B' V = conj(B) V = conj(B conj(V))
+        const int size = A.n*A.r;
+        std::vector<Scalar> W( size );
+        const Scalar* RESTRICT AV = &A.V[0];
+        for( int i=0; i<size; ++i )
+            W[i] = Conj( AV[i] );
+
+        blas::Symm
+        ( 'L', 'L', C.n, C.r, 
+          alpha, &B.buffer[0], B.ldim, &W[0], A.n, 0, &C.V[0], C.n );
+
+        Scalar* CV = &C.V[0];
+        for( int i=0; i<size; ++i )
+            C.V[i] = Conj( C.V[i] );
+    }
+    else
+    {
+        blas::Gemm
+        ( 'C', 'N', C.n, C.r, B.m,
+          alpha, &B.buffer[0], B.ldim, &A.V[0], A.n, 0, &C.V[0], C.n );
+    }
+}
+
+// Dense C := alpha A B
+template void psp::hmatrix_tools::MatrixMultiply
+( float alpha, const DenseMatrix<float>& A,
+               const DenseMatrix<float>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( double alpha, const DenseMatrix<double>& A,
+                const DenseMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
+                             const DenseMatrix< std::complex<float> >& B,
+                                   DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
+                              const DenseMatrix< std::complex<double> >& B,
+                                    DenseMatrix< std::complex<double> >& C );
+
+// Low-rank C := alpha A B
 template void psp::hmatrix_tools::MatrixMultiply
 ( float alpha, const FactorMatrix<float>& A,
                const FactorMatrix<float>& B,
@@ -93,3 +242,40 @@ template void psp::hmatrix_tools::MatrixMultiply
 ( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
                               const FactorMatrix< std::complex<double> >& B,
                                     FactorMatrix< std::complex<double> >& C );
+
+// Form a factor matrix from a dense matrix times a factor matrix
+template void psp::hmatrix_tools::MatrixMultiply
+( float alpha, const DenseMatrix<float>& A, 
+               const FactorMatrix<float>& B, 
+                     FactorMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( double alpha, const DenseMatrix<double>& A,
+                const FactorMatrix<double>& B,
+                      FactorMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
+                             const FactorMatrix< std::complex<float> >& B,
+                                   FactorMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
+                              const FactorMatrix< std::complex<double> >& B,
+                                    FactorMatrix< std::complex<double> >& C );
+
+// Form a factor matrix from a factor matrix times a dense matrix
+template void psp::hmatrix_tools::MatrixMultiply
+( float alpha, const FactorMatrix<float>& A, 
+               const DenseMatrix<float>& B, 
+                     FactorMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( double alpha, const FactorMatrix<double>& A,
+                const DenseMatrix<double>& B,
+                      FactorMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+                             const DenseMatrix< std::complex<float> >& B,
+                                   FactorMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMultiply
+( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+                              const DenseMatrix< std::complex<double> >& B,
+                                    FactorMatrix< std::complex<double> >& C );
+

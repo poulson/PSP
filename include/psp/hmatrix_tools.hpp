@@ -33,49 +33,96 @@ namespace psp {
 namespace hmatrix_tools {
 
 //----------------------------------------------------------------------------//
-// Building blocks for H-algebra                                              //
+// Building blocks for H-algebra.                                             //
+//                                                                            //
+// Routines are put here when they are needed for H-algebra but do not        //
+// actually require a hierarchical data structure. This is meant to maximize  //
+// the reusability of this code.                                              //
 //----------------------------------------------------------------------------//
 
-// Ensure that the matrix A has a rank of at most 'maxRank'
+/*\
+|*| Ensure that the factor matrix has a rank of at most 'maxRank'
+\*/
 template<typename Real>
-void Compress( int maxRank, FactorMatrix<Real>& A );
-
+void Compress( int maxRank, FactorMatrix<Real>& F );
 template<typename Real>
-void Compress( int maxRank, FactorMatrix< std::complex<Real> >& A );
+void Compress( int maxRank, FactorMatrix< std::complex<Real> >& F );
 
-// Convert a subset of a sparse matrix to a dense matrix
+/*\ 
+|*| Convert a subset of a sparse matrix to dense/factor form
+\*/
 template<typename Scalar>
 void ConvertSubmatrix
 ( DenseMatrix<Scalar>& D, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd );
-
-// Convert a subset of a sparse matrix to a factor matrix
 template<typename Scalar>
 void ConvertSubmatrix
 ( FactorMatrix<Scalar>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd );
 
-// Generalized add of two factor matrices, C := alpha A + beta B
+/*\
+|*| Generalized addition of two dense/factor matrices, C := alpha A + beta B
+\*/
+// D := alpha D + beta D
 template<typename Scalar>
 void MatrixAdd
 ( Scalar alpha, const DenseMatrix<Scalar>& A,
   Scalar beta,  const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
+// F := alpha F + beta F
 template<typename Scalar>
 void MatrixAdd
 ( Scalar alpha, const FactorMatrix<Scalar>& A,
   Scalar beta,  const FactorMatrix<Scalar>& B,
                       FactorMatrix<Scalar>& C );
+// D := alpha F + beta D
+template<typename Scalar>
+void MatrixAdd
+( Scalar alpha, const FactorMatrix<Scalar>& A,
+  Scalar beta,  const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha D + beta F
+template<typename Scalar>
+void MatrixAdd
+( Scalar alpha, const DenseMatrix<Scalar>& A,
+  Scalar beta,  const FactorMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha F + beta F
+template<typename Scalar>
+void MatrixAdd
+( Scalar alpha, const FactorMatrix<Scalar>& A,
+  Scalar beta,  const FactorMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
 
-// Generalized add of two factor matrices, C := alpha A + beta B, 
-// where C is then forced to be of rank at most 'maxRank'
+/*\
+|*| Generalized update of two dense/factor matrices, B := alpha A + beta B
+\*/
+// D := alpha D + beta D
+template<typename Scalar>
+void MatrixUpdate
+( Scalar alpha, const DenseMatrix<Scalar>& A,
+  Scalar beta,        DenseMatrix<Scalar>& B );
+// F := alpha F + beta F
+template<typename Scalar>
+void MatrixUpdate
+( Scalar alpha, const FactorMatrix<Scalar>& A,
+  Scalar beta,        FactorMatrix<Scalar>& B );
+// D := alpha F + beta D
+template<typename Scalar>
+void MatrixUpdate
+( Scalar alpha, const FactorMatrix<Scalar>& A,
+  Scalar beta,        DenseMatrix<Scalar>& B );
+
+/*\
+|*| Generalized add of two factor matrices, C := alpha A + beta B, 
+|*| where C is then forced to be of rank at most 'maxRank'
+\*/
 template<typename Real>
 void MatrixAddRounded
 ( int maxRank,
   Real alpha, const FactorMatrix<Real>& A,
   Real beta,  const FactorMatrix<Real>& B,
                     FactorMatrix<Real>& C );
-
 template<typename Real>
 void MatrixAddRounded
 ( int maxRank,
@@ -83,44 +130,86 @@ void MatrixAddRounded
   std::complex<Real> beta,  const FactorMatrix< std::complex<Real> >& B,
                                   FactorMatrix< std::complex<Real> >& C );
 
-// C := alpha A B
+/*\
+|*| Generalized update of a factor matrix, B := alpha A + beta B, 
+|*| where B is then forced to be of rank at most 'maxRank'
+\*/
+template<typename Real>
+void MatrixUpdateRounded
+( int maxRank,
+  Real alpha, const FactorMatrix<Real>& A,
+  Real beta,        FactorMatrix<Real>& B );
+template<typename Real>
+void MatrixUpdateRounded
+( int maxRank,
+  std::complex<Real> alpha, const FactorMatrix< std::complex<Real> >& A,
+  std::complex<Real> beta,        FactorMatrix< std::complex<Real> >& B );
+
+/*\
+|*| Matrix Multiply, C := alpha A B
+\*/
+// D := alpha D D
+template<typename Scalar>
+void MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+// F := alpha F F
 template<typename Scalar>
 void MatrixMultiply
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar>& B,
                       FactorMatrix<Scalar>& C );
+// F := alpha D F
+template<typename Scalar>
+void MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar>& B,
+                      FactorMatrix<Scalar>& C );
+// F := alpha F D
+template<typename Scalar>
+void MatrixMultiply
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B,
+                      FactorMatrix<Scalar>& C );
 
-// Dense y := alpha A x + beta y
+/*\
+|*| Matrix-Vector multiply, y := alpha A x + beta y
+\*/
+// y := alpha D x + beta y
 template<typename Scalar>
 void MatrixVector
-( Scalar alpha, const DenseMatrix<Scalar>& A, 
+( Scalar alpha, const DenseMatrix<Scalar>& D, 
+                const std::vector<Scalar>& x,
+  Scalar beta,        std::vector<Scalar>& y );
+// y := alpha F x + beta y
+template<typename Scalar>
+void MatrixVector
+( Scalar alpha, const FactorMatrix<Scalar>& F, 
                 const std::vector<Scalar>& x,
   Scalar beta,        std::vector<Scalar>& y );
 
-// Dense y := alpha A x
+/*\
+|*| Matrix-Vector multiply, y := alpha A x 
+\*/
+// y := alpha D x
 template<typename Scalar>
 void MatrixVector
-( Scalar alpha, const DenseMatrix<Scalar>& A, 
+( Scalar alpha, const DenseMatrix<Scalar>& D, 
+                const std::vector<Scalar>& x,
+                      std::vector<Scalar>& y );
+// y := alpha F x
+template<typename Scalar>
+void MatrixVector
+( Scalar alpha, const FactorMatrix<Scalar>& F, 
                 const std::vector<Scalar>& x,
                       std::vector<Scalar>& y );
 
-// Low-rank y := alpha A x + beta y
+/*\
+|*| Dense inversion, D := inv(D)
+\*/
 template<typename Scalar>
-void MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
-                const std::vector<Scalar>& x,
-  Scalar beta,        std::vector<Scalar>& y );
-
-// Low-rank y := alpha A x
-template<typename Scalar>
-void MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
-                const std::vector<Scalar>& x,
-                      std::vector<Scalar>& y );
-
-// Dense inversion
-template<typename Scalar>
-void Invert( DenseMatrix<Scalar>& A );
+void Invert( DenseMatrix<Scalar>& D );
 
 //----------------------------------------------------------------------------//
 // For mapping between different orderings                                    //

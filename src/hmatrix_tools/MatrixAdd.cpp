@@ -110,6 +110,123 @@ void psp::hmatrix_tools::MatrixAdd
     std::memcpy( &C.V[C.n*A.r], &B.V[0], C.n*B.r*sizeof(Scalar) );
 }
 
+// Dense from sum of factor and dense:  C := alpha A + beta B
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixAdd
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+  Scalar beta,  const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.m != B.m || A.n != B.n  )
+        throw std::logic_error("Tried to add nonconforming matrices.");
+#endif
+    C.m = A.m;
+    C.n = A.n;
+    C.ldim = C.m;
+    C.buffer.resize( C.ldim*C.n );
+    C.symmetric = false;
+
+    const int m = A.m;
+    const int n = A.n;
+    const int lda = A.ldim;
+    const int ldb = B.ldim;
+    const int ldc = C.ldim;
+
+    if( B.symmetric )
+    {
+        // Form the full C := beta B from the symmetric B
+        
+        // Form the lower triangle
+        for( int j=0; j<n; ++j )
+        {
+            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
+            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            for( int i=j; i<n; ++i )
+                CCol[i] = beta*BCol[i];
+        }
+
+        // Transpose the strictly-lower triangle into the upper triangle
+        for( int j=0; j<n-1; ++j )
+        {
+            const Scalar* CCol = &C.buffer[j*ldc];
+            Scalar* CRow = &C.buffer[j];
+            for( int i=j+1; i<n; ++i )
+                CRow[i*ldc] = CCol[i];
+        }
+
+        // C := alpha A + C
+        blas::Gemm
+        ( 'N', 'C', A.m, A.n, A.r, 
+          alpha, &A.U[0], A.m, &A.V[0], A.n,
+          1, &C.buffer[0], C.ldim );
+    }
+    else
+    {
+        // Form C := beta B
+        for( int j=0; j<n; ++j )
+        {
+            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
+            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            for( int i=0; i<m; ++i )
+                CCol[i] = beta*BCol[i];
+        }
+
+        // C := alpha A + C
+        blas::Gemm
+        ( 'N', 'C', A.m, A.n, A.r, 
+          alpha, &A.U[0], A.m, &A.V[0], A.n,
+          1, &C.buffer[0], C.ldim );
+    }
+}
+
+// Dense from sum of dense and factor:  C := alpha A + beta B
+// The arguments are switched for generality, so just call the other version.
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixAdd
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+  Scalar beta,  const FactorMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C )
+{
+    MatrixAdd( beta, B, alpha, A, C );
+}
+
+// Dense as sum of two factors
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixAdd
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+  Scalar beta,  const FactorMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.m != B.m || A.n != B.n  )
+        throw std::logic_error("Tried to add nonconforming matrices.");
+#endif
+    C.m = A.m;
+    C.n = A.n;
+    C.ldim = C.m;
+    C.buffer.resize( C.ldim*C.n );
+    C.symmetric = false;
+
+    const int m = A.m;
+    const int n = A.n;
+    const int lda = A.ldim;
+    const int ldb = B.ldim;
+    const int ldc = C.ldim;
+
+    // C := alpha A
+    blas::Gemm
+    ( 'N', 'C', A.m, A.n, A.r, 
+      alpha, &A.U[0], A.m, &A.V[0], A.n,
+      0, &C.buffer[0], C.ldim );
+    // C := beta B + C
+    blas::Gemm
+    ( 'N', 'C', B.m, B.n, B.r, 
+      beta, &B.U[0], B.m, &B.V[0], B.n,
+      1, &C.buffer[0], C.ldim );
+}
+
+// Dense C := alpha A + beta B
 template void psp::hmatrix_tools::MatrixAdd
 ( float alpha, const DenseMatrix<float>& A,
   float beta,  const DenseMatrix<float>& B,
@@ -127,6 +244,7 @@ template void psp::hmatrix_tools::MatrixAdd
   std::complex<double> beta,  const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 
+// Low-rank C := alpha A + beta B
 template void psp::hmatrix_tools::MatrixAdd
 ( float alpha, const FactorMatrix<float>& A,
   float beta,  const FactorMatrix<float>& B,
@@ -143,3 +261,58 @@ template void psp::hmatrix_tools::MatrixAdd
 ( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
   std::complex<double> beta,  const FactorMatrix< std::complex<double> >& B,
                                     FactorMatrix< std::complex<double> >& C );
+
+// Dense as sum of factor and dense, C := alpha A + beta B
+template void psp::hmatrix_tools::MatrixAdd
+( float alpha, const FactorMatrix<float>& A,
+  float beta,  const DenseMatrix<float>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( double alpha, const FactorMatrix<double>& A,
+  double beta,  const DenseMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+  std::complex<float> beta,  const DenseMatrix< std::complex<float> >& B,
+                                   DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+  std::complex<double> beta,  const DenseMatrix< std::complex<double> >& B,
+                                    DenseMatrix< std::complex<double> >& C );
+
+// Dense as sum of dense and factor, C := alpha A + beta B
+template void psp::hmatrix_tools::MatrixAdd
+( float alpha, const DenseMatrix<float>& A,
+  float beta,  const FactorMatrix<float>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( double alpha, const DenseMatrix<double>& A,
+  double beta,  const FactorMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
+  std::complex<float> beta,  const FactorMatrix< std::complex<float> >& B,
+                                   DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
+  std::complex<double> beta,  const FactorMatrix< std::complex<double> >& B,
+                                    DenseMatrix< std::complex<double> >& C );
+
+// Dense as sum of two factors
+template void psp::hmatrix_tools::MatrixAdd
+( float alpha, const FactorMatrix<float>& A,
+  float beta,  const FactorMatrix<float>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( double alpha, const FactorMatrix<double>& A,
+  double beta,  const FactorMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+  std::complex<float> beta,  const FactorMatrix< std::complex<float> >& B,
+                                   DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+  std::complex<double> beta,  const FactorMatrix< std::complex<double> >& B,
+                                    DenseMatrix< std::complex<double> >& C );
+
