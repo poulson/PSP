@@ -31,10 +31,23 @@
 namespace psp {
 namespace hmatrix_tools {
 
+// A basic dense matrix representation that is used for storing blocks 
+// whose sources and targets are too close to represent as low rank
+template<typename Scalar>
+struct DenseMatrix
+{
+    bool symmetric;
+    int m; // height of matrix
+    int n; // width of matrix
+    int ldim; // leading dimension of matrix
+    std::vector<Scalar> buffer; // column-major buffer
+};
+
 // A simple Compressed Sparse Row (CSR) data structure
 template<typename Scalar>
 struct SparseMatrix
 {
+    bool symmetric;
     int m; // height of matrix
     int n; // width of matrix
     std::vector<Scalar> nonzeros;
@@ -54,17 +67,6 @@ struct FactorMatrix
     // A = U V^H
     std::vector<Scalar> U; // buffer for m x r left set of vectors
     std::vector<Scalar> V; // buffer for n x r right set of vectors
-};
-
-// A basic dense matrix representation that is used for storing blocks 
-// whose sources and targets are too close to represent as low rank
-template<typename Scalar>
-struct DenseMatrix
-{
-    int m; // height of matrix
-    int n; // width of matrix
-    int ldim; // leading dimension of matrix
-    std::vector<Scalar> buffer; // column-major buffer
 };
 
 //----------------------------------------------------------------------------//
@@ -120,14 +122,28 @@ void MatrixMultiply
                 const FactorMatrix<Scalar>& B,
                       FactorMatrix<Scalar>& C );
 
-// y := alpha A x + beta y
+// Dense y := alpha A x + beta y
+template<typename Scalar>
+void MatrixVector
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const std::vector<Scalar>& x,
+  Scalar beta,        std::vector<Scalar>& y );
+
+// Dense y := alpha A x
+template<typename Scalar>
+void MatrixVector
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const std::vector<Scalar>& x,
+                      std::vector<Scalar>& y );
+
+// Low-rank y := alpha A x + beta y
 template<typename Scalar>
 void MatrixVector
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 
                 const std::vector<Scalar>& x,
   Scalar beta,        std::vector<Scalar>& y );
 
-// y := alpha A x
+// Low-rank y := alpha A x
 template<typename Scalar>
 void MatrixVector
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 

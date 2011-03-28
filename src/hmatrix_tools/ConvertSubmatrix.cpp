@@ -26,6 +26,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
   int iStart, int iEnd, int jStart, int jEnd )
 {
     // Initialize the dense matrix to all zeros
+    D.symmetric = S.symmetric;
     D.m = iEnd - iStart;
     D.n = jEnd - jStart;
     D.ldim = D.m;

@@ -26,12 +26,54 @@
 namespace psp {
 
 template<typename Scalar>
-class HMatrixQuasi2d
+class HMatrix_Quasi2d
 {
+    enum MatrixType { NODE, NODE_SYMMETRIC, DENSE, DENSE_SYMMETRIC, FACTOR };
+
+    struct MatrixShell 
+    {
+        MatrixType matrixType;        
+
+        // Only one of the following will be active
+        std::vector<MatrixShell> children;
+        hmatrix_tools::DenseMatrix<Scalar> D;
+        hmatrix_tools::FactorMatrix<Scalar> F;
+    };
+
+    const bool _symmetric;
+    const int _xSize, _ySize, _zSize;
+    const int _numLevels;
+    const bool _stronglyAdmissible;
+    MatrixShell _rootShell;
+
+    bool Admissible( int xSource, int ySource, int xTarget, int yTarget ) const;
+
+    void
+    RecursiveConstruction
+    ( MatrixShell& shell,
+      const hmatrix_tools::SparseMatrix<Scalar>& S, 
+      int level,
+      int xSource, int ySource, 
+      int xTarget, int yTarget,
+      int sourceOffset, int xSizeSource, int ySizeSource,
+      int targetOffset, int xSizeTarget, int ySizeTarget );
 
 public:
+    // This will convert a sparse matrix over an xSize x ySize x zSize domain
+    // that is quasi-2d hierarchically ordered into an H-matrix with the
+    // specified number of levels before dense storage. 
+    //
+    // The weak admissibility criterion is:
+    //     max(dist_x(A,B),dist_y(A,B)) >= 1
+    //
+    // The strong admissibility criterion is:
+    //     max(dist_x(A,B),dist_y(A,B)) > 1
+    //
+    HMatrix_Quasi2d
+    ( const hmatrix_tools::SparseMatrix<Scalar>& S,
+      int xSize, int ySize, int zSize, int numLevels, bool stronglyAdmissible );
 
-    // TODO: Application and construction/destruction routines
+    ~HMatrix_Quasi2d();
 
 };
 
