@@ -26,7 +26,7 @@ psp::HMatrix_Quasi2d<Scalar>::Admissible
 ( int xSource, int ySource, int xTarget, int yTarget ) const
 {
     if( _stronglyAdmissible )
-        return std::max(std::abs(xSource-xTarget),std::abs(ySource-yTarget)) > 1;
+        return std::max(std::abs(xSource-xTarget),std::abs(ySource-yTarget))>1;
     else
         return xSource != xTarget || ySource != yTarget;
 }
@@ -59,16 +59,16 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
 
             std::vector<int> xSizes(2);
             std::vector<int> ySizes(2);
-            xSizes[0] = xSizeSource/2;
-            xSizes[1] = xSizeSource - xSizes[0];
-            ySizes[0] = ySizeSource/2;
-            ySizes[1] = ySizeSource - ySizes[0];
+            xSizes[0] = xSizeSource/2;            // left
+            xSizes[1] = xSizeSource - xSizes[0];  // right
+            ySizes[0] = ySizeSource/2;            // bottom
+            ySizes[1] = ySizeSource - ySizes[0];  // top
 
             std::vector<int> sizes(4);
-            sizes[0] = xSizes[0]*ySizes[0]*_zSize;
-            sizes[1] = xSizes[1]*ySizes[0]*_zSize;
-            sizes[2] = xSizes[0]*ySizes[1]*_zSize;
-            sizes[3] = xSizes[1]*ySizes[1]*_zSize;
+            sizes[0] = xSizes[0]*ySizes[0]*_zSize; // bottom-left
+            sizes[1] = xSizes[1]*ySizes[0]*_zSize; // bottom-right
+            sizes[2] = xSizes[0]*ySizes[1]*_zSize; // top-left
+            sizes[3] = xSizes[1]*ySizes[1]*_zSize; // top-right
 
             int child = 0;
             int jStart = sourceOffset;
@@ -97,25 +97,25 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
             std::vector<int> ySizesSource(2);
             std::vector<int> xSizesTarget(2);
             std::vector<int> ySizesTarget(2);
-            xSizesSource[0] = xSizeSource/2;
-            xSizesSource[1] = xSizeSource - xSizesSource[0];
-            ySizesSource[0] = ySizeSource/2;
-            ySizesSource[1] = ySizeSource - ySizesSource[0];
-            xSizesTarget[0] = xSizeTarget/2;
-            xSizesTarget[1] = xSizeTarget - xSizesTarget[0];
-            ySizesTarget[0] = ySizeTarget/2;
-            ySizesTarget[1] = ySizeTarget - ySizesTarget[0];
+            xSizesSource[0] = xSizeSource/2;                 // left
+            xSizesSource[1] = xSizeSource - xSizesSource[0]; // right
+            ySizesSource[0] = ySizeSource/2;                 // bottom
+            ySizesSource[1] = ySizeSource - ySizesSource[0]; // top
+            xSizesTarget[0] = xSizeTarget/2;                 // left
+            xSizesTarget[1] = xSizeTarget - xSizesTarget[0]; // right
+            ySizesTarget[0] = ySizeTarget/2;                 // bottom
+            ySizesTarget[1] = ySizeTarget - ySizesTarget[0]; // top
 
             std::vector<int> sourceSizes(4);
             std::vector<int> targetSizes(4);
-            sourceSizes[0] = xSizesSource[0]*ySizesSource[0]*_zSize;
-            sourceSizes[1] = xSizesSource[1]*ySizesSource[0]*_zSize;
-            sourceSizes[2] = xSizesSource[0]*ySizesSource[1]*_zSize;
-            sourceSizes[3] = xSizesSource[1]*ySizesSource[1]*_zSize;
-            targetSizes[0] = xSizesTarget[0]*ySizesTarget[0]*_zSize;
-            targetSizes[1] = xSizesTarget[1]*ySizesTarget[0]*_zSize;
-            targetSizes[2] = xSizesTarget[0]*ySizesTarget[1]*_zSize;
-            targetSizes[3] = xSizesTarget[1]*ySizesTarget[1]*_zSize;
+            sourceSizes[0] = xSizesSource[0]*ySizesSource[0]*_zSize; // BL
+            sourceSizes[1] = xSizesSource[1]*ySizesSource[0]*_zSize; // BR
+            sourceSizes[2] = xSizesSource[0]*ySizesSource[1]*_zSize; // TL
+            sourceSizes[3] = xSizesSource[1]*ySizesSource[1]*_zSize; // TR
+            targetSizes[0] = xSizesTarget[0]*ySizesTarget[0]*_zSize; // BL
+            targetSizes[1] = xSizesTarget[1]*ySizesTarget[0]*_zSize; // BR
+            targetSizes[2] = xSizesTarget[0]*ySizesTarget[1]*_zSize; // TL
+            targetSizes[3] = xSizesTarget[1]*ySizesTarget[1]*_zSize; // TR
 
             int child = 0;
             int jStart = sourceOffset;
