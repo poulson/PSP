@@ -129,7 +129,6 @@ void psp::hmatrix_tools::MatrixAdd
 
     const int m = A.m;
     const int n = A.n;
-    const int lda = A.ldim;
     const int ldb = B.ldim;
     const int ldc = C.ldim;
 
@@ -210,8 +209,6 @@ void psp::hmatrix_tools::MatrixAdd
 
     const int m = A.m;
     const int n = A.n;
-    const int lda = A.ldim;
-    const int ldb = B.ldim;
     const int ldc = C.ldim;
 
     // C := alpha A

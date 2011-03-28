@@ -36,8 +36,8 @@ class HMatrix_Quasi2d
 
         // Only one of the following will be active
         std::vector<MatrixShell> children;
-        hmatrix_tools::DenseMatrix<Scalar> D;
-        hmatrix_tools::FactorMatrix<Scalar> F;
+        DenseMatrix<Scalar> D;
+        FactorMatrix<Scalar> F;
     };
 
     const bool _symmetric;
@@ -51,7 +51,7 @@ class HMatrix_Quasi2d
     void
     RecursiveConstruction
     ( MatrixShell& shell,
-      const hmatrix_tools::SparseMatrix<Scalar>& S, 
+      const SparseMatrix<Scalar>& S, 
       int level,
       int xSource, int ySource, 
       int xTarget, int yTarget,
@@ -70,7 +70,7 @@ public:
     //     max(dist_x(A,B),dist_y(A,B)) > 1
     //
     HMatrix_Quasi2d
-    ( const hmatrix_tools::SparseMatrix<Scalar>& S,
+    ( const SparseMatrix<Scalar>& S,
       int xSize, int ySize, int zSize, int numLevels, bool stronglyAdmissible );
 
     ~HMatrix_Quasi2d();

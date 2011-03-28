@@ -111,7 +111,6 @@ void psp::hmatrix_tools::MatrixUpdate
 #endif
     const int m = A.m;
     const int n = A.n;
-    const int lda = A.ldim;
     const int ldb = B.ldim;
 
     blas::Gemm
