@@ -58,6 +58,11 @@ void ConvertSubmatrix
 // Generalized add of two factor matrices, C := alpha A + beta B
 template<typename Scalar>
 void MatrixAdd
+( Scalar alpha, const DenseMatrix<Scalar>& A,
+  Scalar beta,  const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+template<typename Scalar>
+void MatrixAdd
 ( Scalar alpha, const FactorMatrix<Scalar>& A,
   Scalar beta,  const FactorMatrix<Scalar>& B,
                       FactorMatrix<Scalar>& C );
@@ -112,6 +117,10 @@ void MatrixVector
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 
                 const std::vector<Scalar>& x,
                       std::vector<Scalar>& y );
+
+// Dense inversion
+template<typename Scalar>
+void Invert( DenseMatrix<Scalar>& A );
 
 //----------------------------------------------------------------------------//
 // For mapping between different orderings                                    //

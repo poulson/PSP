@@ -20,13 +20,63 @@
 */
 #include "psp.hpp"
 
-// C := alpha A + beta B
+// Dense C := alpha A + beta B
+template<typename Scalar>
+void psp::hmatrix_tools::MatrixAdd
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+  Scalar beta,  const DenseMatrix<Scalar>& B, 
+                      DenseMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.m != B.m || A.n != B.n || A.symmetric != B.symmetric )
+        throw std::logic_error("Tried to add nonconforming matrices.");
+#endif
+    C.m = A.m;
+    C.n = A.n;
+    C.ldim = C.m;
+    C.symmetric = A.symmetric; 
+    C.buffer.resize( C.ldim*C.n );
+
+    const int m = C.m;
+    const int n = C.n;
+    const int lda = A.ldim;
+    const int ldb = B.ldim;
+    const int ldc = C.ldim;
+    if( C.symmetric )
+    {
+        for( int j=0; j<n; ++j )
+        {
+            const Scalar* RESTRICT ACol = &A.buffer[j*lda];
+            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
+            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            for( int i=j; i<m; ++i )
+                CCol[i] = alpha*ACol[i] + beta*BCol[i];
+        }
+    }
+    else
+    {
+        for( int j=0; j<n; ++j )
+        {
+            const Scalar* RESTRICT ACol = &A.buffer[j*lda];
+            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
+            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            for( int i=0; i<m; ++i )
+                CCol[i] = alpha*ACol[i] + beta*BCol[i];
+        }
+    }
+}
+
+// Low-rank C := alpha A + beta B
 template<typename Scalar>
 void psp::hmatrix_tools::MatrixAdd
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 
   Scalar beta,  const FactorMatrix<Scalar>& B, 
                       FactorMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    if( A.m != B.m || A.n != B.n )
+        throw std::logic_error("Tried to add nonconforming matrices.");
+#endif
     C.m = A.m;
     C.n = A.n;
     C.r = A.r + B.r;
@@ -59,6 +109,23 @@ void psp::hmatrix_tools::MatrixAdd
     std::memcpy( &C.V[0], &A.V[0], C.n*A.r*sizeof(Scalar) );
     std::memcpy( &C.V[C.n*A.r], &B.V[0], C.n*B.r*sizeof(Scalar) );
 }
+
+template void psp::hmatrix_tools::MatrixAdd
+( float alpha, const DenseMatrix<float>& A,
+  float beta,  const DenseMatrix<float>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( double alpha, const DenseMatrix<double>& A,
+  double beta,  const DenseMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
+  std::complex<float> beta,  const DenseMatrix< std::complex<float> >& B,
+                                   DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixAdd
+( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
+  std::complex<double> beta,  const DenseMatrix< std::complex<double> >& B,
+                                    DenseMatrix< std::complex<double> >& C );
 
 template void psp::hmatrix_tools::MatrixAdd
 ( float alpha, const FactorMatrix<float>& A,

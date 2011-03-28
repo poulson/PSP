@@ -26,12 +26,16 @@ void psp::hmatrix_tools::ConvertSubmatrix
   int iStart, int iEnd, int jStart, int jEnd )
 {
     // Initialize the dense matrix to all zeros
-    D.symmetric = S.symmetric;
+    D.symmetric = ( S.symmetric && iStart == jStart );
     D.m = iEnd - iStart;
     D.n = jEnd - jStart;
     D.ldim = D.m;
     D.buffer.resize( D.ldim*D.n );
     std::memset( &D.buffer[0], 0, D.ldim*D.n*sizeof(Scalar) );
+#ifndef RELEASE
+    if( D.symmetric && iEnd != jEnd )
+        throw std::logic_error("Invalid submatrix of symmetric sparse matrix.");
+#endif
 
     // Add in the nonzeros, one row at a time
     const int m = D.m;
