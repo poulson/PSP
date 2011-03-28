@@ -42,6 +42,7 @@ Conj( const std::complex<Real> alpha )
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
+#include "psp/flat_matrices.hpp"
 #include "psp/hmatrix_tools.hpp"
 #include "psp/hmatrix_quasi2d.hpp"
 

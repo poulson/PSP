@@ -19,7 +19,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
-using namespace psp::hmatrix_tools;
 
 template<typename Scalar>
 bool
@@ -43,10 +42,10 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
   int sourceOffset, int xSizeSource, int ySizeSource,
   int targetOffset, int xSizeTarget, int ySizeTarget )
 {
-    if( Admissible( xSource, ySource, xTarget, yTarget ) )
+    if( this->Admissible( xSource, ySource, xTarget, yTarget ) )
     {
         shell.matrixType = FACTOR;
-        ConvertSubmatrix
+        hmatrix_tools::ConvertSubmatrix
         ( shell.F, S, 
           targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
           sourceOffset, sourceOffset+xSizeSource*ySizeSource*_zSize );
@@ -78,7 +77,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
                 int iStart = jStart;
                 for( int t=s; t<4; ++t )
                 {
-                    RecursiveConstruction
+                    this->RecursiveConstruction
                     ( shell.children[child++], S, level+1,
                       xSource+(s&1), ySource+(s/2),
                       xTarget+(t&1), yTarget+(t/2),
@@ -125,7 +124,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
                 int iStart = targetOffset;
                 for( int t=0; t<4; ++t )
                 {
-                    RecursiveConstruction
+                    this->RecursiveConstruction
                     ( shell.children[child++], S, level+1,
                       xSource+(s&1), ySource+(s/2),
                       xTarget+(t&1), yTarget+(t/2),
@@ -143,7 +142,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
         {
             // TODO: Think about packed storage
             shell.matrixType = DENSE_SYMMETRIC;
-            ConvertSubmatrix
+            hmatrix_tools::ConvertSubmatrix
             ( shell.D, S,
               targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
               sourceOffset, sourceOffset+xSizeTarget*ySizeTarget*_zSize );
@@ -151,7 +150,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
         else
         {
             shell.matrixType = DENSE;
-            ConvertSubmatrix
+            hmatrix_tools::ConvertSubmatrix
             ( shell.D, S,
               targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
               sourceOffset, sourceOffset+xSizeTarget*ySizeTarget*_zSize );
@@ -170,7 +169,7 @@ psp::HMatrix_Quasi2d<Scalar>::HMatrix_Quasi2d
   _numLevels(numLevels),
   _stronglyAdmissible(stronglyAdmissible)
 {
-    RecursiveConstruction
+    this->RecursiveConstruction
     ( _rootShell, S, 0, 
       0, 0, 
       0, 0, 
