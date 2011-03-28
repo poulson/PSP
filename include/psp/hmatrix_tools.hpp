@@ -160,6 +160,18 @@ void MatrixMultiply
 ( Scalar alpha, const FactorMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar>& B,
                       FactorMatrix<Scalar>& C );
+// D := alpha D F
+template<typename Scalar>
+void MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha F D
+template<typename Scalar>
+void MatrixMultiply
+( Scalar alpha, const FactorMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
 // F := alpha D F
 template<typename Scalar>
 void MatrixMultiply
