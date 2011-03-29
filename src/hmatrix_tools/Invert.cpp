@@ -25,22 +25,22 @@ void psp::hmatrix_tools::Invert
 ( DenseMatrix<Scalar>& D )
 {
 #ifndef RELEASE
-    if( D.m != D.n )
+    if( D.Height() != D.Width() )
         throw std::logic_error("Tried to invert a non-square dense matrix.");
 #endif
-    const int n = D.n;
+    const int n = D.Height();
     const int lwork = std::min( 64*n, n*n );
     std::vector<int> ipiv( n );
     std::vector<Scalar> work( lwork );
-    if( D.symmetric )
+    if( D.Symmetric() )
     {
-        lapack::LDLT( 'L', n, &D.buffer[0], D.ldim, &ipiv[0], &work[0], lwork );
-        lapack::InvertLDLT( 'L', n, &D.buffer[0], D.ldim, &ipiv[0], &work[0] );
+        lapack::LDLT( 'L', n, D.Buffer(), D.LDim(), &ipiv[0], &work[0], lwork );
+        lapack::InvertLDLT( 'L', n, D.Buffer(), D.LDim(), &ipiv[0], &work[0] );
     }
     else
     {
-        lapack::LU( n, n, &D.buffer[0], D.ldim, &ipiv[0] );
-        lapack::InvertLU( n, &D.buffer[0], D.ldim, &ipiv[0], &work[0], lwork );
+        lapack::LU( n, n, D.Buffer(), D.LDim(), &ipiv[0] );
+        lapack::InvertLU( n, D.Buffer(), D.LDim(), &ipiv[0], &work[0], lwork );
     }
 }
 

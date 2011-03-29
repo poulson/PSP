@@ -28,27 +28,24 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n || A.symmetric != B.symmetric )
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to add nonconforming matrices.");
+    // TODO: Allow for A and B to have different types
+    if( A.Type() != B.Type() )
+        throw std::logic_error("MatrixAdd with different types not implemented");
 #endif
-    C.m = A.m;
-    C.n = A.n;
-    C.ldim = C.m;
-    C.symmetric = A.symmetric; 
-    C.buffer.resize( C.ldim*C.n );
+    C.Resize( A.Height(), A.Width() );
+    C.SetType( A.Type() );
 
-    const int m = C.m;
-    const int n = C.n;
-    const int lda = A.ldim;
-    const int ldb = B.ldim;
-    const int ldc = C.ldim;
-    if( C.symmetric )
+    const int m = C.Height();
+    const int n = C.Width();
+    if( C.Symmetric() )
     {
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT ACol = &A.buffer[j*lda];
-            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
-            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
+            const Scalar* RESTRICT BCol = B.LockedBuffer(0,j);
+            Scalar* RESTRICT CCol = C.Buffer(0,j);
             for( int i=j; i<m; ++i )
                 CCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
@@ -57,9 +54,9 @@ void psp::hmatrix_tools::MatrixAdd
     {
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT ACol = &A.buffer[j*lda];
-            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
-            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
+            const Scalar* RESTRICT BCol = B.LockedBuffer(0,j);
+            Scalar* RESTRICT CCol = C.Buffer(0,j);
             for( int i=0; i<m; ++i )
                 CCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
@@ -118,38 +115,34 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n  )
+    if( A.m != B.Height() || A.n != B.Width()  )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
-    C.m = A.m;
-    C.n = A.n;
-    C.ldim = C.m;
-    C.buffer.resize( C.ldim*C.n );
-    C.symmetric = false;
+    C.Resize( A.m, A.n );
+    C.SetType( GENERAL );
 
     const int m = A.m;
     const int n = A.n;
-    const int ldb = B.ldim;
-    const int ldc = C.ldim;
 
-    if( B.symmetric )
+    if( B.Symmetric() )
     {
         // Form the full C := beta B from the symmetric B
         
         // Form the lower triangle
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
-            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            const Scalar* RESTRICT BCol = B.LockedBuffer(0,j);
+            Scalar* RESTRICT CCol = C.Buffer(0,j);
             for( int i=j; i<n; ++i )
                 CCol[i] = beta*BCol[i];
         }
 
         // Transpose the strictly-lower triangle into the upper triangle
+        const int ldc = C.LDim();
         for( int j=0; j<n-1; ++j )
         {
-            const Scalar* CCol = &C.buffer[j*ldc];
-            Scalar* CRow = &C.buffer[j];
+            const Scalar* CCol = C.LockedBuffer(0,j);
+            Scalar* CRow = C.Buffer(j,0);
             for( int i=j+1; i<n; ++i )
                 CRow[i*ldc] = CCol[i];
         }
@@ -158,15 +151,15 @@ void psp::hmatrix_tools::MatrixAdd
         blas::Gemm
         ( 'N', 'C', A.m, A.n, A.r, 
           alpha, &A.U[0], A.m, &A.V[0], A.n,
-          1, &C.buffer[0], C.ldim );
+          1, C.Buffer(), C.LDim() );
     }
     else
     {
         // Form C := beta B
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT BCol = &B.buffer[j*ldb];
-            Scalar* RESTRICT CCol = &C.buffer[j*ldc];
+            const Scalar* RESTRICT BCol = B.LockedBuffer(0,j);
+            Scalar* RESTRICT CCol = C.Buffer(0,j);
             for( int i=0; i<m; ++i )
                 CCol[i] = beta*BCol[i];
         }
@@ -175,7 +168,7 @@ void psp::hmatrix_tools::MatrixAdd
         blas::Gemm
         ( 'N', 'C', A.m, A.n, A.r, 
           alpha, &A.U[0], A.m, &A.V[0], A.n,
-          1, &C.buffer[0], C.ldim );
+          1, C.Buffer(), C.LDim() );
     }
 }
 
@@ -201,26 +194,22 @@ void psp::hmatrix_tools::MatrixAdd
     if( A.m != B.m || A.n != B.n  )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
-    C.m = A.m;
-    C.n = A.n;
-    C.ldim = C.m;
-    C.buffer.resize( C.ldim*C.n );
-    C.symmetric = false;
+    C.Resize( A.m, A.n );
+    C.SetType( GENERAL );
 
     const int m = A.m;
     const int n = A.n;
-    const int ldc = C.ldim;
 
     // C := alpha A
     blas::Gemm
     ( 'N', 'C', A.m, A.n, A.r, 
       alpha, &A.U[0], A.m, &A.V[0], A.n,
-      0, &C.buffer[0], C.ldim );
+      0, C.Buffer(), C.LDim() );
     // C := beta B + C
     blas::Gemm
     ( 'N', 'C', B.m, B.n, B.r, 
       beta, &B.U[0], B.m, &B.V[0], B.n,
-      1, &C.buffer[0], C.ldim );
+      1, C.Buffer(), C.LDim() );
 }
 
 // Dense C := alpha A + beta B

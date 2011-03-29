@@ -44,7 +44,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
 {
     if( this->Admissible( xSource, ySource, xTarget, yTarget ) )
     {
-        shell.matrixType = FACTOR;
+        shell.type = FACTOR;
         hmatrix_tools::ConvertSubmatrix
         ( shell.F, S, 
           targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
@@ -54,7 +54,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
     {
         if( _symmetric && sourceOffset == targetOffset )
         {
-            shell.matrixType = NODE_SYMMETRIC;
+            shell.type = NODE_SYMMETRIC;
             shell.children.resize( 10 );
 
             std::vector<int> xSizes(2);
@@ -90,7 +90,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
         }
         else
         {
-            shell.matrixType = NODE;
+            shell.type = NODE;
             shell.children.resize( 16 );
             
             std::vector<int> xSizesSource(2);
@@ -141,7 +141,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
         if( _symmetric && sourceOffset == targetOffset )
         {
             // TODO: Think about packed storage
-            shell.matrixType = DENSE_SYMMETRIC;
+            shell.type = DENSE_SYMMETRIC;
             hmatrix_tools::ConvertSubmatrix
             ( shell.D, S,
               targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
@@ -149,7 +149,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
         }
         else
         {
-            shell.matrixType = DENSE;
+            shell.type = DENSE;
             hmatrix_tools::ConvertSubmatrix
             ( shell.D, S,
               targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,

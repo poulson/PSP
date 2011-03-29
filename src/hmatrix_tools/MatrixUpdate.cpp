@@ -27,19 +27,22 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n || A.symmetric != B.symmetric )
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to update with nonconforming matrices.");
+    // TODO: Allow for A to be symmetric when B is general
+    if( A.Symmetric() && B.General() )
+        throw std::logic_error("A-symmetric/B-general not yet implemented.");
+    if( A.General() && B.Symmetric() )
+        throw std::logic_error("Cannot update a symmetric matrix with a general one");
 #endif
-    const int m = A.m;
-    const int n = A.n;
-    const int lda = A.ldim;
-    const int ldb = B.ldim;
-    if( A.symmetric )
+    const int m = A.Height();
+    const int n = A.Width();
+    if( A.Symmetric() )
     {
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT ACol = &A.buffer[j*lda];
-            Scalar* RESTRICT BCol = &B.buffer[j*ldb];
+            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
+            Scalar* RESTRICT BCol = B.Buffer(0,j);
             for( int i=j; i<m; ++i )
                 BCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
@@ -48,8 +51,8 @@ void psp::hmatrix_tools::MatrixUpdate
     {
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT ACol = &A.buffer[j*lda];
-            Scalar* RESTRICT BCol = &B.buffer[j*ldb];
+            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
+            Scalar* RESTRICT BCol = B.Buffer(0,j);
             for( int i=0; i<m; ++i )
                 BCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
@@ -104,19 +107,15 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n  )
+    if( A.m != B.Height() || A.n != B.Width()  )
         throw std::logic_error("Tried to update with nonconforming matrices.");
-    if( B.symmetric )
+    if( B.Symmetric() )
         throw std::logic_error("Unsafe update of symmetric dense matrix.");
 #endif
-    const int m = A.m;
-    const int n = A.n;
-    const int ldb = B.ldim;
-
     blas::Gemm
     ( 'N', 'C', A.m, A.n, A.r, 
       alpha, &A.U[0], A.m, &A.V[0], A.n, 
-      beta, &B.buffer[0], B.ldim );
+      beta, B.Buffer(), B.LDim() );
 }
 
 // Dense update B := alpha A + beta B

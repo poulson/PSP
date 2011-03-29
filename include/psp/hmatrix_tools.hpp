@@ -27,7 +27,10 @@
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
-#include "psp/flat_matrices.hpp"
+#include "psp/vector.hpp"
+#include "psp/dense_matrix.hpp"
+#include "psp/factor_matrix.hpp"
+#include "psp/sparse_matrix.hpp"
 
 namespace psp {
 namespace hmatrix_tools {
@@ -192,14 +195,14 @@ void MatrixMultiply
 template<typename Scalar>
 void MatrixVector
 ( Scalar alpha, const DenseMatrix<Scalar>& D, 
-                const std::vector<Scalar>& x,
-  Scalar beta,        std::vector<Scalar>& y );
+                const Vector<Scalar>& x,
+  Scalar beta,        Vector<Scalar>& y );
 // y := alpha F x + beta y
 template<typename Scalar>
 void MatrixVector
 ( Scalar alpha, const FactorMatrix<Scalar>& F, 
-                const std::vector<Scalar>& x,
-  Scalar beta,        std::vector<Scalar>& y );
+                const Vector<Scalar>& x,
+  Scalar beta,        Vector<Scalar>& y );
 
 /*\
 |*| Matrix-Vector multiply, y := alpha A x 
@@ -208,14 +211,14 @@ void MatrixVector
 template<typename Scalar>
 void MatrixVector
 ( Scalar alpha, const DenseMatrix<Scalar>& D, 
-                const std::vector<Scalar>& x,
-                      std::vector<Scalar>& y );
+                const Vector<Scalar>& x,
+                      Vector<Scalar>& y );
 // y := alpha F x
 template<typename Scalar>
 void MatrixVector
 ( Scalar alpha, const FactorMatrix<Scalar>& F, 
-                const std::vector<Scalar>& x,
-                      std::vector<Scalar>& y );
+                const Vector<Scalar>& x,
+                      Vector<Scalar>& y );
 
 /*\
 |*| Dense inversion, D := inv(D)

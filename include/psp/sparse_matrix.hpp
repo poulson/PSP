@@ -18,25 +18,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_FLAT_MATRICES_HPP
-#define PSP_FLAT_MATRICES_HPP 1
-
-#include <complex>
-#include <vector>
+#ifndef PSP_SPARSE_MATRIX_HPP
+#define PSP_SPARSE_MATRIX_HPP 1
 
 namespace psp {
-
-// A basic dense matrix representation that is used for storing blocks 
-// whose sources and targets are too close to represent as low rank
-template<typename Scalar>
-struct DenseMatrix
-{
-    bool symmetric;
-    int m; // height of matrix
-    int n; // width of matrix
-    int ldim; // leading dimension of matrix
-    std::vector<Scalar> buffer; // column-major buffer
-};
 
 // A simple Compressed Sparse Row (CSR) data structure
 template<typename Scalar>
@@ -51,19 +36,6 @@ struct SparseMatrix
     // TODO: Routines for outputting in Matlab and PETSc formats?
 };
 
-// A basic low-rank matrix representation that is used for the blocks with
-// sufficiently separated sources and targets
-template<typename Scalar>
-struct FactorMatrix
-{
-    int m; // height of matrix
-    int n; // width of matrix
-    int r; // rank of matrix
-    // A = U V^H
-    std::vector<Scalar> U; // buffer for m x r left set of vectors
-    std::vector<Scalar> V; // buffer for n x r right set of vectors
-};
-
 } // namespace psp
 
-#endif // PSP_FLAT_MATRICES_HPP
+#endif // PSP_SPARSE_MATRIX_HPP

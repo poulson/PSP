@@ -18,35 +18,24 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HPP
-#define PSP_HPP 1
-
-#include "mpi.h"
-#include <complex>
-
-#include "psp/config.h"
+#ifndef PSP_FACTOR_MATRIX_HPP
+#define PSP_FACTOR_MATRIX_HPP 1
 
 namespace psp {
 
-template<typename Real>
-inline Real
-Conj( const Real alpha )
-{ return alpha; }
-
-template<typename Real>
-inline std::complex<Real>
-Conj( const std::complex<Real> alpha )
-{ return std::conj( alpha ); }
+// A basic low-rank matrix representation that is used for the blocks with
+// sufficiently separated sources and targets
+template<typename Scalar>
+struct FactorMatrix
+{
+    int m; // height of matrix
+    int n; // width of matrix
+    int r; // rank of matrix
+    // A = U V^H
+    std::vector<Scalar> U; // buffer for m x r left set of vectors
+    std::vector<Scalar> V; // buffer for n x r right set of vectors
+};
 
 } // namespace psp
 
-#include "psp/blas.hpp"
-#include "psp/lapack.hpp"
-#include "psp/vector.hpp"
-#include "psp/dense_matrix.hpp"
-#include "psp/factor_matrix.hpp"
-#include "psp/sparse_matrix.hpp"
-#include "psp/hmatrix_tools.hpp"
-#include "psp/hmatrix_quasi2d.hpp"
-
-#endif // PSP_HPP
+#endif // PSP_FACTOR_MATRIX_HPP

@@ -28,11 +28,11 @@ namespace psp {
 template<typename Scalar>
 class HMatrix_Quasi2d
 {
-    enum MatrixType { NODE, NODE_SYMMETRIC, DENSE, DENSE_SYMMETRIC, FACTOR };
+    enum ShellType { NODE, NODE_SYMMETRIC, DENSE, DENSE_SYMMETRIC, FACTOR };
 
     struct MatrixShell 
     {
-        MatrixType matrixType;        
+        ShellType type;        
 
         // Only one of the following will be active
         std::vector<MatrixShell> children;
@@ -58,6 +58,30 @@ class HMatrix_Quasi2d
       int sourceOffset, int xSizeSource, int ySizeSource,
       int targetOffset, int xSizeTarget, int ySizeTarget );
 
+    // y := alpha H x + beta y
+    void RecursiveMatrixVector
+    ( Scalar alpha, const MatrixShell& shell, 
+                    const Vector<Scalar>& x,
+      Scalar beta,        Vector<Scalar>& y );       
+
+    // y := alpha H x
+    void RecursiveMatrixVector
+    ( Scalar alpha, const MatrixShell& shell,
+                    const Vector<Scalar>& x,
+                          Vector<Scalar>& y );
+
+    // C := alpha H B + beta C
+    void RecursiveMatrixMultiply
+    ( Scalar alpha, const MatrixShell& shell,
+                    const DenseMatrix<Scalar>& B,
+      Scalar beta,        DenseMatrix<Scalar>& C );
+
+    // C := alpha H B
+    void RecursiveMatrixMultiply
+    ( Scalar alpha, const MatrixShell& shell,
+                    const DenseMatrix<Scalar>& B,
+                          DenseMatrix<Scalar>& C );
+
 public:
     // This will convert a sparse matrix over an xSize x ySize x zSize domain
     // that is quasi-2d hierarchically ordered into an H-matrix with the
@@ -75,6 +99,21 @@ public:
 
     ~HMatrix_Quasi2d();
 
+    // y := alpha H x + beta y
+    void MapVector
+    ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y );
+
+    // y := alpha H x
+    void MapVector
+    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y );
+
+    // C := alpha H B + beta C
+    void MapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, Scalar beta, DenseMatrix<Scalar>& C );
+
+    // C := alpha H B
+    void MapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C );
 };
 
 } // namespace psp

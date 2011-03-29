@@ -26,20 +26,21 @@ void psp::hmatrix_tools::ConvertSubmatrix
   int iStart, int iEnd, int jStart, int jEnd )
 {
     // Initialize the dense matrix to all zeros
-    D.symmetric = ( S.symmetric && iStart == jStart );
-    D.m = iEnd - iStart;
-    D.n = jEnd - jStart;
-    D.ldim = D.m;
-    D.buffer.resize( D.ldim*D.n );
-    std::memset( &D.buffer[0], 0, D.ldim*D.n*sizeof(Scalar) );
+    if( S.symmetric && iStart == jStart )
+        D.SetType( SYMMETRIC );
+    else 
+        D.SetType( GENERAL );
+    D.Resize( iEnd-iStart, jEnd-jStart );
+    std::memset( D.Buffer(), 0, D.LDim()*D.Width()*sizeof(Scalar) );
 #ifndef RELEASE
-    if( D.symmetric && iEnd != jEnd )
+    if( D.Symmetric() && iEnd != jEnd )
         throw std::logic_error("Invalid submatrix of symmetric sparse matrix.");
 #endif
 
     // Add in the nonzeros, one row at a time
-    const int m = D.m;
-    const int ldim = D.ldim;
+    const int m = D.Height();
+    const int ldim = D.LDim();
+    Scalar* DBuffer = D.Buffer();
     for( int iOffset=0; iOffset<m; ++iOffset )
     {
         const int thisRowOffset = S.rowOffsets[iStart+iOffset];
@@ -54,7 +55,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
             else if( thisColIndex < jEnd )
             {
                 const int jOffset = thisColIndex - jStart;
-                D.buffer[iOffset+jOffset*ldim] = S.nonzeros[thisRowOffset+k];
+                DBuffer[iOffset+jOffset*ldim] = S.nonzeros[thisRowOffset+k];
             }
             else
                 break;

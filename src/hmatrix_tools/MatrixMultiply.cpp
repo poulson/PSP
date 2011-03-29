@@ -31,37 +31,34 @@ void psp::hmatrix_tools::MatrixMultiply
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( A.symmetric && B.symmetric )
+    if( A.Symmetric() && B.Symmetric() )
         throw std::logic_error("Product of symmetric matrices not supported.");
 #endif
-    C.m = A.m;
-    C.n = B.n;
-    C.ldim = C.m;
-    C.buffer.resize( C.ldim*C.n );
-    C.symmetric = false;
+    C.Resize( A.Height(), B.Width() );
+    C.SetType( GENERAL );
 
-    if( A.symmetric )
+    if( A.Symmetric() )
     {
         blas::Symm
-        ( 'L', 'L', C.m, C.n,
-          alpha, &A.buffer[0], A.ldim, &B.buffer[0], B.ldim, 
-          0, &C.buffer[0], C.ldim );
+        ( 'L', 'L', C.Height(), C.Width(),
+          alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(), 
+          0, C.Buffer(), C.LDim() );
     }
-    else if( B.symmetric )
+    else if( B.Symmetric() )
     {
         blas::Symm
-        ( 'R', 'L', C.m, C.n,
-          alpha, &B.buffer[0], B.ldim, &A.buffer[0], A.ldim,
-          0, &C.buffer[0], C.ldim );
+        ( 'R', 'L', C.Height(), C.Width(),
+          alpha, B.LockedBuffer(), B.LDim(), A.LockedBuffer(), A.LDim(),
+          0, C.Buffer(), C.LDim() );
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.m, C.n, A.n,
-          alpha, &A.buffer[0], A.ldim, &B.buffer[0], B.ldim,
-          0, &C.buffer[0], C.ldim );
+        ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+          alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(),
+          0, C.Buffer(), C.LDim() );
     }
 }
 
@@ -134,29 +131,27 @@ void psp::hmatrix_tools::MatrixMultiply
                       FactorMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.Width() != B.m )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( A.symmetric && A.m != A.n )
-        throw std::logic_error("Nonsquare matrices cannot be symmetric.");
 #endif
-    C.m = A.m;
+    C.m = A.Height();
     C.n = B.n;
     C.r = B.r;
     C.U.resize( C.m*C.r );
     C.V.resize( C.n*C.r );
 
     // Form C.U := A B.U
-    if( A.symmetric )
+    if( A.Symmetric() )
     {
         blas::Symm
         ( 'L', 'L', C.m, C.r, 
-          alpha, &A.buffer[0], A.ldim, &B.U[0], B.m, 0, &C.U[0], C.m );
+          alpha, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &C.U[0], C.m );
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.m, C.r, A.n,
-          alpha, &A.buffer[0], A.ldim, &B.U[0], B.m, 0, &C.U[0], C.m );
+        ( 'N', 'N', C.m, C.r, A.Width(),
+          alpha, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &C.U[0], C.m );
     }
 
     // Form C.V := B.V
@@ -171,13 +166,11 @@ void psp::hmatrix_tools::MatrixMultiply
                       FactorMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.n != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( B.symmetric && B.m != B.n )
-        throw std::logic_error("Nonsquare matrices cannot be symmetric.");
 #endif
     C.m = A.m;
-    C.n = B.n;
+    C.n = B.Width();
     C.r = A.r;
     C.U.resize( C.m*C.r );
     C.V.resize( C.n*C.r );
@@ -186,7 +179,7 @@ void psp::hmatrix_tools::MatrixMultiply
     std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
 
     // Form C.V := B' V
-    if( B.symmetric )
+    if( B.Symmetric() )
     {
         // Since B is symmetric, B' V = conj(B) V = conj(B conj(V))
         const int size = A.n*A.r;
@@ -197,7 +190,7 @@ void psp::hmatrix_tools::MatrixMultiply
 
         blas::Symm
         ( 'L', 'L', C.n, C.r, 
-          alpha, &B.buffer[0], B.ldim, &W[0], A.n, 0, &C.V[0], C.n );
+          alpha, B.LockedBuffer(), B.LDim(), &W[0], A.n, 0, &C.V[0], C.n );
 
         Scalar* CV = &C.V[0];
         for( int i=0; i<size; ++i )
@@ -206,8 +199,8 @@ void psp::hmatrix_tools::MatrixMultiply
     else
     {
         blas::Gemm
-        ( 'C', 'N', C.n, C.r, B.m,
-          alpha, &B.buffer[0], B.ldim, &A.V[0], A.n, 0, &C.V[0], C.n );
+        ( 'C', 'N', C.n, C.r, B.Height(),
+          alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 0, &C.V[0], C.n );
     }
 }
 
@@ -219,35 +212,30 @@ void psp::hmatrix_tools::MatrixMultiply
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.Width() != B.m )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( A.symmetric && A.m != A.n )
-        throw std::logic_error("Nonsquare matrices cannot be symmetric.");
 #endif
-    C.m = A.m;
-    C.n = B.n;
-    C.ldim = C.m;
-    C.buffer.resize( C.ldim*C.n );
-    C.symmetric = false;
+    C.Resize( A.Height(), B.n );
+    C.SetType( GENERAL );
 
     // W := A B.U
-    std::vector<Scalar> W( A.m*B.r );
-    if( A.symmetric )
+    std::vector<Scalar> W( A.Height()*B.r );
+    if( A.Symmetric() )
     {
         blas::Symm
-        ( 'L', 'L', C.m, B.r,
-          1, &A.buffer[0], A.ldim, &B.U[0], B.m, 0, &W[0], A.m );
+        ( 'L', 'L', C.Height(), B.r,
+          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.m, B.r, A.n,
-          1, &A.buffer[0], A.ldim, &B.U[0], B.m, 0, &W[0], A.m );
+        ( 'N', 'N', C.Height(), B.r, A.Width(),
+          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
     }
     // C := alpha W B.V' = alpha (A B.U) B.V'
     blas::Gemm
-    ( 'N', 'C', C.m, C.n, B.r,
-      alpha, &W[0], A.m, &B.V[0], B.n, 0, &C.buffer[0], C.ldim );
+    ( 'N', 'C', C.Height(), C.Width(), B.r,
+      alpha, &W[0], A.Height(), &B.V[0], B.n, 0, C.Buffer(), C.LDim() );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
@@ -258,18 +246,13 @@ void psp::hmatrix_tools::MatrixMultiply
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.n != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( B.symmetric && B.m != B.n )
-        throw std::logic_error("Nonsquare matrices cannot be symmetric.");
 #endif
-    C.m = A.m;
-    C.n = B.n;
-    C.ldim = C.m;
-    C.buffer.resize( C.ldim*C.n );
-    C.symmetric = false;
+    C.Resize( A.m, B.Width() );
+    C.SetType( GENERAL );
 
-    if( B.symmetric )
+    if( B.Symmetric() )
     {
         // Form AVConj := conj(A.V)
         const int size = A.n*A.r;
@@ -279,26 +262,26 @@ void psp::hmatrix_tools::MatrixMultiply
             AVConj[i] = Conj( AV[i] );
         
         // W := B conj(A.V) = conj(B' A.V) = conj( (A.V' B)' ) = (A.V' B)^T
-        std::vector<Scalar> W( B.m*A.r );
+        std::vector<Scalar> W( B.Height()*A.r );
         blas::Symm
-        ( 'L', 'L', B.m, A.r,
-          1, &B.buffer[0], B.ldim, &AVConj[0], A.n, 0, &W[0], B.m );
+        ( 'L', 'L', B.Height(), A.r,
+          1, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 0, &W[0], B.Height() );
         // C := alpha A.U W^T =  alpha A.U (A.V' B)
         blas::Gemm
-        ( 'N', 'T', C.m, C.n, A.r,
-          alpha, &A.U[0], A.m, &W[0], B.m, 0, &C.buffer[0], C.ldim );
+        ( 'N', 'T', C.Height(), C.Width(), A.r,
+          alpha, &A.U[0], A.m, &W[0], B.Height(), 0, C.Buffer(), C.LDim() );
     }
     else
     {
-        std::vector<Scalar> W( A.r*B.n );
+        std::vector<Scalar> W( A.r*B.Width() );
         // W := A.V' B
         blas::Gemm
-        ( 'C', 'N', A.r, B.n, A.n,
-          1, &A.V[0], A.n, &B.buffer[0], B.ldim, 0, &W[0], A.r );
+        ( 'C', 'N', A.r, B.Width(), A.n,
+          1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
         // C := alpha A.U W = alpha A.U (A.V' B)
         blas::Gemm
-        ( 'N', 'N', C.m, C.n, A.r,
-          alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.buffer[0], C.ldim );
+        ( 'N', 'N', C.Height(), C.Width(), A.r,
+          alpha, &A.U[0], A.m, &W[0], A.r, 0, C.Buffer(), C.LDim() );
     }
 }
 
