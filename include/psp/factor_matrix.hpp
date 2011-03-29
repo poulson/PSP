@@ -23,15 +23,19 @@
 
 namespace psp {
 
+// NOTE: We have two different factorized forms since Hermitian-transposes are
+//       more natural, but plain transposes will almost certainly be faster for
+//       complex symmetric problems.
+
 // A basic low-rank matrix representation that is used for the blocks with
-// sufficiently separated sources and targets
-template<typename Scalar>
+// sufficiently separated sources and targets. 
+template<typename Scalar,bool Conjugate>
 struct FactorMatrix
 {
     int m; // height of matrix
     int n; // width of matrix
     int r; // rank of matrix
-    // A = U V^H
+    // If Conjugate == true, then A = U V^H, otherwise, A = U V^T. 
     std::vector<Scalar> U; // buffer for m x r left set of vectors
     std::vector<Scalar> V; // buffer for n x r right set of vectors
 };

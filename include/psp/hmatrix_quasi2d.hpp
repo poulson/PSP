@@ -37,7 +37,7 @@ class HMatrix_Quasi2d
         // Only one of the following will be active
         std::vector<MatrixShell> children;
         DenseMatrix<Scalar> D;
-        FactorMatrix<Scalar> F;
+        FactorMatrix<Scalar,false> F; // A = U V^T
     };
 
     const bool _symmetric;
@@ -109,7 +109,8 @@ public:
 
     // C := alpha H B + beta C
     void MapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& B, Scalar beta, DenseMatrix<Scalar>& C );
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, 
+      Scalar beta, DenseMatrix<Scalar>& C );
 
     // C := alpha H B
     void MapMatrix

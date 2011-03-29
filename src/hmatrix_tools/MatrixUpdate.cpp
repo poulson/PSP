@@ -60,10 +60,10 @@ void psp::hmatrix_tools::MatrixUpdate
 }
 
 // Low-rank B := alpha A + beta B
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
-  Scalar beta,        FactorMatrix<Scalar>& B )
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+  Scalar beta,        FactorMatrix<Scalar,Conjugate>& B )
 {
 #ifndef RELEASE
     if( A.m != B.m || A.n != B.n )
@@ -101,9 +101,9 @@ void psp::hmatrix_tools::MatrixUpdate
 }
 
 // Dense updated with factored, B := alpha A + beta B
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
@@ -112,8 +112,9 @@ void psp::hmatrix_tools::MatrixUpdate
     if( B.Symmetric() )
         throw std::logic_error("Unsafe update of symmetric dense matrix.");
 #endif
+    const char option = ( Conjugate ? 'C' : 'T' );
     blas::Gemm
-    ( 'N', 'C', A.m, A.n, A.r, 
+    ( 'N', option, A.m, A.n, A.r, 
       alpha, &A.U[0], A.m, &A.V[0], A.n, 
       beta, B.Buffer(), B.LDim() );
 }
@@ -134,28 +135,55 @@ template void psp::hmatrix_tools::MatrixUpdate
 
 // Low-rank update B := alpha A + beta B
 template void psp::hmatrix_tools::MatrixUpdate
-( float alpha, const FactorMatrix<float>& A,
-  float beta,        FactorMatrix<float>& B );
+( float alpha, const FactorMatrix<float,false>& A,
+  float beta,        FactorMatrix<float,false>& B );
 template void psp::hmatrix_tools::MatrixUpdate
-( double alpha, const FactorMatrix<double>& A,
-  double beta,        FactorMatrix<double>& B );
+( float alpha, const FactorMatrix<float,true>& A,
+  float beta,        FactorMatrix<float,true>& B );
 template void psp::hmatrix_tools::MatrixUpdate
-( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
-  std::complex<float> beta,        FactorMatrix< std::complex<float> >& B );
+( double alpha, const FactorMatrix<double,false>& A,
+  double beta,        FactorMatrix<double,false>& B );
 template void psp::hmatrix_tools::MatrixUpdate
-( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
-  std::complex<double> beta,        FactorMatrix< std::complex<double> >& B );
+( double alpha, const FactorMatrix<double,true>& A,
+  double beta,        FactorMatrix<double,true>& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
+  std::complex<float> beta,        FactorMatrix<std::complex<float>,false>& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
+  std::complex<float> beta,        FactorMatrix<std::complex<float>,true>& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
+  std::complex<double> beta,        FactorMatrix<std::complex<double>,false>& B
+);
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
+  std::complex<double> beta,        FactorMatrix<std::complex<double>,true>& B
+);
+
 
 // Dense updated with factor, B := alpha A + beta B
 template void psp::hmatrix_tools::MatrixUpdate
-( float alpha, const FactorMatrix<float>& A,
+( float alpha, const FactorMatrix<float,false>& A,
   float beta,        DenseMatrix<float>& B );
 template void psp::hmatrix_tools::MatrixUpdate
-( double alpha, const FactorMatrix<double>& A,
+( float alpha, const FactorMatrix<float,true>& A,
+  float beta,        DenseMatrix<float>& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( double alpha, const FactorMatrix<double,false>& A,
   double beta,        DenseMatrix<double>& B );
 template void psp::hmatrix_tools::MatrixUpdate
-( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+( double alpha, const FactorMatrix<double,true>& A,
+  double beta,        DenseMatrix<double>& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& B );
 template void psp::hmatrix_tools::MatrixUpdate
-( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
+  std::complex<float> beta,        DenseMatrix< std::complex<float> >& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
+  std::complex<double> beta,        DenseMatrix< std::complex<double> >& B );
+template void psp::hmatrix_tools::MatrixUpdate
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& B );

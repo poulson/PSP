@@ -21,11 +21,11 @@
 #include "psp.hpp"
 
 // B :~= alpha A + beta B
-template<typename Real>
+template<typename Real,bool Conjugate>
 void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real>& A, 
-  Real beta,        FactorMatrix<Real>& B )
+  Real alpha, const FactorMatrix<Real,Conjugate>& A, 
+  Real beta,        FactorMatrix<Real,Conjugate>& B )
 {
     const int m = A.m;
     const int n = A.n;
@@ -151,7 +151,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //  [offset,offset+blockSize): R1                                         //
     //------------------------------------------------------------------------//
 
-    // Update W := R1 (R2^H). We are unfortunately performing 2x as many
+    // Update W := R1 R2^T. We are unfortunately performing 2x as many
     // flops as are required.
     blas::Trmm
     ( 'R', 'U', 'T', 'N', r, r, 
@@ -161,10 +161,10 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // buffer contains:                                                       //
     //  [0,leftPanelSize):         qr([(alpha A.U), (beta B.U)])              //
     //  [leftPanelSize,offset):    qr([A.V, B.V])                             //
-    //  [offset,offset+blockSize): R1 R2^H                                    //
+    //  [offset,offset+blockSize): R1 R2^T                                    //
     //------------------------------------------------------------------------//
 
-    // Get the SVD of R1 R2^H, overwriting R1 R2^H with U
+    // Get the SVD of R1 R2^T, overwriting R1 R2^T with U
     std::vector<Real> s( r );
     lapack::SVD
     ( 'O', 'A', r, r, &buffer[offset], r, 
@@ -175,8 +175,8 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // buffer contains:                                                       //
     //  [0,leftPanelSize):                     qr([(alpha A.U),(beta B.U)])   //
     //  [leftPanelSize,offset):                qr([A.V, B.V])                 //
-    //  [offset,offset+blockSize):             U of R1 R2^H                   //
-    //  [offset+blockSize,offset+2*blockSize): V^H of R1 R2^H                 //
+    //  [offset,offset+blockSize):             U of R1 R2^T                   //
+    //  [offset+blockSize,offset+2*blockSize): V^T of R1 R2^T                 //
     //------------------------------------------------------------------------//
 
     // Get B ready for the rounded factors
@@ -191,39 +191,40 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = s[j];
-        const Real* RESTRICT UColOrig = &buffer[offset+j*r];
+        const Real* RESTRICT UCol = &buffer[offset+j*r];
         Real* RESTRICT UColScaled = &B.U[j*m];
         for( int i=0; i<r; ++i )
-            UColScaled[i] = sigma*UColOrig[i];
+            UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'C', m, roundedRank, r, &buffer[0], B.m, &tauU[0], &B.U[0], B.m, 
+    ( 'L', 'T', m, roundedRank, r, &buffer[0], B.m, &tauU[0], &B.U[0], B.m, 
       &buffer[offset], blockSize );
 
     // Form the rounded B.V by first filling it with 
-    //  | (VH_Top)^H |, and then hitting it from the left with Q2
+    //  | (VT_Top)^T |, and then hitting it from the left with Q2
     //  |      0     |
     std::memset( &B.V[0], 0, n*roundedRank*sizeof(Real) );
     for( int j=0; j<roundedRank; ++j )
     {
-        const Real* RESTRICT VRowOrig = &buffer[offset+blockSize+j];
-        Real* RESTRICT VColConj = &B.V[j*n];
+        const Real* RESTRICT VTRow = &buffer[offset+blockSize+j];
+        Real* RESTRICT VCol = &B.V[j*n];
         for( int i=0; i<r; ++i )
-            VColConj[i] = VRowOrig[i*r];
+            VCol[i] = VTRow[i*r];
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'C', n, roundedRank, r, &buffer[leftPanelSize], B.n, &tauV[0], 
+    ( 'L', 'T', n, roundedRank, r, &buffer[leftPanelSize], B.n, &tauV[0], 
       &B.V[0], B.n, &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 }
 
-template<typename Real>
+template<typename Real,bool Conjugate>
 void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  std::complex<Real> alpha, const FactorMatrix< std::complex<Real> >& A, 
-  std::complex<Real> beta,        FactorMatrix< std::complex<Real> >& B )
+  std::complex<Real> alpha, const FactorMatrix<std::complex<Real>,Conjugate>& A,
+  std::complex<Real> beta,        FactorMatrix<std::complex<Real>,Conjugate>& B 
+)
 {
     typedef std::complex<Real> Scalar;
 
@@ -351,20 +352,21 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //  [offset,offset+blockSize): R1                                         //
     //------------------------------------------------------------------------//
 
-    // Update W := R1 (R2^H). We are unfortunately performing 2x as many
+    // Update W := R1 R2^[T,H]. We are unfortunately performing 2x as many
     // flops as are required.
+    const char option = ( Conjugate ? 'C' : 'T' );
     blas::Trmm
-    ( 'R', 'U', 'T', 'N', r, r, 
+    ( 'R', 'U', option, 'N', r, r, 
       1, &buffer[leftPanelSize], n, &buffer[offset], r );
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
     //  [0,leftPanelSize):         qr([(alpha A.U), (beta B.U)])              //
     //  [leftPanelSize,offset):    qr([A.V, B.V])                             //
-    //  [offset,offset+blockSize): R1 R2^H                                    //
+    //  [offset,offset+blockSize): R1 R2^[T,H]                                //
     //------------------------------------------------------------------------//
 
-    // Get the SVD of R1 R2^H, overwriting R1 R2^H with U
+    // Get the SVD of R1 R2^[T,H], overwriting R1 R2^[T,H] with U
     std::vector<Real> realBuffer( 6*r );
     lapack::SVD
     ( 'O', 'A', r, r, &buffer[offset], r, 
@@ -375,11 +377,11 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // buffer contains:                                                       //
     //  [0,leftPanelSize):                     qr([(alpha A.U),(beta B.U)])   //
     //  [leftPanelSize,offset):                qr([A.V, B.V])                 //
-    //  [offset,offset+blockSize):             U of R1 R2^H                   //
-    //  [offset+blockSize,offset+2*blockSize): V^H of R1 R2^H                 //
+    //  [offset,offset+blockSize):             U of R1 R2^[T,H]               //
+    //  [offset+blockSize,offset+2*blockSize): V^H of R1 R2^[T,H]             //
     //                                                                        //
     // realBuffer contains:                                                   //
-    //   [0,r): singular values of R1 R2^H                                    //
+    //   [0,r): singular values of R1 R2^[T,H]                                //
     //------------------------------------------------------------------------//
 
     // Get B ready for the rounded factors
@@ -394,10 +396,10 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = realBuffer[j];
-        const Scalar* RESTRICT UColOrig = &buffer[offset+j*r];
+        const Scalar* RESTRICT UCol = &buffer[offset+j*r];
         Scalar* RESTRICT UColScaled = &B.U[j*m];
         for( int i=0; i<r; ++i )
-            UColScaled[i] = sigma*UColOrig[i];
+            UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
@@ -405,15 +407,28 @@ void psp::hmatrix_tools::MatrixUpdateRounded
       &buffer[offset], blockSize );
 
     // Form the rounded B.V by first filling it with 
-    //  | (VH_Top)^H |, and then hitting it from the left with Q2
-    //  |      0     |
+    //  | (VH_Top)^[T,H] |, and then hitting it from the left with Q2
+    //  |      0         |
     std::memset( &B.V[0], 0, n*roundedRank*sizeof(Scalar) );
-    for( int j=0; j<roundedRank; ++j )
+    if( Conjugate )
     {
-        const Scalar* RESTRICT VRowOrig = &buffer[offset+blockSize+j];
-        Scalar* RESTRICT VColConj = &B.V[j*n];
-        for( int i=0; i<r; ++i )
-            VColConj[i] = Conj( VRowOrig[i*r] );
+        for( int j=0; j<roundedRank; ++j )
+        {
+            const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
+            Scalar* RESTRICT VCol = &B.V[j*n];
+            for( int i=0; i<r; ++i )
+                VCol[i] = Conj( VHRow[i*r] );
+        }
+    }
+    else
+    {
+        for( int j=0; j<roundedRank; ++j )
+        {
+            const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
+            Scalar* RESTRICT VColConj = &B.V[j*n];
+            for( int i=0; i<r; ++i )
+                VColConj[i] = VHRow[i*r];
+        }
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
@@ -424,17 +439,34 @@ void psp::hmatrix_tools::MatrixUpdateRounded
 
 template void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  float alpha, const FactorMatrix<float>& A,
-  float beta,        FactorMatrix<float>& B );
+  float alpha, const FactorMatrix<float,false>& A,
+  float beta,        FactorMatrix<float,false>& B );
 template void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  double alpha, const FactorMatrix<double>& A,
-  double beta,        FactorMatrix<double>& B );
+  float alpha, const FactorMatrix<float,true>& A,
+  float beta,        FactorMatrix<float,true>& B );
 template void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
-  std::complex<float> beta,        FactorMatrix< std::complex<float> >& B );
+  double alpha, const FactorMatrix<double,false>& A,
+  double beta,        FactorMatrix<double,false>& B );
 template void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
-  std::complex<double> beta,        FactorMatrix< std::complex<double> >& B );
+  double alpha, const FactorMatrix<double,true>& A,
+  double beta,        FactorMatrix<double,true>& B );
+template void psp::hmatrix_tools::MatrixUpdateRounded
+( int maxRank,
+  std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
+  std::complex<float> beta,        FactorMatrix<std::complex<float>,false>& B );template void psp::hmatrix_tools::MatrixUpdateRounded
+( int maxRank,
+  std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
+  std::complex<float> beta,        FactorMatrix<std::complex<float>,true>& B );
+template void psp::hmatrix_tools::MatrixUpdateRounded
+( int maxRank,
+  std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
+  std::complex<double> beta,        FactorMatrix<std::complex<double>,false>& B 
+);
+template void psp::hmatrix_tools::MatrixUpdateRounded
+( int maxRank,
+  std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
+  std::complex<double> beta,        FactorMatrix<std::complex<double>,true>& B 
+);

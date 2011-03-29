@@ -23,6 +23,7 @@
 
 #include "psp/config.h"
 #include <complex>
+#include <cstring>
 #include <sstream>
 #include <stdexcept>
 
@@ -342,6 +343,10 @@ inline void ApplyQ
         float* C, int ldc,
         float* work, int lwork )
 {
+    // Convert the more general complex option to the real case
+    if( trans == 'C' || trans == 'c' )
+        trans = 'T';
+
     int info;
     LAPACK(sormqr)
     ( &side, &trans, &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, &info );
@@ -362,6 +367,10 @@ inline void ApplyQ
         double* C, int ldc,
         double* work, int lwork )
 {
+    // Convert the more general complex option to the real case
+    if( trans == 'C' || trans == 'c' )
+        trans = 'T';
+
     int info;
     LAPACK(dormqr)
     ( &side, &trans, &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, &info );

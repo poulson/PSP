@@ -72,18 +72,19 @@ void psp::hmatrix_tools::MatrixVector
 }
 
 // Low-rank y := alpha A x + beta y
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
     const int r = A.r;
     std::vector<Scalar> t(r);
 
-    // Form t := alpha (A.V)^H x
+    // Form t := alpha (A.V)^[T,H] x
+    const char option = ( Conjugate ? 'C' : 'T' );
     blas::Gemv
-    ( 'C', A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( option, A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
     // Form y := (A.U) t + beta y
     blas::Gemv
@@ -91,18 +92,19 @@ void psp::hmatrix_tools::MatrixVector
 }
 
 // Low-rank y := alpha A x
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
     const int r = A.r;
     std::vector<Scalar> t(r);
 
-    // Form t := alpha (A.V)^H x
+    // Form t := alpha (A.V)^[T,H] x
+    const char option = ( Conjugate ? 'C' : 'T' );
     blas::Gemv
-    ( 'C', A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( option, A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
     // Form y := (A.U) t
     y.Resize( x.Size() );
@@ -145,36 +147,68 @@ template void psp::hmatrix_tools::MatrixVector
                                     Vector< std::complex<double> >& y );
 
 template void psp::hmatrix_tools::MatrixVector
-( float alpha, const FactorMatrix<float>& A,
+( float alpha, const FactorMatrix<float,false>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
 template void psp::hmatrix_tools::MatrixVector
-( double alpha, const FactorMatrix<double>& A,
+( float alpha, const FactorMatrix<float,true>& A,
+               const Vector<float>& x,
+  float beta,        Vector<float>& y );
+template void psp::hmatrix_tools::MatrixVector
+( double alpha, const FactorMatrix<double,false>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+( double alpha, const FactorMatrix<double,true>& A,
+                const Vector<double>& x,
+  double beta,        Vector<double>& y );
+template void psp::hmatrix_tools::MatrixVector
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const Vector< std::complex<float> >& x,
   std::complex<float> beta,        Vector< std::complex<float> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
+                             const Vector< std::complex<float> >& x,
+  std::complex<float> beta,        Vector< std::complex<float> >& y );
+template void psp::hmatrix_tools::MatrixVector
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
+                              const Vector< std::complex<double> >& x,
+  std::complex<double> beta,        Vector< std::complex<double> >& y );
+template void psp::hmatrix_tools::MatrixVector
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const Vector< std::complex<double> >& x,
   std::complex<double> beta,        Vector< std::complex<double> >& y );
 
 template void psp::hmatrix_tools::MatrixVector
-( float alpha, const FactorMatrix<float>& A,
+( float alpha, const FactorMatrix<float,false>& A,
                const Vector<float>& x,
                      Vector<float>& y );
 template void psp::hmatrix_tools::MatrixVector
-( double alpha, const FactorMatrix<double>& A,
+( float alpha, const FactorMatrix<float,true>& A,
+               const Vector<float>& x,
+                     Vector<float>& y );
+template void psp::hmatrix_tools::MatrixVector
+( double alpha, const FactorMatrix<double,false>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<float> alpha, const FactorMatrix< std::complex<float> >& A,
+( double alpha, const FactorMatrix<double,true>& A,
+                const Vector<double>& x,
+                      Vector<double>& y );
+template void psp::hmatrix_tools::MatrixVector
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const Vector< std::complex<float> >& x,
                                    Vector< std::complex<float> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<double> alpha, const FactorMatrix< std::complex<double> >& A,
+( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
+                             const Vector< std::complex<float> >& x,
+                                   Vector< std::complex<float> >& y );
+template void psp::hmatrix_tools::MatrixVector
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
+                              const Vector< std::complex<double> >& x,
+                                    Vector< std::complex<double> >& y );
+template void psp::hmatrix_tools::MatrixVector
+( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const Vector< std::complex<double> >& x,
                                     Vector< std::complex<double> >& y );
 

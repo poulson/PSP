@@ -63,9 +63,9 @@ void psp::hmatrix_tools::ConvertSubmatrix
     }
 }
 
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::ConvertSubmatrix
-( FactorMatrix<Scalar>& F, const SparseMatrix<Scalar>& S,
+( FactorMatrix<Scalar,Conjugate>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd )
 {
     // Count the number of nonzeros in the submatrix
@@ -102,9 +102,12 @@ void psp::hmatrix_tools::ConvertSubmatrix
             else if( thisColIndex < jEnd )
             {
                 const int jOffset = thisColIndex - jStart;
-                const Scalar conjValue = Conj( S.nonzeros[thisRowOffset+k] );
+                const Scalar value = S.nonzeros[thisRowOffset+k];
                 F.U[iOffset+rankCounter*m] = 1;
-                F.V[jOffset+rankCounter*n] = conjValue;
+                if( Conjugate )
+                    F.V[jOffset+rankCounter*n] = Conj( value );
+                else
+                    F.V[jOffset+rankCounter*n] = value;
                 ++rankCounter;
             }
             else
@@ -131,18 +134,34 @@ template void psp::hmatrix_tools::ConvertSubmatrix
   int iStart, int iEnd, int jStart, int jEnd );
 
 template void psp::hmatrix_tools::ConvertSubmatrix
-(       FactorMatrix<float>& F,
+(       FactorMatrix<float,false>& F,
   const SparseMatrix<float>& S,
   int iStart, int iEnd, int jStart, int jEnd );
 template void psp::hmatrix_tools::ConvertSubmatrix
-(       FactorMatrix<double>& F,
+(       FactorMatrix<float,true>& F,
+  const SparseMatrix<float>& S,
+  int iStart, int iEnd, int jStart, int jEnd );
+template void psp::hmatrix_tools::ConvertSubmatrix
+(       FactorMatrix<double,false>& F,
   const SparseMatrix<double>& S,
   int iStart, int iEnd, int jStart, int jEnd );
 template void psp::hmatrix_tools::ConvertSubmatrix
-(       FactorMatrix< std::complex<float> >& F,
+(       FactorMatrix<double,true>& F,
+  const SparseMatrix<double>& S,
+  int iStart, int iEnd, int jStart, int jEnd );
+template void psp::hmatrix_tools::ConvertSubmatrix
+(       FactorMatrix<std::complex<float>,false>& F,
   const SparseMatrix< std::complex<float> >& S,
   int iStart, int iEnd, int jStart, int jEnd );
 template void psp::hmatrix_tools::ConvertSubmatrix
-(       FactorMatrix< std::complex<double> >& F,
+(       FactorMatrix<std::complex<float>,true>& F,
+  const SparseMatrix< std::complex<float> >& S,
+  int iStart, int iEnd, int jStart, int jEnd );
+template void psp::hmatrix_tools::ConvertSubmatrix
+(       FactorMatrix<std::complex<double>,false>& F,
+  const SparseMatrix< std::complex<double> >& S,
+  int iStart, int iEnd, int jStart, int jEnd );
+template void psp::hmatrix_tools::ConvertSubmatrix
+(       FactorMatrix<std::complex<double>,true>& F,
   const SparseMatrix< std::complex<double> >& S,
   int iStart, int iEnd, int jStart, int jEnd );

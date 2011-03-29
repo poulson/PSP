@@ -22,8 +22,9 @@
 #define PSP_HMATRIX_TOOLS_HPP 1
 
 #include <complex>
-#include <cstring>
-#include <vector>
+#include <cstdlib> // for integer abs
+#include <cstring> // for std::memset and std::memcpy
+#include <vector> 
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
@@ -46,21 +47,21 @@ namespace hmatrix_tools {
 /*\
 |*| Ensure that the factor matrix has a rank of at most 'maxRank'
 \*/
-template<typename Real>
-void Compress( int maxRank, FactorMatrix<Real>& F );
-template<typename Real>
-void Compress( int maxRank, FactorMatrix< std::complex<Real> >& F );
+template<typename Real,bool Conjugate>
+void Compress( int maxRank, FactorMatrix<Real,Conjugate>& F );
+template<typename Real,bool Conjugate>
+void Compress( int maxRank, FactorMatrix<std::complex<Real>,Conjugate>& F );
 
-/*\ 
+/*\
 |*| Convert a subset of a sparse matrix to dense/factor form
 \*/
 template<typename Scalar>
 void ConvertSubmatrix
 ( DenseMatrix<Scalar>& D, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd );
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void ConvertSubmatrix
-( FactorMatrix<Scalar>& F, const SparseMatrix<Scalar>& S,
+( FactorMatrix<Scalar,Conjugate>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd );
 
 /*\
@@ -73,28 +74,28 @@ void MatrixAdd
   Scalar beta,  const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // F := alpha F + beta F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar>& A,
-  Scalar beta,  const FactorMatrix<Scalar>& B,
-                      FactorMatrix<Scalar>& C );
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A,
+  Scalar beta,  const FactorMatrix<Scalar,Conjugate>& B,
+                      FactorMatrix<Scalar,Conjugate>& C );
 // D := alpha F + beta D
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar>& A,
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A,
   Scalar beta,  const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D + beta F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixAdd
 ( Scalar alpha, const DenseMatrix<Scalar>& A,
-  Scalar beta,  const FactorMatrix<Scalar>& B,
+  Scalar beta,  const FactorMatrix<Scalar,Conjugate>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F + beta F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar>& A,
-  Scalar beta,  const FactorMatrix<Scalar>& B,
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A,
+  Scalar beta,  const FactorMatrix<Scalar,Conjugate>& B,
                       DenseMatrix<Scalar>& C );
 
 /*\
@@ -106,47 +107,49 @@ void MatrixUpdate
 ( Scalar alpha, const DenseMatrix<Scalar>& A,
   Scalar beta,        DenseMatrix<Scalar>& B );
 // F := alpha F + beta F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar>& A,
-  Scalar beta,        FactorMatrix<Scalar>& B );
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A,
+  Scalar beta,        FactorMatrix<Scalar,Conjugate>& B );
 // D := alpha F + beta D
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar>& A,
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A,
   Scalar beta,        DenseMatrix<Scalar>& B );
 
 /*\
 |*| Generalized add of two factor matrices, C := alpha A + beta B, 
 |*| where C is then forced to be of rank at most 'maxRank'
 \*/
-template<typename Real>
+template<typename Real,bool Conjugate>
 void MatrixAddRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real>& A,
-  Real beta,  const FactorMatrix<Real>& B,
-                    FactorMatrix<Real>& C );
-template<typename Real>
+  Real alpha, const FactorMatrix<Real,Conjugate>& A,
+  Real beta,  const FactorMatrix<Real,Conjugate>& B,
+                    FactorMatrix<Real,Conjugate>& C );
+template<typename Real,bool Conjugate>
 void MatrixAddRounded
 ( int maxRank,
-  std::complex<Real> alpha, const FactorMatrix< std::complex<Real> >& A,
-  std::complex<Real> beta,  const FactorMatrix< std::complex<Real> >& B,
-                                  FactorMatrix< std::complex<Real> >& C );
+  std::complex<Real> alpha, const FactorMatrix<std::complex<Real>,Conjugate>& A,
+  std::complex<Real> beta,  const FactorMatrix<std::complex<Real>,Conjugate>& B,
+                                  FactorMatrix<std::complex<Real>,Conjugate>& C 
+);
 
 /*\
 |*| Generalized update of a factor matrix, B := alpha A + beta B, 
 |*| where B is then forced to be of rank at most 'maxRank'
 \*/
-template<typename Real>
+template<typename Real,bool Conjugate>
 void MatrixUpdateRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real>& A,
-  Real beta,        FactorMatrix<Real>& B );
-template<typename Real>
+  Real alpha, const FactorMatrix<Real,Conjugate>& A,
+  Real beta,        FactorMatrix<Real,Conjugate>& B );
+template<typename Real,bool Conjugate>
 void MatrixUpdateRounded
 ( int maxRank,
-  std::complex<Real> alpha, const FactorMatrix< std::complex<Real> >& A,
-  std::complex<Real> beta,        FactorMatrix< std::complex<Real> >& B );
+  std::complex<Real> alpha, const FactorMatrix<std::complex<Real>,Conjugate>& A,
+  std::complex<Real> beta,        FactorMatrix<std::complex<Real>,Conjugate>& B
+);
 
 /*\
 |*| Matrix Multiply, C := alpha A B
@@ -158,35 +161,35 @@ void MatrixMultiply
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // F := alpha F F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixMultiply
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar>& B,
-                      FactorMatrix<Scalar>& C );
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+                const FactorMatrix<Scalar,Conjugate>& B,
+                      FactorMatrix<Scalar,Conjugate>& C );
 // D := alpha D F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixMultiply
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar>& B,
+                const FactorMatrix<Scalar,Conjugate>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F D
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixMultiply
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // F := alpha D F
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixMultiply
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar>& B,
-                      FactorMatrix<Scalar>& C );
+                const FactorMatrix<Scalar,Conjugate>& B,
+                      FactorMatrix<Scalar,Conjugate>& C );
 // F := alpha F D
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixMultiply
-( Scalar alpha, const FactorMatrix<Scalar>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B,
-                      FactorMatrix<Scalar>& C );
+                      FactorMatrix<Scalar,Conjugate>& C );
 
 /*\
 |*| Matrix-Vector multiply, y := alpha A x + beta y
@@ -198,9 +201,9 @@ void MatrixVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 // y := alpha F x + beta y
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar>& F, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& F, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
@@ -214,9 +217,9 @@ void MatrixVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 // y := alpha F x
-template<typename Scalar>
+template<typename Scalar,bool Conjugate>
 void MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar>& F, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& F, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
