@@ -37,7 +37,7 @@ class HMatrix_Quasi2d
         // Only one of the following will be active
         std::vector<MatrixShell> children;
         DenseMatrix<Scalar> D;
-        FactorMatrix<Scalar,false> F; // A = U V^T
+        FactorMatrix<Scalar,false> F; // F = U V^T
     };
 
     const bool _symmetric;
