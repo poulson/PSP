@@ -265,8 +265,37 @@ void MatrixVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
-// TODO: Transpose Matrix-Vector multiply, y := alpha A^T x + beta y
-// TODO: Transpose Matrix-Vector multiply, y := alpha A^T
+/*\
+|*| Matrix-Transpose-Vector multiply, y := alpha A^T x + beta y
+\*/
+// y := alpha D^T x + beta y
+template<typename Scalar>
+void MatrixTransposeVector
+( Scalar alpha, const DenseMatrix<Scalar>& D, 
+                const Vector<Scalar>& x,
+  Scalar beta,        Vector<Scalar>& y );
+// y := alpha F^T x + beta y
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeVector
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& F, 
+                const Vector<Scalar>& x,
+  Scalar beta,        Vector<Scalar>& y );
+
+/*\
+|*| Matrix-Transpose-Vector multiply, y := alpha A^T x 
+\*/
+// y := alpha D^T x
+template<typename Scalar>
+void MatrixTransposeVector
+( Scalar alpha, const DenseMatrix<Scalar>& D, 
+                const Vector<Scalar>& x,
+                      Vector<Scalar>& y );
+// y := alpha F^T x
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeVector
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& F, 
+                const Vector<Scalar>& x,
+                      Vector<Scalar>& y );
 
 /*\
 |*| Dense inversion, D := inv(D)
