@@ -45,8 +45,9 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
     if( this->Admissible( xSource, ySource, xTarget, yTarget ) )
     {
         shell.type = FACTOR;
+        shell.u.factor = new FactorData;
         hmatrix_tools::ConvertSubmatrix
-        ( shell.F, S, 
+        ( shell.u.factor->F, S, 
           targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
           sourceOffset, sourceOffset+xSizeSource*ySizeSource*_zSize );
     }
@@ -55,108 +56,315 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveConstruction
         if( _symmetric && sourceOffset == targetOffset )
         {
             shell.type = NODE_SYMMETRIC;
-            shell.children.resize( 10 );
+            shell.u.nodeSymmetric = new NodeSymmetricData;
+            shell.u.nodeSymmetric->children.resize( 10 );
 
-            std::vector<int> xSizes(2);
-            std::vector<int> ySizes(2);
+            int* xSizes = shell.u.nodeSymmetric->xSizes;
             xSizes[0] = xSizeSource/2;            // left
             xSizes[1] = xSizeSource - xSizes[0];  // right
+            int* ySizes = shell.u.nodeSymmetric->ySizes;
             ySizes[0] = ySizeSource/2;            // bottom
             ySizes[1] = ySizeSource - ySizes[0];  // top
 
-            std::vector<int> sizes(4);
+            int* sizes = shell.u.nodeSymmetric->sizes;
             sizes[0] = xSizes[0]*ySizes[0]*_zSize; // bottom-left
             sizes[1] = xSizes[1]*ySizes[0]*_zSize; // bottom-right
             sizes[2] = xSizes[0]*ySizes[1]*_zSize; // top-left
             sizes[3] = xSizes[1]*ySizes[1]*_zSize; // top-right
 
             int child = 0;
-            int jStart = sourceOffset;
-            for( int s=0; s<4; ++s )
+            int iStart = targetOffset;
+            for( int t=0; t<4; ++t )
             {
-                int iStart = jStart;
-                for( int t=s; t<4; ++t )
+                int jStart = 0;
+                for( int s=0; s<=t; ++s )
                 {
                     this->RecursiveConstruction
-                    ( shell.children[child++], S, level+1,
+                    ( shell.u.nodeSymmetric->children[child++], 
+                      S, level+1,
                       xSource+(s&1), ySource+(s/2),
                       xTarget+(t&1), yTarget+(t/2),
                       iStart, xSizes[s&1], ySizes[s/2],
                       jStart, xSizes[t&1], ySizes[t/2] );
-                    iStart += sizes[t];
+                    jStart += sizes[s];
                 }
-                jStart += sizes[s];
+                iStart += sizes[t];
             }
         }
         else
         {
             shell.type = NODE;
-            shell.children.resize( 16 );
+            shell.u.node = new NodeData;
+            shell.u.node->children.resize( 16 );
             
-            std::vector<int> xSizesSource(2);
-            std::vector<int> ySizesSource(2);
-            std::vector<int> xSizesTarget(2);
-            std::vector<int> ySizesTarget(2);
-            xSizesSource[0] = xSizeSource/2;                 // left
-            xSizesSource[1] = xSizeSource - xSizesSource[0]; // right
-            ySizesSource[0] = ySizeSource/2;                 // bottom
-            ySizesSource[1] = ySizeSource - ySizesSource[0]; // top
-            xSizesTarget[0] = xSizeTarget/2;                 // left
-            xSizesTarget[1] = xSizeTarget - xSizesTarget[0]; // right
-            ySizesTarget[0] = ySizeTarget/2;                 // bottom
-            ySizesTarget[1] = ySizeTarget - ySizesTarget[0]; // top
+            int* xSourceSizes = shell.u.node->xSourceSizes;
+            xSourceSizes[0] = xSizeSource/2;                 // left
+            xSourceSizes[1] = xSizeSource - xSourceSizes[0]; // right
+            int* ySourceSizes = shell.u.node->ySourceSizes;
+            ySourceSizes[0] = ySizeSource/2;                 // bottom
+            ySourceSizes[1] = ySizeSource - ySourceSizes[0]; // top
+            int* xTargetSizes = shell.u.node->xTargetSizes;
+            xTargetSizes[0] = xSizeTarget/2;                 // left
+            xTargetSizes[1] = xSizeTarget - xTargetSizes[0]; // right
+            int* yTargetSizes = shell.u.node->yTargetSizes;
+            yTargetSizes[0] = ySizeTarget/2;                 // bottom
+            yTargetSizes[1] = ySizeTarget - yTargetSizes[0]; // top
 
-            std::vector<int> sourceSizes(4);
-            std::vector<int> targetSizes(4);
-            sourceSizes[0] = xSizesSource[0]*ySizesSource[0]*_zSize; // BL
-            sourceSizes[1] = xSizesSource[1]*ySizesSource[0]*_zSize; // BR
-            sourceSizes[2] = xSizesSource[0]*ySizesSource[1]*_zSize; // TL
-            sourceSizes[3] = xSizesSource[1]*ySizesSource[1]*_zSize; // TR
-            targetSizes[0] = xSizesTarget[0]*ySizesTarget[0]*_zSize; // BL
-            targetSizes[1] = xSizesTarget[1]*ySizesTarget[0]*_zSize; // BR
-            targetSizes[2] = xSizesTarget[0]*ySizesTarget[1]*_zSize; // TL
-            targetSizes[3] = xSizesTarget[1]*ySizesTarget[1]*_zSize; // TR
+            int* sourceSizes = shell.u.node->sourceSizes;
+            sourceSizes[0] = xSourceSizes[0]*ySourceSizes[0]*_zSize; // BL
+            sourceSizes[1] = xSourceSizes[1]*ySourceSizes[0]*_zSize; // BR
+            sourceSizes[2] = xSourceSizes[0]*ySourceSizes[1]*_zSize; // TL
+            sourceSizes[3] = xSourceSizes[1]*ySourceSizes[1]*_zSize; // TR
+            int* targetSizes = shell.u.node->targetSizes;
+            targetSizes[0] = xTargetSizes[0]*yTargetSizes[0]*_zSize; // BL
+            targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*_zSize; // BR
+            targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*_zSize; // TL
+            targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*_zSize; // TR
 
-            int child = 0;
-            int jStart = sourceOffset;
-            for( int s=0; s<4; ++s )
+            int iStart = targetOffset;
+            for( int t=0; t<4; ++t )
             {
-                int iStart = targetOffset;
-                for( int t=0; t<4; ++t )
+                int jStart = sourceOffset;
+                for( int s=0; s<4; ++s )
                 {
                     this->RecursiveConstruction
-                    ( shell.children[child++], S, level+1,
+                    ( shell.u.node->children[s+4*t], 
+                      S, level+1,
                       xSource+(s&1), ySource+(s/2),
                       xTarget+(t&1), yTarget+(t/2),
-                      iStart, xSizesSource[s&1], ySizesSource[s/2],
-                      jStart, xSizesTarget[t&1], ySizesTarget[t/2] );
-                    iStart += targetSizes[t];
+                      iStart, xSourceSizes[s&1], ySourceSizes[s/2],
+                      jStart, xTargetSizes[t&1], yTargetSizes[t/2] );
+                    jStart += sourceSizes[s];
                 }
-                jStart += sourceSizes[s];
+                iStart += targetSizes[t];
             }
         }
     }
     else
     {
-        if( _symmetric && sourceOffset == targetOffset )
-        {
-            // TODO: Think about packed storage
-            shell.type = DENSE_SYMMETRIC;
-            hmatrix_tools::ConvertSubmatrix
-            ( shell.D, S,
-              targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
-              sourceOffset, sourceOffset+xSizeTarget*ySizeTarget*_zSize );
-        }
-        else
-        {
-            shell.type = DENSE;
-            hmatrix_tools::ConvertSubmatrix
-            ( shell.D, S,
-              targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
-              sourceOffset, sourceOffset+xSizeTarget*ySizeTarget*_zSize );
-        }
+        shell.type = DENSE;
+        shell.u.dense = new DenseData;
+        hmatrix_tools::ConvertSubmatrix
+        ( shell.u.dense->D, S,
+          targetOffset, targetOffset+xSizeTarget*ySizeTarget*_zSize,
+          sourceOffset, sourceOffset+xSizeTarget*ySizeTarget*_zSize );
     }
 }
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixVector
+( Scalar alpha, const MatrixShell& shell,
+                const Vector<Scalar>& x,
+  Scalar beta,        Vector<Scalar>& y ) const
+{
+    if( shell.type == NODE )
+    {
+        // First scale y so that we can simply sum contributions onto it
+        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+
+        // Loop over all 16 children, summing in each row
+        int targetOffset = 0;
+        const int* sourceSizes = shell.u.node->sourceSizes;
+        const int* targetSizes = shell.u.node->targetSizes;
+        for( int t=0; t<4; ++t )
+        {
+            Vector<Scalar> ySub;
+            ySub.View( y, targetOffset, targetSizes[t] );
+
+            int sourceOffset = 0;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> xSub;
+                xSub.LockedView( x, sourceOffset, sourceSizes[s] );
+
+                RecursiveMatrixVector
+                ( alpha, shell.u.node->children[s+4*t], xSub, 1, ySub );
+
+                sourceOffset += sourceSizes[s];
+            }
+            targetOffset += targetSizes[t];
+        }
+    }
+    else if( shell.type == NODE_SYMMETRIC )
+    {
+        // First scale y so that we can simply sum contributions onto it
+        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+
+        // Loop over the 10 children in the lower triangle, summing in each row
+        {
+            int child = 0;
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int t=0; t<4; ++t )
+            {
+                Vector<Scalar> ySub;
+                ySub.View( y, targetOffset, sizes[t] );
+
+                int sourceOffset = 0;
+                for( int s=0; s<=t; ++s )
+                {
+                    Vector<Scalar> xSub;
+                    xSub.LockedView( x, sourceOffset, sizes[s] );
+
+                    RecursiveMatrixVector
+                    ( alpha, shell.u.nodeSymmetric->children[child++], xSub, 
+                      1, ySub );
+
+                    sourceOffset += sizes[s];
+                }
+                targetOffset += sizes[t];
+            }
+        }
+
+        // Loop over the 6 children in the strictly lower triangle, summing in
+        // each row
+        {
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> ySub;
+                ySub.View( y, targetOffset, sizes[s] );
+
+                int sourceOffset = targetOffset + sizes[s];
+                for( int t=s+1; t<4; ++t )
+                {
+                    Vector<Scalar> xSub;
+                    xSub.LockedView( x, sourceOffset, sizes[t] );
+
+                    const int child = (t*(t+1))/2 + s;
+                    RecursiveMatrixTransposeVector
+                    ( alpha, shell.u.nodeSymmetric->children[child], xSub,
+                      1, ySub );
+
+                    sourceOffset += sizes[t];
+                }
+                targetOffset += sizes[s];
+            }
+        }
+    }
+    else if( shell.type == FACTOR )
+    {
+        hmatrix_tools::MatrixVector( alpha, shell.u.factor->F, x, beta, y );
+    }
+    else /* shell.type == DENSE */
+    {
+        hmatrix_tools::MatrixVector( alpha, shell.u.dense->D, x, beta, y );
+    }
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeVector
+( Scalar alpha, const MatrixShell& shell,
+                const Vector<Scalar>& x,
+  Scalar beta,        Vector<Scalar>& y ) const
+{
+    if( shell.type == NODE )
+    {
+        // First scale y so that we can simply sum contributions onto it
+        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+
+        // Loop over all 16 children, summing in each row
+        int targetOffset = 0;
+        const int* sourceSizes = shell.u.node->sourceSizes;
+        const int* targetSizes = shell.u.node->targetSizes;
+        for( int t=0; t<4; ++t )
+        {
+            Vector<Scalar> ySub;
+            ySub.View( y, targetOffset, sourceSizes[t] );
+
+            int sourceOffset = 0;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> xSub;
+                xSub.LockedView( x, sourceOffset, targetSizes[s] );
+
+                RecursiveMatrixTransposeVector
+                ( alpha, shell.u.node->children[t+4*s], xSub, 1, ySub );
+
+                sourceOffset += targetSizes[s];
+            }
+            targetOffset += sourceSizes[t];
+        }
+    }
+    else if( shell.type == NODE_SYMMETRIC )
+    {
+        // NOTE: This section is an exact copy of that of the one from 
+        //       RecursiveMatrixVector. TODO: Avoid this duplication.
+
+        // First scale y so that we can simply sum contributions onto it
+        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+
+        // Loop over the 10 children in the lower triangle, summing in each row
+        {
+            int child = 0;
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int t=0; t<4; ++t )
+            {
+                Vector<Scalar> ySub;
+                ySub.View( y, targetOffset, sizes[t] );
+
+                int sourceOffset = 0;
+                for( int s=0; s<=t; ++s )
+                {
+                    Vector<Scalar> xSub;
+                    xSub.LockedView( x, sourceOffset, sizes[s] );
+
+                    RecursiveMatrixVector
+                    ( alpha, shell.u.nodeSymmetric->children[child++], xSub, 
+                      1, ySub );
+
+                    sourceOffset += sizes[s];
+                }
+                targetOffset += sizes[t];
+            }
+        }
+
+        // Loop over the 6 children in the strictly lower triangle, summing in
+        // each row
+        {
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> ySub;
+                ySub.View( y, targetOffset, sizes[s] );
+
+                int sourceOffset = targetOffset + sizes[s];
+                for( int t=s+1; t<4; ++t )
+                {
+                    Vector<Scalar> xSub;
+                    xSub.LockedView( x, sourceOffset, sizes[t] );
+
+                    const int child = (t*(t+1))/2 + s;
+                    RecursiveMatrixTransposeVector
+                    ( alpha, shell.u.nodeSymmetric->children[child], xSub,
+                      1, ySub );
+
+                    sourceOffset += sizes[t];
+                }
+                targetOffset += sizes[s];
+            }
+        }
+    }
+    else if( shell.type == FACTOR )
+    {
+        hmatrix_tools::MatrixTransposeVector
+        ( alpha, shell.u.factor->F, x, beta, y );
+    }
+    else /* shell.type == DENSE */
+    {
+        hmatrix_tools::MatrixTransposeVector
+        ( alpha, shell.u.dense->D, x, beta, y );
+    }
+}
+
+//----------------------------------------------------------------------------//
+// Public routines                                                            //
+//----------------------------------------------------------------------------//
 
 template<typename Scalar>
 psp::HMatrix_Quasi2d<Scalar>::HMatrix_Quasi2d
@@ -181,6 +389,42 @@ template<typename Scalar>
 psp::HMatrix_Quasi2d<Scalar>::~HMatrix_Quasi2d()
 {
     // Nothing is needed yet
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::MapVector
+( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
+{
+    RecursiveMatrixVector( alpha, _rootShell, x, beta, y );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::MapVector
+( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
+{
+    y.Resize( x.Size() );
+    std::memset( y.Buffer(), 0, y.Size()*sizeof(Scalar) );
+    RecursiveMatrixVector( alpha, _rootShell, x, 1, y );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::TransposeMapVector
+( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
+{
+    RecursiveMatrixTransposeVector( alpha, _rootShell, x, beta, y );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::TransposeMapVector
+( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
+{
+    y.Resize( x.Size() );
+    std::memset( y.Buffer(), 0, y.Size()*sizeof(Scalar) );
+    RecursiveMatrixTransposeVector( alpha, _rootShell, x, 1, y );
 }
 
 template class psp::HMatrix_Quasi2d<float>;

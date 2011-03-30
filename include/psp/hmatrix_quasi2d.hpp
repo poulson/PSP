@@ -28,16 +28,60 @@ namespace psp {
 template<typename Scalar>
 class HMatrix_Quasi2d
 {
-    enum ShellType { NODE, NODE_SYMMETRIC, DENSE, DENSE_SYMMETRIC, FACTOR };
+    enum ShellType { NODE, NODE_SYMMETRIC, DENSE, FACTOR };
+
+    struct MatrixShell; // forward declaration for Node(Symmetric)Data
+
+    struct NodeData
+    {
+        std::vector<MatrixShell> children;
+        int xSourceSizes[2];
+        int ySourceSizes[2];
+        int sourceSizes[4];
+        int xTargetSizes[2];
+        int yTargetSizes[2];
+        int targetSizes[4];
+    };
+
+    struct NodeSymmetricData
+    {
+        std::vector<MatrixShell> children;
+        int xSizes[2];
+        int ySizes[2];
+        int sizes[4];
+    };
+
+    struct DenseData
+    {
+        DenseMatrix<Scalar> D;
+    };
+
+    struct FactorData
+    {
+        FactorMatrix<Scalar,false> F; // F = U V^T
+    };
 
     struct MatrixShell 
     {
         ShellType type;        
-
-        // Only one of the following will be active
-        std::vector<MatrixShell> children;
-        DenseMatrix<Scalar> D;
-        FactorMatrix<Scalar,false> F; // F = U V^T
+        union
+        {
+            NodeData* node;
+            NodeSymmetricData* nodeSymmetric;
+            DenseData* dense;
+            FactorData* factor;
+        } u;
+        MatrixShell() { }
+        ~MatrixShell() 
+        { 
+            switch( type )
+            {
+                case NODE:           delete u.node;          break;
+                case NODE_SYMMETRIC: delete u.nodeSymmetric; break;
+                case DENSE:          delete u.dense;         break;
+                case FACTOR:         delete u.factor;        break;
+            }
+        }
     };
 
     const bool _symmetric;
@@ -62,25 +106,31 @@ class HMatrix_Quasi2d
     void RecursiveMatrixVector
     ( Scalar alpha, const MatrixShell& shell, 
                     const Vector<Scalar>& x,
-      Scalar beta,        Vector<Scalar>& y );       
+      Scalar beta,        Vector<Scalar>& y ) const;
 
-    // y := alpha H x
-    void RecursiveMatrixVector
-    ( Scalar alpha, const MatrixShell& shell,
+    // y := alpha H^T x + beta y
+    void RecursiveMatrixTransposeVector
+    ( Scalar alpha, const MatrixShell& shell, 
                     const Vector<Scalar>& x,
-                          Vector<Scalar>& y );
+      Scalar beta,        Vector<Scalar>& y ) const;
 
     // C := alpha H B + beta C
+    // TODO
+    /*
     void RecursiveMatrixMultiply
     ( Scalar alpha, const MatrixShell& shell,
                     const DenseMatrix<Scalar>& B,
-      Scalar beta,        DenseMatrix<Scalar>& C );
+      Scalar beta,        DenseMatrix<Scalar>& C ) const;
+    */
 
-    // C := alpha H B
-    void RecursiveMatrixMultiply
+    // C := alpha H^T B + beta C
+    // TODO
+    /*
+    void RecursiveMatrixTransposeMultiply
     ( Scalar alpha, const MatrixShell& shell,
                     const DenseMatrix<Scalar>& B,
-                          DenseMatrix<Scalar>& C );
+      Scalar beta,        DenseMatrix<Scalar>& C ) const;
+    */
 
 public:
     // This will convert a sparse matrix over an xSize x ySize x zSize domain
@@ -101,20 +151,53 @@ public:
 
     // y := alpha H x + beta y
     void MapVector
-    ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y );
+    ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) 
+    const;
 
     // y := alpha H x
     void MapVector
-    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y );
+    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
+
+    // y := alpha H^T x + beta y
+    void TransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) 
+    const;
+
+    // y := alpha H^T x
+    void TransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
 
     // C := alpha H B + beta C
+    // TODO
+    /*
     void MapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, 
-      Scalar beta, DenseMatrix<Scalar>& C );
+      Scalar beta, DenseMatrix<Scalar>& C ) const;
+    */
 
     // C := alpha H B
+    // TODO
+    /*
     void MapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C );
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
+    const;
+    */
+    
+    // C := alpha H^T B + beta C
+    // TODO
+    /*
+    void TransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, 
+      Scalar beta, DenseMatrix<Scalar>& C ) const;
+    */
+
+    // C := alpha H^T B
+    // TODO
+    /*
+    void TransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
+    const;
+    */
 };
 
 } // namespace psp

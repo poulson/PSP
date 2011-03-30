@@ -38,6 +38,18 @@ extern "C" {
 typedef std::complex<float> scomplex;
 typedef std::complex<double> dcomplex;
 
+void BLAS(sscal)
+( const int* n, const float* alpha, float* x, const int* incx );
+
+void BLAS(dscal)
+( const int* n, const double* alpha, double* x, const int* incx );
+
+void BLAS(cscal)
+( const int* n, const scomplex* alpha, scomplex* x, const int* incx );
+
+void BLAS(zscal)
+( const int* n, const dcomplex* alpha, dcomplex* x, const int* incx );
+
 void BLAS(sgemv)
 ( const char* trans, const int* m, const int* n,
   const float* alpha, const float* A, const int* lda,
@@ -166,6 +178,34 @@ void BLAS(ztrmm)
 
 namespace psp {
 namespace blas {
+
+//----------------------------------------------------------------------------//
+// Scale a vector                                                             //
+//----------------------------------------------------------------------------//
+
+inline void Scal
+( int n, float alpha, float* x, int incx )
+{
+    BLAS(sscal)( &n, &alpha, x, &incx );
+}
+
+inline void Scal
+( int n, double alpha, double* x, int incx )
+{
+    BLAS(dscal)( &n, &alpha, x, &incx );
+}
+
+inline void Scal
+( int n, std::complex<float> alpha, std::complex<float>* x, int incx )
+{
+    BLAS(cscal)( &n, &alpha, x, &incx );
+}
+
+inline void Scal
+( int n, std::complex<double> alpha, std::complex<double>* x, int incx )
+{
+    BLAS(zscal)( &n, &alpha, x, &incx );
+}
 
 //----------------------------------------------------------------------------//
 // General matrix-vector multiplication                                       //
