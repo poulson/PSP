@@ -190,6 +190,48 @@ void MatrixMultiply
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugate>& C );
+// TODO: F := alpha H H, where black-box multiplication routines are provided
+
+/*\
+|*| Matrix Transpose Multiply, C := alpha A^T B
+\*/
+// D := alpha D^T D
+template<typename Scalar>
+void MatrixTransposeMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+// F := alpha F^T F
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+                const FactorMatrix<Scalar,Conjugate>& B,
+                      FactorMatrix<Scalar,Conjugate>& C );
+// D := alpha D^T F
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar,Conjugate>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha F^T D
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+                const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C );
+// F := alpha D^T F
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar,Conjugate>& B,
+                      FactorMatrix<Scalar,Conjugate>& C );
+// F := alpha F^T D
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+                const DenseMatrix<Scalar>& B,
+                      FactorMatrix<Scalar,Conjugate>& C );
+// TODO: F := alpha H^T H, where black-box multiplication routines are provided
 
 /*\
 |*| Matrix-Vector multiply, y := alpha A x + beta y
@@ -222,6 +264,9 @@ void MatrixVector
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& F, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
+
+// TODO: Transpose Matrix-Vector multiply, y := alpha A^T x + beta y
+// TODO: Transpose Matrix-Vector multiply, y := alpha A^T
 
 /*\
 |*| Dense inversion, D := inv(D)
