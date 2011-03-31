@@ -161,7 +161,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixVector
     if( shell.type == NODE )
     {
         // First scale y so that we can simply sum contributions onto it
-        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+        hmatrix_tools::Scale( beta, y );
 
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -189,7 +189,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixVector
     else if( shell.type == NODE_SYMMETRIC )
     {
         // First scale y so that we can simply sum contributions onto it
-        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+        hmatrix_tools::Scale( beta, y );
 
         // Loop over the 10 children in the lower triangle, summing in each row
         {
@@ -264,7 +264,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeVector
     if( shell.type == NODE )
     {
         // First scale y so that we can simply sum contributions onto it
-        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+        hmatrix_tools::Scale( beta, y );
 
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -295,7 +295,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeVector
         //       RecursiveMatrixVector. TODO: Avoid this duplication.
 
         // First scale y so that we can simply sum contributions onto it
-        blas::Scal( y.Size(), beta, y.Buffer(), 1 );
+        hmatrix_tools::Scale( beta, y );
 
         // Loop over the 10 children in the lower triangle, summing in each row
         {
@@ -362,6 +362,219 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeVector
     }
 }
 
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
+( Scalar alpha, const MatrixShell& shell,
+                const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C ) const
+{
+    if( shell.type == NODE )
+    {
+        // First scale C so that we can simply sum contributions onto it
+        hmatrix_tools::Scale( beta, C );
+
+        // Loop over all 16 children, summing in each row
+        int targetOffset = 0;
+        const int* sourceSizes = shell.u.node->sourceSizes;
+        const int* targetSizes = shell.u.node->targetSizes;
+        for( int t=0; t<4; ++t )
+        {
+            Vector<Scalar> CSub;
+            CSub.View( C, targetOffset, targetSizes[t], 0, C.Width() );
+
+            int sourceOffset = 0;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> BSub;
+                BSub.LockedView
+                ( B, sourceOffset, sourceSizes[s], 0, B.Width() );
+
+                RecursiveMatrixMultiply
+                ( alpha, shell.u.node->children[s+4*t], BSub, 1, CSub );
+
+                sourceOffset += sourceSizes[s];
+            }
+            targetOffset += targetSizes[t];
+        }
+    }
+    else if( shell.type == NODE_SYMMETRIC )
+    {
+        // First scale C so that we can simply sum contributions onto it
+        hmatrix_tools::Scale( beta, C );
+
+        // Loop over the 10 children in the lower triangle, summing in each row
+        {
+            int child = 0;
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int t=0; t<4; ++t )
+            {
+                Vector<Scalar> CSub;
+                ySub.View( C, targetOffset, sizes[t], 0, C.Width() );
+
+                int sourceOffset = 0;
+                for( int s=0; s<=t; ++s )
+                {
+                    Vector<Scalar> BSub;
+                    BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
+
+                    RecursiveMatrixMultiply
+                    ( alpha, shell.u.nodeSymmetric->children[child++], BSub, 
+                      1, CSub );
+
+                    sourceOffset += sizes[s];
+                }
+                targetOffset += sizes[t];
+            }
+        }
+
+        // Loop over the 6 children in the strictly lower triangle, summing in
+        // each row
+        {
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> CSub;
+                CSub.View( C, targetOffset, sizes[s], 0, C.Width() );
+
+                int sourceOffset = targetOffset + sizes[s];
+                for( int t=s+1; t<4; ++t )
+                {
+                    Vector<Scalar> BSub;
+                    BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
+
+                    const int child = (t*(t+1))/2 + s;
+                    RecursiveMatrixTransposeMultiply
+                    ( alpha, shell.u.nodeSymmetric->children[child], BSub,
+                      1, CSub );
+
+                    sourceOffset += sizes[t];
+                }
+                targetOffset += sizes[s];
+            }
+        }
+    }
+    else if( shell.type == FACTOR )
+    {
+        hmatrix_tools::MatrixMultiply( alpha, shell.u.factor->F, B, beta, C );
+    }
+    else /* shell.type == DENSE */
+    {
+        hmatrix_tools::MatrixMultiply( alpha, shell.u.dense->D, B, beta, C );
+    }
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
+( Scalar alpha, const MatrixShell& shell,
+                const Vector<Scalar>& B,
+  Scalar beta,        Vector<Scalar>& C ) const
+{
+    if( shell.type == NODE )
+    {
+        // First scale C so that we can simply sum contributions onto it
+        hmatrix_tools::Scale( beta, C );
+
+        // Loop over all 16 children, summing in each row
+        int targetOffset = 0;
+        const int* sourceSizes = shell.u.node->sourceSizes;
+        const int* targetSizes = shell.u.node->targetSizes;
+        for( int t=0; t<4; ++t )
+        {
+            Vector<Scalar> CSub;
+            CSub.View( C, targetOffset, sourceSizes[t], 0, C.Width() );
+
+            int sourceOffset = 0;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> BSub;
+                BSub.LockedView
+                ( B, sourceOffset, targetSizes[s], 0, B.Width() );
+
+                RecursiveMatrixTransposeMultiply
+                ( alpha, shell.u.node->children[t+4*s], BSub, 1, CSub );
+
+                sourceOffset += targetSizes[s];
+            }
+            targetOffset += sourceSizes[t];
+        }
+    }
+    else if( shell.type == NODE_SYMMETRIC )
+    {
+        // NOTE: This section is an exact copy of that of the one from 
+        //       RecursiveMatrixMultiply. TODO: Avoid this duplication.
+
+        // First scale C so that we can simply sum contributions onto it
+        hmatrix_tools::Scale( beta, C );
+
+        // Loop over the 10 children in the lower triangle, summing in each row
+        {
+            int child = 0;
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int t=0; t<4; ++t )
+            {
+                Vector<Scalar> CSub;
+                ySub.View( C, targetOffset, sizes[t], 0, C.Width() );
+
+                int sourceOffset = 0;
+                for( int s=0; s<=t; ++s )
+                {
+                    Vector<Scalar> BSub;
+                    BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
+
+                    RecursiveMatrixMultiply
+                    ( alpha, shell.u.nodeSymmetric->children[child++], BSub, 
+                      1, CSub );
+
+                    sourceOffset += sizes[s];
+                }
+                targetOffset += sizes[t];
+            }
+        }
+
+        // Loop over the 6 children in the strictly lower triangle, summing in
+        // each row
+        {
+            int targetOffset = 0;
+            const int* sizes = shell.u.nodeSymmetric->sizes;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> CSub;
+                BSub.View( C, targetOffset, sizes[s], 0, C.Width() );
+
+                int sourceOffset = targetOffset + sizes[s];
+                for( int t=s+1; t<4; ++t )
+                {
+                    Vector<Scalar> BSub;
+                    BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
+
+                    const int child = (t*(t+1))/2 + s;
+                    RecursiveMatrixTransposeMultiply
+                    ( alpha, shell.u.nodeSymmetric->children[child], BSub,
+                      1, CSub );
+
+                    sourceOffset += sizes[t];
+                }
+                targetOffset += sizes[s];
+            }
+        }
+    }
+    else if( shell.type == FACTOR )
+    {
+        hmatrix_tools::MatrixTransposeMultiply
+        ( alpha, shell.u.factor->F, B, beta, C );
+    }
+    else /* shell.type == DENSE */
+    {
+        hmatrix_tools::MatrixTransposeMultiply
+        ( alpha, shell.u.dense->D, B, beta, C );
+    }
+}
+
 //----------------------------------------------------------------------------//
 // Public routines                                                            //
 //----------------------------------------------------------------------------//
@@ -377,6 +590,8 @@ psp::HMatrix_Quasi2d<Scalar>::HMatrix_Quasi2d
   _numLevels(numLevels),
   _stronglyAdmissible(stronglyAdmissible)
 {
+    _m = S.m;
+    _n = S.n;
     this->RecursiveConstruction
     ( _rootShell, S, 0, 
       0, 0, 
@@ -404,8 +619,8 @@ void
 psp::HMatrix_Quasi2d<Scalar>::MapVector
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
-    y.Resize( x.Size() );
-    std::memset( y.Buffer(), 0, y.Size()*sizeof(Scalar) );
+    y.Resize( _m );
+    std::memset( y.Buffer(), 0, _m*sizeof(Scalar) );
     RecursiveMatrixVector( alpha, _rootShell, x, 1, y );
 }
 
@@ -422,9 +637,49 @@ void
 psp::HMatrix_Quasi2d<Scalar>::TransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
-    y.Resize( x.Size() );
-    std::memset( y.Buffer(), 0, y.Size()*sizeof(Scalar) );
+    y.Resize( _n );
+    std::memset( y.Buffer(), 0, _n*sizeof(Scalar) );
     RecursiveMatrixTransposeVector( alpha, _rootShell, x, 1, y );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::MapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& B, 
+  Scalar beta,        DenseMatrix<Scalar>& C )
+{
+    RecursiveMatrixMultiply( alpha, _rootShell, B, beta, C );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::MapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C )
+{
+    C.Resize( _m*B.Width() );
+    std::memset( C.Buffer(), 0, _m*B.Width()*sizeof(Scalar) );
+    RecursiveMatrixMultiply( alpha, _rootShell, B, 1, C );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::TransposeMapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C )
+{
+    RecursiveTransposeMatrixMultiply( alpha, _rootShell, B, beta, C );
+}
+
+template<typename Scalar>
+void
+psp::HMatrix_Quasi2d<Scalar>::TransposeMapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& B,
+                      DenseMatrix<Scalar>& C )
+{
+    C.Resize( _n*B.Width() );
+    std::memset( C.Buffer(), 0, _n*B.Width()*sizeof(Scalar) );
+    RecursiveTransposeMatrixMultiply( alpha, _rootShell, B, 1, C );
 }
 
 template class psp::HMatrix_Quasi2d<float>;

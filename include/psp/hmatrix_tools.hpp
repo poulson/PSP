@@ -303,6 +303,18 @@ void MatrixTransposeVector
 template<typename Scalar>
 void Invert( DenseMatrix<Scalar>& D );
 
+/*\
+|*| Scale a vector or matrix
+\*/
+template<typename Scalar>
+void Scale( Scalar alpha, Vector<Scalar>& x );
+
+template<typename Scalar>
+void Scale( Scalar alpha, DenseMatrix<Scalar>& D );
+
+template<typename Scalar,bool Conjugate>
+void Scale( Scalar alpha, FactorMatrix<Scalar,Conjugate>& F );
+
 //----------------------------------------------------------------------------//
 // For mapping between different orderings                                    //
 //----------------------------------------------------------------------------//

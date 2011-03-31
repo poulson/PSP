@@ -28,6 +28,8 @@ namespace psp {
 template<typename Scalar>
 class HMatrix_Quasi2d
 {
+    const int _m, _n;
+
     enum ShellType { NODE, NODE_SYMMETRIC, DENSE, FACTOR };
 
     struct MatrixShell; // forward declaration for Node(Symmetric)Data
@@ -115,22 +117,16 @@ class HMatrix_Quasi2d
       Scalar beta,        Vector<Scalar>& y ) const;
 
     // C := alpha H B + beta C
-    // TODO
-    /*
     void RecursiveMatrixMultiply
     ( Scalar alpha, const MatrixShell& shell,
                     const DenseMatrix<Scalar>& B,
       Scalar beta,        DenseMatrix<Scalar>& C ) const;
-    */
 
     // C := alpha H^T B + beta C
-    // TODO
-    /*
     void RecursiveMatrixTransposeMultiply
     ( Scalar alpha, const MatrixShell& shell,
                     const DenseMatrix<Scalar>& B,
       Scalar beta,        DenseMatrix<Scalar>& C ) const;
-    */
 
 public:
     // This will convert a sparse matrix over an xSize x ySize x zSize domain
@@ -148,6 +144,9 @@ public:
       int xSize, int ySize, int zSize, int numLevels, bool stronglyAdmissible );
 
     ~HMatrix_Quasi2d();
+
+    const int Height() const;
+    const int Width() const;
 
     // y := alpha H x + beta y
     void MapVector
@@ -168,36 +167,24 @@ public:
     ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
 
     // C := alpha H B + beta C
-    // TODO
-    /*
     void MapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, 
       Scalar beta, DenseMatrix<Scalar>& C ) const;
-    */
 
     // C := alpha H B
-    // TODO
-    /*
     void MapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
-    */
     
     // C := alpha H^T B + beta C
-    // TODO
-    /*
     void TransposeMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, 
       Scalar beta, DenseMatrix<Scalar>& C ) const;
-    */
 
     // C := alpha H^T B
-    // TODO
-    /*
     void TransposeMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
-    */
 };
 
 } // namespace psp
