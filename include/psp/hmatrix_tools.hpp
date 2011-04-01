@@ -160,6 +160,12 @@ void MatrixMultiply
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
+// D := alpha D D + beta D
+template<typename Scalar>
+void MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
 // F := alpha F F
 template<typename Scalar,bool Conjugate>
 void MatrixMultiply
@@ -172,12 +178,24 @@ void MatrixMultiply
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B,
                       DenseMatrix<Scalar>& C );
+// D := alpha D F + beta D
+template<typename Scalar,bool Conjugate>
+void MatrixMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar,Conjugate>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F D
 template<typename Scalar,bool Conjugate>
 void MatrixMultiply
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
+// D := alpha F D + beta D
+template<typename Scalar,bool Conjugate>
+void MatrixMultiply
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+                const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
 // F := alpha D F
 template<typename Scalar,bool Conjugate>
 void MatrixMultiply
@@ -201,6 +219,12 @@ void MatrixTransposeMultiply
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
+// D := alpha D^T D + beta D
+template<typename Scalar>
+void MatrixTransposeMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
 // F := alpha F^T F
 template<typename Scalar,bool Conjugate>
 void MatrixTransposeMultiply
@@ -213,12 +237,24 @@ void MatrixTransposeMultiply
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B,
                       DenseMatrix<Scalar>& C );
+// D := alpha D^T F + beta D
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const FactorMatrix<Scalar,Conjugate>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F^T D
 template<typename Scalar,bool Conjugate>
 void MatrixTransposeMultiply
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
+// D := alpha F^T D + beta D
+template<typename Scalar,bool Conjugate>
+void MatrixTransposeMultiply
+( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+                const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
 // F := alpha D^T F
 template<typename Scalar,bool Conjugate>
 void MatrixTransposeMultiply

@@ -380,13 +380,13 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
         const int* targetSizes = shell.u.node->targetSizes;
         for( int t=0; t<4; ++t )
         {
-            Vector<Scalar> CSub;
+            DenseMatrix<Scalar> CSub;
             CSub.View( C, targetOffset, targetSizes[t], 0, C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<4; ++s )
             {
-                Vector<Scalar> BSub;
+                DenseMatrix<Scalar> BSub;
                 BSub.LockedView
                 ( B, sourceOffset, sourceSizes[s], 0, B.Width() );
 
@@ -410,13 +410,13 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
             const int* sizes = shell.u.nodeSymmetric->sizes;
             for( int t=0; t<4; ++t )
             {
-                Vector<Scalar> CSub;
-                ySub.View( C, targetOffset, sizes[t], 0, C.Width() );
+                DenseMatrix<Scalar> CSub;
+                CSub.View( C, targetOffset, sizes[t], 0, C.Width() );
 
                 int sourceOffset = 0;
                 for( int s=0; s<=t; ++s )
                 {
-                    Vector<Scalar> BSub;
+                    DenseMatrix<Scalar> BSub;
                     BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
 
                     RecursiveMatrixMultiply
@@ -436,13 +436,13 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
             const int* sizes = shell.u.nodeSymmetric->sizes;
             for( int s=0; s<4; ++s )
             {
-                Vector<Scalar> CSub;
+                DenseMatrix<Scalar> CSub;
                 CSub.View( C, targetOffset, sizes[s], 0, C.Width() );
 
                 int sourceOffset = targetOffset + sizes[s];
                 for( int t=s+1; t<4; ++t )
                 {
-                    Vector<Scalar> BSub;
+                    DenseMatrix<Scalar> BSub;
                     BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
 
                     const int child = (t*(t+1))/2 + s;
@@ -470,8 +470,8 @@ template<typename Scalar>
 void
 psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
 ( Scalar alpha, const MatrixShell& shell,
-                const Vector<Scalar>& B,
-  Scalar beta,        Vector<Scalar>& C ) const
+                const DenseMatrix<Scalar>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
     if( shell.type == NODE )
     {
@@ -484,13 +484,13 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
         const int* targetSizes = shell.u.node->targetSizes;
         for( int t=0; t<4; ++t )
         {
-            Vector<Scalar> CSub;
+            DenseMatrix<Scalar> CSub;
             CSub.View( C, targetOffset, sourceSizes[t], 0, C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<4; ++s )
             {
-                Vector<Scalar> BSub;
+                DenseMatrix<Scalar> BSub;
                 BSub.LockedView
                 ( B, sourceOffset, targetSizes[s], 0, B.Width() );
 
@@ -517,13 +517,13 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
             const int* sizes = shell.u.nodeSymmetric->sizes;
             for( int t=0; t<4; ++t )
             {
-                Vector<Scalar> CSub;
-                ySub.View( C, targetOffset, sizes[t], 0, C.Width() );
+                DenseMatrix<Scalar> CSub;
+                CSub.View( C, targetOffset, sizes[t], 0, C.Width() );
 
                 int sourceOffset = 0;
                 for( int s=0; s<=t; ++s )
                 {
-                    Vector<Scalar> BSub;
+                    DenseMatrix<Scalar> BSub;
                     BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
 
                     RecursiveMatrixMultiply
@@ -543,13 +543,13 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
             const int* sizes = shell.u.nodeSymmetric->sizes;
             for( int s=0; s<4; ++s )
             {
-                Vector<Scalar> CSub;
-                BSub.View( C, targetOffset, sizes[s], 0, C.Width() );
+                DenseMatrix<Scalar> CSub;
+                CSub.View( C, targetOffset, sizes[s], 0, C.Width() );
 
                 int sourceOffset = targetOffset + sizes[s];
                 for( int t=s+1; t<4; ++t )
                 {
-                    Vector<Scalar> BSub;
+                    DenseMatrix<Scalar> BSub;
                     BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
 
                     const int child = (t*(t+1))/2 + s;
@@ -585,13 +585,11 @@ psp::HMatrix_Quasi2d<Scalar>::HMatrix_Quasi2d
   int xSize, int ySize, int zSize, 
   int numLevels, 
   bool stronglyAdmissible )
-: _symmetric(S.symmetric), 
+: _m(S.m), _n(S.n), _symmetric(S.symmetric), 
   _xSize(xSize), _ySize(ySize), _zSize(zSize), 
   _numLevels(numLevels),
   _stronglyAdmissible(stronglyAdmissible)
 {
-    _m = S.m;
-    _n = S.n;
     this->RecursiveConstruction
     ( _rootShell, S, 0, 
       0, 0, 
@@ -646,7 +644,7 @@ template<typename Scalar>
 void
 psp::HMatrix_Quasi2d<Scalar>::MapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B, 
-  Scalar beta,        DenseMatrix<Scalar>& C )
+  Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
     RecursiveMatrixMultiply( alpha, _rootShell, B, beta, C );
 }
@@ -655,9 +653,9 @@ template<typename Scalar>
 void
 psp::HMatrix_Quasi2d<Scalar>::MapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
-                      DenseMatrix<Scalar>& C )
+                      DenseMatrix<Scalar>& C ) const
 {
-    C.Resize( _m*B.Width() );
+    C.Resize( _m, B.Width() );
     std::memset( C.Buffer(), 0, _m*B.Width()*sizeof(Scalar) );
     RecursiveMatrixMultiply( alpha, _rootShell, B, 1, C );
 }
@@ -666,20 +664,20 @@ template<typename Scalar>
 void
 psp::HMatrix_Quasi2d<Scalar>::TransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
-  Scalar beta,        DenseMatrix<Scalar>& C )
+  Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
-    RecursiveTransposeMatrixMultiply( alpha, _rootShell, B, beta, C );
+    RecursiveMatrixTransposeMultiply( alpha, _rootShell, B, beta, C );
 }
 
 template<typename Scalar>
 void
 psp::HMatrix_Quasi2d<Scalar>::TransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
-                      DenseMatrix<Scalar>& C )
+                      DenseMatrix<Scalar>& C ) const
 {
-    C.Resize( _n*B.Width() );
+    C.Resize( _n, B.Width() );
     std::memset( C.Buffer(), 0, _n*B.Width()*sizeof(Scalar) );
-    RecursiveTransposeMatrixMultiply( alpha, _rootShell, B, 1, C );
+    RecursiveMatrixTransposeMultiply( alpha, _rootShell, B, 1, C );
 }
 
 template class psp::HMatrix_Quasi2d<float>;

@@ -409,7 +409,7 @@ psp::DenseMatrix<Scalar>::LockedView
     _ldim = A.LDim();
     _viewing = true;
     _lockedView = true;
-    _buffer = A.LockedBuffer(i,j);
+    _lockedBuffer = A.LockedBuffer(i,j);
     _type = A.Type();
 }
 

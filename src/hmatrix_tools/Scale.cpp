@@ -47,42 +47,42 @@ void psp::hmatrix_tools::Scale
 
 template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<Scalar>& F )
+( Scalar alpha, FactorMatrix<Scalar,Conjugate>& F )
 {
     blas::Scal( F.m*F.r, alpha, &F.U[0], 1 );
 }
 
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, Vector<float>& x );
+( float alpha, Vector<float>& x );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, Vector<double>& x );
+( double alpha, Vector<double>& x );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, Vector< std::complex<float> >& x );
+( std::complex<float> alpha, Vector< std::complex<float> >& x );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, Vector< std::complex<double> >& x );
+( std::complex<double> alpha, Vector< std::complex<double> >& x );
 
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, DenseMatrix<float>& D );
+( float alpha, DenseMatrix<float>& D );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, DenseMatrix<double>& D );
+( double alpha, DenseMatrix<double>& D );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, DenseMatrix< std::complex<float> >& D );
+( std::complex<float> alpha, DenseMatrix< std::complex<float> >& D );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, DenseMatrix< std::complex<double> >& D );
+( std::complex<double> alpha, DenseMatrix< std::complex<double> >& D );
 
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<float,false>& F );
+( float alpha, FactorMatrix<float,false>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<float,true>& F );
+( float alpha, FactorMatrix<float,true>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<double,false>& F );
+( double alpha, FactorMatrix<double,false>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<double,true>& F );
+( double alpha, FactorMatrix<double,true>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<std::complex<float>,false>& F );
+( std::complex<float> alpha, FactorMatrix<std::complex<float>,false>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<std::complex<float>,true>& F );
+( std::complex<float> alpha, FactorMatrix<std::complex<float>,true>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<std::complex<double>,false>& F );
+( std::complex<double> alpha, FactorMatrix<std::complex<double>,false>& F );
 template void psp::hmatrix_tools::Scale
-( Scalar alpha, FactorMatrix<std::complex<double>,true>& F );
+( std::complex<double> alpha, FactorMatrix<std::complex<double>,true>& F );
