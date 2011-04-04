@@ -22,19 +22,19 @@
 
 // Dense C := alpha A^T B
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
     C.Resize( A.Width(), B.Width() );
     C.SetType( GENERAL );
-    MatrixTransposeMultiply( alpha, A, B, (Scalar)0, C );
+    MatrixTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
 // Dense C := alpha A^T B + beta C
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
@@ -50,20 +50,20 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
         blas::Symm
         ( 'L', 'L', C.Height(), C.Width(),
           alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(), 
-          0, C.Buffer(), C.LDim() );
+          beta, C.Buffer(), C.LDim() );
     }
     else
     {
         blas::Gemm
         ( 'T', 'N', C.Height(), C.Width(), A.Height(),
           alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(),
-          0, C.Buffer(), C.LDim() );
+          beta, C.Buffer(), C.LDim() );
     }
 }
 
 // Low-rank C := alpha A^T B
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
@@ -166,7 +166,7 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
 
 // Form a factor matrix from a dense matrix times a factor matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
@@ -201,7 +201,7 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
 
 // Form a factor matrix from a factor matrix times a dense matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
@@ -267,19 +267,19 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
 
 // Form a dense matrix from a dense matrix times a factor matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
                       DenseMatrix<Scalar>& C )
 {
     C.Resize( A.Width(), B.n );
     C.SetType( GENERAL );
-    MatrixTransposeMultiply( alpha, A, B, (Scalar)0, C );
+    MatrixTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
 // Form a dense matrix from a dense matrix times a factor matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
@@ -302,28 +302,28 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
         ( 'T', 'N', C.Height(), B.r, A.Height(),
           1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Width() );
     }
-    // C := alpha W B.V^[T,H] = alpha (A^T B.U) B.V^[T,H]
+    // C := alpha W B.V^[T,H] + beta C = alpha (A^T B.U) B.V^[T,H] + beta C
     const char option = ( Conjugate ? 'C' : 'T' );
     blas::Gemm
     ( 'N', option, C.Height(), C.Width(), B.r,
-      alpha, &W[0], A.Width(), &B.V[0], B.n, 0, C.Buffer(), C.LDim() );
+      alpha, &W[0], A.Width(), &B.V[0], B.n, beta, C.Buffer(), C.LDim() );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
     C.Resize( A.n, B.Width() );
     C.SetType( GENERAL );
-    MatrixTransposeMultiply( alpha, A, B, (Scalar)0, C );
+    MatrixTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
@@ -350,19 +350,20 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
             for( int i=0; i<size; ++i )
                 AVConj[i] = Conj( AV[i] );
 
-            // C := alpha conj(A.V) W^T = alpha conj(A.V) (A.U^T B)
+            // C := alpha conj(A.V) W^T + beta C 
+            //    = alpha conj(A.V) (A.U^T B) + beta C
             blas::Gemm
             ( 'N', 'T', C.Height(), C.Width(), A.r,
               alpha, &AVConj[0], A.n, &W[0], B.Height(), 
-              0, C.Buffer(), C.LDim() );
+              beta, C.Buffer(), C.LDim() );
         }
         else
         {
-            // C := alpha A.V W^T = alpha A.V (A.U^T B)
+            // C := alpha A.V W^T + beta C = alpha A.V (A.U^T B) + beta C
             blas::Gemm
             ( 'N', 'T', C.Height(), C.Width(), A.r,
               alpha, &A.V[0], A.n, &W[0], B.Height(), 
-              0, C.Buffer(), C.LDim() );
+              beta, C.Buffer(), C.LDim() );
         }
     }
     else
@@ -382,298 +383,299 @@ void psp::hmatrix_tools::MatrixTransposeMultiply
             for( int i=0; i<size; ++i )
                 AVConj[i] = Conj( AV[i] );
 
-            // C := alpha conj(A.V) W = alpha conj(A.V) (A.U^T B)
+            // C := alpha conj(A.V) W + beta C 
+            //    = alpha conj(A.V) (A.U^T B) + beta C
             blas::Gemm
             ( 'N', 'N', C.Height(), C.Width(), A.r,
               alpha, &AVConj[0], A.n, &W[0], A.r, 
-              0, C.Buffer(), C.LDim() );
+              beta, C.Buffer(), C.LDim() );
         }
         else
         {
-            // C := alpha A.V W = alpha A.V (A.U^T B)
+            // C := alpha A.V W + beta C = alpha A.V (A.U^T B) + beta C
             blas::Gemm
             ( 'N', 'N', C.Height(), C.Width(), A.r,
               alpha, &A.V[0], A.n, &W[0], A.r,
-              0, C.Buffer(), C.LDim() );
+              beta, C.Buffer(), C.LDim() );
         }
     }
 }
 
 // Dense C := alpha A^T B
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A,
                const DenseMatrix<float>& B,
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 
 // Dense C := alpha A^T B + beta C
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A,
                const DenseMatrix<float>& B,
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const DenseMatrix<double>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
 // Low-rank C := alpha A^T B
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A,
                const FactorMatrix<float,false>& B,
                      FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A,
                const FactorMatrix<float,true>& B,
                      FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const FactorMatrix<double,false>& B,
                       FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const FactorMatrix<double,true>& B,
                       FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const FactorMatrix<std::complex<float>,false>& B,
                                    FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const FactorMatrix<std::complex<float>,true>& B,
                                    FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const FactorMatrix<std::complex<double>,false>& B,
                                     FactorMatrix<std::complex<double>,false>& C
 );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const FactorMatrix<std::complex<double>,true>& B,
                                     FactorMatrix<std::complex<double>,true>& C
 );
 
 // Form a dense matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,false>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,true>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,false>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,true>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,false>& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,true>& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,false>& B,
                                     DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,true>& B,
                                     DenseMatrix< std::complex<double> >& C );
 
 // Form a dense matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,false>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,true>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,false>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,true>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,false>& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,true>& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,false>& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,true>& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
 // Form a dense matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A, 
                const DenseMatrix<float>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A, 
                const DenseMatrix<float>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 
 // Form a dense matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A, 
                const DenseMatrix<float>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A, 
                const DenseMatrix<float>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const DenseMatrix<double>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const DenseMatrix<double>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
 // Form a factor matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,false>& B, 
                      FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,true>& B, 
                      FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,false>& B,
                       FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,true>& B,
                       FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,false>& B,
                                    FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,true>& B,
                                    FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,false>& B,
                                     FactorMatrix<std::complex<double>,false>& C
 );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,true>& B,
                                     FactorMatrix<std::complex<double>,true>& C
 );
 
 // Form a factor matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A, 
                const DenseMatrix<float>& B, 
                      FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A, 
                const DenseMatrix<float>& B, 
                      FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const DenseMatrix<double>& B,
                       FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const DenseMatrix<double>& B,
                       FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     FactorMatrix<std::complex<double>,false>& C 
 );
-template void psp::hmatrix_tools::MatrixTransposeMultiply
+template void psp::hmatrix_tools::MatrixTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     FactorMatrix<std::complex<double>,true>& C 

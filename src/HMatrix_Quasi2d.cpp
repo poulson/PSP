@@ -364,7 +364,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeVector
 
 template<typename Scalar>
 void
-psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
+psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMatrix
 ( Scalar alpha, const MatrixShell& shell,
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C ) const
@@ -390,7 +390,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
                 BSub.LockedView
                 ( B, sourceOffset, sourceSizes[s], 0, B.Width() );
 
-                RecursiveMatrixMultiply
+                RecursiveMatrixMatrix
                 ( alpha, shell.u.node->children[s+4*t], BSub, 1, CSub );
 
                 sourceOffset += sourceSizes[s];
@@ -419,7 +419,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
                     DenseMatrix<Scalar> BSub;
                     BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
 
-                    RecursiveMatrixMultiply
+                    RecursiveMatrixMatrix
                     ( alpha, shell.u.nodeSymmetric->children[child++], BSub, 
                       1, CSub );
 
@@ -458,17 +458,17 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMultiply
     }
     else if( shell.type == FACTOR )
     {
-        hmatrix_tools::MatrixMultiply( alpha, shell.u.factor->F, B, beta, C );
+        hmatrix_tools::MatrixMatrix( alpha, shell.u.factor->F, B, beta, C );
     }
     else /* shell.type == DENSE */
     {
-        hmatrix_tools::MatrixMultiply( alpha, shell.u.dense->D, B, beta, C );
+        hmatrix_tools::MatrixMatrix( alpha, shell.u.dense->D, B, beta, C );
     }
 }
 
 template<typename Scalar>
 void
-psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
+psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMatrix
 ( Scalar alpha, const MatrixShell& shell,
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C ) const
@@ -494,7 +494,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
                 BSub.LockedView
                 ( B, sourceOffset, targetSizes[s], 0, B.Width() );
 
-                RecursiveMatrixTransposeMultiply
+                RecursiveMatrixTransposeMatrix
                 ( alpha, shell.u.node->children[t+4*s], BSub, 1, CSub );
 
                 sourceOffset += targetSizes[s];
@@ -505,7 +505,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
     else if( shell.type == NODE_SYMMETRIC )
     {
         // NOTE: This section is an exact copy of that of the one from 
-        //       RecursiveMatrixMultiply. TODO: Avoid this duplication.
+        //       RecursiveMatrixMatrix. TODO: Avoid this duplication.
 
         // First scale C so that we can simply sum contributions onto it
         hmatrix_tools::Scale( beta, C );
@@ -526,7 +526,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
                     DenseMatrix<Scalar> BSub;
                     BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
 
-                    RecursiveMatrixMultiply
+                    RecursiveMatrixMatrix
                     ( alpha, shell.u.nodeSymmetric->children[child++], BSub, 
                       1, CSub );
 
@@ -553,7 +553,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
                     BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
 
                     const int child = (t*(t+1))/2 + s;
-                    RecursiveMatrixTransposeMultiply
+                    RecursiveMatrixTransposeMatrix
                     ( alpha, shell.u.nodeSymmetric->children[child], BSub,
                       1, CSub );
 
@@ -565,12 +565,12 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixTransposeMultiply
     }
     else if( shell.type == FACTOR )
     {
-        hmatrix_tools::MatrixTransposeMultiply
+        hmatrix_tools::MatrixTransposeMatrix
         ( alpha, shell.u.factor->F, B, beta, C );
     }
     else /* shell.type == DENSE */
     {
-        hmatrix_tools::MatrixTransposeMultiply
+        hmatrix_tools::MatrixTransposeMatrix
         ( alpha, shell.u.dense->D, B, beta, C );
     }
 }
@@ -646,7 +646,7 @@ psp::HMatrix_Quasi2d<Scalar>::MapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
-    RecursiveMatrixMultiply( alpha, _rootShell, B, beta, C );
+    RecursiveMatrixMatrix( alpha, _rootShell, B, beta, C );
 }
 
 template<typename Scalar>
@@ -657,7 +657,7 @@ psp::HMatrix_Quasi2d<Scalar>::MapMatrix
 {
     C.Resize( _m, B.Width() );
     std::memset( C.Buffer(), 0, _m*B.Width()*sizeof(Scalar) );
-    RecursiveMatrixMultiply( alpha, _rootShell, B, 1, C );
+    RecursiveMatrixMatrix( alpha, _rootShell, B, 1, C );
 }
 
 template<typename Scalar>
@@ -666,7 +666,7 @@ psp::HMatrix_Quasi2d<Scalar>::TransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
-    RecursiveMatrixTransposeMultiply( alpha, _rootShell, B, beta, C );
+    RecursiveMatrixTransposeMatrix( alpha, _rootShell, B, beta, C );
 }
 
 template<typename Scalar>
@@ -677,7 +677,7 @@ psp::HMatrix_Quasi2d<Scalar>::TransposeMapMatrix
 {
     C.Resize( _n, B.Width() );
     std::memset( C.Buffer(), 0, _n*B.Width()*sizeof(Scalar) );
-    RecursiveMatrixTransposeMultiply( alpha, _rootShell, B, 1, C );
+    RecursiveMatrixTransposeMatrix( alpha, _rootShell, B, 1, C );
 }
 
 template class psp::HMatrix_Quasi2d<float>;

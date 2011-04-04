@@ -117,13 +117,13 @@ class HMatrix_Quasi2d
       Scalar beta,        Vector<Scalar>& y ) const;
 
     // C := alpha H B + beta C
-    void RecursiveMatrixMultiply
+    void RecursiveMatrixMatrix
     ( Scalar alpha, const MatrixShell& shell,
                     const DenseMatrix<Scalar>& B,
       Scalar beta,        DenseMatrix<Scalar>& C ) const;
 
     // C := alpha H^T B + beta C
-    void RecursiveMatrixTransposeMultiply
+    void RecursiveMatrixTransposeMatrix
     ( Scalar alpha, const MatrixShell& shell,
                     const DenseMatrix<Scalar>& B,
       Scalar beta,        DenseMatrix<Scalar>& C ) const;

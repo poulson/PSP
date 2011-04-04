@@ -20,117 +20,190 @@
 */
 #include "psp.hpp"
 
-// Dense C := alpha A B
+// Dense C := alpha A^H B
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.Height(), B.Width() );
+    C.Resize( A.Width(), B.Width() );
     C.SetType( GENERAL );
-    MatrixMultiply( alpha, A, B, (Scalar)0, C );
+    MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
-// Dense C := alpha A B + beta C
+// Dense C := alpha A^H B + beta C
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.Width() != B.Height() )
+    if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( A.Symmetric() && B.Symmetric() )
-        throw std::logic_error("Product of symmetric matrices not supported.");
+    if( B.Symmetric() )
+        throw std::logic_error("BLAS does not support symm times trans");
 #endif
     if( A.Symmetric() )
     {
-        blas::Symm
-        ( 'L', 'L', C.Height(), C.Width(),
-          alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(), 
-          0, C.Buffer(), C.LDim() );
-    }
-    else if( B.Symmetric() )
-    {
-        blas::Symm
-        ( 'R', 'L', C.Height(), C.Width(),
-          alpha, B.LockedBuffer(), B.LDim(), A.LockedBuffer(), A.LDim(),
-          0, C.Buffer(), C.LDim() );
+        const int m = A.Height();
+        const int n = B.Width();
+        if( m <= 2*n )
+        {
+            // Form conj(alpha A) in a buffer
+            DenseMatrix<Scalar> AConj(m,m); 
+            for( int j=0; j<m; ++j )
+            {
+                Scalar* RESTRICT AConjCol = AConj.Buffer(0,j);
+                const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
+                for( int i=0; i<m; ++i )
+                    AConjCol[i] = Conj( alpha*ACol[i] );
+            }
+
+            // Form C := A B + beta C
+            blas::Symm
+            ( 'L', 'L', C.Height(), C.Width(),
+              1, AConj.LockedBuffer(), AConj.LDim(), B.LockedBuffer(), B.LDim(),
+              beta, C.Buffer(), C.LDim() );
+        }
+        else
+        {
+            // Form conj(alpha B) in a buffer
+            DenseMatrix<Scalar> BConj(m,n);
+            for( int j=0; j<n; ++j )
+            {
+                Scalar* BConjCol = BConj.Buffer(0,j);
+                const Scalar* BCol = B.LockedBuffer(0,j);
+                for( int i=0; i<m; ++i )
+                    BConjCol[i] = Conj( alpha*BCol[i] );
+            }
+
+            // C := conj(beta C)
+            for( int j=0; j<n; ++j )
+            {
+                Scalar* CCol = C.Buffer(0,j);
+                for( int i=0; i<m; ++i )
+                    CCol[i] = Conj( beta*CCol[i] );
+            }
+
+            // C := A B + C
+            blas::Symm
+            ( 'L', 'L', C.Height(), C.Width(),
+              1, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(), 
+              1, C.Buffer(), C.LDim() );
+
+            // C := conj(C)
+            for( int j=0; j<n; ++j )
+            {
+                Scalar* CCol = C.Buffer(0,j);
+                for( int i=0; i<m; ++i )
+                    CCol[i] = Conj( CCol[i] );
+            }
+        }
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+        ( 'C', 'N', C.Height(), C.Width(), A.Height(),
           alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(),
-          0, C.Buffer(), C.LDim() );
+          beta, C.Buffer(), C.LDim() );
     }
 }
 
-// Low-rank C := alpha A B
+/*
+// Low-rank C := alpha A^H B
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.m != B.m )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.m;
+    C.m = A.n;
     C.n = B.n;
     if( A.r < B.r )
     {
-        // C := A.U (alpha (A.V^H B.U) B.V^H)
-        //                  or
-        // C := A.U (alpha (A.V^T B.U) B.V^T)
         C.r = A.r;
-
-        // C.U := A.U
         C.U.resize( C.m*C.r );
-        std::memcpy( &C.U[0], &A.U[0], C.m*C.r*sizeof(Scalar) );
 
-        // C.V := conj(alpha) B.V (B.U^H A.V)
+        if( Conjugate )
+        {
+            std::memcpy( &C.U[0], &A.V[0], C.m*C.r*sizeof(Scalar) );
+        }
+        else
+        {
+            const int m = C.m;
+            const int r = C.r;
+            for( int j=0; j<r; ++j )
+            {
+                const Scalar* RESTRICT AV = &A.V[j*A.n];
+                Scalar* RESTRICT CU = &C.U[j*A.n];
+                for( int i=0; i<m; ++i )
+                    CU[i] = Conj( AV[i] );
+            }
+        }
+
+        // LEFT OFF HERE
+
+        // C.V := conj(alpha) B.V (A.U^T B.U)^H
         //                  or
-        // C.V := alpha       B.V (B.U^T A.V)
-        //
-        // We need a temporary buffer of size B.r*A.r; for now, we will allocate
-        // it on the fly, but eventually we may want to have a permanent buffer
-        // of a fixed size.
+        // C.V := alpha       B.V (A.U^T B.U)^T
         C.V.resize( C.n*C.r );
-        std::vector<Scalar> W( B.r*A.r );
-        // W := B.U^[T,H] A.V
-        const char option = ( Conjugate ? 'C' : 'T' );
+        std::vector<Scalar> W( A.r*B.r );
+        // W := A.U^T B.U
         blas::Gemm
-        ( option, 'N', B.r, A.r, B.m, 
-          1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
-        // C.V := conj(alpha) B.V W = conj(alpha) B.V (B.U^H A.V)
+        ( 'T', 'N', A.r, B.r, A.m,
+          1, &A.U[0], A.m, &B.U[0], B.m, 0, &W[0], A.r );
+        // C.V := conj(alpha) B.V W = conj(alpha) B.V (A.U^T B.U)^H
         //                  or
-        // C.V := alpha       B.V W = alpha       B.V (B.U^T A.V)
+        // C.V := alpha       B.V W = alpha       B.V (A.U^T B.U)^T
+        const char option = ( Conjugate ? 'C' : 'T' );
         const Scalar scale = ( Conjugate ? Conj(alpha) : alpha );
         blas::Gemm
-        ( 'N', 'N', C.n, C.r, B.r, 
+        ( 'N', option, C.n, C.r, B.r, 
           scale, &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
     }
     else
     {
-        // C := (alpha A.U (A.V^[T,H] B.U)) B.V^[T,H]
+        // C := (alpha conj(A.V) (A.U^T B.U)) B.V^H
+        //                     or
+        // C := (alpha A.V       (A.U^T B.U)) B.V^T
         C.r = B.r;
 
-        // C.U := alpha A.U (A.V^[T,H B.U)
+        // C.U := alpha conj(A.V) (A.U^T B.U)
+        //                  or
+        // C.U := alpha A.V       (A.U^T B.U)
         C.U.resize( C.m*C.r );
         std::vector<Scalar> W( A.r*B.r );
-        // W := A.V^[T,H] B.U
-        const char option = ( Conjugate ? 'C' : 'N' );
+        // W := A.U^T B.U
         blas::Gemm
-        ( option, 'N', A.r, B.r, A.n,
-          1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
-        // C.U := alpha A.U W = alpha A.U (A.V^[T,H] B.U)
-        blas::Gemm
-        ( 'N', 'N', C.m, C.r, A.r,
-          alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );
+        ( 'T', 'N', A.r, B.r, A.m,
+          1, &A.U[0], A.m, &B.U[0], B.m, 0, &W[0], A.r );
+        // C.U := alpha conj(A.V) W = alpha conj(A.V) (A.U^T B.U)
+        //                      or
+        // C.U := alpha A.V       W = alpha A.V       (A.U^T B.U)
+        if( Conjugate )
+        {
+            const int size = A.n*A.r;
+            std::vector<Scalar> AVConj( size );
+            const Scalar* RESTRICT AV = &A.V[0];
+            for( int i=0; i<size; ++i )
+                AVConj[i] = Conj( AV[i] );
+
+            blas::Gemm
+            ( 'N', 'N', C.m, C.r, A.r,
+              alpha, &AVConj[0], A.n, &W[0], A.r, 0, &C.U[0], C.m );
+        }
+        else
+        {
+            blas::Gemm
+            ( 'N', 'N', C.m, C.r, A.r,
+              alpha, &A.V[0], A.n, &W[0], A.r, 0, &C.U[0], C.m );
+        }
 
         // C.V := B.V
         C.V.resize( C.n*C.r );
@@ -140,16 +213,16 @@ void psp::hmatrix_tools::MatrixMultiply
 
 // Form a factor matrix from a dense matrix times a factor matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
 {
 #ifndef RELEASE
-    if( A.Width() != B.m )
+    if( A.Height() != B.m )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.Height();
+    C.m = A.Width();
     C.n = B.n;
     C.r = B.r;
     C.U.resize( C.m*C.r );
@@ -165,7 +238,7 @@ void psp::hmatrix_tools::MatrixMultiply
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.m, C.r, A.Width(),
+        ( 'T', 'N', C.m, C.r, A.Height(),
           alpha, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &C.U[0], C.m );
     }
 
@@ -175,136 +248,146 @@ void psp::hmatrix_tools::MatrixMultiply
 
 // Form a factor matrix from a factor matrix times a dense matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.Height() )
+    if( A.m != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.m;
+    C.m = A.n;
     C.n = B.Width();
     C.r = A.r;
     C.U.resize( C.m*C.r );
     C.V.resize( C.n*C.r );
 
-    // Form C.U := A.U
-    std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+    if( Conjugate )
+    {
+        // Form C.U := conj(A.V)
+        const int r = A.r;
+        const int n = A.n;
+        const Scalar* RESTRICT AV = &A.V[0];
+        Scalar* RESTRICT AVConj = &C.U[0];
+        for( int j=0; j<r; ++j )
+            for( int i=0; i<n; ++i )
+                AVConj[i] = Conj( AV[i] );
+    }
+    else
+    {
+        // Form C.U := A.V
+        std::memcpy( &C.U[0], &A.V[0], A.n*A.r*sizeof(Scalar) );
+    }
 
-    // Form C.V := conj(alpha) B^H A.V
-    //            or
-    //      C.V := alpha       B^T A.V
+    // Form C.V := conj( alpha B^T A.U )
+    //                or
+    //      C.V :=       alpha B^T A.U
     if( B.Symmetric() )
     {
+        blas::Symm
+        ( 'L', 'L', C.n, C.r, 
+          alpha, B.LockedBuffer(), B.LDim(), &A.U[0], A.m, 
+          0, &C.V[0], C.n );
         if( Conjugate )
         {
-            // Since B is symmetric, 
-            //   conj(alpha) B^H V = conj(alpha) conj(B) V = 
-            //   conj(alpha B conj(V))
-            const int size = A.n*A.r;
-            std::vector<Scalar> W( size );
-            const Scalar* RESTRICT AV = &A.V[0];
-            for( int i=0; i<size; ++i )
-                W[i] = Conj( AV[i] );
-
-            blas::Symm
-            ( 'L', 'L', C.n, C.r, 
-              alpha, B.LockedBuffer(), B.LDim(), &W[0], A.n, 
-              0, &C.V[0], C.n );
-
             Scalar* CV = &C.V[0];
+            const int size = C.n*C.r;
             for( int i=0; i<size; ++i )
                 CV[i] = Conj( CV[i] );
-        }
-        else
-        {
-            blas::Symm
-            ( 'L', 'L', C.n, C.r,
-              alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 
-              0, &C.V[0], C.n );
         }
     }
     else
     {
-        const char option = ( Conjugate ? 'C' : 'T' );
-        const Scalar scale = ( Conjugate ? Conj(alpha) : alpha );
         blas::Gemm
-        ( option, 'N', C.n, C.r, B.Height(),
-          scale, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 0, &C.V[0], C.n );
+        ( 'T', 'N', C.n, C.r, B.Height(),
+          alpha, B.LockedBuffer(), B.LDim(), &A.U[0], A.m, 0, &C.V[0], C.n );
+        if( Conjugate )
+        {
+            Scalar* CV = &C.V[0];
+            const int size = C.n*C.r;
+            for( int i=0; i<size; ++i )
+                CV[i] = Conj( CV[i] );
+        }
     }
 }
 
 // Form a dense matrix from a dense matrix times a factor matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.Height(), B.n );
+    C.Resize( A.Width(), B.n );
     C.SetType( GENERAL );
-    MatrixMultiply( alpha, A, B, (Scalar)0, C );
+    MatrixTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
 // Form a dense matrix from a dense matrix times a factor matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugate>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.Width() != B.m )
+    if( A.Height() != B.m )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    // W := A B.U
-    std::vector<Scalar> W( A.Height()*B.r );
+    // W := A^T B.U
+    std::vector<Scalar> W( A.Width()*B.r );
     if( A.Symmetric() )
     {
         blas::Symm
         ( 'L', 'L', C.Height(), B.r,
-          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
+          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Width() );
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.Height(), B.r, A.Width(),
-          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
+        ( 'T', 'N', C.Height(), B.r, A.Height(),
+          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Width() );
     }
-    // C := alpha W B.V^[T,H] = alpha (A B.U) B.V^[T,H]
+    // C := alpha W B.V^[T,H] = alpha (A^T B.U) B.V^[T,H]
     const char option = ( Conjugate ? 'C' : 'T' );
     blas::Gemm
     ( 'N', option, C.Height(), C.Width(), B.r,
-      alpha, &W[0], A.Height(), &B.V[0], B.n, 0, C.Buffer(), C.LDim() );
+      alpha, &W[0], A.Width(), &B.V[0], B.n, 0, C.Buffer(), C.LDim() );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.m, B.Width() );
+    C.Resize( A.n, B.Width() );
     C.SetType( GENERAL );
-    MatrixMultiply( alpha, A, B, (Scalar)0, C );
+    MatrixTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixMultiply
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.Height() )
+    if( A.m != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
     if( B.Symmetric() )
     {
+        // W := B A.U 
+        std::vector<Scalar> W( B.Height()*A.r );
+        blas::Symm
+        ( 'L', 'L', B.Height(), A.r,
+          1, B.LockedBuffer(), B.LDim(), &A.U[0], A.m, 
+          0, &W[0], B.Height() );
+
         if( Conjugate )
         {
             // Form AVConj := conj(A.V)
@@ -313,326 +396,332 @@ void psp::hmatrix_tools::MatrixMultiply
             std::vector<Scalar> AVConj( size );
             for( int i=0; i<size; ++i )
                 AVConj[i] = Conj( AV[i] );
-        
-            // W := B conj(A.V) = (A.V^H B)^T
-            std::vector<Scalar> W( B.Height()*A.r );
-            blas::Symm
-            ( 'L', 'L', B.Height(), A.r,
-              1, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 
-              0, &W[0], B.Height() );
 
-            // C := alpha A.U W^T =  alpha A.U (A.V^H B)
+            // C := alpha conj(A.V) W^T = alpha conj(A.V) (A.U^T B)
             blas::Gemm
             ( 'N', 'T', C.Height(), C.Width(), A.r,
-              alpha, &A.U[0], A.m, &W[0], B.Height(), 
+              alpha, &AVConj[0], A.n, &W[0], B.Height(), 
               0, C.Buffer(), C.LDim() );
         }
         else
         {
-            // W := B A.V = (A.V^T B)^T
-            std::vector<Scalar> W( B.Height()*A.r );
-            blas::Symm
-            ( 'L', 'L', B.Height(), A.r,
-              1, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 
-              0, &W[0], B.Height() );
-
-            // C := alpha A.U W^T =  alpha A.U (A.V^T B)
+            // C := alpha A.V W^T = alpha A.V (A.U^T B)
             blas::Gemm
             ( 'N', 'T', C.Height(), C.Width(), A.r,
-              alpha, &A.U[0], A.m, &W[0], B.Height(), 
+              alpha, &A.V[0], A.n, &W[0], B.Height(), 
               0, C.Buffer(), C.LDim() );
         }
     }
     else
     {
+        // W := A.U^T B
         std::vector<Scalar> W( A.r*B.Width() );
-        // W := A.V^[T,H] B
-        const char option = ( Conjugate ? 'C' : 'T' );
         blas::Gemm
-        ( option, 'N', A.r, B.Width(), A.n,
-          1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
-        // C := alpha A.U W = alpha A.U (A.V^[T,H] B)
-        blas::Gemm
-        ( 'N', 'N', C.Height(), C.Width(), A.r,
-          alpha, &A.U[0], A.m, &W[0], A.r, 0, C.Buffer(), C.LDim() );
+        ( 'T', 'N', A.r, B.Width(), A.m,
+          1, &A.U[0], A.m, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
+
+        if( Conjugate )
+        {
+            // Form AVConj := conj(A.V)
+            const int size = A.n*A.r;
+            const Scalar* RESTRICT AV = &A.V[0];
+            std::vector<Scalar> AVConj( size );
+            for( int i=0; i<size; ++i )
+                AVConj[i] = Conj( AV[i] );
+
+            // C := alpha conj(A.V) W = alpha conj(A.V) (A.U^T B)
+            blas::Gemm
+            ( 'N', 'N', C.Height(), C.Width(), A.r,
+              alpha, &AVConj[0], A.n, &W[0], A.r, 
+              0, C.Buffer(), C.LDim() );
+        }
+        else
+        {
+            // C := alpha A.V W = alpha A.V (A.U^T B)
+            blas::Gemm
+            ( 'N', 'N', C.Height(), C.Width(), A.r,
+              alpha, &A.V[0], A.n, &W[0], A.r,
+              0, C.Buffer(), C.LDim() );
+        }
     }
 }
+*/
 
-// Dense C := alpha A B
-template void psp::hmatrix_tools::MatrixMultiply
+// Dense C := alpha A^H B
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A,
                const DenseMatrix<float>& B,
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 
-// Dense C := alpha A B + beta C
-template void psp::hmatrix_tools::MatrixMultiply
+// Dense C := alpha A^H B + beta C
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A,
                const DenseMatrix<float>& B,
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const DenseMatrix<double>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
-// Low-rank C := alpha A B
-template void psp::hmatrix_tools::MatrixMultiply
+// Low-rank C := alpha A^H B
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A,
                const FactorMatrix<float,false>& B,
                      FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A,
                const FactorMatrix<float,true>& B,
                      FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const FactorMatrix<double,false>& B,
                       FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const FactorMatrix<double,true>& B,
                       FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const FactorMatrix<std::complex<float>,false>& B,
                                    FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const FactorMatrix<std::complex<float>,true>& B,
                                    FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const FactorMatrix<std::complex<double>,false>& B,
                                     FactorMatrix<std::complex<double>,false>& C
 );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const FactorMatrix<std::complex<double>,true>& B,
                                     FactorMatrix<std::complex<double>,true>& C
 );
 
 // Form a dense matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,false>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,true>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,false>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,true>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,false>& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,true>& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,false>& B,
                                     DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,true>& B,
                                     DenseMatrix< std::complex<double> >& C );
 
 // Form a dense matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,false>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,true>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,false>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,true>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,false>& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,true>& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,false>& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,true>& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
 // Form a dense matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A, 
                const DenseMatrix<float>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A, 
                const DenseMatrix<float>& B, 
                      DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 
 // Form a dense matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A, 
                const DenseMatrix<float>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A, 
                const DenseMatrix<float>& B, 
   float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const DenseMatrix<double>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const DenseMatrix<double>& B,
   double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
 // Form a factor matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,false>& B, 
                      FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A, 
                const FactorMatrix<float,true>& B, 
                      FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,false>& B,
                       FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const DenseMatrix<double>& A,
                 const FactorMatrix<double,true>& B,
                       FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,false>& B,
                                    FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const FactorMatrix<std::complex<float>,true>& B,
                                    FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,false>& B,
                                     FactorMatrix<std::complex<double>,false>& C
 );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const FactorMatrix<std::complex<double>,true>& B,
                                     FactorMatrix<std::complex<double>,true>& C
 );
 
 // Form a factor matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,false>& A, 
                const DenseMatrix<float>& B, 
                      FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const FactorMatrix<float,true>& A, 
                const DenseMatrix<float>& B, 
                      FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,false>& A,
                 const DenseMatrix<double>& B,
                       FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( double alpha, const FactorMatrix<double,true>& A,
                 const DenseMatrix<double>& B,
                       FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const DenseMatrix< std::complex<float> >& B,
                                    FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     FactorMatrix<std::complex<double>,false>& C 
 );
-template void psp::hmatrix_tools::MatrixMultiply
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const DenseMatrix< std::complex<double> >& B,
                                     FactorMatrix<std::complex<double>,true>& C 

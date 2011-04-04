@@ -20,34 +20,53 @@
 */
 #include "psp.hpp"
 
-// Dense y := alpha A^T x + beta y
+// Dense y := alpha A^H x + beta y
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixTransposeVector
+void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( Scalar alpha, const DenseMatrix<Scalar>& A,
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
     if( A.Symmetric() )
     {
+        // Form conj(alpha x) in a buffer
+        const int n = x.Size();
+        std::vector<Scalar> xConj(n);
+        Scalar* xConjBuffer = xConj.Buffer();
+        const Scalar* xBuffer = x.LockedBuffer();
+        for( int i=0; i<n; ++i )
+            xConjBuffer[i] = Conj( alpha*xBuffer[i] );
+
+        // Form y := conj(beta y)
+        const int m = y.Size();
+        Scalar* yBuffer = y.Buffer();
+        for( int i=0; i<m; ++i )
+            yBuffer[i] = Conj( beta*yBuffer[i] );
+
+        // Form y := A x + y
         blas::Symv
         ( 'L', A.Height(), 
-          alpha, A.LockedBuffer(), A.LDim(), 
-                 x.LockedBuffer(), 1, 
-          beta,  y.Buffer(),       1 );
+          1, A.LockedBuffer(), A.LDim(), 
+             xConj.LockedBuffer(), 1, 
+          1, y.Buffer(),           1 );
+
+        // Form y := conj(y)
+        for( int i=0; i<m; ++i )
+            yBuffer[i] = Conj( yBuffer[i] );
     }
     else
     {
         blas::Gemv
-        ( 'T', A.Height(), A.Width(), 
+        ( 'C', A.Height(), A.Width(), 
           alpha, A.LockedBuffer(), A.LDim(), 
                  x.LockedBuffer(), 1, 
           beta,  y.Buffer(),       1 );
     }
 }
 
-// Dense y := alpha A^T x
+// Dense y := alpha A^H x
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixTransposeVector
+void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
@@ -55,25 +74,40 @@ void psp::hmatrix_tools::MatrixTransposeVector
     y.Resize( x.Size() );
     if( A.Symmetric() )
     {
+        // Form conj(alpha x) in a buffer
+        const int n = x.Size();
+        std::vector<Scalar> xConj(n);
+        Scalar* xConjBuffer = xConj.Buffer();
+        const Scalar* xBuffer = x.LockedBuffer();
+        for( int i=0; i<n; ++i )
+            xConjBuffer[i] = Conj( alpha*xBuffer[i] );
+
+        // Form y := A x
         blas::Symv
         ( 'L', A.Height(), 
-          alpha, A.LockedBuffer(), A.LDim(), 
-                 x.LockedBuffer(), 1, 
-          0,     y.Buffer(),       1 );
+          1, A.LockedBuffer(), A.LDim(), 
+             xConj.LockedBuffer(), 1, 
+          0, y.Buffer(),           1 );
+
+        // Conjugate y
+        const int m = y.Size();
+        Scalar* yBuffer = y.Buffer();
+        for( int i=0; i<m; ++i )
+            yBuffer[i] = Conj( yBuffer[i] );
     }
     else
     {
         blas::Gemv
-        ( 'T', A.Height(), A.Width(), 
+        ( 'C', A.Height(), A.Width(), 
           alpha, A.LockedBuffer(), A.LDim(), 
                  x.LockedBuffer(), 1, 
           0,     y.Buffer(),       1 );
     }
 }
 
-// Low-rank y := alpha A^T x + beta y
+// Low-rank y := alpha A^H x + beta y
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeVector
+void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
@@ -81,11 +115,17 @@ void psp::hmatrix_tools::MatrixTransposeVector
     const int r = A.r;
     std::vector<Scalar> t(r);
 
-    // Form t := alpha (A.U)^T x
+    // Form t := alpha (A.U)^H x
     blas::Gemv
-    ( 'T', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( 'C', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
     if( Conjugate )
+    {
+        // Form y := (A.V) t + beta y
+        blas::Gemv
+        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, beta, y.Buffer(), 1 );
+    }
+    else
     {
         // t := conj(t)
         for( int i=0; i<r; ++i )
@@ -105,17 +145,11 @@ void psp::hmatrix_tools::MatrixTransposeVector
         for( int i=0; i<n; ++i )
             yBuffer[i] = Conj( yBuffer[i] ); 
     }
-    else
-    {
-        // Form y := (A.V) t + beta y
-        blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, beta, y.Buffer(), 1 );
-    }
 }
 
-// Low-rank y := alpha A^T x
+// Low-rank y := alpha A^H x
 template<typename Scalar,bool Conjugate>
-void psp::hmatrix_tools::MatrixTransposeVector
+void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
@@ -123,12 +157,18 @@ void psp::hmatrix_tools::MatrixTransposeVector
     const int r = A.r;
     std::vector<Scalar> t(r);
 
-    // Form t := alpha (A.U)^T x
+    // Form t := alpha (A.U)^H x
     blas::Gemv
-    ( 'T', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( 'C', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
     y.Resize( x.Size() );
     if( Conjugate )
+    {
+        // Form y := (A.V) t
+        blas::Gemv
+        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, 0, y.Buffer(), 1 );
+    }
+    else
     {
         // t := conj(t)
         for( int i=0; i<r; ++i )
@@ -144,111 +184,104 @@ void psp::hmatrix_tools::MatrixTransposeVector
         for( int i=0; i<n; ++i )
             yBuffer[i] = Conj( yBuffer[i] );
     }
-    else
-    {
-        // Form y := (A.V) t
-        blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, 0, y.Buffer(), 1 );
-    }
 }
 
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( float alpha, const DenseMatrix<float>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( double alpha, const DenseMatrix<double>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const Vector< std::complex<float> >& x,
   std::complex<float> beta,        Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const Vector< std::complex<double> >& x,
   std::complex<double> beta,        Vector< std::complex<double> >& y );
 
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( float alpha, const DenseMatrix<float>& A,
                const Vector<float>& x,
                      Vector<float>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( double alpha, const DenseMatrix<double>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const Vector< std::complex<float> >& x,
                                    Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const Vector< std::complex<double> >& x,
                                     Vector< std::complex<double> >& y );
 
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( float alpha, const FactorMatrix<float,false>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( float alpha, const FactorMatrix<float,true>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( double alpha, const FactorMatrix<double,false>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( double alpha, const FactorMatrix<double,true>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const Vector< std::complex<float> >& x,
   std::complex<float> beta,        Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const Vector< std::complex<float> >& x,
   std::complex<float> beta,        Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const Vector< std::complex<double> >& x,
   std::complex<double> beta,        Vector< std::complex<double> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const Vector< std::complex<double> >& x,
   std::complex<double> beta,        Vector< std::complex<double> >& y );
 
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( float alpha, const FactorMatrix<float,false>& A,
                const Vector<float>& x,
                      Vector<float>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( float alpha, const FactorMatrix<float,true>& A,
                const Vector<float>& x,
                      Vector<float>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( double alpha, const FactorMatrix<double,false>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( double alpha, const FactorMatrix<double,true>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
                              const Vector< std::complex<float> >& x,
                                    Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
                              const Vector< std::complex<float> >& x,
                                    Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
                               const Vector< std::complex<double> >& x,
                                     Vector< std::complex<double> >& y );
-template void psp::hmatrix_tools::MatrixTransposeVector
+template void psp::hmatrix_tools::MatrixHermitianTransposeVector
 ( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
                               const Vector< std::complex<double> >& x,
                                     Vector< std::complex<double> >& y );
-

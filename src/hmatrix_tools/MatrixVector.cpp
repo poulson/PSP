@@ -39,9 +39,9 @@ void psp::hmatrix_tools::MatrixVector
     {
         blas::Gemv
         ( 'N', A.Height(), A.Width(), 
-          1,    A.LockedBuffer(), A.LDim(), 
-                x.LockedBuffer(), 1, 
-          beta, y.Buffer(),       1 );
+          alpha, A.LockedBuffer(), A.LDim(), 
+                 x.LockedBuffer(), 1, 
+          beta,  y.Buffer(),       1 );
     }
 }
 
