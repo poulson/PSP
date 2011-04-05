@@ -66,6 +66,40 @@ void LAPACK(zgeqrf)
   dcomplex* work, const int* lwork,
   int* info );
 
+void LAPACK(sgeqp3)
+( const int* m, const int* n,
+  float* A, const int* lda,
+  int* jpvt,
+  float* tau,
+  float* work, const int* lwork,
+  int* info );
+
+void LAPACK(dgeqp3)
+( const int* m, const int* n,
+  double* A, const int* lda,
+  int* jpvt,
+  double* tau,
+  double* work, const int* lwork,
+  int* info );
+
+void LAPACK(cgeqp3)
+( const int* m, const int* n,
+  scomplex* A, const int* lda,
+  int* jpvt,
+  scomplex* tau,
+  scomplex* work, const int* lwork,
+  float* rwork,
+  int* info );
+
+void LAPACK(zgeqp3)
+( const int* m, const int* n,
+  dcomplex* A, const int* lda,
+  int* jpvt,
+  dcomplex* tau,
+  dcomplex* work, const int* lwork,
+  double* rwork,
+  int* info );
+
 void LAPACK(sormqr)
 ( const char* side, const char* trans, 
   const int* m, const int* n, const int* k,
@@ -100,6 +134,34 @@ void LAPACK(zunmqr)
   const dcomplex* tau,
   dcomplex* C, const int* ldc,
   dcomplex* work, const int* lwork,
+  int* info );
+
+void LAPACK(sorgqr)
+( const int* m, const int* n, const int* k,
+        float* A, const int* lda,
+  const float* tau,
+        float* work, const int* lwork,
+  int* info );
+
+void LAPACK(dorgqr)
+( const int* m, const int* n, const int* k,
+        double* A, const int* lda,
+  const double* tau,
+        double* work, const int* lwork,
+  int* info );
+
+void LAPACK(cungqr)
+( const int* m, const int* n, const int* k,
+        scomplex* A, const int* lda,
+  const scomplex* tau,
+        scomplex* work, const int* lwork, 
+  int* info );
+
+void LAPACK(zungqr)
+( const int* m, const int* n, const int* k,
+        dcomplex* A, const int* lda,
+  const dcomplex* tau,
+        dcomplex* work, const int* lwork,
   int* info );
 
 void LAPACK(sgesvd)
@@ -257,12 +319,12 @@ void LAPACK(zsytri)
 
 } // extern "C"
 
-//----------------------------------------------------------------------------//
-// Routines for QR factorizations and Q application                           //
-//----------------------------------------------------------------------------//
-
 namespace psp {
 namespace lapack {
+
+//----------------------------------------------------------------------------//
+// Unpivoted QR                                                               //
+//----------------------------------------------------------------------------//
 
 inline void QR
 ( int m, int n, 
@@ -336,10 +398,96 @@ inline void QR
 #endif
 }
 
+//----------------------------------------------------------------------------//
+// Pivoted QR                                                                 //
+//----------------------------------------------------------------------------//
+
+inline void PivotedQR
+( int m, int n, 
+  float* A, int lda, 
+  int* jpvt,
+  float* tau, 
+  float* work, int lwork )
+{
+    int info;
+    LAPACK(sgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "QR factorization, sgeqp3, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+inline void PivotedQR
+( int m, int n, 
+  double* A, int lda, 
+  int* jpvt,
+  double* tau, 
+  double* work, int lwork )
+{
+    int info;
+    LAPACK(dgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "QR factorization, dgeqp3, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+inline void PivotedQR
+( int m, int n, 
+  std::complex<float>* A, int lda, 
+  int* jpvt,
+  std::complex<float>* tau, 
+  std::complex<float>* work, int lwork,
+  float* rwork )
+{
+    int info;
+    LAPACK(cgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, rwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "QR factorization, cgeqp3, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+inline void PivotedQR
+( int m, int n, 
+  std::complex<double>* A, int lda, 
+  int* jpvt,
+  std::complex<double>* tau, 
+  std::complex<double>* work, int lwork,
+  double* rwork )
+{
+    int info;
+    LAPACK(zgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, rwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "QR factorization, zgeqp3, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+//----------------------------------------------------------------------------//
+// Apply Q from a QR factorization                                            //
+//----------------------------------------------------------------------------//
+
 inline void ApplyQ
 ( char side, char trans, int m, int n, int k, 
   const float* A, int lda,
-        float* tau, 
+  const float* tau, 
         float* C, int ldc,
         float* work, int lwork )
 {
@@ -363,7 +511,7 @@ inline void ApplyQ
 inline void ApplyQ
 ( char side, char trans, int m, int n, int k, 
   const double* A, int lda,
-        double* tau, 
+  const double* tau, 
         double* C, int ldc,
         double* work, int lwork )
 {
@@ -387,7 +535,7 @@ inline void ApplyQ
 inline void ApplyQ
 ( char side, char trans, int m, int n, int k, 
   const std::complex<float>* A, int lda,
-        std::complex<float>* tau, 
+  const std::complex<float>* tau, 
         std::complex<float>* C, int ldc,
         std::complex<float>* work, int lwork )
 {
@@ -407,7 +555,7 @@ inline void ApplyQ
 inline void ApplyQ
 ( char side, char trans, int m, int n, int k, 
   const std::complex<double>* A, int lda,
-        std::complex<double>* tau, 
+  const std::complex<double>* tau, 
         std::complex<double>* C, int ldc,
         std::complex<double>* work, int lwork )
 {
@@ -419,6 +567,82 @@ inline void ApplyQ
     {
         std::ostringstream s;
         s << "Q application, zunmqr, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+//----------------------------------------------------------------------------//
+// Form Q from a QR factorization                                             //
+//----------------------------------------------------------------------------//
+
+inline void FormQ
+( int m, int n, int k, 
+        float* A, int lda,
+  const float* tau, 
+        float* work, int lwork ) 
+{
+    int info;
+    LAPACK(sorgqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "Q application, sorgqr, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+inline void FormQ
+( int m, int n, int k,
+        double* A, int lda,
+  const double* tau,
+        double* work, int lwork )
+{
+    int info;
+    LAPACK(dorgqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "Q application, dorgqr, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+inline void FormQ
+( int m, int n, int k,
+        std::complex<float>* A, int lda,
+  const std::complex<float>* tau,
+        std::complex<float>* work, int lwork )
+{
+    int info;
+    LAPACK(cungqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "Q application, cungqr, failed with info=" << info;
+        throw std::runtime_error( s.str().c_str() );
+    }
+#endif
+}
+
+inline void FormQ
+( int m, int n, int k,
+        std::complex<double>* A, int lda,
+  const std::complex<double>* tau,
+        std::complex<double>* work, int lwork )
+{
+    int info;
+    LAPACK(zungqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
+#ifndef RELEASE
+    if( info != 0 )
+    {
+        std::ostringstream s;
+        s << "Q application, zungqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
 #endif

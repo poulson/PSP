@@ -116,7 +116,7 @@ void psp::hmatrix_tools::Compress
     }
     // Hit the matrix from the left with Q1 from the QR decomp of the orig A.U
     lapack::ApplyQ
-    ( 'L', 'T', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
+    ( 'L', 'N', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
       &A.U[0], m, &buffer[0], blockSize );
 
     // Copy the result of the QR factorization of A.V into a temporary buffer
@@ -135,7 +135,7 @@ void psp::hmatrix_tools::Compress
     }
     // Hit the matrix from the left with Q2 from the QR decomp of the orig A.V
     lapack::ApplyQ
-    ( 'L', 'T', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
+    ( 'L', 'N', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
       &A.V[0], n, &buffer[0], blockSize );
 #endif // PIVOTED_QR
 
@@ -245,7 +245,7 @@ void psp::hmatrix_tools::Compress
     }
     // Hit the matrix from the left with Q1 from the QR decomp of the orig A.U
     lapack::ApplyQ
-    ( 'L', 'C', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
+    ( 'L', 'N', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
       &A.U[0], m, &buffer[0], blockSize );
 
     // Copy the result of the QR factorization of A.V into a temporary buffer
@@ -278,7 +278,7 @@ void psp::hmatrix_tools::Compress
     }
     // Hit the matrix from the left with Q2 from the QR decomp of the orig A.V
     lapack::ApplyQ
-    ( 'L', 'C', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
+    ( 'L', 'N', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
       &A.V[0], n, &buffer[0], blockSize );
 #endif // PIVOTED_QR
 

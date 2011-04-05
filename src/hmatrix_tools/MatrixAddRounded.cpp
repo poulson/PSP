@@ -221,7 +221,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'T', m, roundedRank, r, &buffer[0], C.m, &tauU[0], &C.U[0], C.m, 
+    ( 'L', 'N', m, roundedRank, r, &buffer[0], C.m, &tauU[0], &C.U[0], C.m, 
       &buffer[offset], blockSize );
 
     // Form the rounded C.V by first filling it with 
@@ -237,7 +237,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'T', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
+    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
       &C.V[0], C.n, &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 }
@@ -432,7 +432,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'C', m, roundedRank, r, &buffer[0], C.m, &tauU[0], &C.U[0], C.m, 
+    ( 'L', 'N', m, roundedRank, r, &buffer[0], C.m, &tauU[0], &C.U[0], C.m, 
       &buffer[offset], blockSize );
 
     // Form the rounded C.V by first filling it with 
@@ -461,7 +461,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'C', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
+    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], C.n, &tauV[0], 
       &C.V[0], C.n, &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 }
