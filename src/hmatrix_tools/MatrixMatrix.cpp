@@ -44,6 +44,8 @@ void psp::hmatrix_tools::MatrixMatrix
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( A.Symmetric() && B.Symmetric() )
         throw std::logic_error("Product of symmetric matrices not supported.");
+    if( C.Symmetric() )
+        throw std::logic_error("Update will probably not be symmetric.");
 #endif
     if( A.Symmetric() )
     {
@@ -81,60 +83,89 @@ void psp::hmatrix_tools::MatrixMatrix
 #endif
     C.m = A.m;
     C.n = B.n;
-    if( A.r < B.r )
+    if( A.r <= B.r )
     {
-        // C := A.U (alpha (A.V^H B.U) B.V^H)
-        //                  or
-        // C := A.U (alpha (A.V^T B.U) B.V^T)
         C.r = A.r;
-
-        // C.U := A.U
         C.U.resize( C.m*C.r );
-        std::memcpy( &C.U[0], &A.U[0], C.m*C.r*sizeof(Scalar) );
-
-        // C.V := conj(alpha) B.V (B.U^H A.V)
-        //                  or
-        // C.V := alpha       B.V (B.U^T A.V)
-        //
-        // We need a temporary buffer of size B.r*A.r; for now, we will allocate
-        // it on the fly, but eventually we may want to have a permanent buffer
-        // of a fixed size.
         C.V.resize( C.n*C.r );
-        std::vector<Scalar> W( B.r*A.r );
-        // W := B.U^[T,H] A.V
-        const char option = ( Conjugate ? 'C' : 'T' );
-        blas::Gemm
-        ( option, 'N', B.r, A.r, B.m, 
-          1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
-        // C.V := conj(alpha) B.V W = conj(alpha) B.V (B.U^H A.V)
-        //                  or
-        // C.V := alpha       B.V W = alpha       B.V (B.U^T A.V)
-        const Scalar scale = ( Conjugate ? Conj(alpha) : alpha );
-        blas::Gemm
-        ( 'N', 'N', C.n, C.r, B.r, 
-          scale, &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
+
+        if( Conjugate )
+        {
+            // C.U C.V^H := alpha (A.U A.V^H) (B.U B.V^H)
+            //            = A.U (alpha A.V^H B.U B.V^H)
+            //            = A.U (conj(alpha) B.V (B.U^H A.V))^H
+            //
+            // C.U := A.U
+            // W := B.U^H A.V
+            // C.V := conj(alpha) B.V W
+            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            std::vector<Scalar> W( B.r*A.r );
+            blas::Gemm
+            ( 'C', 'N', B.r, A.r, B.m,
+              1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
+            blas::Gemm
+            ( 'N', 'N', B.n, A.r, B.r,
+              Conj(alpha), &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
+        }
+        else
+        {
+            // C.U C.V^T := alpha (A.U A.V^T) (B.U B.V^T)
+            //            = A.U (alpha A.V^T B.U B.V^T)
+            //            = A.U (alpha B.V (B.U^T A.V))^T
+            //
+            // C.U := A.U
+            // W := B.U^T A.V
+            // C.V := alpha B.V W
+            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            std::vector<Scalar> W( B.r*A.r );
+            blas::Gemm
+            ( 'T', 'N', B.r, A.r, B.m,
+              1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
+            blas::Gemm
+            ( 'N', 'N', B.n, A.r, B.r,
+              alpha, &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
+        }
     }
-    else
+    else // B.r < A.r
     {
-        // C := (alpha A.U (A.V^[T,H] B.U)) B.V^[T,H]
         C.r = B.r;
-
-        // C.U := alpha A.U (A.V^[T,H B.U)
         C.U.resize( C.m*C.r );
-        std::vector<Scalar> W( A.r*B.r );
-        // W := A.V^[T,H] B.U
-        const char option = ( Conjugate ? 'C' : 'N' );
-        blas::Gemm
-        ( option, 'N', A.r, B.r, A.n,
-          1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
-        // C.U := alpha A.U W = alpha A.U (A.V^[T,H] B.U)
-        blas::Gemm
-        ( 'N', 'N', C.m, C.r, A.r,
-          alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );
-
-        // C.V := B.V
         C.V.resize( C.n*C.r );
-        std::memcpy( &C.V[0], &B.V[0], C.n*C.r*sizeof(Scalar) );
+
+        if( Conjugate )
+        {
+            // C.U C.V^H := alpha (A.U A.V^H) (B.U B.V^H)
+            //            = (alpha A.U (A.V^H B.U)) B.V^H
+            //
+            // W := A.V^H B.U
+            // C.U := alpha A.U W
+            // C.V := B.V
+            std::vector<Scalar> W( A.r*B.r );
+            blas::Gemm
+            ( 'C', 'N', A.r, B.r, A.n,
+              1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
+            blas::Gemm
+            ( 'N', 'N', A.m, B.r, A.r,
+              alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );
+            std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+        }
+        else
+        {
+            // C.U C.V^T := alpha (A.U A.V^T) (B.U B.V^T)
+            //            = (alpha A.U (A.V^T B.U)) B.V^T
+            //
+            // W := A.V^T B.U
+            // C.U := alpha A.U W
+            // C.V := B.V
+            std::vector<Scalar> W( A.r*B.r );
+            blas::Gemm
+            ( 'T', 'N', A.r, B.r, A.n,
+              1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
+            blas::Gemm
+            ( 'N', 'N', A.m, B.r, A.r,
+              alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );
+            std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+        }
     }
 }
 
@@ -190,49 +221,84 @@ void psp::hmatrix_tools::MatrixMatrix
     C.U.resize( C.m*C.r );
     C.V.resize( C.n*C.r );
 
-    // Form C.U := A.U
-    std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
-
-    // Form C.V := conj(alpha) B^H A.V
-    //            or
-    //      C.V := alpha       B^T A.V
-    if( B.Symmetric() )
+    if( Conjugate )
     {
-        if( Conjugate )
+        if( B.Symmetric() )
         {
-            // Since B is symmetric, 
-            //   conj(alpha) B^H V = conj(alpha) conj(B) V = 
-            //   conj(alpha B conj(V))
-            const int size = A.n*A.r;
-            std::vector<Scalar> W( size );
-            const Scalar* RESTRICT AV = &A.V[0];
-            for( int i=0; i<size; ++i )
-                W[i] = Conj( AV[i] );
-
+            // C.U C.V^H := alpha (A.U A.V^H) B
+            //            = A.U (alpha A.V^H B)
+            //            = A.U (conj(alpha) B^H A.V)^H
+            //            = A.U (conj(alpha B conj(A.V)))^H
+            //
+            // C.U := A.U
+            // AVConj := conj(A.V)
+            // C.V := alpha B AVConj
+            // C.V := conj(C.V)
+            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            std::vector<Scalar> AVConj( A.n*A.r );
+            {
+                const int An = A.n;
+                const int Ar = A.r;
+                const Scalar* RESTRICT AV = &A.V[0];
+                Scalar* RESTRICT AVConjBuffer = &AVConj[0];
+                for( int i=0; i<An*Ar; ++i )
+                    AVConjBuffer[i] = Conj( AV[i] );
+            }
             blas::Symm
-            ( 'L', 'L', C.n, C.r, 
-              alpha, B.LockedBuffer(), B.LDim(), &W[0], A.n, 
+            ( 'L', 'L', A.n, A.r,
+              alpha, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 
               0, &C.V[0], C.n );
-
-            Scalar* CV = &C.V[0];
-            for( int i=0; i<size; ++i )
-                CV[i] = Conj( CV[i] );
+            {
+                const int Cn = C.n; 
+                const int Cr = C.r;
+                Scalar* CV = &C.V[0];
+                for( int i=0; i<Cn*Cr; ++i )
+                    CV[i] = Conj( CV[i] );
+            }
         }
         else
         {
-            blas::Symm
-            ( 'L', 'L', C.n, C.r,
-              alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 
+            // C.U C.V^H := alpha (A.U A.V^H) B
+            //            = A.U (conj(alpha) B^H A.V)^H
+            //
+            // C.U := A.U
+            // C.V := conj(alpha) B^H A.V
+            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            blas::Gemm
+            ( 'C', 'N', C.n, C.r, A.n,
+              Conj(alpha), B.LockedBuffer(), B.LDim(), &A.V[0], A.n,
               0, &C.V[0], C.n );
         }
     }
     else
     {
-        const char option = ( Conjugate ? 'C' : 'T' );
-        const Scalar scale = ( Conjugate ? Conj(alpha) : alpha );
-        blas::Gemm
-        ( option, 'N', C.n, C.r, B.Height(),
-          scale, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 0, &C.V[0], C.n );
+        if( B.Symmetric() )
+        {
+            // C.U C.V^T := alpha (A.U A.V^T) B
+            //            = A.U (alpha A.V^T B)
+            //            = A.U (alpha B A.V)^T
+            //
+            // C.U := A.U
+            // C.V := alpha B A.V
+            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            blas::Symm
+            ( 'L', 'L', A.n, A.r,
+              alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 
+              0, &C.V[0], C.n );
+        }
+        else
+        {
+            // C.U C.V^T := alpha (A.U A.V^T) B
+            //            = A.U (alpha B^T A.V)^T
+            //
+            // C.U := A.U
+            // C.V := alpha B^T A.V
+            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            blas::Gemm
+            ( 'T', 'N', B.Width(), A.r, A.n,
+              alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n,
+              0, &C.V[0], C.n );
+        }
     }
 }
 
@@ -258,6 +324,8 @@ void psp::hmatrix_tools::MatrixMatrix
 #ifndef RELEASE
     if( A.Width() != B.m )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Symmetric() )
+        throw std::logic_error("Update will probably not be symmetric.");
 #endif
     // W := A B.U
     std::vector<Scalar> W( A.Height()*B.r );
@@ -273,7 +341,7 @@ void psp::hmatrix_tools::MatrixMatrix
         ( 'N', 'N', C.Height(), B.r, A.Width(),
           1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
     }
-    // C := alpha W B.V^[T,H] + beta C = alpha (A B.U) B.V^[T,H] + beta C
+    // C := alpha W B.V^[T,H] + beta C
     const char option = ( Conjugate ? 'C' : 'T' );
     blas::Gemm
     ( 'N', option, C.Height(), C.Width(), B.r,
@@ -302,59 +370,86 @@ void psp::hmatrix_tools::MatrixMatrix
 #ifndef RELEASE
     if( A.n != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Symmetric() )
+        throw std::logic_error("Update will probably not be symmetric.");
 #endif
-    if( B.Symmetric() )
+    if( Conjugate )
     {
-        if( Conjugate )
+        if( B.Symmetric() )
         {
-            // Form AVConj := conj(A.V)
-            const int size = A.n*A.r;
-            const Scalar* RESTRICT AV = &A.V[0];
-            std::vector<Scalar> AVConj( size );
-            for( int i=0; i<size; ++i )
-                AVConj[i] = Conj( AV[i] );
-        
-            // W := B conj(A.V) = (A.V^H B)^T
-            std::vector<Scalar> W( B.Height()*A.r );
+            // C := alpha (A.U A.V^H) B + beta C
+            //    = alpha A.U (A.V^H B) + beta C
+            //    = alpha A.U (B conj(A.V))^T + beta C
+            //
+            // AVConj := conj(A.V)
+            // W := B AVConj
+            // C := alpha A.U W^T + beta C
+            std::vector<Scalar> AVConj( A.n*A.r );
+            {
+                const int An = A.n;
+                const int Ar = A.r;
+                const Scalar* RESTRICT AV = &A.V[0];
+                Scalar* RESTRICT AVConjBuffer = &AVConj[0];
+                for( int i=0; i<An*Ar; ++i )
+                    AVConjBuffer[i] = Conj( AV[i] );
+            }
+            std::vector<Scalar> W( A.n*A.r );
             blas::Symm
-            ( 'L', 'L', B.Height(), A.r,
-              1, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 
-              0, &W[0], B.Height() );
-
-            // C := alpha A.U W^T =  alpha A.U (A.V^H B)
+            ( 'L', 'L', A.n, A.r,
+              1, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 0, &W[0], A.n );
             blas::Gemm
-            ( 'N', 'T', C.Height(), C.Width(), A.r,
-              alpha, &A.U[0], A.m, &W[0], B.Height(), 
-              beta, C.Buffer(), C.LDim() );
+            ( 'N', 'T', A.m, A.n, A.r,
+              alpha, &A.U[0], A.m, &W[0], A.n, beta, C.Buffer(), C.LDim() );
         }
         else
         {
-            // W := B A.V = (A.V^T B)^T
-            std::vector<Scalar> W( B.Height()*A.r );
-            blas::Symm
-            ( 'L', 'L', B.Height(), A.r,
-              1, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 
-              0, &W[0], B.Height() );
-
-            // C := alpha A.U W^T =  alpha A.U (A.V^T B)
+            // C := alpha (A.U A.V^H) B + beta C
+            //    = alpha A.U (A.V^H B) + beta C
+            //
+            // W := A.V^H B
+            // C := alpha A.U W + beta C
+            std::vector<Scalar> W( A.r*B.Width() );
             blas::Gemm
-            ( 'N', 'T', C.Height(), C.Width(), A.r,
-              alpha, &A.U[0], A.m, &W[0], B.Height(), 
-              beta, C.Buffer(), C.LDim() );
+            ( 'C', 'N', A.r, B.Width(), A.n,
+              1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
+            blas::Gemm
+            ( 'N', 'N', A.m, B.Width(), A.r,
+              alpha, &A.U[0], A.m, &W[0], A.r, beta, C.Buffer(), C.LDim() );
         }
     }
     else
     {
-        std::vector<Scalar> W( A.r*B.Width() );
-        // W := A.V^[T,H] B
-        const char option = ( Conjugate ? 'C' : 'T' );
-        blas::Gemm
-        ( option, 'N', A.r, B.Width(), A.n,
-          1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
-        // C := alpha A.U W + beta C = alpha A.U (A.V^[T,H] B) + beta C
-        blas::Gemm
-        ( 'N', 'N', C.Height(), C.Width(), A.r,
-          alpha, &A.U[0], A.m, &W[0], A.r, beta, C.Buffer(), C.LDim() );
+        if( B.Symmetric() )
+        {
+            // C := alpha (A.U A.V^T) B + beta C
+            //    = alpha A.U (A.V^T B) + beta C
+            //    = alpha A.U (B A.V)^T + beta C
+            //
+            // W := B A.V
+            // C := alpha A.U W^T + beta C
+            std::vector<Scalar> W( A.n*A.r );
+            blas::Symm
+            ( 'L', 'L', A.n, A.r,
+              1, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 0, &W[0], A.n );
+            blas::Gemm
+            ( 'N', 'T', A.m, A.n, A.r,
+              alpha, &A.U[0], A.m, &W[0], A.n, beta, C.Buffer(), C.LDim() );
+        }
+        else
+        {
+            // C := alpha (A.U A.V^T) B + beta C
+            //    = alpha A.U (A.V^T B) + beta C
+            //
+            // W := A.V^T B
+            // C := alpha A.U W + beta C
+            std::vector<Scalar> W( A.r*B.Width() );
+            blas::Gemm
+            ( 'T', 'N', A.r, B.Width(), A.n,
+              1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
+            blas::Gemm
+            ( 'N', 'N', A.m, B.Width(), A.r,
+              alpha, &A.U[0], A.m, &W[0], A.r, beta, C.Buffer(), C.LDim() );
+        }
     }
 }
 

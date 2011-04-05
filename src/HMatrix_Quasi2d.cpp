@@ -446,7 +446,7 @@ psp::HMatrix_Quasi2d<Scalar>::RecursiveMatrixMatrix
                     BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
 
                     const int child = (t*(t+1))/2 + s;
-                    RecursiveMatrixTransposeMultiply
+                    RecursiveMatrixTransposeMatrix
                     ( alpha, shell.u.nodeSymmetric->children[child], BSub,
                       1, CSub );
 

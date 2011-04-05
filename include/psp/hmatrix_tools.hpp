@@ -502,9 +502,9 @@ void Uniform( Real& U );
 template<typename Real>
 void BoxMuller( Real& X, Real& Y );
 template<typename Real>
-GaussianRandomVariable( Real& X );
+void GaussianRandomVariable( Real& X );
 template<typename Real>
-GaussianRandomVariable( std::complex<Real>& X );
+void GaussianRandomVariable( std::complex<Real>& X );
 template<typename Real>
 void GaussianRandomVector( Vector<Real>& x );
 template<typename Real>
@@ -528,7 +528,7 @@ void GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
 // forms y := A^H X,
 // etc.
 template<typename Scalar,bool Conjugate,class A,class AH,class B,class BH>
-void MatrixMatrix
+void psp::hmatrix_tools::MatrixMatrix
 ( Scalar alpha, FactorMatrix<Scalar,Conjugate>& F )
 {
     // TODO
@@ -541,7 +541,7 @@ void MatrixMatrix
 // forms y := A^H X,
 // etc.
 template<typename Scalar,bool Conjugate,class A,class AH,class B,class BH>
-void MatrixTransposeMatrix
+void psp::hmatrix_tools::MatrixTransposeMatrix
 ( Scalar alpha, FactorMatrix<Scalar,Conjugate>& F )
 {
     // TODO
@@ -554,7 +554,7 @@ void MatrixTransposeMatrix
 // forms y := A^H X,
 // etc.
 template<typename Scalar,bool Conjugate,class A,class AH,class B,class BH>
-void MatrixHermitianTransposeMatrix
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( Scalar alpha, FactorMatrix<Scalar,Conjugate>& F )
 {
     // TODO
@@ -563,19 +563,21 @@ void MatrixHermitianTransposeMatrix
 // Return a uniform sample from [0,1]
 template<typename Real>
 inline void
-Uniform( Real& U )
+psp::hmatrix_tools::Uniform
+( Real& U )
 {
     U = static_cast<Real>(rand()) / static_cast<Real>(RAND_MAX);
 }
 
 template<typename Real>
 inline void
-BoxMuller( Real& X, Real& Y )
+psp::hmatrix_tools::BoxMuller
+( Real& X, Real& Y )
 {
     Real U, V;
     Uniform( U );
     Uniform( V );
-    const Real a = sqrt(-2*log(U));
+    const Real A = sqrt(-2*log(U));
     const Real c = cos(2*M_PI*V);
     const Real s = sin(2*M_PI*V);
     X = A*c;
@@ -584,17 +586,20 @@ BoxMuller( Real& X, Real& Y )
 
 template<typename Real>
 inline void
-GaussianRandomVariable( Real& X )
+psp::hmatrix_tools::GaussianRandomVariable
+( Real& X )
 {
     // Use half of Box-Muller
-    Real U;
+    Real U, V;
     Uniform( U );
+    Uniform( V );
     X = sqrt(-2*log(U)) * cos(2*M_PI*V);
 }
 
 template<typename Real>
 inline void
-GaussianRandomVariable( std::complex<Real>& X )
+psp::hmatrix_tools::GaussianRandomVariable
+( std::complex<Real>& X )
 {
     Real Y, Z;
     BoxMuller( Y, Z );
@@ -603,7 +608,8 @@ GaussianRandomVariable( std::complex<Real>& X )
 
 template<typename Real>
 void
-GaussianRandomVector( Vector<Real>& x )
+psp::hmatrix_tools::GaussianRandomVector
+( Vector<Real>& x )
 {
     // Use BoxMuller for every pair of entries
     const int n = x.size();
@@ -624,7 +630,8 @@ GaussianRandomVector( Vector<Real>& x )
 
 template<typename Real>
 void
-GaussianRandomVector( Vector< std::complex<Real> >& x )
+psp::hmatrix_tools::GaussianRandomVector
+( Vector< std::complex<Real> >& x )
 {
     const int n = x.size();
     std::complex<Real>* buffer = x.Buffer();
@@ -634,7 +641,8 @@ GaussianRandomVector( Vector< std::complex<Real> >& x )
 
 template<typename Real>
 void
-GaussianRandomVectors( DenseMatrix<Real>& A )
+psp::hmatrix_tools::GaussianRandomVectors
+( DenseMatrix<Real>& A )
 {
     // Use BoxMuller for every pair of entries in each column
     const int m = A.Height();
@@ -659,7 +667,8 @@ GaussianRandomVectors( DenseMatrix<Real>& A )
 
 template<typename Real>
 void
-GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A )
+psp::hmatrix_tools::GaussianRandomVectors
+( DenseMatrix< std::complex<Real> >& A )
 {
     const int m = A.Height();
     const int n = A.Width();

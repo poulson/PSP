@@ -32,7 +32,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
         // Form conj(alpha x) in a buffer
         const int n = x.Size();
         std::vector<Scalar> xConj(n);
-        Scalar* xConjBuffer = xConj.Buffer();
+        Scalar* xConjBuffer = &xConj[0];
         const Scalar* xBuffer = x.LockedBuffer();
         for( int i=0; i<n; ++i )
             xConjBuffer[i] = Conj( alpha*xBuffer[i] );
@@ -47,8 +47,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
         blas::Symv
         ( 'L', A.Height(), 
           1, A.LockedBuffer(), A.LDim(), 
-             xConj.LockedBuffer(), 1, 
-          1, y.Buffer(),           1 );
+             xConjBuffer,      1, 
+          1, y.Buffer(),       1 );
 
         // Form y := conj(y)
         for( int i=0; i<m; ++i )
@@ -77,7 +77,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
         // Form conj(alpha x) in a buffer
         const int n = x.Size();
         std::vector<Scalar> xConj(n);
-        Scalar* xConjBuffer = xConj.Buffer();
+        Scalar* xConjBuffer = &xConj[0];
         const Scalar* xBuffer = x.LockedBuffer();
         for( int i=0; i<n; ++i )
             xConjBuffer[i] = Conj( alpha*xBuffer[i] );
@@ -86,8 +86,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
         blas::Symv
         ( 'L', A.Height(), 
           1, A.LockedBuffer(), A.LDim(), 
-             xConj.LockedBuffer(), 1, 
-          0, y.Buffer(),           1 );
+             xConjBuffer,      1, 
+          0, y.Buffer(),       1 );
 
         // Conjugate y
         const int m = y.Size();
