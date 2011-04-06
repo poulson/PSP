@@ -38,12 +38,12 @@
 // overly complicated, but rounded addition is supposedly one of the most 
 // expensive parts of H-algebra.
 
-template<typename Real,bool Conjugate>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real,Conjugate>& A, 
-  Real beta,  const FactorMatrix<Real,Conjugate>& B, 
-                    FactorMatrix<Real,Conjugate>& C )
+  Real alpha, const FactorMatrix<Real,Conjugated>& A, 
+  Real beta,  const FactorMatrix<Real,Conjugated>& B, 
+                    FactorMatrix<Real,Conjugated>& C )
 {
     const int m = A.m;
     const int n = A.n;
@@ -242,13 +242,14 @@ void psp::hmatrix_tools::MatrixAddRounded
 #endif // PIVOTED_QR
 }
 
-template<typename Real,bool Conjugate>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  std::complex<Real> alpha, const FactorMatrix<std::complex<Real>,Conjugate>& A,
-  std::complex<Real> beta,  const FactorMatrix<std::complex<Real>,Conjugate>& B,
-                                  FactorMatrix<std::complex<Real>,Conjugate>& C 
-)
+  std::complex<Real> alpha, 
+  const FactorMatrix<std::complex<Real>,Conjugated>& A,
+  std::complex<Real> beta,  
+  const FactorMatrix<std::complex<Real>,Conjugated>& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& C )
 {
     typedef std::complex<Real> Scalar;
 
@@ -381,7 +382,7 @@ void psp::hmatrix_tools::MatrixAddRounded
 
     // Update W := R1 R2^[T,H]. We are unfortunately performing 2x as many
     // flops as are required.
-    const char option = ( Conjugate ? 'C' : 'N' );
+    const char option = ( Conjugated ? 'C' : 'N' );
     blas::Trmm
     ( 'R', 'U', option, 'N', r, r, 
       1, &buffer[leftPanelSize], n, &buffer[offset], r );
@@ -439,7 +440,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     //  | (VH_Top)^[T,H] |, and then hitting it from the left with Q2
     //  |      0         |
     std::memset( &C.V[0], 0, n*roundedRank*sizeof(Scalar) );
-    if( Conjugate )
+    if( Conjugated )
     {
         for( int j=0; j<roundedRank; ++j )
         {

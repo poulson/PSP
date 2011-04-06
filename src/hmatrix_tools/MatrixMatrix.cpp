@@ -71,11 +71,11 @@ void psp::hmatrix_tools::MatrixMatrix
 }
 
 // Low-rank C := alpha A B
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
-                const FactorMatrix<Scalar,Conjugate>& B, 
-                      FactorMatrix<Scalar,Conjugate>& C )
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+                const FactorMatrix<Scalar,Conjugated>& B, 
+                      FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.n != B.m )
@@ -89,7 +89,7 @@ void psp::hmatrix_tools::MatrixMatrix
         C.U.resize( C.m*C.r );
         C.V.resize( C.n*C.r );
 
-        if( Conjugate )
+        if( Conjugated )
         {
             // C.U C.V^H := alpha (A.U A.V^H) (B.U B.V^H)
             //            = A.U (alpha A.V^H B.U B.V^H)
@@ -132,7 +132,7 @@ void psp::hmatrix_tools::MatrixMatrix
         C.U.resize( C.m*C.r );
         C.V.resize( C.n*C.r );
 
-        if( Conjugate )
+        if( Conjugated )
         {
             // C.U C.V^H := alpha (A.U A.V^H) (B.U B.V^H)
             //            = (alpha A.U (A.V^H B.U)) B.V^H
@@ -170,10 +170,10 @@ void psp::hmatrix_tools::MatrixMatrix
 }
 
 // Form a factor matrix from a dense matrix times a factor matrix
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugate>& B, 
+                const FactorMatrix<Scalar,Conjugated>& B, 
                       FactorMatrix<Scalar,Conjugate>& C )
 {
 #ifndef RELEASE
@@ -205,11 +205,11 @@ void psp::hmatrix_tools::MatrixMatrix
 }
 
 // Form a factor matrix from a factor matrix times a dense matrix
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B, 
-                      FactorMatrix<Scalar,Conjugate>& C )
+                      FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.n != B.Height() )
@@ -221,7 +221,7 @@ void psp::hmatrix_tools::MatrixMatrix
     C.U.resize( C.m*C.r );
     C.V.resize( C.n*C.r );
 
-    if( Conjugate )
+    if( Conjugated )
     {
         if( B.Symmetric() )
         {
@@ -236,25 +236,12 @@ void psp::hmatrix_tools::MatrixMatrix
             // C.V := conj(C.V)
             std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
             std::vector<Scalar> AVConj( A.n*A.r );
-            {
-                const int An = A.n;
-                const int Ar = A.r;
-                const Scalar* RESTRICT AV = &A.V[0];
-                Scalar* RESTRICT AVConjBuffer = &AVConj[0];
-                for( int i=0; i<An*Ar; ++i )
-                    AVConjBuffer[i] = Conj( AV[i] );
-            }
+            Conjugate( A.V, AVConj );
             blas::Symm
             ( 'L', 'L', A.n, A.r,
               alpha, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 
               0, &C.V[0], C.n );
-            {
-                const int Cn = C.n; 
-                const int Cr = C.r;
-                Scalar* CV = &C.V[0];
-                for( int i=0; i<Cn*Cr; ++i )
-                    CV[i] = Conj( CV[i] );
-            }
+            Conjugate( C.V );
         }
         else
         {
@@ -303,10 +290,10 @@ void psp::hmatrix_tools::MatrixMatrix
 }
 
 // Form a dense matrix from a dense matrix times a factor matrix
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugate>& B, 
+                const FactorMatrix<Scalar,Conjugated>& B, 
                       DenseMatrix<Scalar>& C )
 {
     C.Resize( A.Height(), B.n );
@@ -315,10 +302,10 @@ void psp::hmatrix_tools::MatrixMatrix
 }
 
 // Form a dense matrix from a dense matrix times a factor matrix
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugate>& B, 
+                const FactorMatrix<Scalar,Conjugated>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
@@ -342,16 +329,16 @@ void psp::hmatrix_tools::MatrixMatrix
           1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
     }
     // C := alpha W B.V^[T,H] + beta C
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemm
     ( 'N', option, C.Height(), C.Width(), B.r,
       alpha, &W[0], A.Height(), &B.V[0], B.n, beta, C.Buffer(), C.LDim() );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
@@ -361,9 +348,9 @@ void psp::hmatrix_tools::MatrixMatrix
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
@@ -373,7 +360,7 @@ void psp::hmatrix_tools::MatrixMatrix
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
 #endif
-    if( Conjugate )
+    if( Conjugated )
     {
         if( B.Symmetric() )
         {
@@ -385,14 +372,7 @@ void psp::hmatrix_tools::MatrixMatrix
             // W := B AVConj
             // C := alpha A.U W^T + beta C
             std::vector<Scalar> AVConj( A.n*A.r );
-            {
-                const int An = A.n;
-                const int Ar = A.r;
-                const Scalar* RESTRICT AV = &A.V[0];
-                Scalar* RESTRICT AVConjBuffer = &AVConj[0];
-                for( int i=0; i<An*Ar; ++i )
-                    AVConjBuffer[i] = Conj( AV[i] );
-            }
+            Conjugate( A.V, AVConj );
             std::vector<Scalar> W( A.n*A.r );
             blas::Symm
             ( 'L', 'L', A.n, A.r,

@@ -23,9 +23,9 @@
 // A :~= A
 //
 // Approximate A with a given maximum rank.
-template<typename Real,bool Conjugate>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<Real,Conjugate>& A )
+( int maxRank, FactorMatrix<Real,Conjugated>& A )
 {
     const int m = A.m;
     const int n = A.n;
@@ -146,10 +146,10 @@ void psp::hmatrix_tools::Compress
 // A :~= A
 //
 // Approximate A with a given maximum rank. This implementation handles both 
-// cases, A = U V^T (Conjugate=false), and A = U V^H (Conjugate=true)
-template<typename Real,bool Conjugate>
+// cases, A = U V^T (Conjugated=false), and A = U V^H (Conjugated=true)
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<std::complex<Real>,Conjugate>& A )
+( int maxRank, FactorMatrix<std::complex<Real>,Conjugated>& A )
 {
     typedef std::complex<Real> Scalar;
 
@@ -205,7 +205,7 @@ void psp::hmatrix_tools::Compress
 
     // Update W := R1 R2^[T,H].
     // We are unfortunately performing 2x as many flops as required.
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Trmm( 'R', 'U', option, 'N', r, r, 1, &A.V[0], n, &buffer[0], r );
 
     //------------------------------------------------------------------------//
@@ -254,7 +254,7 @@ void psp::hmatrix_tools::Compress
     A.V.resize( n*roundedRank );
     // Zero the shrunk buffer
     std::memset( &A.V[0], 0, A.V.size()*sizeof(Scalar) );
-    if( Conjugate )
+    if( Conjugated )
     {
         // Copy V=(V^H)^H from the SVD of R1 R2^H into the top of A.V
         for( int j=0; j<roundedRank; ++j )

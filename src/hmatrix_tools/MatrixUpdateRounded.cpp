@@ -21,11 +21,11 @@
 #include "psp.hpp"
 
 // B :~= alpha A + beta B
-template<typename Real,bool Conjugate>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real,Conjugate>& A, 
-  Real beta,        FactorMatrix<Real,Conjugate>& B )
+  Real alpha, const FactorMatrix<Real,Conjugated>& A, 
+  Real beta,        FactorMatrix<Real,Conjugated>& B )
 {
     const int m = A.m;
     const int n = A.n;
@@ -219,12 +219,13 @@ void psp::hmatrix_tools::MatrixUpdateRounded
 #endif // PIVOTED_QR
 }
 
-template<typename Real,bool Conjugate>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixUpdateRounded
 ( int maxRank,
-  std::complex<Real> alpha, const FactorMatrix<std::complex<Real>,Conjugate>& A,
-  std::complex<Real> beta,        FactorMatrix<std::complex<Real>,Conjugate>& B 
-)
+  std::complex<Real> alpha, 
+  const FactorMatrix<std::complex<Real>,Conjugated>& A,
+  std::complex<Real> beta,        
+        FactorMatrix<std::complex<Real>,Conjugated>& B )
 {
     typedef std::complex<Real> Scalar;
 
@@ -354,7 +355,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
 
     // Update W := R1 R2^[T,H]. We are unfortunately performing 2x as many
     // flops as are required.
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Trmm
     ( 'R', 'U', option, 'N', r, r, 
       1, &buffer[leftPanelSize], n, &buffer[offset], r );
@@ -410,7 +411,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //  | (VH_Top)^[T,H] |, and then hitting it from the left with Q2
     //  |      0         |
     std::memset( &B.V[0], 0, n*roundedRank*sizeof(Scalar) );
-    if( Conjugate )
+    if( Conjugated )
     {
         for( int j=0; j<roundedRank; ++j )
         {

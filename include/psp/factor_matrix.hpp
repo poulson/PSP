@@ -29,13 +29,13 @@ namespace psp {
 
 // A basic low-rank matrix representation that is used for the blocks with
 // sufficiently separated sources and targets. 
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 struct FactorMatrix
 {
     int m; // height of matrix
     int n; // width of matrix
     int r; // rank of matrix
-    // If Conjugate == true, then A = U V^H, otherwise, A = U V^T. 
+    // If Conjugated == true, then A = U V^H, otherwise, A = U V^T. 
     std::vector<Scalar> U; // buffer for m x r left set of vectors
     std::vector<Scalar> V; // buffer for n x r right set of vectors
 };

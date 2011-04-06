@@ -46,7 +46,8 @@ Conj( const std::complex<Real> alpha )
 #include "psp/dense_matrix.hpp"
 #include "psp/factor_matrix.hpp"
 #include "psp/sparse_matrix.hpp"
+#include "psp/abstract_hmatrix.hpp"
 #include "psp/hmatrix_tools.hpp"
-#include "psp/hmatrix_quasi2d.hpp"
+#include "psp/quasi2d_hmatrix.hpp"
 
 #endif // PSP_HPP

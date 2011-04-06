@@ -63,9 +63,9 @@ void psp::hmatrix_tools::ConvertSubmatrix
     }
 }
 
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::ConvertSubmatrix
-( FactorMatrix<Scalar,Conjugate>& F, const SparseMatrix<Scalar>& S,
+( FactorMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd )
 {
     // Count the number of nonzeros in the submatrix
@@ -104,7 +104,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
                 const int jOffset = thisColIndex - jStart;
                 const Scalar value = S.nonzeros[thisRowOffset+k];
                 F.U[iOffset+rankCounter*m] = 1;
-                if( Conjugate )
+                if( Conjugated )
                     F.V[jOffset+rankCounter*n] = Conj( value );
                 else
                     F.V[jOffset+rankCounter*n] = value;

@@ -64,11 +64,11 @@ void psp::hmatrix_tools::MatrixAdd
 }
 
 // Low-rank C := alpha A + beta B
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
-  Scalar beta,  const FactorMatrix<Scalar,Conjugate>& B, 
-                      FactorMatrix<Scalar,Conjugate>& C )
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B, 
+                      FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.m != B.m || A.n != B.n )
@@ -108,9 +108,9 @@ void psp::hmatrix_tools::MatrixAdd
 }
 
 // Dense from sum of factor and dense:  C := alpha A + beta B
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
   Scalar beta,  const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C )
 {
@@ -148,7 +148,7 @@ void psp::hmatrix_tools::MatrixAdd
         }
 
         // C := alpha A + C = alpha A.U A.V^[T,H] + C
-        const char option = ( Conjugate ? 'C' : 'T' );
+        const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
         ( 'N', option, A.m, A.n, A.r, 
           alpha, &A.U[0], A.m, &A.V[0], A.n,
@@ -166,7 +166,7 @@ void psp::hmatrix_tools::MatrixAdd
         }
 
         // C := alpha A + C = alpha A.U A.V^[T,H] + C
-        const char option = ( Conjugate ? 'C' : 'T' );
+        const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
         ( 'N', option, A.m, A.n, A.r, 
           alpha, &A.U[0], A.m, &A.V[0], A.n,
@@ -176,20 +176,20 @@ void psp::hmatrix_tools::MatrixAdd
 
 // Dense from sum of dense and factor:  C := alpha A + beta B
 // The arguments are switched for generality, so just call the other version.
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-  Scalar beta,  const FactorMatrix<Scalar,Conjugate>& B,
+  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
     MatrixAdd( beta, B, alpha, A, C );
 }
 
 // Dense as sum of two factors
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
-  Scalar beta,  const FactorMatrix<Scalar,Conjugate>& B,
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
@@ -200,7 +200,7 @@ void psp::hmatrix_tools::MatrixAdd
     C.SetType( GENERAL );
 
     // C := alpha A = alpha A.U A.V^[T,H] + C
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemm
     ( 'N', option, A.m, A.n, A.r, 
       alpha, &A.U[0], A.m, &A.V[0], A.n,

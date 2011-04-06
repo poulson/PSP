@@ -60,10 +60,10 @@ void psp::hmatrix_tools::MatrixUpdate
 }
 
 // Low-rank B := alpha A + beta B
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
-  Scalar beta,        FactorMatrix<Scalar,Conjugate>& B )
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+  Scalar beta,        FactorMatrix<Scalar,Conjugated>& B )
 {
 #ifndef RELEASE
     if( A.m != B.m || A.n != B.n )
@@ -101,9 +101,9 @@ void psp::hmatrix_tools::MatrixUpdate
 }
 
 // Dense updated with factored, B := alpha A + beta B
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
@@ -112,7 +112,7 @@ void psp::hmatrix_tools::MatrixUpdate
     if( B.Symmetric() )
         throw std::logic_error("Unsafe update of symmetric dense matrix.");
 #endif
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemm
     ( 'N', option, A.m, A.n, A.r, 
       alpha, &A.U[0], A.m, &A.V[0], A.n, 

@@ -72,9 +72,9 @@ void psp::hmatrix_tools::MatrixVector
 }
 
 // Low-rank y := alpha A x + beta y
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
@@ -82,7 +82,7 @@ void psp::hmatrix_tools::MatrixVector
     std::vector<Scalar> t(r);
 
     // Form t := alpha (A.V)^[T,H] x
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemv
     ( option, A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
@@ -92,9 +92,9 @@ void psp::hmatrix_tools::MatrixVector
 }
 
 // Low-rank y := alpha A x
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
@@ -102,7 +102,7 @@ void psp::hmatrix_tools::MatrixVector
     std::vector<Scalar> t(r);
 
     // Form t := alpha (A.V)^[T,H] x
-    const char option = ( Conjugate ? 'C' : 'T' );
+    const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemv
     ( option, A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
 

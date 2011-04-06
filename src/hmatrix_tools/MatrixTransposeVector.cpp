@@ -72,9 +72,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
 }
 
 // Low-rank y := alpha A^T x + beta y
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixTransposeVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
@@ -85,25 +85,13 @@ void psp::hmatrix_tools::MatrixTransposeVector
     blas::Gemv
     ( 'T', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
-    if( Conjugate )
+    if( Conjugated )
     {
-        // t := conj(t)
-        for( int i=0; i<r; ++i )
-            t[i] = Conj( t[i] );
-
-        // y := conj(beta y)
-        const int n = A.n;
-        Scalar* yBuffer = y.Buffer();
-        for( int i=0; i<n; ++i )
-            yBuffer[i] = Conj( beta*yBuffer[i] );
-
-        // Form y := A.V t + y
+        Conjugate( t );
+        Conjugate( y );
         blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, 1, y.Buffer(), 1 );
-
-        // y := conj(y)
-        for( int i=0; i<n; ++i )
-            yBuffer[i] = Conj( yBuffer[i] ); 
+        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, Conj(beta), y.Buffer(), 1 );
+        Conjugate( y );
     }
     else
     {
@@ -114,9 +102,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
 }
 
 // Low-rank y := alpha A^T x
-template<typename Scalar,bool Conjugate>
+template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixTransposeVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugate>& A, 
+( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
@@ -128,21 +116,12 @@ void psp::hmatrix_tools::MatrixTransposeVector
     ( 'T', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
 
     y.Resize( x.Size() );
-    if( Conjugate )
+    if( Conjugated )
     {
-        // t := conj(t)
-        for( int i=0; i<r; ++i )
-            t[i] = Conj( t[i] );
-
-        // Form y := A.V t
+        Conjugate( t );
         blas::Gemv
         ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, 0, y.Buffer(), 1 );
-
-        // y := conj(y)
-        const int n = A.n;
-        Scalar* yBuffer = y.Buffer();
-        for( int i=0; i<n; ++i )
-            yBuffer[i] = Conj( yBuffer[i] );
+        Conjugate( y );
     }
     else
     {
