@@ -216,12 +216,20 @@ void MatrixMatrix
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugated>& C );
 // F := alpha H H,
-template<typename Scalar,bool Conjugated>
+template<typename Real,bool Conjugated>
 void MatrixMatrix
 ( int maxRank, int oversampling,
-  Scalar alpha, const AbstractHMatrix<Scalar>& A,
-                const AbstractHMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& F );
+  Real alpha, 
+  const AbstractHMatrix<Real>& A,
+  const AbstractHMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& F );
+template<typename Real,bool Conjugated>
+void MatrixMatrix
+( int maxRank, int oversampling,
+  std::complex<Real> alpha, 
+  const AbstractHMatrix< std::complex<Real> >& A,
+  const AbstractHMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
 |*| Matrix Transpose Matrix Multiply, C := alpha A^T B
@@ -287,12 +295,20 @@ void MatrixTransposeMatrix
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugated>& C );
 // F := alpha H^T H
-template<typename Scalar,bool Conjugated>
+template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
 ( int maxRank, int oversampling,
-  Scalar alpha, const AbstractHMatrix<Scalar>& A,
-                const AbstractHMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& F );
+  Real alpha, 
+  const AbstractHMatrix<Real>& A,
+  const AbstractHMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& F );
+template<typename Real,bool Conjugated>
+void MatrixTransposeMatrix
+( int maxRank, int oversampling,
+  std::complex<Real> alpha, 
+  const AbstractHMatrix< std::complex<Real> >& A,
+  const AbstractHMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
 |*| Matrix Hermitian Transpose Matrix Multiply, C := alpha A^H B
@@ -358,12 +374,20 @@ void MatrixHermitianTransposeMatrix
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugated>& C );
 // F := alpha H^H H
-template<typename Scalar,bool Conjugated>
+template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
 ( int maxRank, int oversampling,
-  Scalar alpha, const AbstractHMatrix<Scalar>& A,
-                const AbstractHMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& F );
+  Real alpha, 
+  const AbstractHMatrix<Real>& A,
+  const AbstractHMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& F );
+template<typename Real,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( int maxRank, int oversampling,
+  std::complex<Real> alpha, 
+  const AbstractHMatrix< std::complex<Real> >& A,
+  const AbstractHMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
 |*| Matrix-Vector multiply, y := alpha A x + beta y
@@ -925,36 +949,405 @@ void psp::hmatrix_tools::Scale
 \*/
 
 // F := alpha H H,
-template<typename Scalar,bool Conjugated>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, int oversampling, 
-  Scalar alpha, const AbstractHMatrix<Scalar>& A, 
-                const AbstractHMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& F )
+  Real alpha, 
+  const AbstractHMatrix<Real>& A, 
+  const AbstractHMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& F )
 {
-    // TODO
+    const int maxRankA = std::min( A.Height(), A.Width() );
+    const int maxRankB = std::min( B.Height(), B.Width() );
+    const int maxRankAB = std::min( maxRankA, maxRankB );
+    const int r = std::min( maxRank, maxRankAB );
+
+    // Generate a few more than k Gaussian random vectors
+    DenseMatrix<Real> X( B.Width(), r+oversampling );
+    GaussianRandomVectors( X );
+
+    // Compute the action of AB on X (into Q)
+    DenseMatrix<Real> Y;
+    B.MapMatrix( alpha, X, Y );
+    DenseMatrix<Real> Q;
+    A.MapMatrix( 1, Y, Q );
+
+    // Perform a pivoted QR decomposition on ABX
+    // (This could be optimized to stop after r steps)
+    const int ABXm = Q.Height();
+    const int ABXn = Q.Width();
+    std::vector<int> jpvt( ABXn );
+    std::vector<Real> tau( std::min(ABXm,ABXn) );
+    const int lwork = ABXn*64;
+    std::vector<Real> work( lwork );
+    lapack::PivotedQR
+    ( ABXm, ABXn, Q.Buffer(), Q.LDim(), &jpvt[0], &tau[0], 
+      &work[0], lwork );
+        
+    // Form the Q from the first r columns in ABX
+    Q.Resize( ABXm, r );
+    lapack::FormQ
+    ( ABXm, r, r, Q.Buffer(), Q.LDim(), &tau[0], &work[0], lwork ); 
+
+    // Compute (Q^T (AB))^T = B^T A^T Q into X
+    A.TransposeMapMatrix( 1, Q, Y );
+    B.TransposeMapMatrix( 1, Y, X );
+        
+    // Compute the economic SVD of X = (Q^T AB)^T, overwriting X with VT, 
+    // and F.V with U.
+    F.m = A.Height();
+    F.n = B.Width();
+    F.r = r;
+    F.U.resize( F.m*F.r );
+    F.V.resize( F.n*F.r );
+    std::vector<Real> s( r );
+    lapack::SVD
+    ( 'S', 'O', ABXm, r, X.Buffer(), X.LDim(), &s[0], &F.V[0], F.n, 
+      0, 0, &work[0], lwork );
+    X.Resize( r, r );
+
+    // Scale the rows of VT in place
+    for( int i=0; i<r; ++i )
+    {
+        const Real sigma = s[i];
+        Real* VTRow = X.Buffer(i,0);
+        const int VTLDim = X.LDim();
+        for( int j=0; j<r; ++j )
+            VTRow[j*VTLDim] *= sigma;
+    }
+
+    // F.U := Q (VT)^T = Q V
+    blas::Gemm
+    ( 'N', 'T', F.m, F.r, F.r, 
+      1, Q.LockedBuffer(), Q.LDim(), X.LockedBuffer(), X.LDim(), 
+      0, &F.U[0], F.m );
+}
+
+// F := alpha H H,
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( int maxRank, int oversampling, 
+  std::complex<Real> alpha, 
+  const AbstractHMatrix< std::complex<Real> >& A, 
+  const AbstractHMatrix< std::complex<Real> >& B,
+        FactorMatrix< std::complex<Real>,Conjugated>& F )
+{
+    typedef std::complex<Real> Scalar;
+
+    const int maxRankA = std::min( A.Height(), A.Width() );
+    const int maxRankB = std::min( B.Height(), B.Width() );
+    const int maxRankAB = std::min( maxRankA, maxRankB );
+    const int r = std::min( maxRank, maxRankAB );
+
+    // Generate a few more than k Gaussian random vectors
+    DenseMatrix<Scalar> X( B.Width(), r+oversampling );
+    GaussianRandomVectors( X );
+
+    // Compute the action of AB on X (into Q)
+    DenseMatrix<Scalar> Y;
+    B.MapMatrix( alpha, X, Y );
+    DenseMatrix<Scalar> Q;
+    A.MapMatrix( 1, Y, Q );
+
+    // Perform a pivoted QR decomposition on ABX
+    // (This could be optimized to stop after r steps)
+    const int ABXm = Q.Height();
+    const int ABXn = Q.Width();
+    std::vector<int> jpvt( ABXn );
+    std::vector<Scalar> tau( std::min(ABXm,ABXn) );
+    const int lwork = ABXn*64;
+    std::vector<Scalar> work( lwork );
+    std::vector<Real> rwork( 2*ABXn );
+    lapack::PivotedQR
+    ( ABXm, ABXn, Q.Buffer(), Q.LDim(), &jpvt[0], &tau[0], 
+      &work[0], lwork, &work[0] );
+        
+    // Form the Q from the first r columns in ABX
+    Q.Resize( ABXm, r );
+    lapack::FormQ
+    ( ABXm, r, r, Q.Buffer(), Q.LDim(), &tau[0], &work[0], lwork ); 
+
+    // Compute (Q^H (AB))^H = B^H A^H Q into X
+    A.HermitianTransposeMapMatrix( 1, Q, Y );
+    B.HermitianTransposeMapMatrix( 1, Y, X );
+        
+    // Compute the economic SVD of X = (Q^H AB)^H, overwriting X with VH,
+    // and F.V with U.
+    F.m = A.Height();
+    F.n = B.Width();
+    F.r = r;
+    F.U.resize( F.m*F.r );
+    F.V.resize( F.n*F.r );
+    rwork.resize( 5*r );
+    std::vector<Real> s( r );
+    lapack::SVD
+    ( 'S', 'O', ABXm, r, X.Buffer(), X.LDim(), &s[0], &F.V[0], F.n, 
+      0, 0, &work[0], lwork );
+    X.Resize( r, r );
+
+    // Scale the rows of VH in place
+    for( int i=0; i<r; ++i )
+    {
+        const Real sigma = s[i];
+        Scalar* VHRow = X.Buffer(i,0);
+        const int VHLDim = X.LDim();
+        for( int j=0; j<r; ++j )
+            VHRow[j*VHLDim] *= sigma;
+    }
+
+    // F.U := Q (VH)^H = Q V
+    blas::Gemm
+    ( 'N', 'C', F.m, F.r, F.r, 
+      1, Q.LockedBuffer(), Q.LDim(), X.LockedBuffer(), X.LDim(), 
+      0, &F.U[0], F.m );
 }
 
 // F := alpha H^T H,
-template<typename Scalar,bool Conjugated>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixTransposeMatrix
 ( int maxRank, int oversampling,
-  Scalar alpha, const AbstractHMatrix<Scalar>& A,
-                const AbstractHMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& F )
+  Real alpha, 
+  const AbstractHMatrix<Real>& A,
+  const AbstractHMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& F )
 {
-    // TODO
+    const int maxRankA = std::min( A.Height(), A.Width() );
+    const int maxRankB = std::min( B.Height(), B.Width() );
+    const int maxRankAB = std::min( maxRankA, maxRankB );
+    const int r = std::min( maxRank, maxRankAB );
+
+    // Generate a few more than k Gaussian random vectors
+    DenseMatrix<Real> X( B.Width(), r+oversampling );
+    GaussianRandomVectors( X );
+
+    // Compute the action of A^T B on X (into Q)
+    DenseMatrix<Real> Y;
+    B.MapMatrix( alpha, X, Y );
+    DenseMatrix<Real> Q;
+    A.TransposeMapMatrix( 1, Y, Q );
+
+    // Perform a pivoted QR decomposition on A^T BX
+    // (This could be optimized to stop after r steps)
+    const int ATBXm = Q.Height();
+    const int ATBXn = Q.Width();
+    std::vector<int> jpvt( ATBXn );
+    std::vector<Real> tau( std::min(ATBXm,ATBXn) );
+    const int lwork = ATBXn*64;
+    std::vector<Real> work( lwork );
+    lapack::PivotedQR
+    ( ATBXm, ATBXn, Q.Buffer(), Q.LDim(), &jpvt[0], &tau[0], 
+      &work[0], lwork );
+        
+    // Form the Q from the first r columns in A^T BX
+    Q.Resize( ATBXm, r );
+    lapack::FormQ
+    ( ATBXm, r, r, Q.Buffer(), Q.LDim(), &tau[0], &work[0], lwork ); 
+
+    // Compute (Q^T (A^T B))^T = B^T A Q into X
+    A.MapMatrix( 1, Q, Y );
+    B.TransposeMapMatrix( 1, Y, X );
+        
+    // Compute the economic SVD of X = (Q^T A^T B)^T, overwriting X with VT, 
+    // and F.V with U.
+    F.m = A.Width();
+    F.n = B.Width();
+    F.r = r;
+    F.U.resize( F.m*F.r );
+    F.V.resize( F.n*F.r );
+    std::vector<Real> s( r );
+    lapack::SVD
+    ( 'S', 'O', ATBXm, r, X.Buffer(), X.LDim(), &s[0], &F.V[0], F.n, 
+      0, 0, &work[0], lwork );
+    X.Resize( r, r );
+
+    // Scale the rows of VT in place
+    for( int i=0; i<r; ++i )
+    {
+        const Real sigma = s[i];
+        Real* VTRow = X.Buffer(i,0);
+        const int VTLDim = X.LDim();
+        for( int j=0; j<r; ++j )
+            VTRow[j*VTLDim] *= sigma;
+    }
+
+    // F.U := Q (VT)^T = Q V
+    blas::Gemm
+    ( 'N', 'T', F.m, F.r, F.r, 
+      1, Q.LockedBuffer(), Q.LDim(), X.LockedBuffer(), X.LDim(), 
+      0, &F.U[0], F.m );
+}
+
+// F := alpha H^T H,
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixTransposeMatrix
+( int maxRank, int oversampling,
+  std::complex<Real> alpha, 
+  const AbstractHMatrix< std::complex<Real> >& A,
+  const AbstractHMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& F )
+{
+    typedef std::complex<Real> Scalar;
+
+    const int maxRankA = std::min( A.Height(), A.Width() );
+    const int maxRankB = std::min( B.Height(), B.Width() );
+    const int maxRankAB = std::min( maxRankA, maxRankB );
+    const int r = std::min( maxRank, maxRankAB );
+
+    // Generate a few more than k Gaussian random vectors
+    DenseMatrix<Scalar> X( B.Width(), r+oversampling );
+    GaussianRandomVectors( X );
+
+    // Compute the action of A^T B on X (into Q)
+    DenseMatrix<Scalar> Y;
+    B.MapMatrix( alpha, X, Y );
+    DenseMatrix<Scalar> Q;
+    A.TransposeMapMatrix( 1, Y, Q );
+
+    // Perform a pivoted QR decomposition on A^T BX
+    // (This could be optimized to stop after r steps)
+    const int ATBXm = Q.Height();
+    const int ATBXn = Q.Width();
+    std::vector<int> jpvt( ATBXn );
+    std::vector<Scalar> tau( std::min(ATBXm,ATBXn) );
+    const int lwork = ATBXn*64;
+    std::vector<Scalar> work( lwork );
+    std::vector<Real> rwork( 2*ATBXn );
+    lapack::PivotedQR
+    ( ATBXm, ATBXn, Q.Buffer(), Q.LDim(), &jpvt[0], &tau[0], 
+      &work[0], lwork, &work[0] );
+        
+    // Form the Q from the first r columns in A^T BX
+    Q.Resize( ATBXm, r );
+    lapack::FormQ
+    ( ATBXm, r, r, Q.Buffer(), Q.LDim(), &tau[0], &work[0], lwork ); 
+
+    // Compute (Q^H (A^T B))^H = B^H conj(A) Q = conj(B^T A conj(Q)) into X
+    Conjugate( Q );
+    A.MapMatrix( 1, Q, Y );
+    B.TransposeMapMatrix( 1, Y, X );
+    Conjugate( X );
+    Conjugate( Q );
+        
+    // Compute the economic SVD of X = (Q^H A^T B)^H, overwriting X with VH,
+    // and F.V with U.
+    F.m = A.Width();
+    F.n = B.Width();
+    F.r = r;
+    F.U.resize( F.m*F.r );
+    F.V.resize( F.n*F.r );
+    rwork.resize( 5*r );
+    std::vector<Real> s( r );
+    lapack::SVD
+    ( 'S', 'O', ATBXm, r, X.Buffer(), X.LDim(), &s[0], &F.V[0], F.n, 
+      0, 0, &work[0], lwork );
+    X.Resize( r, r );
+
+    // Scale the rows of VH in place
+    for( int i=0; i<r; ++i )
+    {
+        const Real sigma = s[i];
+        Scalar* VHRow = X.Buffer(i,0);
+        const int VHLDim = X.LDim();
+        for( int j=0; j<r; ++j )
+            VHRow[j*VHLDim] *= sigma;
+    }
+
+    // F.U := Q (VH)^H = Q V
+    blas::Gemm
+    ( 'N', 'C', F.m, F.r, F.r, 
+      1, Q.LockedBuffer(), Q.LDim(), X.LockedBuffer(), X.LDim(), 
+      0, &F.U[0], F.m );
 }
 
 // F := alpha H^H H,
-template<typename Scalar,bool Conjugated>
+template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( int maxRank, int oversampling, 
-  Scalar alpha, const AbstractHMatrix<Scalar>& A,
-                const AbstractHMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& F )
+  Real alpha, 
+  const AbstractHMatrix<Real>& A,
+  const AbstractHMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& F )
 {
-    // TODO
+    MatrixTransposeMatrix( maxRank, oversampling, alpha, A, B, F );
+}
+
+// F := alpha H^H H
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, int oversampling, 
+  std::complex<Real> alpha, 
+  const AbstractHMatrix< std::complex<Real> >& A,
+  const AbstractHMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& F )
+{
+    typedef std::complex<Real> Scalar;
+
+    const int maxRankA = std::min( A.Height(), A.Width() );
+    const int maxRankB = std::min( B.Height(), B.Width() );
+    const int maxRankAB = std::min( maxRankA, maxRankB );
+    const int r = std::min( maxRank, maxRankAB );
+
+    // Generate a few more than k Gaussian random vectors
+    DenseMatrix<Scalar> X( B.Width(), r+oversampling );
+    GaussianRandomVectors( X );
+
+    // Compute the action of A^H B on X (into Q)
+    DenseMatrix<Scalar> Y;
+    B.MapMatrix( alpha, X, Y );
+    DenseMatrix<Scalar> Q;
+    A.HermitianTransposeMapMatrix( 1, Y, Q );
+
+    // Perform a pivoted QR decomposition on A^H BX
+    // (This could be optimized to stop after r steps)
+    const int AHBXm = Q.Height();
+    const int AHBXn = Q.Width();
+    std::vector<int> jpvt( AHBXn );
+    std::vector<Scalar> tau( std::min(AHBXm,AHBXn) );
+    const int lwork = AHBXn*64;
+    std::vector<Scalar> work( lwork );
+    std::vector<Real> rwork( 2*AHBXn );
+    lapack::PivotedQR
+    ( AHBXm, AHBXn, Q.Buffer(), Q.LDim(), &jpvt[0], &tau[0], 
+      &work[0], lwork, &work[0] );
+        
+    // Form the Q from the first r columns in A^H BX
+    Q.Resize( AHBXm, r );
+    lapack::FormQ
+    ( AHBXm, r, r, Q.Buffer(), Q.LDim(), &tau[0], &work[0], lwork ); 
+
+    // Compute (Q^H (A^H B))^H = B^H A Q into X
+    A.MapMatrix( 1, Q, Y );
+    B.HermitianTransposeMapMatrix( 1, Y, X );
+        
+    // Compute the economic SVD of X = (Q^H A^H B)^H, overwriting X with VH,
+    // and F.V with U.
+    F.m = A.Width();
+    F.n = B.Width();
+    F.r = r;
+    F.U.resize( F.m*F.r );
+    F.V.resize( F.n*F.r );
+    rwork.resize( 5*r );
+    std::vector<Real> s( r );
+    lapack::SVD
+    ( 'S', 'O', AHBXm, r, X.Buffer(), X.LDim(), &s[0], &F.V[0], F.n, 
+      0, 0, &work[0], lwork );
+    X.Resize( r, r );
+
+    // Scale the rows of VH in place
+    for( int i=0; i<r; ++i )
+    {
+        const Real sigma = s[i];
+        Scalar* VHRow = X.Buffer(i,0);
+        const int VHLDim = X.LDim();
+        for( int j=0; j<r; ++j )
+            VHRow[j*VHLDim] *= sigma;
+    }
+
+    // F.U := Q (VH)^H = Q V
+    blas::Gemm
+    ( 'N', 'C', F.m, F.r, F.r, 
+      1, Q.LockedBuffer(), Q.LDim(), X.LockedBuffer(), X.LDim(), 
+      0, &F.U[0], F.m );
 }
 
 /*\
@@ -1045,6 +1438,7 @@ void
 psp::hmatrix_tools::GaussianRandomVectors
 ( DenseMatrix<Real>& A )
 {
+    A.SetType( GENERAL );
     // Use BoxMuller for every pair of entries in each column
     const int m = A.Height();
     const int n = A.Width();
@@ -1071,6 +1465,7 @@ void
 psp::hmatrix_tools::GaussianRandomVectors
 ( DenseMatrix< std::complex<Real> >& A )
 {
+    A.SetType( GENERAL );
     const int m = A.Height();
     const int n = A.Width();
     for( int j=0; j<n; ++j )

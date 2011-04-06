@@ -44,7 +44,7 @@ void psp::hmatrix_tools::Compress
 
 #if defined(PIVOTED_QR)
     // TODO
-    throw std::logic_error("Pivoted QR is not yet supported.");
+    throw std::logic_error("Pivoted QR is not yet supported for this routine.");
 #else
     // Perform an unpivoted QR decomposition on A.U
     std::vector<Real> tauU( std::min( m, r ) );
@@ -170,7 +170,7 @@ void psp::hmatrix_tools::Compress
 
 #if defined(PIVOTED_QR)
     // TODO
-    throw std::logic_error("Pivoted QR is not yet supported.");
+    throw std::logic_error("Pivoted QR is not yet supported for this routine.");
 #else
     // Perform an unpivoted QR decomposition on A.U
     std::vector<Scalar> tauU( std::min( m, r ) );
