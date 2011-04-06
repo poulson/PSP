@@ -153,6 +153,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 
 // y += alpha A x
 template<typename Scalar,bool Conjugated>
+void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
@@ -160,7 +161,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
     {
         int child = 0;
         int targetOffset = 0;
-        const int* sizes = shell.u.nodeSymmetric->sizes;
+        const int* sizes = _shell.nodeSymmetric->sizes;
         for( int t=0; t<4; ++t )
         {
             Vector<Scalar> ySub;
@@ -174,7 +175,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
 
                 const Quasi2dHMatrix& ASub = 
                     *_shell.nodeSymmetric->children[child];
-                ASub.MapVector( alpha, xSub, 1, ySub );
+                ASub.MapVector( alpha, xSub, (Scalar)1, ySub );
                 ++child;
 
                 sourceOffset += sizes[s];
@@ -202,7 +203,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
                 const int child = (t*(t+1))/2 + s;
                 const Quasi2dHMatrix& ASub = 
                     *_shell.nodeSymmetric->children[child];
-                ASub.TransposeMapVector( alpha, xSub, 1, ySub );
+                ASub.TransposeMapVector( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += sizes[t];
             }
@@ -213,6 +214,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
 
 // C += alpha A B
 template<typename Scalar,bool Conjugated>
+void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
 ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) const
 {
@@ -234,7 +236,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
 
                 const Quasi2dHMatrix& ASub = 
                     *_shell.nodeSymmetric->children[child];
-                ASub.MapMatrix( alpha, BSub, 1, CSub );
+                ASub.MapMatrix( alpha, BSub, (Scalar)1, CSub );
                 ++child;
 
                 sourceOffset += sizes[s];
@@ -262,7 +264,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
                 const int child = (t*(t+1))/2 + s;
                 const Quasi2dHMatrix& ASub =  
                     *_shell.nodeSymmetric->children[child];
-                ASub.TransposeMapMatrix( alpha, BSub, 1, CSub );
+                ASub.TransposeMapMatrix( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += sizes[t];
             }
@@ -352,7 +354,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
                 xSub.LockedView( x, sourceOffset, sourceSizes[s] );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[s+4*t];
-                ASub.MapVector( alpha, xSub, 1, ySub );
+                ASub.MapVector( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += sourceSizes[s];
             }
@@ -365,11 +367,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
     }
     else if( _shellType == FACTOR )
     {
-        hmatrix_tools::MatrixVector( alpha, *_shell.F, x, 1, y );
+        hmatrix_tools::MatrixVector( alpha, *_shell.F, x, (Scalar)1, y );
     }
     else /* _shellType == DENSE */
     {
-        hmatrix_tools::MatrixVector( alpha, *_shell.D, x, 1, y );
+        hmatrix_tools::MatrixVector( alpha, *_shell.D, x, (Scalar)1, y );
     }
 }
 
@@ -406,7 +408,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
                 xSub.LockedView( x, sourceOffset, targetSizes[s] );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[t+4*s];
-                ASub.TransposeMapVector( alpha, xSub, 1, ySub );
+                ASub.TransposeMapVector( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += targetSizes[s];
             }
@@ -419,11 +421,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
     }
     else if( _shellType == FACTOR )
     {
-        hmatrix_tools::MatrixTransposeVector( alpha, *_shell.F, x, 1, y );
+        hmatrix_tools::MatrixTransposeVector
+        ( alpha, *_shell.F, x, (Scalar)1, y );
     }
     else /* _shellType == DENSE */
     {
-        hmatrix_tools::MatrixTransposeVector( alpha, *_shell.D, x, 1, y );
+        hmatrix_tools::MatrixTransposeVector
+        ( alpha, *_shell.D, x, (Scalar)1, y );
     }
 }
 
@@ -460,7 +464,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
                 xSub.LockedView( x, sourceOffset, targetSizes[s] );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[t+4*s];
-                ASub.HermitianTransposeMapVector( alpha, xSub, 1, ySub );
+                ASub.HermitianTransposeMapVector
+                ( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += targetSizes[s];
             }
@@ -478,12 +483,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     else if( _shellType == FACTOR )
     {
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.F, x, 1, y );
+        ( alpha, *_shell.F, x, (Scalar)1, y );
     }
     else /* _shellType == DENSE */
     {
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.D, x, 1, y );
+        ( alpha, *_shell.D, x, (Scalar)1, y );
     }
 }
 
@@ -513,7 +518,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
                 xSub.LockedView( x, sourceOffset, targetSizes[s] );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[t+4*s];
-                ASub.HermitianTransposeMapVector( alpha, xSub, 1, ySub );
+                ASub.HermitianTransposeMapVector
+                ( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += targetSizes[s];
             }
@@ -522,21 +528,21 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     }
     else if( _shellType == NODE_SYMMETRIC )
     {
-        Conjugate( x );
-        Conjugate( y );
+        hmatrix_tools::Conjugate( x );
+        hmatrix_tools::Conjugate( y );
         UpdateVectorWithNodeSymmetric( Conj(alpha), x, y ); 
-        Conjugate( x );
-        Conjugate( y );
+        hmatrix_tools::Conjugate( x );
+        hmatrix_tools::Conjugate( y );
     }
     else if( _shellType == FACTOR )
     {
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.F, x, 1, y );
+        ( alpha, *_shell.F, x, (Scalar)1, y );
     }
     else /* _shellType == DENSE */
     {
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.D, x, 1, y );
+        ( alpha, *_shell.D, x, (Scalar)1, y );
     }
 }
 
@@ -546,7 +552,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
     y.Resize( _n );
-    HermitianTransposeMapVector( alpha, x, 0 y );
+    HermitianTransposeMapVector( alpha, x, 0, y );
 }
 
 // This version allows for temporary in-place conjugation of x
@@ -585,7 +591,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
                 ( B, sourceOffset, sourceSizes[s], 0, B.Width() );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[s+4*t];
-                ASub.MapMatrix( alpha, BSub, 1, CSub );
+                ASub.MapMatrix( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += sourceSizes[s];
             }
@@ -598,11 +604,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     }
     else if( _shellType == FACTOR )
     {
-        hmatrix_tools::MatrixMatrix( alpha, *_shell.F, B, 1, C );
+        hmatrix_tools::MatrixMatrix( alpha, *_shell.F, B, (Scalar)1, C );
     }
     else /* _shellType == DENSE */
     {
-        hmatrix_tools::MatrixMatrix( alpha, *_shell.D, B, 1, C );
+        hmatrix_tools::MatrixMatrix( alpha, *_shell.D, B, (Scalar)1, C );
     }
 }
 
@@ -642,7 +648,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
                 ( B, sourceOffset, targetSizes[s], 0, B.Width() );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[t+4*s];
-                ASub.TransposeMapMatrix( alpha, BSub, 1, CSub );
+                ASub.TransposeMapMatrix( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += targetSizes[s];
             }
@@ -655,11 +661,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     }
     else if( _shellType == FACTOR )
     {
-        hmatrix_tools::MatrixTransposeMatrix( alpha, *_shell.F, B, 1, C );
+        hmatrix_tools::MatrixTransposeMatrix
+        ( alpha, *_shell.F, B, (Scalar)1, C );
     }
     else /* _shellType == DENSE */
     {
-        hmatrix_tools::MatrixTransposeMatrix( alpha, *_shell.D, B, 1, C );
+        hmatrix_tools::MatrixTransposeMatrix
+        ( alpha, *_shell.D, B, (Scalar)1, C );
     }
 }
 
@@ -699,7 +707,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
                 ( B, sourceOffset, targetSizes[s], 0, B.Width() );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[t+4*s];
-                ASub.HermitianTransposeMapMatrix( alpha, BSub, 1, CSub );
+                ASub.HermitianTransposeMapMatrix
+                ( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += targetSizes[s];
             }
@@ -709,20 +718,20 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     else if( _shellType == NODE_SYMMETRIC )
     {
         DenseMatrix<Scalar> BConj;
-        Conjugate( B, BConj );
-        Conjugate( C );
+        hmatrix_tools::Conjugate( B, BConj );
+        hmatrix_tools::Conjugate( C );
         UpdateMatrixWithNodeSymmetric( alpha, B, C );
-        Conjugate( C );
+        hmatrix_tools::Conjugate( C );
     }
     else if( _shellType == FACTOR )
     {
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.F, B, 1, C );
+        ( alpha, *_shell.F, B, (Scalar)1, C );
     }
     else /* _shellType == DENSE */
     {
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.D, B, 1, C );
+        ( alpha, *_shell.D, B, (Scalar)1, C );
     }
 }
 
@@ -753,7 +762,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
                 ( B, sourceOffset, targetSizes[s], 0, B.Width() );
 
                 const Quasi2dHMatrix& ASub = *_shell.node->children[t+4*s];
-                ASub.HermitianTransposeMapMatrix( alpha, BSub, 1, CSub );
+                ASub.HermitianTransposeMapMatrix
+                ( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += targetSizes[s];
             }
@@ -762,21 +772,21 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     }
     else if( _shellType == NODE_SYMMETRIC )
     {
-        Conjugate( B );
-        Conjugate( C );
+        hmatrix_tools::Conjugate( B );
+        hmatrix_tools::Conjugate( C );
         UpdateMatrixWithNodeSymmetric( alpha, B, C );
-        Conjugate( B );
-        Conjugate( C );
+        hmatrix_tools::Conjugate( B );
+        hmatrix_tools::Conjugate( C );
     }
     else if( _shellType == FACTOR )
     {
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.F, B, 1, C );
+        ( alpha, *_shell.F, B, (Scalar)1, C );
     }
     else /* _shellType == DENSE */
     {
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.D, B, 1, C );
+        ( alpha, *_shell.D, B, (Scalar)1, C );
     }
 }
 

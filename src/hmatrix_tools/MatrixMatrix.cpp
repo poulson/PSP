@@ -174,7 +174,7 @@ template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const FactorMatrix<Scalar,Conjugated>& B, 
-                      FactorMatrix<Scalar,Conjugate>& C )
+                      FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.Width() != B.m )

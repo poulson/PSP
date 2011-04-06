@@ -497,6 +497,20 @@ void Conjugate
         Vector< std::complex<Real> >& y );
 
 template<typename Real>
+void Conjugate( std::vector<Real>& x );
+template<typename Real>
+void Conjugate( std::vector< std::complex<Real> >& x );
+
+template<typename Real>
+void Conjugate
+( const std::vector<Real>& x,
+        std::vector<Real>& y );
+template<typename Real>
+void Conjugate
+( const std::vector< std::complex<Real> >& x,
+        std::vector< std::complex<Real> >& y );
+
+template<typename Real>
 void Conjugate
 ( const Vector<Real>& x,
         std::vector<Real>& y );
@@ -584,11 +598,13 @@ void GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
 \*/
 
 template<typename Real> 
-void Conjugate( Vector<Real>& x ) 
+void psp::hmatrix_tools::Conjugate
+( Vector<Real>& x ) 
 { }
 
 template<typename Real>
-void Conjugate( Vector< std::complex<Real> >& x )
+void psp::hmatrix_tools::Conjugate
+( Vector< std::complex<Real> >& x )
 {
     const int n = x.Size();
     std::complex<Real>* xBuffer = x.Buffer();
@@ -597,16 +613,16 @@ void Conjugate( Vector< std::complex<Real> >& x )
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const Vector<Real>& x,
         Vector<Real>& y )
 { 
     y.Resize( x.Size() );
-    std::memcpy( y.Buffer(), x.Buffer(), x.Size()*sizeof(Real) );
+    std::memcpy( y.Buffer(), x.LockedBuffer(), x.Size()*sizeof(Real) );
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const Vector< std::complex<Real> >& x, 
         Vector< std::complex<Real> >& y )
 {
@@ -619,7 +635,44 @@ void Conjugate
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
+( std::vector<Real>& x )
+{ }
+
+template<typename Real>
+void psp::hmatrix_tools::Conjugate
+( std::vector< std::complex<Real> >& x )
+{
+    const int n = x.size();
+    std::complex<Real>* xBuffer = &x[0];
+    for( int i=0; i<n; ++i )
+        xBuffer[i] = Conj( xBuffer[i] );
+}
+
+template<typename Real>
+void psp::hmatrix_tools::Conjugate
+( const std::vector<Real>& x,
+        std::vector<Real>& y )
+{
+    y.resize( x.size() );
+    std::memcpy( &y[0], &x[0], x.size()*sizeof(Real) );
+}
+
+template<typename Real>
+void psp::hmatrix_tools::Conjugate
+( const std::vector< std::complex<Real> >& x,
+        std::vector< std::complex<Real> >& y )
+{
+    const int n = x.size();
+    y.resize( n );
+    const std::complex<Real>* RESTRICT xBuffer = &x[0];
+    std::complex<Real>* RESTRICT yBuffer = &y[0];
+    for( int i=0; i<n; ++i )
+        yBuffer[i] = Conj( xBuffer[i] );
+}
+
+template<typename Real>
+void psp::hmatrix_tools::Conjugate
 ( const Vector<Real>& x,
         std::vector<Real>& y )
 {
@@ -628,7 +681,7 @@ void Conjugate
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const Vector< std::complex<Real> >& x,
         std::vector< std::complex<Real> >& y )
 {
@@ -641,7 +694,7 @@ void Conjugate
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const std::vector<Real>& x,
         Vector<Real>& y )
 {
@@ -650,7 +703,7 @@ void Conjugate
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const std::vector< std::complex<Real> >& x,
         Vector< std::complex<Real> >& y )
 {
@@ -663,11 +716,13 @@ void Conjugate
 }
 
 template<typename Real>
-void Conjugate( DenseMatrix<Real>& D )
+void psp::hmatrix_tools::Conjugate
+( DenseMatrix<Real>& D )
 { }
 
 template<typename Real>
-void Conjugate( DenseMatrix< std::complex<Real> >& D )
+void psp::hmatrix_tools::Conjugate
+( DenseMatrix< std::complex<Real> >& D )
 {
     const int m = D.Height();
     const int n = D.Width();
@@ -680,7 +735,7 @@ void Conjugate( DenseMatrix< std::complex<Real> >& D )
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const DenseMatrix<Real>& D1, 
         DenseMatrix<Real>& D2 )
 {
@@ -707,7 +762,7 @@ void Conjugate
 }
 
 template<typename Real>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const DenseMatrix< std::complex<Real> >& D1,
         DenseMatrix< std::complex<Real> >& D2 )
 {
@@ -738,11 +793,13 @@ void Conjugate
 }
 
 template<typename Real,bool Conjugated>
-void Conjugate( FactorMatrix<Real,Conjugated>& F )
+void psp::hmatrix_tools::Conjugate
+( FactorMatrix<Real,Conjugated>& F )
 { }
 
 template<typename Real,bool Conjugated>
-void Conjugate( FactorMatrix<std::complex<Real>,Conjugated>& F )
+void psp::hmatrix_tools::Conjugate
+( FactorMatrix<std::complex<Real>,Conjugated>& F )
 {
     const int m = F.m;
     const int n = F.n;
@@ -756,7 +813,7 @@ void Conjugate( FactorMatrix<std::complex<Real>,Conjugated>& F )
 }
 
 template<typename Real,bool Conjugated>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const FactorMatrix<Real,Conjugated>& F1,
         FactorMatrix<Real,Conjugated>& F2 )
 {
@@ -773,7 +830,7 @@ void Conjugate
 }
 
 template<typename Real,bool Conjugated>
-void Conjugate
+void psp::hmatrix_tools::Conjugate
 ( const FactorMatrix<std::complex<Real>,Conjugated>& F1,
         FactorMatrix<std::complex<Real>,Conjugated>& F2 )
 {
@@ -803,7 +860,7 @@ template<typename Scalar>
 void psp::hmatrix_tools::Scale
 ( Scalar alpha, Vector<Scalar>& x )
 {
-    if( alpha == 0 )
+    if( alpha == (Scalar)0 )
         std::memset( x.Buffer(), 0, x.Size()*sizeof(Scalar) );
     else
         blas::Scal( x.Size(), alpha, x.Buffer(), 1 );
@@ -816,12 +873,12 @@ void psp::hmatrix_tools::Scale
     const int m = D.Height();
     const int n = D.Width();
 
-    if( alpha == 1 )
+    if( alpha == (Scalar)1 )
         return;
 
     if( D.Symmetric() )
     {
-        if( alpha == 0 )
+        if( alpha == (Scalar)0 )
         {
             for( int j=0; j<n; ++j )
                 std::memset( D.Buffer(j,j), 0, (m-j)*sizeof(Scalar) );
@@ -834,7 +891,7 @@ void psp::hmatrix_tools::Scale
     }
     else
     {
-        if( alpha == 0 )
+        if( alpha == (Scalar)0 )
         {
             for( int j=0; j<n; ++j )
                 std::memset( D.Buffer(0,j), 0, m*sizeof(Scalar) );
@@ -851,7 +908,7 @@ template<typename Scalar,bool Conjugate>
 void psp::hmatrix_tools::Scale
 ( Scalar alpha, FactorMatrix<Scalar,Conjugate>& F )
 {
-    if( alpha == 0 )
+    if( alpha == (Scalar)0 )
     {
         F.r = 0;
         F.U.resize( 0 );

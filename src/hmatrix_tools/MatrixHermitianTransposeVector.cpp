@@ -29,7 +29,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
 {
     if( A.Symmetric() )
     {
-        std::vector<Scalar> xConj;
+        Vector<Scalar> xConj;
         Conjugate( x, xConj );
         Conjugate( y );
         blas::Symv
@@ -59,7 +59,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
     y.Resize( x.Size() );
     if( A.Symmetric() )
     {
-        std::vector<Scalar> xConj;
+        Vector<Scalar> xConj;
         Conjugate( x, xConj );
         blas::Symv
         ( 'L', A.Height(), 
