@@ -27,9 +27,9 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
 ( int maxRank, FactorMatrix<Real,Conjugated>& A )
 {
-    const int m = A.m;
-    const int n = A.n;
-    const int r = A.r;
+    const int m = A.Height();
+    const int n = A.Width();
+    const int r = A.Rank();
     const int roundedRank = std::min( r, maxRank );
     if( roundedRank == r )
         return;
@@ -48,7 +48,8 @@ void psp::hmatrix_tools::Compress
 #else
     // Perform an unpivoted QR decomposition on A.U
     std::vector<Real> tauU( std::min( m, r ) );
-    lapack::QR( m, r, &A.U[0], m, &tauU[0], &buffer[0], leftPanelSize );
+    lapack::QR
+    ( m, r, A.U.Buffer(), A.U.LDim(), &tauU[0], &buffer[0], leftPanelSize );
 
     //------------------------------------------------------------------------//
     // buffer is logically empty                                              //
@@ -57,7 +58,7 @@ void psp::hmatrix_tools::Compress
     // Perform an unpivoted QR decomposition on A.V
     std::vector<Real> tauV( std::min( n, r ) );
     lapack::QR
-    ( n, r, &A.V[0], n, &tauV[0], &buffer[0], rightPanelSize );
+    ( n, r, A.V.Buffer(), A.V.LDim(), &tauV[0], &buffer[0], rightPanelSize );
 
     //------------------------------------------------------------------------//
     // buffer is logically empty                                              //
@@ -65,12 +66,9 @@ void psp::hmatrix_tools::Compress
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
     {
-        Real* RESTRICT W = &buffer[0];
-        const Real* RESTRICT R1 = &A.U[0];
-        std::memset( W, 0, blockSize*sizeof(Real) );
+        std::memset( &buffer[0], 0, blockSize*sizeof(Real) );
         for( int j=0; j<r; ++j )
-            for( int i=0; i<=j; ++i )
-                W[i+j*r] = R1[i+j*m];
+            std::memcpy( &buffer[j*r], A.U.LockedBuffer(0,j), j*sizeof(Real) );
     }
 
     //------------------------------------------------------------------------//
@@ -80,7 +78,9 @@ void psp::hmatrix_tools::Compress
 
     // Update W := R1 R2^T. We are unfortunately performing 2x as many
     // flops as are required.
-    blas::Trmm( 'R', 'U', 'T', 'N', r, r, 1, &A.V[0], n, &buffer[0], r );
+    blas::Trmm
+    ( 'R', 'U', 'T', 'N', r, r, 
+      1, A.V.LockedBuffer(), A.V.LDim(), &buffer[0], r );
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
@@ -100,47 +100,52 @@ void psp::hmatrix_tools::Compress
     //------------------------------------------------------------------------//
 
     // Copy the result of the QR factorization of A.U into a temporary buffer
-    std::memcpy( &buffer[2*blockSize], &A.U[0], m*r*sizeof(Real) );
-    // Logically shrink A.U
-    A.U.resize( m*roundedRank );
+    for( int j=0; j<r; ++j )
+    {
+        std::memcpy
+        ( &buffer[2*blockSize+j*m], A.U.LockedBuffer(0,j), m*sizeof(Real) );
+    }
+    // Logically shrink A.U 
+    A.U.Resize( m, roundedRank );
     // Zero the shrunk buffer
-    std::memset( &A.U[0], 0, A.U.size()*sizeof(Real) );
+    Scale( (Real)0, A.U );
     // Copy the scaled U from the SVD of R1 R2^T into the top of the matrix
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = s[j];
         const Real* RESTRICT UCol = &buffer[j*r];
-        Real* RESTRICT UColScaled = &A.U[j*m];
+        Real* RESTRICT UColScaled = A.U.Buffer(0,j);
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
     // Hit the matrix from the left with Q1 from the QR decomp of the orig A.U
     lapack::ApplyQ
     ( 'L', 'N', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
-      &A.U[0], m, &buffer[0], blockSize );
+      A.U.Buffer(), A.U.LDim(), &buffer[0], blockSize );
 
     // Copy the result of the QR factorization of A.V into a temporary buffer
-    std::memcpy( &buffer[2*blockSize], &A.V[0], n*r*sizeof(Real) );
+    for( int j=0; j<r; ++j )
+    {
+        std::memcpy
+        ( &buffer[2*blockSize+j*n], A.V.LockedBuffer(0,j), n*sizeof(Real) );
+    }
     // Logically shrink A.V
-    A.V.resize( n*roundedRank );
+    A.V.Resize( n, roundedRank );
     // Zero the shrunk buffer
-    std::memset( &A.V[0], 0, A.V.size()*sizeof(Real) );
+    Scale( (Real)0, A.V );
     // Copy V=(V^T)^T from the SVD of R1 R2^T into the top of A.V
     for( int j=0; j<roundedRank; ++j )
     {
         const Real* RESTRICT VTRow = &buffer[blockSize+j];
-        Real* RESTRICT VCol = &A.V[j*n];
+        Real* RESTRICT VCol = A.V.Buffer(0,j);
         for( int i=0; i<r; ++i )
             VCol[i] = VTRow[i*r];
     }
     // Hit the matrix from the left with Q2 from the QR decomp of the orig A.V
     lapack::ApplyQ
     ( 'L', 'N', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
-      &A.V[0], n, &buffer[0], blockSize );
+      A.V.Buffer(), A.V.LDim(), &buffer[0], blockSize );
 #endif // PIVOTED_QR
-
-    // Mark the matrix as having the new reduced rank
-    A.r = roundedRank;
 }
 
 // A :~= A
@@ -153,9 +158,9 @@ void psp::hmatrix_tools::Compress
 {
     typedef std::complex<Real> Scalar;
 
-    const int m = A.m;
-    const int n = A.n;
-    const int r = A.r;
+    const int m = A.Height();
+    const int n = A.Width();
+    const int r = A.Rank();
     const int roundedRank = std::min( r, maxRank );
     if( roundedRank == r )
         return;
@@ -174,7 +179,8 @@ void psp::hmatrix_tools::Compress
 #else
     // Perform an unpivoted QR decomposition on A.U
     std::vector<Scalar> tauU( std::min( m, r ) );
-    lapack::QR( m, r, &A.U[0], m, &tauU[0], &buffer[0], leftPanelSize );
+    lapack::QR
+    ( m, r, A.U.Buffer(), A.U.LDim(), &tauU[0], &buffer[0], leftPanelSize );
 
     //------------------------------------------------------------------------//
     // buffer is logically empty                                              //
@@ -182,7 +188,8 @@ void psp::hmatrix_tools::Compress
 
     // Perform an unpivoted QR decomposition on A.V
     std::vector<Scalar> tauV( std::min( n, r ) );
-    lapack::QR( n, r, &A.V[0], n, &tauV[0], &buffer[0], rightPanelSize );
+    lapack::QR
+    ( n, r, A.V.Buffer(), A.V.LDim(), &tauV[0], &buffer[0], rightPanelSize );
 
     //------------------------------------------------------------------------//
     // buffer is logically empty                                              //
@@ -190,12 +197,9 @@ void psp::hmatrix_tools::Compress
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
     {
-        Scalar* RESTRICT W = &buffer[0];
-        const Scalar* RESTRICT R1 = &A.U[0];
-        std::memset( W, 0, blockSize*sizeof(Scalar) );
+        std::memset( &buffer[0], 0, blockSize*sizeof(Scalar) );
         for( int j=0; j<r; ++j )
-            for( int i=0; i<=j; ++i )
-                W[i+j*r] = R1[i+j*m];
+            std::memcpy( &buffer[j*r], A.U.LockedBuffer(0,j), j*sizeof(Real) );
     }
 
     //------------------------------------------------------------------------//
@@ -206,7 +210,9 @@ void psp::hmatrix_tools::Compress
     // Update W := R1 R2^[T,H].
     // We are unfortunately performing 2x as many flops as required.
     const char option = ( Conjugated ? 'C' : 'T' );
-    blas::Trmm( 'R', 'U', option, 'N', r, r, 1, &A.V[0], n, &buffer[0], r );
+    blas::Trmm
+    ( 'R', 'U', option, 'N', r, r, 
+      1, A.V.LockedBuffer(), A.V.LDim(), &buffer[0], r );
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
@@ -229,38 +235,46 @@ void psp::hmatrix_tools::Compress
     //------------------------------------------------------------------------//
 
     // Copy the result of the QR factorization of A.U into a temporary buffer
-    std::memcpy( &buffer[2*blockSize], &A.U[0], m*r*sizeof(Scalar) );
+    for( int j=0; j<r; ++j )
+    {
+        std::memcpy
+        ( &buffer[2*blockSize+j*m], A.U.LockedBuffer(0,j), m*sizeof(Real) );
+    }
     // Logically shrink A.U
-    A.U.resize( m*roundedRank );
+    A.U.Resize( m, roundedRank );
     // Zero the shrunk buffer
-    std::memset( &A.U[0], 0, A.U.size()*sizeof(Scalar) );
+    Scale( (Scalar)0, A.U );
     // Copy the scaled U from the SVD of R1 R2^[T,H] into the top of the matrix
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = realBuffer[j];
         const Scalar* RESTRICT UCol = &buffer[j*r];
-        Scalar* RESTRICT UColScaled = &A.U[j*m];
+        Scalar* RESTRICT UColScaled = A.U.Buffer(0,j);
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
     // Hit the matrix from the left with Q1 from the QR decomp of the orig A.U
     lapack::ApplyQ
     ( 'L', 'N', m, roundedRank, r, &buffer[2*blockSize], m, &tauU[0], 
-      &A.U[0], m, &buffer[0], blockSize );
+      A.U.Buffer(), A.U.LDim(), &buffer[0], blockSize );
 
     // Copy the result of the QR factorization of A.V into a temporary buffer
-    std::memcpy( &buffer[2*blockSize], &A.V[0], n*r*sizeof(Scalar) );
+    for( int j=0; j<r; ++j )
+    {
+        std::memcpy
+        ( &buffer[2*blockSize+j*n], A.V.LockedBuffer(0,j), n*sizeof(Real) );
+    }
     // Logically shrink A.V
-    A.V.resize( n*roundedRank );
+    A.V.Resize( n, roundedRank );
     // Zero the shrunk buffer
-    std::memset( &A.V[0], 0, A.V.size()*sizeof(Scalar) );
+    Scale( (Scalar)0, A.V );
     if( Conjugated )
     {
         // Copy V=(V^H)^H from the SVD of R1 R2^H into the top of A.V
         for( int j=0; j<roundedRank; ++j )
         {
             const Scalar* RESTRICT VHRow = &buffer[blockSize+j];
-            Scalar* RESTRICT VCol = &A.V[j*n];
+            Scalar* RESTRICT VCol = A.V.Buffer(0,j);
             for( int i=0; i<r; ++i )
                 VCol[i] = Conj( VHRow[i*r] );
         }
@@ -271,7 +285,7 @@ void psp::hmatrix_tools::Compress
         for( int j=0; j<roundedRank; ++j )
         {
             const Scalar* RESTRICT VHRow = &buffer[blockSize+j];
-            Scalar* RESTRICT VColConj = &A.V[j*n];
+            Scalar* RESTRICT VColConj = A.V.Buffer(0,j);
             for( int i=0; i<r; ++i )
                 VColConj[i] = VHRow[i*r];
         }
@@ -279,11 +293,8 @@ void psp::hmatrix_tools::Compress
     // Hit the matrix from the left with Q2 from the QR decomp of the orig A.V
     lapack::ApplyQ
     ( 'L', 'N', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
-      &A.V[0], n, &buffer[0], blockSize );
+      A.V.Buffer(), A.V.LDim(), &buffer[0], blockSize );
 #endif // PIVOTED_QR
-
-    // Mark the matrix as having the new reduced rank
-    A.r = roundedRank;
 }
 
 template void psp::hmatrix_tools::Compress

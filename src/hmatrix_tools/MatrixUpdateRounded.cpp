@@ -27,40 +27,33 @@ void psp::hmatrix_tools::MatrixUpdateRounded
   Real alpha, const FactorMatrix<Real,Conjugated>& A, 
   Real beta,        FactorMatrix<Real,Conjugated>& B )
 {
-    const int m = A.m;
-    const int n = A.n;
-    const int r = A.r + B.r;
+    const int m = A.Height();
+    const int n = A.Width();
+    const int Ar = A.Rank();
+    const int Br = B.Rank();
+    const int r = Ar + Br;
     const int roundedRank = std::min( r, maxRank );
 
     // Early exit if possible
     if( roundedRank == r )
     {
-        B.U.resize( m*r );
-        B.V.resize( n*r );
-
-        // Scale B.U by beta
+        Scale( beta, B.U );
+        B.U.Resize( m, r );
+        for( int j=0; j<Ar; ++j )
         {
-            const int Br = B.r;
-            Real* RESTRICT BULeft = &B.U[0];
-            for( int j=0; j<Br; ++j )
-                for( int i=0; i<m; ++i )
-                    BULeft[i+j*m] *= beta;
-        }
-        // Copy alpha A.U into the right half of B.U
-        {
-            const int Ar = A.r;
-            Real* RESTRICT BURight = &B.U[m*B.r];
-            const Real* RESTRICT AU = &A.U[0];
-            for( int j=0; j<Ar; ++j )
-                for( int i=0; i<m; ++i )
-                    BURight[i+j*m] = alpha*AU[i+j*m];
+            Real* RESTRICT BUACol = B.U.Buffer(0,j+Br);
+            const Real* RESTRICT AUCol = A.U.LockedBuffer(0,j);
+            for( int i=0; i<m; ++i )
+                BUACol[i] = alpha*AUCol[i];
         }
 
         // Copy A.V into the right half of B.V
-        std::memcpy( &B.V[n*B.r], &A.V[0], n*A.r*sizeof(Real) );
-
-        // Mark the new rank
-        B.r = roundedRank;
+        B.V.Resize( n, r );
+        for( int j=0; j<Ar; ++j )
+        {
+            std::memcpy
+            ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Real) );
+        }
 
         return;
     }
@@ -77,29 +70,35 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // Put [(alpha A.U), (beta B.U)] into the first 'leftPanelSize' entries of
     // our buffer and [A.V, B.V] into the next 'rightPanelSize' entries
     // Copy in (alpha A.U)
+    for( int j=0; j<Ar; ++j )
     {
-        const int Ar = A.r;
-        Real* RESTRICT packedAU = &buffer[0];
-        const Real* RESTRICT AU = &A.U[0];
-        for( int j=0; j<Ar; ++j )
-            for( int i=0; i<m; ++i )
-                packedAU[i+j*m] = alpha*AU[i+j*m];
+        Real* RESTRICT packedAUCol = &buffer[j*m];
+        const Real* RESTRICT AUCol = A.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            packedAUCol[i] = alpha*AUCol[i];
     }
     // Copy in (beta B.U)
+    for( int j=0; j<Br; ++j )
     {
-        const int Br = B.r;
-        Real* RESTRICT packedBU = &buffer[m*A.r];
-        const Real* RESTRICT BU = &B.U[0];
-        for( int j=0; j<Br; ++j )
-            for( int i=0; i<m; ++i )
-                packedBU[i+j*m] = beta*BU[i+j*m];
+        Real* RESTRICT packedBUCol = &buffer[(j+Ar)*m];
+        const Real* RESTRICT BUCol = B.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            packedBUCol[i] = beta*BUCol[i];
     }
     // Copy in A.V
-    std::memcpy
-    ( &buffer[leftPanelSize], &A.V[0], n*A.r*sizeof(Real) );
+    for( int j=0; j<Ar; ++j )
+    {
+        std::memcpy
+        ( &buffer[leftPanelSize+j*n], A.V.LockedBuffer(0,j), 
+          n*sizeof(Real) );
+    }
     // Copy in B.V
-    std::memcpy
-    ( &buffer[leftPanelSize+n*A.r], &B.V[0], n*B.r*sizeof(Real) );
+    for( int j=0; j<Br; ++j )
+    {
+        std::memcpy
+        ( &buffer[leftPanelSize+(j+Ar)*n], B.V.LockedBuffer(0,j), 
+          n*sizeof(Real) );
+    }
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
@@ -180,42 +179,41 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //------------------------------------------------------------------------//
 
     // Get B ready for the rounded factors
-    B.r = roundedRank;
-    B.U.resize( m*roundedRank );
-    B.V.resize( n*roundedRank );
+    B.U.Resize( m, roundedRank );
+    B.V.Resize( n, roundedRank );
 
     // Form the rounded B.U by first filling it with 
     //  | S*U_Left |, and then hitting it from the left with Q1
     //  |  0       |
-    std::memset( &B.U[0], 0, m*roundedRank*sizeof(Real) );
+    Scale( (Real)0, B.U );
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = s[j];
         const Real* RESTRICT UCol = &buffer[offset+j*r];
-        Real* RESTRICT UColScaled = &B.U[j*m];
+        Real* RESTRICT UColScaled = B.U.Buffer(0,j);
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', m, roundedRank, r, &buffer[0], B.m, &tauU[0], &B.U[0], B.m, 
-      &buffer[offset], blockSize );
+    ( 'L', 'N', m, roundedRank, r, &buffer[0], B.Height(), &tauU[0], 
+      B.U.Buffer(), B.U.LDim(), &buffer[offset], blockSize );
 
     // Form the rounded B.V by first filling it with 
     //  | (VT_Top)^T |, and then hitting it from the left with Q2
     //  |      0     |
-    std::memset( &B.V[0], 0, n*roundedRank*sizeof(Real) );
+    Scale( (Real)0, B.V );
     for( int j=0; j<roundedRank; ++j )
     {
         const Real* RESTRICT VTRow = &buffer[offset+blockSize+j];
-        Real* RESTRICT VCol = &B.V[j*n];
+        Real* RESTRICT VCol = B.V.Buffer(0,j);
         for( int i=0; i<r; ++i )
             VCol[i] = VTRow[i*r];
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], B.n, &tauV[0], 
-      &B.V[0], B.n, &buffer[offset], blockSize );
+    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], B.Width(), &tauV[0],
+      B.V.Buffer(), B.V.LDim(), &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 }
 
@@ -229,40 +227,33 @@ void psp::hmatrix_tools::MatrixUpdateRounded
 {
     typedef std::complex<Real> Scalar;
 
-    const int m = A.m;
-    const int n = A.n;
-    const int r = A.r + B.r;
+    const int m = A.Height();
+    const int n = A.Width();
+    const int Ar = A.Rank();
+    const int Br = B.Rank();
+    const int r = Ar + Br;
     const int roundedRank = std::min( r, maxRank );
 
     // Early exit if possible
     if( roundedRank == r )
     {
-        B.U.resize( m*r );
-        B.V.resize( n*r );
-
-        // Scale B.U by beta
+        Scale( beta, B.U );
+        B.U.Resize( m, r );
+        for( int j=0; j<Ar; ++j )
         {
-            const int Br = B.r;
-            Scalar* RESTRICT BULeft = &B.U[0];
-            for( int j=0; j<Br; ++j )
-                for( int i=0; i<m; ++i )
-                    BULeft[i+j*m] *= beta;
-        }
-        // Copy alpha A.U into the right half of B.U
-        {
-            const int Ar = A.r;
-            Scalar* RESTRICT BURight = &B.U[m*B.r];
-            const Scalar* RESTRICT AU = &A.U[0];
-            for( int j=0; j<Ar; ++j )
-                for( int i=0; i<m; ++i )
-                    BURight[i+j*m] = alpha*AU[i+j*m];
+            Scalar* RESTRICT BUACol = B.U.Buffer(0,j+Br);
+            const Scalar* RESTRICT AUCol = A.U.LockedBuffer(0,j);
+            for( int i=0; i<m; ++i )
+                BUACol[i] = alpha*AUCol[i];
         }
 
         // Copy A.V into the right half of B.V
-        std::memcpy( &B.V[n*B.r], &A.V[0], n*A.r*sizeof(Scalar) );
-
-        // Mark the new rank
-        B.r = roundedRank;
+        B.V.Resize( n, r );
+        for( int j=0; j<Ar; ++j )
+        {
+            std::memcpy
+            ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
+        }
 
         return;
     }
@@ -279,29 +270,35 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // Put [(alpha A.U), (beta B.U)] into the first 'leftPanelSize' entries of
     // our buffer and [A.V, B.V] into the next 'rightPanelSize' entries
     // Copy in (alpha A.U)
+    for( int j=0; j<Ar; ++j )
     {
-        const int Ar = A.r;
-        Scalar* RESTRICT packedAU = &buffer[0];
-        const Scalar* RESTRICT AU = &A.U[0];
-        for( int j=0; j<Ar; ++j )
-            for( int i=0; i<m; ++i )
-                packedAU[i+j*m] = alpha*AU[i+j*m];
+        Scalar* RESTRICT packedAUCol = &buffer[j*m];
+        const Scalar* RESTRICT AUCol = A.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            packedAUCol[i] = alpha*AUCol[i];
     }
     // Copy in (beta B.U)
+    for( int j=0; j<Br; ++j )
     {
-        const int Br = B.r;
-        Scalar* RESTRICT packedBU = &buffer[m*A.r];
-        const Scalar* RESTRICT BU = &B.U[0];
-        for( int j=0; j<Br; ++j )
-            for( int i=0; i<m; ++i )
-                packedBU[i+j*m] = beta*BU[i+j*m];
+        Scalar* RESTRICT packedBUCol = &buffer[(j+Ar)*m];
+        const Scalar* RESTRICT BUCol = B.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            packedBUCol[i] = beta*BUCol[i];
     }
     // Copy in A.V
-    std::memcpy
-    ( &buffer[leftPanelSize], &A.V[0], n*A.r*sizeof(Scalar) );
+    for( int j=0; j<Ar; ++j )
+    {
+        std::memcpy
+        ( &buffer[leftPanelSize+j*n], A.V.LockedBuffer(0,j), 
+          n*sizeof(Scalar) );
+    }
     // Copy in B.V
-    std::memcpy
-    ( &buffer[leftPanelSize+n*A.r], &B.V[0], n*B.r*sizeof(Scalar) );
+    for( int j=0; j<Br; ++j )
+    {
+        std::memcpy
+        ( &buffer[leftPanelSize+(j+Ar)*n], B.V.LockedBuffer(0,j),
+          n*sizeof(Scalar) );
+    }
 
     //------------------------------------------------------------------------//
     // buffer contains:                                                       //
@@ -386,37 +383,36 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //------------------------------------------------------------------------//
 
     // Get B ready for the rounded factors
-    B.r = roundedRank;
-    B.U.resize( m*roundedRank );
-    B.V.resize( n*roundedRank );
+    B.U.Resize( m, roundedRank );
+    B.V.Resize( n, roundedRank );
 
     // Form the rounded B.U by first filling it with 
     //  | S*U_Left |, and then hitting it from the left with Q1
     //  |  0       |
-    std::memset( &B.U[0], 0, m*roundedRank*sizeof(Scalar) );
+    Scale( (Scalar)0, B.U );
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = realBuffer[j];
         const Scalar* RESTRICT UCol = &buffer[offset+j*r];
-        Scalar* RESTRICT UColScaled = &B.U[j*m];
+        Scalar* RESTRICT UColScaled = B.U.Buffer(0,j);
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', m, roundedRank, r, &buffer[0], B.m, &tauU[0], &B.U[0], B.m, 
-      &buffer[offset], blockSize );
+    ( 'L', 'N', m, roundedRank, r, &buffer[0], B.Height(), &tauU[0], 
+      B.U.Buffer(), B.U.LDim(), &buffer[offset], blockSize );
 
     // Form the rounded B.V by first filling it with 
     //  | (VH_Top)^[T,H] |, and then hitting it from the left with Q2
     //  |      0         |
-    std::memset( &B.V[0], 0, n*roundedRank*sizeof(Scalar) );
+    Scale( (Scalar)0, B.V );
     if( Conjugated )
     {
         for( int j=0; j<roundedRank; ++j )
         {
             const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
-            Scalar* RESTRICT VCol = &B.V[j*n];
+            Scalar* RESTRICT VCol = B.V.Buffer(0,j);
             for( int i=0; i<r; ++i )
                 VCol[i] = Conj( VHRow[i*r] );
         }
@@ -426,15 +422,15 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         for( int j=0; j<roundedRank; ++j )
         {
             const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
-            Scalar* RESTRICT VColConj = &B.V[j*n];
+            Scalar* RESTRICT VColConj = B.V.Buffer(0,j);
             for( int i=0; i<r; ++i )
                 VColConj[i] = VHRow[i*r];
         }
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], B.n, &tauV[0], 
-      &B.V[0], B.n, &buffer[offset], blockSize );
+    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], B.Width(), &tauV[0],
+      B.V.Buffer(), B.V.LDim(), &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 }
 

@@ -34,11 +34,12 @@ void psp::hmatrix_tools::MatrixAdd
     if( A.Type() != B.Type() )
         throw std::logic_error("MatrixAdd with different types not written");
 #endif
-    C.Resize( A.Height(), A.Width() );
-    C.SetType( A.Type() );
-
     const int m = C.Height();
     const int n = C.Width();
+
+    C.SetType( A.Type() );
+    C.Resize( m, n );
+
     if( C.Symmetric() )
     {
         for( int j=0; j<n; ++j )
@@ -71,40 +72,46 @@ void psp::hmatrix_tools::MatrixAdd
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n )
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
-    C.m = A.m;
-    C.n = A.n;
-    C.r = A.r + B.r;
+    const int m = A.Height();
+    const int n = A.Width();
+    const int Ar = A.Rank();
+    const int Br = B.Rank();
+    const int r = Ar + Br;
+    C.U.SetType( GENERAL ); C.U.Resize( m, r );
+    C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
     // C.U := [(alpha A.U), (beta B.U)]
-    C.U.resize( C.m*C.r );
     // Copy in (alpha A.U)
+    for( int j=0; j<Ar; ++j )
     {
-        const int r = A.r;
-        const int m = A.m;
-        Scalar* RESTRICT CU_A = &C.U[0];
-        const Scalar* RESTRICT AU = &A.U[0]; 
-        for( int j=0; j<r; ++j )
-            for( int i=0; i<m; ++i )
-                CU_A[i+j*m] = alpha*AU[i+j*m];
+        Scalar* RESTRICT CUACol = C.U.Buffer(0,j);
+        const Scalar* RESTRICT AUCol = A.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            CUACol[i] = alpha*AUCol[i];
     }
     // Copy in (beta B.U)
+    for( int j=0; j<Br; ++j )
     {
-        const int r = B.r;
-        const int m = A.m;
-        Scalar* RESTRICT CU_B = &C.U[C.m*A.r];
-        const Scalar* RESTRICT BU = &B.U[0];
-        for( int j=0; j<r; ++j )
-            for( int i=0; i<m; ++i )
-                CU_B[i+j*m] = beta*BU[i+j*m];
+        Scalar* RESTRICT CUBCol = C.U.Buffer(0,j+Ar);
+        const Scalar* RESTRICT BUCol = B.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            CUBCol[i] = beta*BUCol[i];
     }
 
     // C.V := [A.V B.V]
-    C.V.resize( C.n*C.r );
-    std::memcpy( &C.V[0], &A.V[0], C.n*A.r*sizeof(Scalar) );
-    std::memcpy( &C.V[C.n*A.r], &B.V[0], C.n*B.r*sizeof(Scalar) );
+    for( int j=0; j<Ar; ++j )
+    {
+        std::memcpy
+        ( C.V.Buffer(0,j), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
+    }
+    for( int j=0; j<Br; ++j )
+    {
+        std::memcpy
+        ( C.V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Scalar) );
+    }
 }
 
 // Dense from sum of factor and dense:  C := alpha A + beta B
@@ -115,14 +122,15 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.Height() || A.n != B.Width()  )
+    if( A.Height() != B.Height() || A.Width() != B.Width()  )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
-    C.Resize( A.m, A.n );
-    C.SetType( GENERAL );
+    const int m = A.Height();
+    const int n = A.Width();
+    const int r = A.Rank();
 
-    const int m = A.m;
-    const int n = A.n;
+    C.SetType( GENERAL );
+    C.Resize( m, n );
 
     if( B.Symmetric() )
     {
@@ -150,9 +158,10 @@ void psp::hmatrix_tools::MatrixAdd
         // C := alpha A + C = alpha A.U A.V^[T,H] + C
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
-        ( 'N', option, A.m, A.n, A.r, 
-          alpha, &A.U[0], A.m, &A.V[0], A.n,
-          1, C.Buffer(), C.LDim() );
+        ( 'N', option, m, n, r, 
+          alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                 A.V.LockedBuffer(), A.V.LDim(),
+          1,     C.Buffer(),         C.LDim() );
     }
     else
     {
@@ -168,9 +177,10 @@ void psp::hmatrix_tools::MatrixAdd
         // C := alpha A + C = alpha A.U A.V^[T,H] + C
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
-        ( 'N', option, A.m, A.n, A.r, 
-          alpha, &A.U[0], A.m, &A.V[0], A.n,
-          1, C.Buffer(), C.LDim() );
+        ( 'N', option, m, n, r, 
+          alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                 A.V.LockedBuffer(), A.V.LDim(),
+          1,     C.Buffer(),         C.LDim() );
     }
 }
 
@@ -193,23 +203,29 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n  )
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
-    C.Resize( A.m, A.n );
+    const int m = A.Height();
+    const int n = A.Width();
+    const int r = A.Rank();
+
     C.SetType( GENERAL );
+    C.Resize( m, n );
 
     // C := alpha A = alpha A.U A.V^[T,H] + C
     const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemm
-    ( 'N', option, A.m, A.n, A.r, 
-      alpha, &A.U[0], A.m, &A.V[0], A.n,
-      0, C.Buffer(), C.LDim() );
+    ( 'N', option, m, n, r, 
+      alpha, A.U.LockedBuffer(), A.U.LDim(), 
+             A.V.LockedBuffer(), A.V.LDim(),
+      0,     C.Buffer(),         C.LDim() );
     // C := beta B + C = beta B.U B.V^[T,H] + C
     blas::Gemm
-    ( 'N', option, B.m, B.n, B.r, 
-      beta, &B.U[0], B.m, &B.V[0], B.n,
-      1, C.Buffer(), C.LDim() );
+    ( 'N', option, m, n, r, 
+      beta, B.U.LockedBuffer(), B.U.LDim(), 
+            B.V.LockedBuffer(), B.V.LDim(),
+      1,    C.Buffer(),         C.LDim() );
 }
 
 // Dense C := alpha A + beta B

@@ -248,8 +248,11 @@ psp::DenseMatrix<Scalar>::Resize( int m, int n )
     if( _type == SYMMETRIC && m != n )
         throw std::logic_error("Destroyed symmetry of symmetric matrix");
 #endif
-    if( m > _m || n > _n )
-        _ldim = std::max( m, 1 ); 
+    if( m > _m )
+    {
+        // We cannot trivially preserve the old contents
+        _ldim = std::max( m, 1 );
+    }
     _m = m;
     _n = n;
     _memory.resize( _ldim*n );

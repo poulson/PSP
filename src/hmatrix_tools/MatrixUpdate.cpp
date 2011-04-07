@@ -66,38 +66,34 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        FactorMatrix<Scalar,Conjugated>& B )
 {
 #ifndef RELEASE
-    if( A.m != B.m || A.n != B.n )
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to update with nonconforming matrices.");
 #endif
-    const int newRank = A.r + B.r;
+    const int m = A.Height();
+    const int n = A.Width();
+    const int Ar = A.Rank();
+    const int Br = B.Rank();
+    const int newRank = Ar + Br;
 
     // B.U := [(beta B.U), (alpha A.U)]
-    B.U.resize( B.m*newRank );
-    // Scale B.U by beta
-    {
-        const int r = B.r;
-        const int m = B.m;
-        Scalar* BU_B = &B.U[0];
-        for( int i=0; i<r*m; ++i )
-            BU_B[i] *= beta;
-    }
+    Scale( beta, B.U );
+    B.U.Resize( B.Height(), newRank );
     // Copy in (alpha A.U)
+    for( int j=0; j<Ar; ++j )
     {
-        const int r = A.r;
-        const int m = A.m;
-        Scalar* RESTRICT BU_A = &B.U[B.r*m];
-        const Scalar* RESTRICT AU = &A.U[0]; 
-        for( int j=0; j<r; ++j )
-            for( int i=0; i<m; ++i )
-                BU_A[i+j*m] = alpha*AU[i+j*m];
+        Scalar* RESTRICT BUACol = B.U.Buffer(0,j+Br);
+        const Scalar* RESTRICT AUCol = A.U.LockedBuffer(0,j);
+        for( int i=0; i<m; ++i )
+            BUACol[i] = alpha*AUCol[i];
     }
 
     // B.V := [B.V A.V]
-    B.V.resize( B.n*newRank );
-    std::memcpy( &B.V[B.n*B.r], &A.V[0], A.n*A.r*sizeof(Scalar) );
-
-    // Mark the new rank
-    B.r = newRank;
+    B.V.Resize( B.Width(), newRank );
+    for( int j=0; j<Ar; ++j )
+    {
+        std::memcpy
+        ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
+    }
 }
 
 // Dense updated with factored, B := alpha A + beta B
@@ -107,15 +103,15 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
-    if( A.m != B.Height() || A.n != B.Width()  )
+    if( A.Height() != B.Height() || A.Width() != B.Width()  )
         throw std::logic_error("Tried to update with nonconforming matrices.");
     if( B.Symmetric() )
         throw std::logic_error("Unsafe update of symmetric dense matrix.");
 #endif
     const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemm
-    ( 'N', option, A.m, A.n, A.r, 
-      alpha, &A.U[0], A.m, &A.V[0], A.n, 
+    ( 'N', option, A.Height(), A.Width(), A.Rank(), 
+      alpha, A.U.LockedBuffer(), A.U.LDim(), A.V.LockedBuffer(), A.V.LDim(), 
       beta, B.Buffer(), B.LDim() );
 }
 

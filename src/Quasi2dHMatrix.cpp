@@ -618,6 +618,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
+    C.SetType( GENERAL );
     C.Resize( _m, B.Width() );
     MapMatrix( alpha, B, 0, C );
 }
@@ -677,6 +678,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
+    C.SetType( GENERAL );
     C.Resize( _n, B.Width() );
     TransposeMapMatrix( alpha, B, 0, C );
 }
@@ -796,6 +798,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
+    C.SetType( GENERAL );
     C.Resize( _n, B.Width() );
     HermitianTransposeMapMatrix( alpha, B, 0, C );
 }
@@ -807,6 +810,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 ( Scalar alpha, DenseMatrix<Scalar>& B,
                 DenseMatrix<Scalar>& C ) const
 {
+    C.SetType( GENERAL );
     C.Resize( _n, B.Width() );
     HermitianTransposeMapMatrix( alpha, B, 0, C );
 }

@@ -78,26 +78,35 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
-    const int r = A.r;
-    std::vector<Scalar> t(r);
+    const int r = A.Rank();
 
     // Form t := alpha (A.U)^T x
+    Vector<Scalar> t( r );
     blas::Gemv
-    ( 'T', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( 'T', A.Height(), r, 
+      alpha, A.U.LockedBuffer(), A.U.LDim(), 
+             x.LockedBuffer(),   1, 
+      0,     t.Buffer(),         1 );
 
     if( Conjugated )
     {
         Conjugate( t );
         Conjugate( y );
         blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, Conj(beta), y.Buffer(), 1 );
+        ( 'N', A.Width(), r, 
+          1,          A.V.LockedBuffer(), A.V.LDim(), 
+                      t.LockedBuffer(),   1, 
+          Conj(beta), y.Buffer(),         1 );
         Conjugate( y );
     }
     else
     {
         // Form y := (A.V) t + beta y
         blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, beta, y.Buffer(), 1 );
+        ( 'N', A.Width(), r, 
+          1,    A.V.LockedBuffer(), A.V.LDim(), 
+                t.LockedBuffer(),   1, 
+          beta, y.Buffer(),         1 );
     }
 }
 
@@ -108,26 +117,35 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
-    const int r = A.r;
-    std::vector<Scalar> t(r);
+    const int r = A.Rank();
 
     // Form t := alpha (A.U)^T x
+    Vector<Scalar> t( r );
     blas::Gemv
-    ( 'T', A.m, A.r, alpha, &A.U[0], A.m, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( 'T', A.Height(), r, 
+      alpha, A.U.LockedBuffer(), A.U.LDim(), 
+             x.LockedBuffer(),   1, 
+      0,     t.Buffer(),         1 );
 
     y.Resize( x.Size() );
     if( Conjugated )
     {
         Conjugate( t );
         blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, 0, y.Buffer(), 1 );
+        ( 'N', A.Width(), r, 
+          1, A.V.LockedBuffer(), A.V.LDim(), 
+             t.LockedBuffer(),   1, 
+          0, y.Buffer(),         1 );
         Conjugate( y );
     }
     else
     {
         // Form y := (A.V) t
         blas::Gemv
-        ( 'N', A.n, A.r, 1, &A.V[0], A.n, &t[0], 1, 0, y.Buffer(), 1 );
+        ( 'N', A.Width(), r, 
+          1, A.V.LockedBuffer(), A.V.LDim(), 
+             t.LockedBuffer(),   1, 
+          0, y.Buffer(),         1 );
     }
 }
 

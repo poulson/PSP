@@ -27,8 +27,8 @@ void psp::hmatrix_tools::MatrixMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.Height(), B.Width() );
     C.SetType( GENERAL );
+    C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
 }
 
@@ -78,16 +78,19 @@ void psp::hmatrix_tools::MatrixMatrix
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.m )
+    if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.m;
-    C.n = B.n;
-    if( A.r <= B.r )
+    const int m = A.Height();
+    const int n = A.Width();
+    const int Ar = A.Rank();
+    const int Br = B.Rank();
+
+    if( Ar <= Br )
     {
-        C.r = A.r;
-        C.U.resize( C.m*C.r );
-        C.V.resize( C.n*C.r );
+        const int r = Ar;
+        C.U.SetType( GENERAL ); C.U.Resize( m, r );
+        C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
         if( Conjugated )
         {
@@ -98,14 +101,18 @@ void psp::hmatrix_tools::MatrixMatrix
             // C.U := A.U
             // W := B.U^H A.V
             // C.V := conj(alpha) B.V W
-            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
-            std::vector<Scalar> W( B.r*A.r );
+            Copy( A.U, C.U );
+            DenseMatrix<Scalar> W( Br, Ar );
             blas::Gemm
-            ( 'C', 'N', B.r, A.r, B.m,
-              1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
+            ( 'C', 'N', Br, Ar, B.Height(),
+              1, B.U.LockedBuffer(), B.U.LDim(), 
+                 A.V.LockedBuffer(), A.V.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', B.n, A.r, B.r,
-              Conj(alpha), &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
+            ( 'N', 'N', n, Ar, Br,
+              Conj(alpha), B.V.LockedBuffer(), B.V.LDim(), 
+                           W.LockedBuffer(),   W.LDim(), 
+              0,           C.V.Buffer(),       C.V.LDim() );
         }
         else
         {
@@ -116,21 +123,25 @@ void psp::hmatrix_tools::MatrixMatrix
             // C.U := A.U
             // W := B.U^T A.V
             // C.V := alpha B.V W
-            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
-            std::vector<Scalar> W( B.r*A.r );
+            Copy( A.U, C.U );
+            DenseMatrix<Scalar> W( Br, Ar );
             blas::Gemm
-            ( 'T', 'N', B.r, A.r, B.m,
-              1, &B.U[0], B.m, &A.V[0], A.n, 0, &W[0], B.r );
+            ( 'T', 'N', Br, Ar, B.Height(),
+              1, B.U.LockedBuffer(), B.U.LDim(),
+                 A.V.LockedBuffer(), A.U.LDim(),
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', B.n, A.r, B.r,
-              alpha, &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
+            ( 'N', 'N', n, Ar, Br,
+              alpha, B.V.LockedBuffer(), B.V.LDim(),
+                     W.LockedBuffer(),   W.LDim(),
+              0,     C.V.Buffer(),       C.V.LDim() );
         }
     }
     else // B.r < A.r
     {
-        C.r = B.r;
-        C.U.resize( C.m*C.r );
-        C.V.resize( C.n*C.r );
+        const int r = Br;
+        C.U.SetType( GENERAL ); C.U.Resize( m, r );
+        C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
         if( Conjugated )
         {
@@ -140,14 +151,18 @@ void psp::hmatrix_tools::MatrixMatrix
             // W := A.V^H B.U
             // C.U := alpha A.U W
             // C.V := B.V
-            std::vector<Scalar> W( A.r*B.r );
+            DenseMatrix<Scalar> W( Ar, Br );
             blas::Gemm
-            ( 'C', 'N', A.r, B.r, A.n,
-              1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
+            ( 'C', 'N', Ar, Br, A.Width(),
+              1, A.V.LockedBuffer(), A.V.LDim(), 
+                 B.U.LockedBuffer(), B.U.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', A.m, B.r, A.r,
-              alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );
-            std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+            ( 'N', 'N', m, Br, Ar,
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              0,     C.U.Buffer(),       C.U.LDim() );
+            Copy( B.V, C.V );
         }
         else
         {
@@ -157,14 +172,18 @@ void psp::hmatrix_tools::MatrixMatrix
             // W := A.V^T B.U
             // C.U := alpha A.U W
             // C.V := B.V
-            std::vector<Scalar> W( A.r*B.r );
+            DenseMatrix<Scalar> W( Ar, Br );
             blas::Gemm
-            ( 'T', 'N', A.r, B.r, A.n,
-              1, &A.V[0], A.n, &B.U[0], B.m, 0, &W[0], A.r );
+            ( 'T', 'N', Ar, Br, A.Width(),
+              1, A.V.LockedBuffer(), A.V.LDim(), 
+                 B.U.LockedBuffer(), B.U.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', A.m, B.r, A.r,
-              alpha, &A.U[0], A.m, &W[0], A.r, 0, &C.U[0], C.m );
-            std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+            ( 'N', 'N', m, Br, Ar,
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              0,     C.U.Buffer(),       C.U.LDim() );
+            Copy( B.V, C.V );
         }
     }
 }
@@ -177,31 +196,36 @@ void psp::hmatrix_tools::MatrixMatrix
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.Width() != B.m )
+    if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.Height();
-    C.n = B.n;
-    C.r = B.r;
-    C.U.resize( C.m*C.r );
-    C.V.resize( C.n*C.r );
+    const int m = A.Height();
+    const int n = B.Width();
+    const int r = B.Rank();
+
+    C.U.SetType( GENERAL ); C.U.Resize( m, r );
+    C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
     // Form C.U := A B.U
     if( A.Symmetric() )
     {
         blas::Symm
-        ( 'L', 'L', C.m, C.r, 
-          alpha, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &C.U[0], C.m );
+        ( 'L', 'L', m, r, 
+          alpha, A.LockedBuffer(),   A.LDim(), 
+                 B.U.LockedBuffer(), B.U.LDim(), 
+          0,     C.U.Buffer(),       C.U.LDim() );
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.m, C.r, A.Width(),
-          alpha, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &C.U[0], C.m );
+        ( 'N', 'N', m, r, A.Width(),
+          alpha, A.LockedBuffer(),   A.LDim(), 
+                 B.U.LockedBuffer(), B.U.LDim(), 
+          0,     C.U.Buffer(),       C.U.LDim() );
     }
 
     // Form C.V := B.V
-    std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+    Copy( B.V, C.V );
 }
 
 // Form a factor matrix from a factor matrix times a dense matrix
@@ -212,14 +236,15 @@ void psp::hmatrix_tools::MatrixMatrix
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.Height() )
+    if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.m;
-    C.n = B.Width();
-    C.r = A.r;
-    C.U.resize( C.m*C.r );
-    C.V.resize( C.n*C.r );
+    const int m = A.Height();
+    const int n = B.Width();
+    const int r = A.Rank();
+
+    C.U.SetType( GENERAL ); C.U.Resize( m, r );
+    C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
     if( Conjugated )
     {
@@ -234,13 +259,14 @@ void psp::hmatrix_tools::MatrixMatrix
             // AVConj := conj(A.V)
             // C.V := alpha B AVConj
             // C.V := conj(C.V)
-            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
-            std::vector<Scalar> AVConj( A.n*A.r );
+            Copy( A.U, C.U );
+            DenseMatrix<Scalar> AVConj;
             Conjugate( A.V, AVConj );
             blas::Symm
-            ( 'L', 'L', A.n, A.r,
-              alpha, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 
-              0, &C.V[0], C.n );
+            ( 'L', 'L', A.Width(), r,
+              alpha, B.LockedBuffer(),      B.LDim(), 
+                     AVConj.LockedBuffer(), AVConj.LDim(), 
+              0,     C.V.Buffer(),          C.V.LDim() );
             Conjugate( C.V );
         }
         else
@@ -250,11 +276,12 @@ void psp::hmatrix_tools::MatrixMatrix
             //
             // C.U := A.U
             // C.V := conj(alpha) B^H A.V
-            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            Copy( A.U, C.U );
             blas::Gemm
-            ( 'C', 'N', C.n, C.r, A.n,
-              Conj(alpha), B.LockedBuffer(), B.LDim(), &A.V[0], A.n,
-              0, &C.V[0], C.n );
+            ( 'C', 'N', n, r, A.Width(),
+              Conj(alpha), B.LockedBuffer(),   B.LDim(), 
+                           A.V.LockedBuffer(), A.V.LDim(),
+              0,           C.V.Buffer(),       C.V.LDim() );
         }
     }
     else
@@ -267,11 +294,12 @@ void psp::hmatrix_tools::MatrixMatrix
             //
             // C.U := A.U
             // C.V := alpha B A.V
-            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            Copy( A.U, C.U );
             blas::Symm
-            ( 'L', 'L', A.n, A.r,
-              alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 
-              0, &C.V[0], C.n );
+            ( 'L', 'L', A.Width(), r,
+              alpha, B.LockedBuffer(),   B.LDim(), 
+                     A.V.LockedBuffer(), A.V.LDim(), 
+              0,     C.V.Buffer(),       C.V.LDim() );
         }
         else
         {
@@ -280,11 +308,12 @@ void psp::hmatrix_tools::MatrixMatrix
             //
             // C.U := A.U
             // C.V := alpha B^T A.V
-            std::memcpy( &C.U[0], &A.U[0], A.m*A.r*sizeof(Scalar) );
+            Copy( A.U, C.U );
             blas::Gemm
-            ( 'T', 'N', B.Width(), A.r, A.n,
-              alpha, B.LockedBuffer(), B.LDim(), &A.V[0], A.n,
-              0, &C.V[0], C.n );
+            ( 'T', 'N', n, r, A.Width(),
+              alpha, B.LockedBuffer(),   B.LDim(), 
+                     A.V.LockedBuffer(), A.V.LDim(),
+              0,     C.V.Buffer(),       C.V.LDim() );
         }
     }
 }
@@ -296,8 +325,8 @@ void psp::hmatrix_tools::MatrixMatrix
                 const FactorMatrix<Scalar,Conjugated>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.Height(), B.n );
     C.SetType( GENERAL );
+    C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
 }
 
@@ -309,30 +338,36 @@ void psp::hmatrix_tools::MatrixMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.Width() != B.m )
+    if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
 #endif
     // W := A B.U
-    std::vector<Scalar> W( A.Height()*B.r );
+    DenseMatrix<Scalar> W( A.Height(), B.Rank() );
     if( A.Symmetric() )
     {
         blas::Symm
-        ( 'L', 'L', C.Height(), B.r,
-          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
+        ( 'L', 'L', A.Height(), B.Rank(),
+          1, A.LockedBuffer(),   A.LDim(), 
+             B.U.LockedBuffer(), B.U.LDim(), 
+          0, W.Buffer(),         W.LDim() );
     }
     else
     {
         blas::Gemm
-        ( 'N', 'N', C.Height(), B.r, A.Width(),
-          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Height() );
+        ( 'N', 'N', A.Height(), B.Rank(), A.Width(),
+          1, A.LockedBuffer(),   A.LDim(), 
+             B.U.LockedBuffer(), B.U.LDim(), 
+          0, W.Buffer(),         W.LDim() );
     }
     // C := alpha W B.V^[T,H] + beta C
     const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemm
-    ( 'N', option, C.Height(), C.Width(), B.r,
-      alpha, &W[0], A.Height(), &B.V[0], B.n, beta, C.Buffer(), C.LDim() );
+    ( 'N', option, C.Height(), C.Width(), B.Rank(),
+      alpha, W.LockedBuffer(),   W.LDim(), 
+             B.V.LockedBuffer(), B.V.LDim(), 
+      beta,  C.Buffer(),         C.LDim() );
 }
 
 // Form a dense matrix from a factor matrix times a dense matrix
@@ -342,8 +377,8 @@ void psp::hmatrix_tools::MatrixMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.m, B.Width() );
     C.SetType( GENERAL );
+    C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
 }
 
@@ -355,7 +390,7 @@ void psp::hmatrix_tools::MatrixMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.n != B.Height() )
+    if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
@@ -371,15 +406,19 @@ void psp::hmatrix_tools::MatrixMatrix
             // AVConj := conj(A.V)
             // W := B AVConj
             // C := alpha A.U W^T + beta C
-            std::vector<Scalar> AVConj( A.n*A.r );
+            DenseMatrix<Scalar> AVConj;
             Conjugate( A.V, AVConj );
-            std::vector<Scalar> W( A.n*A.r );
+            DenseMatrix<Scalar> W( A.Width(), A.Rank() );
             blas::Symm
-            ( 'L', 'L', A.n, A.r,
-              1, B.LockedBuffer(), B.LDim(), &AVConj[0], A.n, 0, &W[0], A.n );
+            ( 'L', 'L', A.Width(), A.Rank(),
+              1, B.LockedBuffer(),      B.LDim(), 
+                 AVConj.LockedBuffer(), AVConj.LDim(), 
+              0, W.Buffer(),            W.LDim() );
             blas::Gemm
-            ( 'N', 'T', A.m, A.n, A.r,
-              alpha, &A.U[0], A.m, &W[0], A.n, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'T', A.Height(), A.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
         }
         else
         {
@@ -388,13 +427,17 @@ void psp::hmatrix_tools::MatrixMatrix
             //
             // W := A.V^H B
             // C := alpha A.U W + beta C
-            std::vector<Scalar> W( A.r*B.Width() );
+            DenseMatrix<Scalar> W( A.Rank(), B.Width() );
             blas::Gemm
-            ( 'C', 'N', A.r, B.Width(), A.n,
-              1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
+            ( 'C', 'N', A.Rank(), B.Width(), A.Width(),
+              1, A.V.LockedBuffer(), A.V.LDim(), 
+                 B.LockedBuffer(),   B.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', A.m, B.Width(), A.r,
-              alpha, &A.U[0], A.m, &W[0], A.r, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
         }
     }
     else
@@ -407,13 +450,17 @@ void psp::hmatrix_tools::MatrixMatrix
             //
             // W := B A.V
             // C := alpha A.U W^T + beta C
-            std::vector<Scalar> W( A.n*A.r );
+            DenseMatrix<Scalar> W( A.Width(), A.Rank() );
             blas::Symm
-            ( 'L', 'L', A.n, A.r,
-              1, B.LockedBuffer(), B.LDim(), &A.V[0], A.n, 0, &W[0], A.n );
+            ( 'L', 'L', A.Width(), A.Rank(),
+              1, B.LockedBuffer(),   B.LDim(), 
+                 A.V.LockedBuffer(), A.V.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'T', A.m, A.n, A.r,
-              alpha, &A.U[0], A.m, &W[0], A.n, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'T', A.Height(), A.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
         }
         else
         {
@@ -422,13 +469,17 @@ void psp::hmatrix_tools::MatrixMatrix
             //
             // W := A.V^T B
             // C := alpha A.U W + beta C
-            std::vector<Scalar> W( A.r*B.Width() );
+            DenseMatrix<Scalar> W( A.Rank(), B.Width() );
             blas::Gemm
-            ( 'T', 'N', A.r, B.Width(), A.n,
-              1, &A.V[0], A.n, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
+            ( 'T', 'N', A.Rank(), B.Width(), A.Width(),
+              1, A.V.LockedBuffer(), A.V.LDim(), 
+                 B.LockedBuffer(),   B.LDim(), 
+              0, W.Buffer(),         A.Rank() );
             blas::Gemm
-            ( 'N', 'N', A.m, B.Width(), A.r,
-              alpha, &A.U[0], A.m, &W[0], A.r, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
         }
     }
 }

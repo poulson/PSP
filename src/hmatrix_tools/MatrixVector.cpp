@@ -78,17 +78,23 @@ void psp::hmatrix_tools::MatrixVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
-    const int r = A.r;
-    std::vector<Scalar> t(r);
+    const int r = A.Rank();
 
     // Form t := alpha (A.V)^[T,H] x
+    Vector<Scalar> t( r );
     const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemv
-    ( option, A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( option, A.Width(), r, 
+      alpha, A.V.LockedBuffer(), A.V.LDim(), 
+             x.LockedBuffer(),   1, 
+      0,     t.Buffer(),         1 );
 
     // Form y := (A.U) t + beta y
     blas::Gemv
-    ( 'N', A.m, A.r, 1, &A.U[0], A.m, &t[0], 1, beta, y.Buffer(), 1 );
+    ( 'N', A.Height(), r, 
+      1,    A.U.LockedBuffer(), A.U.LDim(), 
+            t.LockedBuffer(),   1, 
+      beta, y.Buffer(),         1 );
 }
 
 // Low-rank y := alpha A x
@@ -98,18 +104,24 @@ void psp::hmatrix_tools::MatrixVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
-    const int r = A.r;
-    std::vector<Scalar> t(r);
+    const int r = A.Rank();
 
     // Form t := alpha (A.V)^[T,H] x
+    Vector<Scalar> t( r );
     const char option = ( Conjugated ? 'C' : 'T' );
     blas::Gemv
-    ( option, A.n, A.r, alpha, &A.V[0], A.n, x.LockedBuffer(), 1, 0, &t[0], 1 );
+    ( option, A.Width(), r, 
+      alpha, A.V.LockedBuffer(), A.V.LDim(), 
+             x.LockedBuffer(),   1, 
+      0,     t.Buffer(),         1 );
 
     // Form y := (A.U) t
     y.Resize( x.Size() );
     blas::Gemv
-    ( 'N', A.m, A.r, 1, &A.U[0], A.m, &t[0], 1, 0, y.Buffer(), 1 );
+    ( 'N', A.Height(), r, 
+      1, A.U.LockedBuffer(), A.U.LDim(), 
+         t.LockedBuffer(),   1, 
+      0, y.Buffer(),         1 );
 }
 
 template void psp::hmatrix_tools::MatrixVector

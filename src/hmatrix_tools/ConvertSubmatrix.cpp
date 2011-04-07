@@ -31,7 +31,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
     else 
         D.SetType( GENERAL );
     D.Resize( iEnd-iStart, jEnd-jStart );
-    std::memset( D.Buffer(), 0, D.LDim()*D.Width()*sizeof(Scalar) );
+    Scale( (Scalar)0, D );
 #ifndef RELEASE
     if( D.Symmetric() && iEnd != jEnd )
         throw std::logic_error("Invalid submatrix of symmetric sparse matrix.");
@@ -74,20 +74,18 @@ void psp::hmatrix_tools::ConvertSubmatrix
     const int numNonzeros = nonzeroEnd - nonzeroStart;
 
     // Initialize the factor matrix to all zeros
-    F.m = iEnd - iStart;
-    F.n = jEnd - jStart;
-    F.r = numNonzeros;
-    F.U.resize( F.m*F.r );
-    F.V.resize( F.n*F.r );
-    std::memset( &F.U[0], 0, F.m*F.r*sizeof(Scalar) );
-    std::memset( &F.V[0], 0, F.n*F.r*sizeof(Scalar) );
+    const int m = iEnd - iStart;
+    const int n = jEnd - jStart;
+    const int r = numNonzeros;
+    F.U.SetType( GENERAL ); F.U.Resize( m, r );
+    F.V.SetType( GENERAL ); F.V.Resize( n, r );
+    Scale( (Scalar)0, F.U );
+    Scale( (Scalar)0, F.V );
 
     // Fill in the representation of each nonzero using the appropriate column
     // of identity in F.U and the appropriate scaled column of identity in 
     // F.V
     int rankCounter = 0;
-    const int m = F.m;
-    const int n = F.n;
     for( int iOffset=0; iOffset<m; ++iOffset )
     {
         const int thisRowOffset = S.rowOffsets[iStart+iOffset];
@@ -103,11 +101,11 @@ void psp::hmatrix_tools::ConvertSubmatrix
             {
                 const int jOffset = thisColIndex - jStart;
                 const Scalar value = S.nonzeros[thisRowOffset+k];
-                F.U[iOffset+rankCounter*m] = 1;
+                F.U.Set(iOffset,rankCounter,1);
                 if( Conjugated )
-                    F.V[jOffset+rankCounter*n] = Conj( value );
+                    F.V.Set(jOffset,rankCounter,Conj(value));
                 else
-                    F.V[jOffset+rankCounter*n] = value;
+                    F.V.Set(jOffset,rankCounter,value);
                 ++rankCounter;
             }
             else

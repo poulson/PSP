@@ -21,6 +21,8 @@
 #ifndef PSP_FACTOR_MATRIX_HPP
 #define PSP_FACTOR_MATRIX_HPP 1
 
+#include "psp/dense_matrix.hpp"
+
 namespace psp {
 
 // NOTE: We have two different factorized forms since Hermitian-transposes are
@@ -29,15 +31,19 @@ namespace psp {
 
 // A basic low-rank matrix representation that is used for the blocks with
 // sufficiently separated sources and targets. 
+//
+// U and V will always be assumed to be of general type 
+// (they should be non-square except in pathological cases).
 template<typename Scalar,bool Conjugated>
 struct FactorMatrix
 {
-    int m; // height of matrix
-    int n; // width of matrix
-    int r; // rank of matrix
     // If Conjugated == true, then A = U V^H, otherwise, A = U V^T. 
-    std::vector<Scalar> U; // buffer for m x r left set of vectors
-    std::vector<Scalar> V; // buffer for n x r right set of vectors
+    DenseMatrix<Scalar> U;
+    DenseMatrix<Scalar> V;
+
+    int Height() const { return U.Height(); }
+    int Width() const { return V.Height(); }
+    int Rank() const { return U.Width(); }
 };
 
 } // namespace psp

@@ -27,8 +27,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.Width(), B.Width() );
     C.SetType( GENERAL );
+    C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
@@ -108,16 +108,18 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.m )
+    if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.n;
-    C.n = B.n;
-    if( A.r <= B.r )
+    const int m = A.Width();
+    const int n = B.Width();
+    const int Ar = A.Rank();
+    const int Br = B.Rank();
+    if( Ar <= Br )
     {
-        C.r = A.r;
-        C.U.resize( C.m*C.r );
-        C.V.resize( C.n*C.r );
+        const int r = Ar;
+        C.U.SetType( GENERAL ); C.U.Resize( m, r ); 
+        C.V.SetType( GENERAL ); C.V.Resize( n, r ); 
 
         if( Conjugated )
         {
@@ -129,14 +131,18 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // C.U := A.V
             // W := B.U^H A.U
             // C.V := conj(alpha) B.V W
-            std::memcpy( &C.U[0], &A.V[0], A.m*A.r*sizeof(Scalar) );
-            std::vector<Scalar> W(B.r*A.r);
+            Copy( A.V, C.U );
+            DenseMatrix<Scalar> W( Br, Ar );
             blas::Gemm
-            ( 'C', 'N', B.r, A.r, B.m, 
-              1, &B.U[0], B.m, &A.U[0], A.m, 0, &W[0], B.r );
+            ( 'C', 'N', Br, Ar, B.Height(), 
+              1, B.U.LockedBuffer(), B.U.LDim(), 
+                 A.U.LockedBuffer(), A.U.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', C.n, A.r, B.r,
-              Conj(alpha), &B.V[0], B.n, &W[0], B.r, 0, &C.V[0], C.n );
+            ( 'N', 'N', n, Ar, Br,
+              Conj(alpha), B.V.LockedBuffer(), B.V.LDim(), 
+                           W.LockedBuffer(),   W.LDim(), 
+              0,           C.V.Buffer(),       C.V.LDim() );
         }
         else
         {
@@ -150,20 +156,24 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // W := A.U^H B.U
             // C.V := alpha B.V W^T
             Conjugate( A.V, C.U );
-            std::vector<Scalar> W( A.r*B.r );
+            DenseMatrix<Scalar> W( Ar, Br );
             blas::Gemm
-            ( 'C', 'N', A.r, B.r, A.m,
-              1, &A.U[0], A.m, &B.U[0], B.m, 0, &W[0], A.r );
+            ( 'C', 'N', Ar, Br, A.Height(),
+              1, A.U.LockedBuffer(), A.U.LDim(), 
+                 B.U.LockedBuffer(), B.U.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'T', B.n, A.r, B.r,
-              alpha, &B.V[0], B.n, &W[0], A.r, 0, &C.V[0], C.n );
+            ( 'N', 'T', n, Ar, Br,
+              alpha, B.V.LockedBuffer(), B.V.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              0,     C.V.Buffer(),       C.V.LDim() );
         }
     }
     else // B.r < A.r
     {
-        C.r = B.r;
-        C.U.resize( C.m*C.r );
-        C.V.resize( C.n*C.r );
+        const int r = Br;
+        C.U.SetType( GENERAL ); C.U.Resize( m, r ); 
+        C.V.SetType( GENERAL ); C.V.Resize( n, r ); 
 
         if( Conjugated )
         {
@@ -175,14 +185,18 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // W := A.U^H B.U
             // C.U := alpha A.V W
             // C.V := B.V
-            std::vector<Scalar> W( A.r*B.r );
+            DenseMatrix<Scalar> W( Ar, Br );
             blas::Gemm
-            ( 'C', 'N', A.r, B.r, A.m,
-              1, &A.U[0], A.m, &B.U[0], B.m, 0, &W[0], A.r );
+            ( 'C', 'N', Ar, Br, A.Height(),
+              1, A.U.LockedBuffer(), A.U.LDim(),
+                 B.U.LockedBuffer(), B.U.LDim(),
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', A.n, A.r, B.r,
-              alpha, &A.V[0], A.n, &W[0], A.r, 0, &C.U[0], C.m );
-            std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+            ( 'N', 'N', A.Width(), Ar, Br,
+              alpha, A.V.LockedBuffer(), A.V.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              0,     C.U.Buffer(),       C.U.LDim() );
+            Copy( B.V, C.V );
         }
         else
         {
@@ -197,15 +211,19 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // C.U := conj(alpha) A.V W^T
             // C.U := conj(C.U)
             // C.V := B.V
-            std::vector<Scalar> W( B.r*A.r );
+            DenseMatrix<Scalar> W( Br, Ar );
             blas::Gemm
-            ( 'C', 'N', B.r, A.r, B.m,
-              1, &B.U[0], B.m, &A.U[0], A.m, 0, &W[0], B.r );
+            ( 'C', 'N', Br, Ar, B.Height(),
+              1, B.U.LockedBuffer(), B.U.LDim(), 
+                 A.U.LockedBuffer(), A.U.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'T', A.n, B.r, A.r,
-              Conj(alpha), &A.V[0], A.n, &W[0], B.r, 0, &C.U[0], C.m );
+            ( 'N', 'T', A.Width(), Br, Ar,
+              Conj(alpha), A.V.LockedBuffer(), A.V.LDim(), 
+                           W.LockedBuffer(),   W.LDim(), 
+              0,           C.U.Buffer(),       C.U.LDim() );
             Conjugate( C.U );
-            std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+            Copy( B.V, C.V );
         }
     }
 }
@@ -218,14 +236,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.Height() != B.m )
+    if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.Width();
-    C.n = B.n;
-    C.r = B.r;
-    C.U.resize( C.m*C.r );
-    C.V.resize( C.n*C.r );
+    const int m = A.Width();
+    const int n = B.Width();
+    const int r = B.Rank();
+
+    C.U.SetType( GENERAL ); C.U.Resize( m, r );
+    C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
     if( A.Symmetric() )
     {
@@ -237,23 +256,26 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         // C.U := conj(alpha) A BUConj
         // C.U := conj(C.U)
         // C.V := B.V
-        std::vector<Scalar> BUConj( B.m*B.r );
+        DenseMatrix<Scalar> BUConj;
         Conjugate( B.U, BUConj );
         blas::Symm
-        ( 'L', 'L', B.m, B.r,
-          Conj(alpha), A.LockedBuffer(), A.LDim(), &BUConj[0], B.m,
-          0, &C.U[0], C.m );
+        ( 'L', 'L', B.Height(), r,
+          Conj(alpha), A.LockedBuffer(),      A.LDim(), 
+                       BUConj.LockedBuffer(), BUConj.LDim(),
+          0,           C.U.Buffer(),          C.U.LDim() );
         Conjugate( C.U );
-        std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+        Copy( B.V, C.V );
     }
     else
     {
         // C.U C.V^[T,H] := alpha A^H B.U B.V^[T,H]
         //                = (alpha A^H B.U) B.V^[T,H]
         blas::Gemm
-        ( 'C', 'N', C.m, C.r, A.Height(),
-          alpha, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &C.U[0], C.m );
-        std::memcpy( &C.V[0], &B.V[0], B.n*B.r*sizeof(Scalar) );
+        ( 'C', 'N', m, r, A.Height(),
+          alpha, A.LockedBuffer(),   A.LDim(), 
+                 B.U.LockedBuffer(), B.U.LDim(), 
+          0,     C.U.Buffer(),       C.U.LDim() );
+        Copy( B.V, C.V );
     }
 }
 
@@ -265,14 +287,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                       FactorMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.Height() )
+    if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
-    C.m = A.n;
-    C.n = B.Width();
-    C.r = A.r;
-    C.U.resize( C.m*C.r );
-    C.V.resize( C.n*C.r );
+    const int m = A.Width();
+    const int n = B.Width();
+    const int r = A.Rank();
+
+    C.U.SetType( GENERAL ); C.U.Resize( m, r );
+    C.V.SetType( GENERAL ); C.V.Resize( n, r );
 
     if( Conjugated )
     {
@@ -288,13 +311,14 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // AUConj := conj(A.U)
             // C.V := alpha B AUConj
             // C.V := conj(C.V)
-            std::memcpy( &C.U[0], &A.V[0], A.n*A.r*sizeof(Scalar) );
-            std::vector<Scalar> AUConj( A.m*A.r );
+            Copy( A.V, C.U );
+            DenseMatrix<Scalar> AUConj;
             Conjugate( A.U, AUConj );
             blas::Symm
-            ( 'L', 'L', C.n, C.r,
-              alpha, B.LockedBuffer(), B.LDim(), &AUConj[0], A.m, 
-              0, &C.V[0], C.n );
+            ( 'L', 'L', n, r,
+              alpha, B.LockedBuffer(),      B.LDim(), 
+                     AUConj.LockedBuffer(), AUConj.LDim(), 
+              0,     C.V.Buffer(),          C.V.LDim() );
             Conjugate( C.V );
         }
         else
@@ -305,11 +329,12 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             //
             // C.U := A.V
             // C.V := conj(alpha) B^H A.U
-            std::memcpy( &C.U[0], &A.V[0], A.n*A.r*sizeof(Scalar) );
+            Copy( A.V, C.U );
             blas::Gemm
-            ( 'C', 'N', C.n, C.r, A.m,
-              alpha, B.LockedBuffer(), B.LDim(), &A.U[0], A.m, 
-              0, &C.V[0], C.n );
+            ( 'C', 'N', n, r, A.Height(),
+              alpha, B.LockedBuffer(),   B.LDim(), 
+                     A.U.LockedBuffer(), A.U.LDim(), 
+              0,     C.V.Buffer(),       C.V.LDim() );
         }
     }
     else
@@ -322,21 +347,23 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         // AUConj := conj(A.U)
         // C.V := alpha B^T AUConj
         Conjugate( A.V, C.U );
-        std::vector<Scalar> AUConj( A.m*A.r );
+        DenseMatrix<Scalar> AUConj;
         Conjugate( A.U, AUConj );
         if( B.Symmetric() )
         {
             blas::Symm
-            ( 'L', 'L', A.m, A.r, 
-              alpha, B.LockedBuffer(), B.LDim(), &AUConj[0], A.m, 
-              0, &C.V[0], C.n );
+            ( 'L', 'L', A.Height(), r, 
+              alpha, B.LockedBuffer(),      B.LDim(), 
+                     AUConj.LockedBuffer(), AUConj.LDim(), 
+              0,     C.V.Buffer(),          C.V.LDim() );
         }
         else
         {
             blas::Gemm
-            ( 'T', 'N', C.n, C.r, A.m,
-              alpha, B.LockedBuffer(), B.LDim(), &AUConj[0], A.m,
-              0, &C.V[0], C.n );
+            ( 'T', 'N', n, r, A.Height(),
+              alpha, B.LockedBuffer(),      B.LDim(), 
+                     AUConj.LockedBuffer(), AUConj.LDim(),
+              0,     C.V.Buffer(),          C.V.LDim() );
         }
     }
 }
@@ -348,8 +375,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const FactorMatrix<Scalar,Conjugated>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.Width(), B.n );
     C.SetType( GENERAL );
+    C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
@@ -361,11 +388,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.Height() != B.m )
+    if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
 #endif
+    const int m = C.Height();
+    const int n = C.Width();
+    const int r = B.Rank();
+
     if( A.Symmetric() )
     {
         // C := alpha A^H (B.U B.V^[T,H]) + beta C
@@ -376,17 +407,21 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         // W := A BUConj
         // W := conj(W)
         // C := alpha W B.V^[T,H] + beta C
-        std::vector<Scalar> BUConj( B.m*B.r );
+        DenseMatrix<Scalar> BUConj;
         Conjugate( B.U, BUConj );
-        std::vector<Scalar> W( B.m*B.r );
+        DenseMatrix<Scalar> W( B.Height(), r );
         blas::Symm
-        ( 'L', 'L', B.m, B.r,
-          1, A.LockedBuffer(), A.LDim(), &BUConj[0], B.m, 0, &W[0], B.m );
+        ( 'L', 'L', B.Height(), r,
+          1, A.LockedBuffer(),      A.LDim(), 
+             BUConj.LockedBuffer(), BUConj.LDim(), 
+          0, W.Buffer(),            W.LDim() );
         Conjugate( W );
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
-        ( 'N', option, C.Height(), C.Width(), B.r,
-          alpha, &W[0], B.m, &B.V[0], B.n, beta, C.Buffer(), C.LDim() );
+        ( 'N', option, m, n, r,
+          alpha, W.LockedBuffer(),   W.LDim(), 
+                 B.V.LockedBuffer(), B.V.LDim(), 
+          beta,  C.Buffer(),         C.LDim() );
     }
     else
     {
@@ -394,14 +429,18 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         //
         // W := A^H B.U
         // C := alpha W B.V^[T,H] + beta C
-        std::vector<Scalar> W( A.Width()*B.r );
+        DenseMatrix<Scalar> W( m, r );
         blas::Gemm
-        ( 'C', 'N', A.Width(), B.r, B.m,
-          1, A.LockedBuffer(), A.LDim(), &B.U[0], B.m, 0, &W[0], A.Width() );
+        ( 'C', 'N', m, r, B.Height(),
+          1, A.LockedBuffer(),   A.LDim(), 
+             B.U.LockedBuffer(), B.U.LDim(), 
+          0, W.Buffer(),         W.LDim() );
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
-        ( 'N', option, C.Height(), C.Width(), B.r,
-          alpha, &W[0], A.Width(), &B.V[0], B.n, beta, C.Buffer(), C.LDim() );
+        ( 'N', option, m, n, r,
+          alpha, W.LockedBuffer(),   W.LDim(), 
+                 B.V.LockedBuffer(), B.V.LDim(), 
+          beta,  C.Buffer(),         C.LDim() );
     }
 }
 
@@ -412,8 +451,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
-    C.Resize( A.n, B.Width() );
     C.SetType( GENERAL );
+    C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
 }
 
@@ -425,11 +464,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
-    if( A.m != B.Height() )
+    if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
 #endif
+    const int m = A.Width();
+    const int n = B.Width();
+    const int r = A.Rank();
+
     if( Conjugated )
     {
         if( B.Symmetric() )
@@ -442,15 +485,19 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // AUConj := conj(A.U)
             // W := B AUConj
             // C := alpha A.V W^T + beta C
-            std::vector<Scalar> AUConj( A.m*A.r );
+            DenseMatrix<Scalar> AUConj;
             Conjugate( A.U, AUConj );
-            std::vector<Scalar> W( A.m*A.r );
+            DenseMatrix<Scalar> W( A.Height(), r );
             blas::Symm
-            ( 'L', 'L', A.m, A.r,
-              1, B.LockedBuffer(), B.LDim(), &AUConj[0], A.m, 0, &W[0], A.m );
+            ( 'L', 'L', A.Height(), r,
+              1, B.LockedBuffer(),      B.LDim(), 
+                 AUConj.LockedBuffer(), AUConj.LDim(), 
+              0, W.Buffer(),            W.LDim() );
             blas::Gemm
-            ( 'N', 'T', C.Height(), C.Width(), A.r,
-              alpha, &A.V[0], A.n, &W[0], A.m, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'T', m, n, r,
+              alpha, A.V.LockedBuffer(), A.V.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
         }
         else
         {
@@ -459,13 +506,17 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             //
             // W := A.U^H B
             // C := alpha A.V W + beta C
-            std::vector<Scalar> W( A.r*B.Width() );
+            DenseMatrix<Scalar> W( r, n );
             blas::Gemm
-            ( 'C', 'N', A.r, B.Width(), A.m,
-              1, &A.U[0], A.m, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
+            ( 'C', 'N', r, n, A.Height(),
+              1, A.U.LockedBuffer(), A.U.LDim(), 
+                 B.LockedBuffer(),   B.LDim(), 
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
-            ( 'N', 'N', C.Height(), C.Width(), A.r,
-              alpha, &A.V[0], A.n, &W[0], A.r, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'N', m, n, r,
+              alpha, A.V.LockedBuffer(), A.V.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
         }
     }
     else
@@ -480,17 +531,21 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // W := B AUConj
             // AVConj := conj(A.V)
             // C := alpha AVConj W^T + beta C
-            std::vector<Scalar> AUConj( A.m*A.r );
+            DenseMatrix<Scalar> AUConj;
             Conjugate( A.U, AUConj );
-            std::vector<Scalar> W( A.m*A.r );
+            DenseMatrix<Scalar> W( A.Height(), r );
             blas::Symm
-            ( 'L', 'L', A.m, A.r,
-              1, B.LockedBuffer(), B.LDim(), &AUConj[0], A.m, 0, &W[0], A.m );
-            std::vector<Scalar> AVConj( A.n*A.r );
+            ( 'L', 'L', A.Height(), r,
+              1, B.LockedBuffer(),      B.LDim(), 
+                 AUConj.LockedBuffer(), AUConj.LDim(), 
+              0, W.Buffer(),            W.LDim() );
+            DenseMatrix<Scalar> AVConj;
             Conjugate( A.V, AVConj );
             blas::Gemm
-            ( 'N', 'T', A.n, A.m, A.r,
-              alpha, &AVConj[0], A.n, &W[0], A.m, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'T', m, A.Height(), r,
+              alpha, AVConj.LockedBuffer(), AVConj.LDim(), 
+                     W.LockedBuffer(),      W.LDim(), 
+              beta, C.Buffer(),             C.LDim() );
         }
         else
         {
@@ -500,15 +555,19 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             // W := A.U^H B
             // AVConj := conj(A.V)
             // C := alpha AVConj W + beta C
-            std::vector<Scalar> W( A.r*B.Width() );
+            DenseMatrix<Scalar> W( r, n );
             blas::Gemm
-            ( 'C', 'N', A.r, B.Width(), A.m,
-              1, &A.U[0], A.m, B.LockedBuffer(), B.LDim(), 0, &W[0], A.r );
-            std::vector<Scalar> AVConj( A.n*A.r );
+            ( 'C', 'N', r, n, A.Height(),
+              1, A.U.LockedBuffer(), A.U.LDim(),
+                 B.LockedBuffer(),   B.LDim(), 
+              0, W.Buffer(),         W.LDim() );
+            DenseMatrix<Scalar> AVConj;
             Conjugate( A.V, AVConj );
             blas::Gemm
-            ( 'N', 'N', C.Height(), C.Width(), A.r,
-              alpha, &AVConj[0], A.n, &W[0], A.r, beta, C.Buffer(), C.LDim() );
+            ( 'N', 'N', m, n, r,
+              alpha, AVConj.LockedBuffer(), AVConj.LDim(), 
+                     W.LockedBuffer(),      W.LDim(), 
+              beta,  C.Buffer(),            C.LDim() );
         }
     }
 }
