@@ -33,6 +33,8 @@
 #define LAPACK(name) name
 #endif
 
+#define BLOCKSIZE 32
+
 extern "C" {
 
 typedef std::complex<float> scomplex;
@@ -326,6 +328,12 @@ namespace lapack {
 // Unpivoted QR                                                               //
 //----------------------------------------------------------------------------//
 
+inline int QRWorkSize( int n )
+{
+    // Minimum workspace for using blocksize BLOCKSIZE.
+    return n*BLOCKSIZE;
+}
+
 inline void QR
 ( int m, int n, 
   float* A, int lda, 
@@ -401,6 +409,17 @@ inline void QR
 //----------------------------------------------------------------------------//
 // Pivoted QR                                                                 //
 //----------------------------------------------------------------------------//
+
+inline int PivotedQRWorkSize( int n )
+{
+    // Return the amount of space needed for a blocksize of BLOCKSIZE.
+    return 2*n + (n+1)*BLOCKSIZE;
+}
+
+inline int PivotedQRRealWorkSize( int n )
+{
+    return 2*n;
+}
 
 inline void PivotedQR
 ( int m, int n, 
@@ -483,6 +502,18 @@ inline void PivotedQR
 //----------------------------------------------------------------------------//
 // Apply Q from a QR factorization                                            //
 //----------------------------------------------------------------------------//
+
+inline int ApplyQWorkSize( char side, int m, int n )
+{
+    if( side == 'L' )
+        return n*BLOCKSIZE;
+    else if( side == 'R' )
+        return m*BLOCKSIZE;
+#ifndef RELEASE
+    else
+        throw std::logic_error("Invalid side for ApplyQ worksize query.");
+#endif
+}
 
 inline void ApplyQ
 ( char side, char trans, int m, int n, int k, 
@@ -576,6 +607,12 @@ inline void ApplyQ
 // Form Q from a QR factorization                                             //
 //----------------------------------------------------------------------------//
 
+inline int FormQWorkSize( int n )
+{
+    // Minimum workspace for using blocksize BLOCKSIZE.
+    return n*BLOCKSIZE;
+}
+
 inline void FormQ
 ( int m, int n, int k, 
         float* A, int lda,
@@ -651,6 +688,17 @@ inline void FormQ
 //----------------------------------------------------------------------------//
 // SVD                                                                        //
 //----------------------------------------------------------------------------//
+
+inline int SVDWorkSize( int m, int n )
+{
+    // Return 5 times the minimum recommendation
+    return 5*std::max( 1, 2*std::min(m,n)+std::max(m,n) );
+}
+
+inline int SVDRealWorkSize( int m, int n )
+{
+    return 5*std::min( m, n );
+}
 
 inline void SVD
 ( char jobu, char jobvh, int m, int n, 
@@ -1136,6 +1184,12 @@ inline void LU
 // Invert an LU factorization                                                 //
 //----------------------------------------------------------------------------//
 
+inline int InvertLUWorkSize( int n )
+{
+    // Minimum space for running with blocksize BLOCKSIZE.
+    return n*BLOCKSIZE;
+}
+
 inline void InvertLU
 ( int n, float* A, int lda, int* ipiv, 
   float* work, int lwork )
@@ -1204,6 +1258,12 @@ inline void InvertLU
 // LDL^T Factorization                                                        //
 //----------------------------------------------------------------------------//
 
+inline int LDLTWorkSize( int n )
+{
+    // Return the worksize for a blocksize of BLOCKSIZE.
+    return (n+1)*BLOCKSIZE;
+}
+
 inline void LDLT
 ( char uplo, int n, float* A, int lda, int* ipiv, 
   float* work, int lwork )
@@ -1271,6 +1331,11 @@ inline void LDLT
 //----------------------------------------------------------------------------//
 // Invert an LDL^T factorization                                              //
 //----------------------------------------------------------------------------//
+
+inline int InvertLDLTWorkSize( int n )
+{
+    return 2*n;
+}
 
 inline void InvertLDLT
 ( char uplo, int n, float* A, int lda, int* ipiv, 

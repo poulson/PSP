@@ -38,7 +38,7 @@ void psp::hmatrix_tools::Compress
     const int leftPanelSize = m*r;
     const int rightPanelSize = n*r;
     const int blockSize = r*r;
-    const int lworkSVD = 4*r*r;
+    const int lworkSVD = lapack::SVDWorkSize( r, r );
     std::vector<Real> buffer
     ( 2*blockSize+std::max(lworkSVD,std::max(leftPanelSize,rightPanelSize)) );
 
@@ -169,7 +169,7 @@ void psp::hmatrix_tools::Compress
     const int leftPanelSize = m*r;
     const int rightPanelSize = n*r;
     const int blockSize = r*r;
-    const int lworkSVD = 4*r*r;
+    const int lworkSVD = lapack::SVDWorkSize( r, r );
     std::vector<Scalar> buffer
     ( 2*blockSize+std::max(lworkSVD,std::max(leftPanelSize,rightPanelSize)) );
 

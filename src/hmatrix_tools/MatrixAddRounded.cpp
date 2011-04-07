@@ -95,7 +95,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     const int leftPanelSize = m*r;
     const int rightPanelSize = n*r;
     const int blockSize = r*r;
-    const int lworkSVD = 4*r*r;
+    const int lworkSVD = lapack::SVDWorkSize( r, r );
     std::vector<Real> buffer
     ( leftPanelSize+rightPanelSize+
       std::max(std::max(leftPanelSize,rightPanelSize),2*blockSize+lworkSVD) );
@@ -308,7 +308,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     const int leftPanelSize = m*r;
     const int rightPanelSize = n*r;
     const int blockSize = r*r;
-    const int lworkSVD = 4*r*r;
+    const int lworkSVD = lapack::SVDWorkSize( r, r );;
     std::vector<Scalar> buffer
     ( leftPanelSize+rightPanelSize+
       std::max(std::max(leftPanelSize,rightPanelSize),2*blockSize+lworkSVD) );

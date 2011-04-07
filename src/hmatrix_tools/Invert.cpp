@@ -29,7 +29,9 @@ void psp::hmatrix_tools::Invert
         throw std::logic_error("Tried to invert a non-square dense matrix.");
 #endif
     const int n = D.Height();
-    const int lwork = std::min( 64*n, n*n );
+    const int lworkLDLT = lapack::LDLTWorkSize( n );
+    const int lworkInvertLDLT = lapack::InvertLDLTWorkSize( n );
+    const int lwork = std::max( lworkLDLT, lworkInvertLDLT );
     std::vector<int> ipiv( n );
     std::vector<Scalar> work( lwork );
     if( D.Symmetric() )

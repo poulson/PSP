@@ -219,6 +219,36 @@ void MatrixMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugated>& C );
+// F := alpha D D
+template<typename Real,bool Conjugated>
+void MatrixMatrix
+( int maxRank, Real alpha, 
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& C );
+// F := alpha D D
+template<typename Real,bool Conjugated>
+void MatrixMatrix
+( int maxRank, std::complex<Real> alpha, 
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& C );
+// F := alpha D D + beta F
+template<typename Real,bool Conjugated>
+void MatrixMatrix
+( int maxRank, Real alpha, 
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+  Real beta,
+        FactorMatrix<Real,Conjugated>& C );
+// F := alpha D D + beta F
+template<typename Real,bool Conjugated>
+void MatrixMatrix
+( int maxRank, std::complex<Real> alpha, 
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+  std::complex<Real> beta,
+        FactorMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void MatrixMatrix
@@ -1039,7 +1069,9 @@ void psp::hmatrix_tools::MatrixMatrix
     A.MapMatrix( 1, X, Y );
 
     // Create a work vector that is sufficiently large for all operations
-    const int lwork = 64*Y.Width();
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Real> work( lwork );
 
     // Replace Y with an orthogonal matrix which spans its range
@@ -1126,9 +1158,13 @@ void psp::hmatrix_tools::MatrixMatrix
     A.MapMatrix( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
-    const int lwork = 64*Y.Width();
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
+    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( r+oversampling );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), r+oversampling );
+    const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Scalar> work( lwork );
-    std::vector<Real> rwork( 5*Y.Width() );
+    std::vector<Real> rwork( std::max(lrworkPivotedQR,lrworkSVD) );
     
     // Replace Y with an orthogonal matrix which spans its range
     {
@@ -1212,7 +1248,9 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
     A.TransposeMapMatrix( 1, X, Y );
 
     // Create a work vector that is sufficiently large for all operations
-    const int lwork = 64*Y.Width();
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Real> work( lwork );
 
     // Replace Y with an orthogonal matrix which spans its range
@@ -1299,9 +1337,13 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
     A.TransposeMapMatrix( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
-    const int lwork = 64*Y.Width();
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
+    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( r+oversampling );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), r+oversampling );
+    const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Scalar> work( lwork );
-    std::vector<Real> rwork( 5*Y.Width() );
+    std::vector<Real> rwork( std::max(lrworkPivotedQR,lrworkSVD) );
     
     // Replace Y with an orthogonal matrix which spans its range
     {
@@ -1405,9 +1447,13 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     A.HermitianTransposeMapMatrix( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
-    const int lwork = 64*Y.Width();
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
+    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( r+oversampling );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), r+oversampling );
+    const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Scalar> work( lwork );
-    std::vector<Real> rwork( 5*Y.Width() );
+    std::vector<Real> rwork( std::max(lrworkPivotedQR,lrworkSVD) );
     
     // Replace Y with an orthogonal matrix which spans its range
     {
