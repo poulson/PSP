@@ -81,6 +81,9 @@ public:
         } data;
     };
 
+    static void BuildNaturalToHierarchicalMap
+    ( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels );
+
     // Create a square top-level H-matrix
     //
     // The weak admissibility criterion is:

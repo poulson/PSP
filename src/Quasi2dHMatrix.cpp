@@ -20,6 +20,68 @@
 */
 #include "psp.hpp"
 
+namespace {
+void BuildMapOnQuadrant
+( int* map, int& index, int level, int numLevels,
+  int xSize, int ySize, int zSize, int thisXSize, int thisYSize )
+{
+    if( level == numLevels-1 )
+    {
+        // Stamp these indices into the buffer 
+        for( int k=0; k<zSize; ++k )
+        {
+            for( int j=0; j<thisYSize; ++j )
+            {
+                int* thisRow = &map[k*xSize*ySize+j*xSize];
+                for( int i=0; i<thisXSize; ++i )
+                    thisRow[i] = index++;
+            }
+        }
+    }
+    else
+    {
+        const int leftWidth = thisXSize/2;
+        const int rightWidth = thisXSize - leftWidth;
+        const int bottomHeight = thisYSize/2;
+        const int topHeight = thisYSize - bottomHeight;
+
+        // Recurse on the lower-left quadrant 
+        BuildMapOnQuadrant
+        ( &map[0], index, level+1, numLevels,
+          xSize, ySize, zSize, leftWidth, bottomHeight );
+        // Recurse on the lower-right quadrant
+        BuildMapOnQuadrant
+        ( &map[leftWidth], index, level+1, numLevels,
+          xSize, ySize, zSize, rightWidth, bottomHeight );
+        // Recurse on the upper-left quadrant
+        BuildMapOnQuadrant
+        ( &map[bottomHeight*xSize], index, level+1, numLevels,
+          xSize, ySize, zSize, leftWidth, topHeight );
+        // Recurse on the upper-right quadrant
+        BuildMapOnQuadrant
+        ( &map[bottomHeight*xSize+leftWidth], index, level+1, numLevels,
+          xSize, ySize, zSize, rightWidth, topHeight );
+    }
+}
+} // anonymous namespace
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildNaturalToHierarchicalMap
+( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels )
+{
+    map.resize( xSize*ySize*zSize );
+
+    // Fill the mapping from the 'natural' x-y-z ordering
+    int index = 0;
+    BuildMapOnQuadrant
+    ( &map[0], index, 0, numLevels, xSize, ySize, zSize, xSize, ySize );
+#ifndef RELEASE
+    if( index != xSize*ySize*zSize )
+        throw std::logic_error("Map recursion is incorrect.");
+#endif
+}
+
 //----------------------------------------------------------------------------//
 // Public routines                                                            //
 //----------------------------------------------------------------------------//

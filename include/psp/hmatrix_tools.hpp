@@ -703,16 +703,6 @@ void Conjugate
         FactorMatrix<std::complex<Real>,Conjugated>& F2 );
 
 /*\
-|*| For mapping between different orderings 
-\*/
-void BuildNaturalToHierarchicalQuasi2dMap
-( std::vector<int>& map, int numLevels, int xSize, int ySize, int zSize );
-
-void InvertMap
-(       std::vector<int>& invertedMap,
-  const std::vector<int>& originalMap );
-
-/*\
 |*| For generating Gaussian random variables/vectors
 \*/
 template<typename Real>
