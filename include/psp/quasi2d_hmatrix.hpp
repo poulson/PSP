@@ -29,6 +29,9 @@ namespace psp {
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
+// Put the public section first since the private section depends upon 
+// this class's public data structures.
+public:    
     struct NodeData
     {
         std::vector<Quasi2dHMatrix*> children;
@@ -66,44 +69,18 @@ class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 
     enum ShellType { NODE, NODE_SYMMETRIC, DENSE, FACTOR };
 
-    union Shell
+    struct Shell
     {
-        NodeData* node;
-        NodeSymmetricData* nodeSymmetric;
-        DenseMatrix<Scalar>* D;
-        FactorMatrix<Scalar,Conjugated>* F;
+        ShellType type;
+        union 
+        {
+            NodeData* node;
+            NodeSymmetricData* nodeSymmetric;
+            DenseMatrix<Scalar>* D;
+            FactorMatrix<Scalar,Conjugated>* F;
+        } data;
     };
 
-    const int _m, _n;
-    const bool _symmetric;
-    const int _numLevels;
-    const bool _stronglyAdmissible;
-    const int _xSizeSource, _xSizeTarget;
-    const int _ySizeSource, _ySizeTarget;
-    const int _zSize;
-    const int _xSource, _xTarget;
-    const int _ySource, _yTarget;
-    const int _sourceOffset, _targetOffset;
-
-    ShellType _shellType;
-    Shell _shell;
-
-    bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
-
-    // Since a constructor cannot call another constructor, have both of our
-    // constructors call this routine.
-    void ImportSparseMatrix( const SparseMatrix<Scalar>& S );
-
-    // y += alpha A x
-    void UpdateVectorWithNodeSymmetric
-    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
-
-    // C += alpha A B
-    void UpdateMatrixWithNodeSymmetric
-    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
-    const;
-
-public:
     // Create a square top-level H-matrix
     //
     // The weak admissibility criterion is:
@@ -129,6 +106,13 @@ public:
       int sourceOffset, int targetOffset );
 
     ~Quasi2dHMatrix();
+
+          Shell& GetShell();
+    const Shell& GetShell() const;
+
+    //------------------------------------------------------------------------//
+    // Fulfillments of AbstractHMatrix interface                              //
+    //------------------------------------------------------------------------//
 
     virtual const int Height() const;
     virtual const int Width() const;
@@ -207,6 +191,35 @@ public:
     // C := alpha A^H B (temporarily conjugate B in place)
     void HermitianTransposeMapMatrix
     ( Scalar alpha, DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
+    const;
+
+private:
+    const int _m, _n;
+    const bool _symmetric;
+    const int _numLevels;
+    const bool _stronglyAdmissible;
+    const int _xSizeSource, _xSizeTarget;
+    const int _ySizeSource, _ySizeTarget;
+    const int _zSize;
+    const int _xSource, _xTarget;
+    const int _ySource, _yTarget;
+    const int _sourceOffset, _targetOffset;
+
+    Shell _shell;
+
+    bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
+
+    // Since a constructor cannot call another constructor, have both of our
+    // constructors call this routine.
+    void ImportSparseMatrix( const SparseMatrix<Scalar>& S );
+
+    // y += alpha A x
+    void UpdateVectorWithNodeSymmetric
+    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
+
+    // C += alpha A B
+    void UpdateMatrixWithNodeSymmetric
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
 };
 
