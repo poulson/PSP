@@ -28,8 +28,7 @@ template<typename Scalar>
 struct SparseMatrix
 {
     bool symmetric;
-    int m; // height of matrix
-    int n; // width of matrix
+    int height, width;
     std::vector<Scalar> nonzeros;
     std::vector<int> columnIndices;
     std::vector<int> rowOffsets;

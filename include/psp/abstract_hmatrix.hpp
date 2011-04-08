@@ -30,9 +30,34 @@ namespace psp {
 template<typename Scalar>
 class AbstractHMatrix
 {
+protected:
+    int _height, _width;
+    int _numLevels;
+    int _sourceOffset, _targetOffset;
+    bool _symmetric;
+    bool _stronglyAdmissible;
+
+    AbstractHMatrix()
+    : _height(0), _width(0), _numLevels(0), _sourceOffset(0), _targetOffset(0),
+      _symmetric(false), _stronglyAdmissible(false)
+    { }
+
+    AbstractHMatrix
+    ( int height, int width, int numLevels, int sourceOffset, int targetOffset,
+      bool symmetric, bool stronglyAdmissible )
+    : _height(height), _width(width), _numLevels(numLevels), 
+      _sourceOffset(sourceOffset), _targetOffset(targetOffset),
+      _symmetric(symmetric), _stronglyAdmissible(stronglyAdmissible)
+    { }
+
 public:
-    virtual const int Height() const = 0;
-    virtual const int Width() const = 0;
+    int Height() const { return _height; }
+    int Width() const  { return _width; }
+    int NumLevels() const { return _numLevels; }
+    int SourceOffset() const { return _sourceOffset; }
+    int TargetOffset() const { return _targetOffset; }
+    bool Symmetric() const { return _symmetric; }
+    bool StronglyAdmissible() const { return _stronglyAdmissible; }
 
     // y := alpha A x + beta y
     virtual void MapVector

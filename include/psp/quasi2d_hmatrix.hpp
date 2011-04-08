@@ -84,6 +84,9 @@ public:
     static void BuildNaturalToHierarchicalMap
     ( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels );
 
+    // Default constructor
+    Quasi2dHMatrix();
+
     // Create a square top-level H-matrix
     //
     // The weak admissibility criterion is:
@@ -123,27 +126,27 @@ public:
 
     ~Quasi2dHMatrix();
 
-          Shell& GetShell();
-    const Shell& GetShell() const;
+    int XSizeSource() const { return _xSizeSource; }
+    int XSizeTarget() const { return _xSizeTarget; }
+    int YSizeSource() const { return _ySizeSource; }
+    int YSizeTarget() const { return _ySizeTarget; }
+    int ZSize() const { return _zSize; }
+    int XSource() const { return _xSource; }
+    int YSource() const { return _ySource; }
+
+          Shell& GetShell() { return _shell; }
+    const Shell& GetShell() const { return _shell; }
 
     // TODO
     /*
-    void MapMatrix
-    ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
-                          Quasi2dHMatrix<Scalar,Conjugated>& C );
-    */
-    /*
-    void MapMatrix
-    ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
-      Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C );
+    void ConformWith
+    ( const Quasi2dHMatrix<Scalar,Conjugate>& A, 
+      const Quasi2dHMatrix<Scalar,Conjugate>& B );
     */
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //
     //------------------------------------------------------------------------//
-
-    virtual const int Height() const;
-    virtual const int Width() const;
 
     // y := alpha H x + beta y
     virtual void MapVector
@@ -220,19 +223,30 @@ public:
     void HermitianTransposeMapMatrix
     ( Scalar alpha, DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
+    
+    //------------------------------------------------------------------------//
+    // Computational routines specific to Quasi2dHMatrix                      //
+    //------------------------------------------------------------------------//
+
+    // TODO
+    /*
+    void MapMatrix
+    ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
+                          Quasi2dHMatrix<Scalar,Conjugated>& C );
+    */
+    /*
+    void MapMatrix
+    ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
+      Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C );
+    */
 
 private:
-    const int _m, _n;
-    const bool _symmetric;
-    const int _numLevels;
-    const bool _stronglyAdmissible;
-    const int _xSizeSource, _xSizeTarget;
-    const int _ySizeSource, _ySizeTarget;
-    const int _zSize;
-    const int _xSource, _xTarget;
-    const int _ySource, _yTarget;
-    const int _sourceOffset, _targetOffset;
-
+    // Data specific to our quasi-2d H-matrix
+    int _xSizeSource, _xSizeTarget;
+    int _ySizeSource, _ySizeTarget;
+    int _zSize;
+    int _xSource, _xTarget;
+    int _ySource, _yTarget;
     Shell _shell;
 
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
