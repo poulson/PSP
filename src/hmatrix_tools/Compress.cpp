@@ -20,6 +20,104 @@
 */
 #include "psp.hpp"
 
+// Compress a dense matrix into a factor matrix with specified rank
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::Compress
+( int maxRank, DenseMatrix<Real>& D, FactorMatrix<Real,Conjugated>& F )
+{
+    const int m = D.Height();
+    const int n = D.Width();
+    const int minDim = std::min( m, n );
+    const int r = std::min( minDim, maxRank );
+
+    // Get the economic SVD of D, D = U Sigma V^T, overwriting F.U with U.
+    F.U.Resize( m, minDim );
+    Vector<Real> s( minDim );
+    DenseMatrix<Real> VT( minDim, n );
+    const int lwork = lapack::SVDWorkSize( m, n );
+    std::vector<Real> work( lwork );
+    lapack::SVD
+    ( 'S', 'S', m, n, D.Buffer(), D.LDim(),
+      s.Buffer(), F.U.Buffer(), F.U.LDim(), VT.Buffer(), VT.LDim(),
+      &work[0], lwork );
+
+    // Truncate the SVD in-place
+    F.U.Resize( m, r );
+    s.Resize( r );
+    VT.Resize( r, n );
+
+    // Put (Sigma V^T)^T = V Sigma into F.V
+    F.V.Resize( n, r );
+    for( int j=0; j<r; ++j )
+    {
+        const Real sigma = s.Get(j);
+        Real* RESTRICT VCol = F.V.Buffer(0,j);
+        const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
+        const int VTLDim = VT.LDim();
+        for( int i=0; i<n; ++i )
+            VCol[i] = sigma*VTRow[i*VTLDim];
+    }
+}
+
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix< std::complex<Real> >& D, 
+  FactorMatrix<std::complex<Real>,Conjugated>& F )
+{
+    typedef std::complex<Real> Scalar;
+
+    const int m = D.Height();
+    const int n = D.Width();
+    const int minDim = std::min( m, n );
+    const int r = std::min( minDim, maxRank );
+
+    // Get the economic SVD of D, D = U Sigma V^H, overwriting F.U with U.
+    F.U.Resize( m, minDim );
+    Vector<Real> s( minDim );
+    DenseMatrix<Scalar> VH( minDim, n );
+    const int lwork = lapack::SVDWorkSize( m, n );
+    std::vector<Scalar> work( lwork );
+    std::vector<Real> rwork( 5*minDim );
+    lapack::SVD
+    ( 'S', 'S', m, n, D.Buffer(), D.LDim(),
+      s.Buffer(), F.U.Buffer(), F.U.LDim(), VH.Buffer(), VH.LDim(),
+      &work[0], lwork, &rwork[0] );
+
+    // Truncate the SVD in-place
+    F.U.Resize( m, r );
+    s.Resize( r );
+    VH.Resize( r, n );
+
+    F.V.Resize( n, r );
+    if( Conjugated )
+    {
+        // Put (Sigma V^H)^H = V Sigma into F.V
+        for( int j=0; j<r; ++j )
+        {
+            const Real sigma = s.Get(j);
+            Scalar* RESTRICT VCol = F.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
+            for( int i=0; i<n; ++i )
+                VCol[i] = sigma*VHRow[i*VHLDim];
+        }
+    }
+    else
+    {
+        // Put (Sigma V^H)^T = conj(V) Sigma into F.V
+        for( int j=0; j<r; ++j )
+        {
+            const Real sigma = s.Get(j);
+            Scalar* RESTRICT VCol = F.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
+            for( int i=0; i<n; ++i )
+                VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
+        }
+    }
+}
+
 // A :~= A
 //
 // Approximate A with a given maximum rank.
@@ -296,6 +394,39 @@ void psp::hmatrix_tools::Compress
       A.V.Buffer(), A.V.LDim(), &buffer[0], blockSize );
 #endif // PIVOTED_QR
 }
+
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix<float>& D, 
+  FactorMatrix<float,false>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix<float>& D, 
+  FactorMatrix<float,true>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix<double>& D, 
+  FactorMatrix<double,false>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix<double>& D, 
+  FactorMatrix<double,true>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix< std::complex<float> >& D, 
+  FactorMatrix<std::complex<float>,false>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix< std::complex<float> >& D, 
+  FactorMatrix<std::complex<float>,true>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix< std::complex<double> >& D, 
+  FactorMatrix<std::complex<double>,false>& F );
+template void psp::hmatrix_tools::Compress
+( int maxRank, 
+  DenseMatrix< std::complex<double> >& D, 
+  FactorMatrix<std::complex<double>,true>& F );
 
 template void psp::hmatrix_tools::Compress
 ( int maxRank, FactorMatrix<float,false>& A );

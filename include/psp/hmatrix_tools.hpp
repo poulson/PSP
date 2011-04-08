@@ -49,6 +49,16 @@ namespace hmatrix_tools {
 |*| Ensure that the factor matrix has a rank of at most 'maxRank'
 \*/
 template<typename Real,bool Conjugated>
+void Compress
+( int maxRank, 
+  DenseMatrix<Real>& D, 
+  FactorMatrix<Real,Conjugated>& F );
+template<typename Real,bool Conjugated>
+void Compress
+( int maxRank, 
+  DenseMatrix< std::complex<Real> >& D, 
+  FactorMatrix<std::complex<Real>,Conjugated>& F );
+template<typename Real,bool Conjugated>
 void Compress( int maxRank, FactorMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void Compress( int maxRank, FactorMatrix<std::complex<Real>,Conjugated>& F );
@@ -328,6 +338,36 @@ void MatrixTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugated>& C );
+// F := alpha D^T D
+template<typename Real,bool Conjugated>
+void MatrixTransposeMatrix
+( int maxRank, Real alpha, 
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& C );
+// F := alpha D^T D
+template<typename Real,bool Conjugated>
+void MatrixTransposeMatrix
+( int maxRank, std::complex<Real> alpha, 
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& C );
+// F := alpha D^T D + beta F
+template<typename Real,bool Conjugated>
+void MatrixTransposeMatrix
+( int maxRank, Real alpha, 
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+  Real beta,
+        FactorMatrix<Real,Conjugated>& C );
+// F := alpha D^T D + beta F
+template<typename Real,bool Conjugated>
+void MatrixTransposeMatrix
+( int maxRank, std::complex<Real> alpha, 
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+  std::complex<Real> beta,
+        FactorMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H^T H
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
@@ -407,6 +447,36 @@ void MatrixHermitianTransposeMatrix
 ( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       FactorMatrix<Scalar,Conjugated>& C );
+// F := alpha D^H D
+template<typename Real,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( int maxRank, Real alpha, 
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& C );
+// F := alpha D^H D
+template<typename Real,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<Real> alpha, 
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& C );
+// F := alpha D^H D + beta F
+template<typename Real,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( int maxRank, Real alpha, 
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+  Real beta,
+        FactorMatrix<Real,Conjugated>& C );
+// F := alpha D^H D + beta F
+template<typename Real,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<Real> alpha, 
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+  std::complex<Real> beta,
+        FactorMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix

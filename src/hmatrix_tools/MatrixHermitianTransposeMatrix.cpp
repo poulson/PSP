@@ -572,6 +572,108 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     }
 }
 
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, Real alpha,
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+        FactorMatrix<Real,Conjugated>& C )
+{
+    MatrixTransposeMatrix( maxRank, alpha, A, B, C );
+}
+
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<Real> alpha,
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+        FactorMatrix<std::complex<Real>,Conjugated>& C )
+{
+    typedef std::complex<Real> Scalar;
+
+    const int m = A.Width();
+    const int n = B.Width();
+    const int minDim = std::min( m, n );
+    const int r = std::min( minDim, maxRank );
+
+    // C.U := alpha A^H B
+    MatrixHermitianTransposeMatrix( alpha, A, B, C.U );
+
+    // Get the economic SVD of C.U, C.U = U Sigma V^H, overwriting C.U with U.
+    Vector<Real> s( minDim );
+    DenseMatrix<Scalar> VH( minDim, n );
+    const int lwork = lapack::SVDWorkSize( m, n );
+    std::vector<Scalar> work( lwork );
+    std::vector<Real> rwork( 5*minDim );
+    lapack::SVD
+    ( 'O', 'S', m, n, C.U.Buffer(), C.U.LDim(),
+      s.Buffer(), 0, 0, VH.Buffer(), VH.LDim(),
+      &work[0], lwork, &rwork[0] );
+
+    // Truncate the SVD in-place
+    C.U.Resize( m, r );
+    s.Resize( r );
+    VH.Resize( r, n );
+
+    C.V.SetType( GENERAL ); C.V.Resize( n, r );
+    if( Conjugated )
+    {
+        // Put (Sigma V^H)^H = V Sigma into C.V
+        for( int j=0; j<r; ++j )
+        {
+            const Real sigma = s.Get(j);
+            Scalar* RESTRICT VCol = C.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
+            for( int i=0; i<n; ++i )
+                VCol[i] = sigma*VHRow[i*VHLDim];
+        }
+    }
+    else
+    {
+        // Put (Sigma V^H)^T = conj(V) Sigma into C.V
+        for( int j=0; j<r; ++j )
+        {
+            const Real sigma = s.Get(j);
+            Scalar* RESTRICT VCol = C.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
+            for( int i=0; i<n; ++i )
+                VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
+        }
+    }
+}
+
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, Real alpha,
+  const DenseMatrix<Real>& A,
+  const DenseMatrix<Real>& B,
+  Real beta,
+  FactorMatrix<Real,Conjugated>& C )
+{
+    MatrixTransposeMatrix( maxRank, alpha, A, B, beta, C );
+}
+
+template<typename Real,bool Conjugated>
+void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<Real> alpha,
+  const DenseMatrix< std::complex<Real> >& A,
+  const DenseMatrix< std::complex<Real> >& B,
+  std::complex<Real> beta,
+        FactorMatrix< std::complex<Real>,Conjugated>& C )
+{
+    typedef std::complex<Real> Scalar;
+
+    // D := alpha A^H B + beta C
+    DenseMatrix<Scalar> D;
+    MatrixHermitianTransposeMatrix( alpha, A, B, D );
+    MatrixUpdate( beta, C, (Scalar)1, D );
+
+    // Force D into a factor matrix of rank 'maxRank'
+    Compress( maxRank, D, C );
+}
+
 // Dense C := alpha A^H B
 template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 ( float alpha, const DenseMatrix<float>& A,
@@ -851,3 +953,95 @@ template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                               const DenseMatrix< std::complex<double> >& B,
                                     FactorMatrix<std::complex<double>,true>& C 
 );
+
+// Generate a factor matrix from the product of two dense matrices
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, float alpha,
+  const DenseMatrix<float>& A,
+  const DenseMatrix<float>& B,
+        FactorMatrix<float,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, float alpha,
+  const DenseMatrix<float>& A,
+  const DenseMatrix<float>& B,
+        FactorMatrix<float,true>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, double alpha,
+  const DenseMatrix<double>& A,
+  const DenseMatrix<double>& B,
+        FactorMatrix<double,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, double alpha,
+  const DenseMatrix<double>& A,
+  const DenseMatrix<double>& B,
+        FactorMatrix<double,true>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<float> alpha,
+  const DenseMatrix< std::complex<float> >& A,
+  const DenseMatrix< std::complex<float> >& B,
+        FactorMatrix<std::complex<float>,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<float> alpha,
+  const DenseMatrix< std::complex<float> >& A,
+  const DenseMatrix< std::complex<float> >& B,
+        FactorMatrix<std::complex<float>,true>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<double> alpha,
+  const DenseMatrix< std::complex<double> >& A,
+  const DenseMatrix< std::complex<double> >& B,
+        FactorMatrix<std::complex<double>,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<double> alpha,
+  const DenseMatrix< std::complex<double> >& A,
+  const DenseMatrix< std::complex<double> >& B,
+        FactorMatrix<std::complex<double>,true>& C );
+
+// Update a factor matrix from the product of two dense matrices
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, float alpha,
+  const DenseMatrix<float>& A,
+  const DenseMatrix<float>& B,
+  float beta,
+        FactorMatrix<float,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, float alpha,
+  const DenseMatrix<float>& A,
+  const DenseMatrix<float>& B,
+  float beta,
+        FactorMatrix<float,true>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, double alpha,
+  const DenseMatrix<double>& A,
+  const DenseMatrix<double>& B,
+  double beta,
+        FactorMatrix<double,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, double alpha,
+  const DenseMatrix<double>& A,
+  const DenseMatrix<double>& B,
+  double beta,
+        FactorMatrix<double,true>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<float> alpha,
+  const DenseMatrix< std::complex<float> >& A,
+  const DenseMatrix< std::complex<float> >& B,
+  std::complex<float> beta,
+        FactorMatrix<std::complex<float>,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<float> alpha,
+  const DenseMatrix< std::complex<float> >& A,
+  const DenseMatrix< std::complex<float> >& B,
+  std::complex<float> beta,
+        FactorMatrix<std::complex<float>,true>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<double> alpha,
+  const DenseMatrix< std::complex<double> >& A,
+  const DenseMatrix< std::complex<double> >& B,
+  std::complex<double> beta,
+        FactorMatrix<std::complex<double>,false>& C );
+template void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+( int maxRank, std::complex<double> alpha,
+  const DenseMatrix< std::complex<double> >& A,
+  const DenseMatrix< std::complex<double> >& B,
+  std::complex<double> beta,
+        FactorMatrix<std::complex<double>,true>& C );

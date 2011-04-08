@@ -597,43 +597,13 @@ void psp::hmatrix_tools::MatrixMatrix
   Real beta,
   FactorMatrix<Real,Conjugated>& C )
 {
-    const int m = A.Height();
-    const int n = B.Width();
-    const int minDim = std::min( m, n );
-    const int r = std::min( minDim, maxRank );
-
     // D := alpha A B + beta C
     DenseMatrix<Real> D;
     MatrixMatrix( alpha, A, B, D );
     MatrixUpdate( beta, C, (Real)1, D );
 
-    // Get the economic SVD of D, D = U Sigma V^T, overwriting C.U with U.
-    C.U.Resize( m, minDim );
-    Vector<Real> s( minDim );
-    DenseMatrix<Real> VT( minDim, n );
-    const int lwork = lapack::SVDWorkSize( m, n );
-    std::vector<Real> work( lwork );
-    lapack::SVD
-    ( 'S', 'S', m, n, D.Buffer(), D.LDim(), 
-      s.Buffer(), C.U.Buffer(), C.U.LDim(), VT.Buffer(), VT.LDim(),
-      &work[0], lwork );
-
-    // Truncate the SVD in-place
-    C.U.Resize( m, r );
-    s.Resize( r );
-    VT.Resize( r, n );
-
-    // Put (Sigma V^T)^T = V Sigma into C.V
-    C.V.Resize( n, r );
-    for( int j=0; j<r; ++j )
-    {
-        const Real sigma = s.Get(j);
-        Real* RESTRICT VCol = C.V.Buffer(0,j);
-        const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
-        const int VTLDim = VT.LDim();
-        for( int i=0; i<n; ++i )
-            VCol[i] = sigma*VTRow[i*VTLDim];
-    }
+    // Truncate D down to a factor matrix of rank 'maxRank'
+    Compress( maxRank, D, C );
 }
 
 template<typename Real,bool Conjugated>
@@ -646,60 +616,13 @@ void psp::hmatrix_tools::MatrixMatrix
 {
     typedef std::complex<Real> Scalar;
 
-    const int m = A.Height();
-    const int n = B.Width();
-    const int minDim = std::min( m, n );
-    const int r = std::min( minDim, maxRank );
-
     // D := alpha A B + beta C
     DenseMatrix<Scalar> D;
     MatrixMatrix( alpha, A, B, D );
     MatrixUpdate( beta, C, (Scalar)1, D );
 
-    // Get the economic SVD of D, D = U Sigma V^H, overwriting C.U with U.
-    C.U.Resize( m, minDim );
-    Vector<Real> s( minDim );
-    DenseMatrix<Scalar> VH( minDim, n );
-    const int lwork = lapack::SVDWorkSize( m, n );
-    std::vector<Scalar> work( lwork );
-    std::vector<Real> rwork( 5*minDim );
-    lapack::SVD
-    ( 'S', 'S', m, n, D.Buffer(), D.LDim(), 
-      s.Buffer(), C.U.Buffer(), C.U.LDim(), VH.Buffer(), VH.LDim(),
-      &work[0], lwork, &rwork[0] );
-
-    // Truncate the SVD in-place
-    C.U.Resize( m, r );
-    s.Resize( r );
-    VH.Resize( r, n );
-
-    C.V.Resize( n, r );
-    if( Conjugated )
-    {
-        // Put (Sigma V^H)^H = V Sigma into C.V
-        for( int j=0; j<r; ++j )
-        {
-            const Real sigma = s.Get(j);
-            Scalar* RESTRICT VCol = C.V.Buffer(0,j);
-            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
-            for( int i=0; i<n; ++i )
-                VCol[i] = sigma*VHRow[i*VHLDim];
-        }
-    }
-    else
-    {
-        // Put (Sigma V^H)^T = conj(V) Sigma into C.V
-        for( int j=0; j<r; ++j )
-        {
-            const Real sigma = s.Get(j);
-            Scalar* RESTRICT VCol = C.V.Buffer(0,j);
-            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
-            for( int i=0; i<n; ++i )
-                VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
-        }
-    }
+    // Truncate D down to a factor matrix of rank 'maxRank'
+    Compress( maxRank, D, C );
 }
 
 // Dense C := alpha A B
