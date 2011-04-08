@@ -90,11 +90,24 @@ public:
     //     max(dist_x(A,B),dist_y(A,B)) > 1
     //
     Quasi2dHMatrix
+    ( const FactorMatrix<Scalar,Conjugated>& F,
+      int numLevels, bool stronglyAdmissible,
+      int xSize, int ySize, int zSize );
+    Quasi2dHMatrix
     ( const SparseMatrix<Scalar>& S,
       int numLevels, bool stronglyAdmissible,
       int xSize, int ySize, int zSize );
     
     // Create a potentially non-square non-top-level H-matrix
+    Quasi2dHMatrix
+    ( const FactorMatrix<Scalar,Conjugated>& F,
+      int numLevels, bool stronglyAdmissible,
+      int xSizeSource, int xSizeTarget,
+      int ySizeSource, int ySizeTarget,
+      int zSize,
+      int xSource, int xTarget,
+      int ySource, int yTarget,
+      int sourceOffset, int targetOffset );
     Quasi2dHMatrix
     ( const SparseMatrix<Scalar>& S,
       int numLevels, bool stronglyAdmissible,
@@ -109,6 +122,18 @@ public:
 
           Shell& GetShell();
     const Shell& GetShell() const;
+
+    // TODO
+    /*
+    void MapMatrix
+    ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
+                          Quasi2dHMatrix<Scalar,Conjugated>& C );
+    */
+    /*
+    void MapMatrix
+    ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
+      Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C );
+    */
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //
@@ -211,6 +236,7 @@ private:
 
     // Since a constructor cannot call another constructor, have both of our
     // constructors call this routine.
+    void ImportFactorMatrix( const FactorMatrix<Scalar,Conjugated>& F );
     void ImportSparseMatrix( const SparseMatrix<Scalar>& S );
 
     // y += alpha A x
