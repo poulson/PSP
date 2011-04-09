@@ -41,9 +41,9 @@
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real,Conjugated>& A, 
-  Real beta,  const FactorMatrix<Real,Conjugated>& B, 
-                    FactorMatrix<Real,Conjugated>& C )
+  Real alpha, const LowRankMatrix<Real,Conjugated>& A, 
+  Real beta,  const LowRankMatrix<Real,Conjugated>& B, 
+                    LowRankMatrix<Real,Conjugated>& C )
 {
     const int m = A.Height();
     const int n = A.Width();
@@ -251,10 +251,10 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
   std::complex<Real> alpha, 
-  const FactorMatrix<std::complex<Real>,Conjugated>& A,
+  const LowRankMatrix<std::complex<Real>,Conjugated>& A,
   std::complex<Real> beta,  
-  const FactorMatrix<std::complex<Real>,Conjugated>& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& C )
+  const LowRankMatrix<std::complex<Real>,Conjugated>& B,
+        LowRankMatrix<std::complex<Real>,Conjugated>& C )
 {
     typedef std::complex<Real> Scalar;
 
@@ -478,43 +478,47 @@ void psp::hmatrix_tools::MatrixAddRounded
 
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  float alpha, const FactorMatrix<float,false>& A,
-  float beta,  const FactorMatrix<float,false>& B,
-                     FactorMatrix<float,false>& C );
+  float alpha, const LowRankMatrix<float,false>& A,
+  float beta,  const LowRankMatrix<float,false>& B,
+                     LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  float alpha, const FactorMatrix<float,true>& A,
-  float beta,  const FactorMatrix<float,true>& B,
-                     FactorMatrix<float,true>& C );
+  float alpha, const LowRankMatrix<float,true>& A,
+  float beta,  const LowRankMatrix<float,true>& B,
+                     LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  double alpha, const FactorMatrix<double,false>& A,
-  double beta,  const FactorMatrix<double,false>& B,
-                      FactorMatrix<double,false>& C );
+  double alpha, const LowRankMatrix<double,false>& A,
+  double beta,  const LowRankMatrix<double,false>& B,
+                      LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  double alpha, const FactorMatrix<double,true>& A,
-  double beta,  const FactorMatrix<double,true>& B,
-                      FactorMatrix<double,true>& C );
+  double alpha, const LowRankMatrix<double,true>& A,
+  double beta,  const LowRankMatrix<double,true>& B,
+                      LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,false>& B,
-                                   FactorMatrix<std::complex<float>,false>& C );
+  std::complex<float> alpha,
+  const LowRankMatrix<std::complex<float>,false>& A,
+  std::complex<float> beta,
+  const LowRankMatrix<std::complex<float>,false>& B,
+        LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,true>& B,
-                                   FactorMatrix<std::complex<float>,true>& C );
+  std::complex<float> alpha, const LowRankMatrix<std::complex<float>,true>& A,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,true>& B,
+                                   LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,false>& B,
-                                    FactorMatrix<std::complex<double>,false>& C 
-);
+  std::complex<double> alpha,
+  const LowRankMatrix<std::complex<double>,false>& A,
+  std::complex<double> beta,
+  const LowRankMatrix<std::complex<double>,false>& B,
+        LowRankMatrix<std::complex<double>,false>& C );
 template void psp::hmatrix_tools::MatrixAddRounded
 ( int maxRank,
-  std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,true>& B,
-                                    FactorMatrix<std::complex<double>,true>& C 
-);
+  std::complex<double> alpha,
+  const LowRankMatrix<std::complex<double>,true>& A,
+  std::complex<double> beta,
+  const LowRankMatrix<std::complex<double>,true>& B,
+        LowRankMatrix<std::complex<double>,true>& C );

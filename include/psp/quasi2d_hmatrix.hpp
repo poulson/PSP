@@ -42,10 +42,36 @@ public:
         int yTargetSizes[2];
         int targetSizes[4];
 
+        NodeData
+        ( int xSizeSource, int xSizeTarget,
+          int ySizeSource, int ySizeTarget,
+          int zSize )
+        : children(16)
+        {
+            xSourceSizes[0] = xSizeSource/2;
+            xSourceSizes[1] = xSizeSource - xSourceSizes[0];
+            ySourceSizes[0] = ySizeSource/2;
+            ySourceSizes[1] = ySizeSource - ySourceSizes[0];
+            
+            sourceSizes[0] = xSourceSizes[0]*ySourceSizes[0]*zSize;
+            sourceSizes[1] = xSourceSizes[1]*ySourceSizes[0]*zSize;
+            sourceSizes[2] = xSourceSizes[0]*ySourceSizes[1]*zSize;
+            sourceSizes[3] = xSourceSizes[1]*ySourceSizes[1]*zSize;
+
+            xTargetSizes[0] = xSizeTarget/2;
+            xTargetSizes[1] = xSizeTarget - xTargetSizes[0];
+            yTargetSizes[0] = ySizeTarget/2;
+            yTargetSizes[1] = ySizeTarget - yTargetSizes[1];
+
+            targetSizes[0] = xTargetSizes[0]*yTargetSizes[0]*zSize;
+            targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
+            targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*zSize;
+            targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
+        }
+
         ~NodeData()
         {
-            const int numChildren = children.size(); 
-            for( int i=0; i<numChildren; ++i )
+            for( int i=0; i<16; ++i )
                 delete children[i];
             children.clear();
         }
@@ -58,16 +84,29 @@ public:
         int ySizes[2];
         int sizes[4];
 
+        NodeSymmetricData( int xSize, int ySize, int zSize )
+        : children(10)
+        {
+            xSizes[0] = xSize/2;
+            xSizes[1] = xSize - xSizes[0];
+            ySizes[0] = ySize/2;
+            ySizes[1] = ySize - ySizes[1];
+
+            sizes[0] = xSizes[0]*ySizes[0]*zSize;
+            sizes[1] = xSizes[1]*ySizes[0]*zSize;
+            sizes[2] = xSizes[0]*ySizes[1]*zSize;
+            sizes[3] = xSizes[1]*ySizes[1]*zSize;
+        }
+
         ~NodeSymmetricData()
         {
-            const int numChildren = children.size();
-            for( int i=0; i<numChildren; ++i )
+            for( int i=0; i<10; ++i )
                 delete children[i];
             children.clear();
         }
     };
 
-    enum ShellType { NODE, NODE_SYMMETRIC, DENSE, FACTOR };
+    enum ShellType { NODE, NODE_SYMMETRIC, DENSE, LOW_RANK };
 
     struct Shell
     {
@@ -77,7 +116,7 @@ public:
             NodeData* node;
             NodeSymmetricData* nodeSymmetric;
             DenseMatrix<Scalar>* D;
-            FactorMatrix<Scalar,Conjugated>* F;
+            LowRankMatrix<Scalar,Conjugated>* F;
         } data;
     };
 
@@ -96,18 +135,18 @@ public:
     //     max(dist_x(A,B),dist_y(A,B)) > 1
     //
     Quasi2dHMatrix
-    ( const FactorMatrix<Scalar,Conjugated>& F,
-      int numLevels, bool stronglyAdmissible,
+    ( const LowRankMatrix<Scalar,Conjugated>& F,
+      int numLevels, int maxRank, bool stronglyAdmissible,
       int xSize, int ySize, int zSize );
     Quasi2dHMatrix
     ( const SparseMatrix<Scalar>& S,
-      int numLevels, bool stronglyAdmissible,
+      int numLevels, int maxRank, bool stronglyAdmissible,
       int xSize, int ySize, int zSize );
     
     // Create a potentially non-square non-top-level H-matrix
     Quasi2dHMatrix
-    ( const FactorMatrix<Scalar,Conjugated>& F,
-      int numLevels, bool stronglyAdmissible,
+    ( const LowRankMatrix<Scalar,Conjugated>& F,
+      int numLevels, int maxRank, bool stronglyAdmissible,
       int xSizeSource, int xSizeTarget,
       int ySizeSource, int ySizeTarget,
       int zSize,
@@ -116,7 +155,7 @@ public:
       int sourceOffset, int targetOffset );
     Quasi2dHMatrix
     ( const SparseMatrix<Scalar>& S,
-      int numLevels, bool stronglyAdmissible,
+      int numLevels, int maxRank, bool stronglyAdmissible,
       int xSizeSource, int xSizeTarget,
       int ySizeSource, int ySizeTarget,
       int zSize,
@@ -133,16 +172,16 @@ public:
     int ZSize() const { return _zSize; }
     int XSource() const { return _xSource; }
     int YSource() const { return _ySource; }
+    int XTarget() const { return _xTarget; }
+    int YTarget() const { return _yTarget; }
 
           Shell& GetShell() { return _shell; }
     const Shell& GetShell() const { return _shell; }
 
-    // TODO
-    /*
-    void ConformWith
-    ( const Quasi2dHMatrix<Scalar,Conjugate>& A, 
-      const Quasi2dHMatrix<Scalar,Conjugate>& B );
-    */
+    bool IsDense() const { return _shell.type == DENSE; }
+    bool IsHierarchical() const
+    { return _shell.type == NODE || _shell.type == NODE_SYMMETRIC; }
+    bool IsLowRank() const { return _shell.type == LOW_RANK; }
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //
@@ -228,12 +267,11 @@ public:
     // Computational routines specific to Quasi2dHMatrix                      //
     //------------------------------------------------------------------------//
 
-    // TODO
-    /*
+
     void MapMatrix
     ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
                           Quasi2dHMatrix<Scalar,Conjugated>& C );
-    */
+    // TODO
     /*
     void MapMatrix
     ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
@@ -253,7 +291,7 @@ private:
 
     // Since a constructor cannot call another constructor, have both of our
     // constructors call this routine.
-    void ImportFactorMatrix( const FactorMatrix<Scalar,Conjugated>& F );
+    void ImportLowRankMatrix( const LowRankMatrix<Scalar,Conjugated>& F );
     void ImportSparseMatrix( const SparseMatrix<Scalar>& S );
 
     // y += alpha A x

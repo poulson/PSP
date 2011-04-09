@@ -20,10 +20,10 @@
 */
 #include "psp.hpp"
 
-// Compress a dense matrix into a factor matrix with specified rank
+// Compress a dense matrix into a low-rank matrix with specified rank
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
-( int maxRank, DenseMatrix<Real>& D, FactorMatrix<Real,Conjugated>& F )
+( int maxRank, DenseMatrix<Real>& D, LowRankMatrix<Real,Conjugated>& F )
 {
     const int m = D.Height();
     const int n = D.Width();
@@ -63,7 +63,7 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix< std::complex<Real> >& D, 
-  FactorMatrix<std::complex<Real>,Conjugated>& F )
+  LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
     typedef std::complex<Real> Scalar;
 
@@ -123,7 +123,7 @@ void psp::hmatrix_tools::Compress
 // Approximate A with a given maximum rank.
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<Real,Conjugated>& A )
+( int maxRank, LowRankMatrix<Real,Conjugated>& A )
 {
     const int m = A.Height();
     const int n = A.Width();
@@ -252,7 +252,7 @@ void psp::hmatrix_tools::Compress
 // cases, A = U V^T (Conjugated=false), and A = U V^H (Conjugated=true)
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<std::complex<Real>,Conjugated>& A )
+( int maxRank, LowRankMatrix<std::complex<Real>,Conjugated>& A )
 {
     typedef std::complex<Real> Scalar;
 
@@ -398,49 +398,49 @@ void psp::hmatrix_tools::Compress
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix<float>& D, 
-  FactorMatrix<float,false>& F );
+  LowRankMatrix<float,false>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix<float>& D, 
-  FactorMatrix<float,true>& F );
+  LowRankMatrix<float,true>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix<double>& D, 
-  FactorMatrix<double,false>& F );
+  LowRankMatrix<double,false>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix<double>& D, 
-  FactorMatrix<double,true>& F );
+  LowRankMatrix<double,true>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix< std::complex<float> >& D, 
-  FactorMatrix<std::complex<float>,false>& F );
+  LowRankMatrix<std::complex<float>,false>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix< std::complex<float> >& D, 
-  FactorMatrix<std::complex<float>,true>& F );
+  LowRankMatrix<std::complex<float>,true>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix< std::complex<double> >& D, 
-  FactorMatrix<std::complex<double>,false>& F );
+  LowRankMatrix<std::complex<double>,false>& F );
 template void psp::hmatrix_tools::Compress
 ( int maxRank, 
   DenseMatrix< std::complex<double> >& D, 
-  FactorMatrix<std::complex<double>,true>& F );
+  LowRankMatrix<std::complex<double>,true>& F );
 
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<float,false>& A );
+( int maxRank, LowRankMatrix<float,false>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<float,true>& A );
+( int maxRank, LowRankMatrix<float,true>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<double,false>& A );
+( int maxRank, LowRankMatrix<double,false>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<double,true>& A );
+( int maxRank, LowRankMatrix<double,true>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<std::complex<float>,false>& A );
+( int maxRank, LowRankMatrix<std::complex<float>,false>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<std::complex<float>,true>& A );
+( int maxRank, LowRankMatrix<std::complex<float>,true>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<std::complex<double>,false>& A );
+( int maxRank, LowRankMatrix<std::complex<double>,false>& A );
 template void psp::hmatrix_tools::Compress
-( int maxRank, FactorMatrix<std::complex<double>,true>& A );
+( int maxRank, LowRankMatrix<std::complex<double>,true>& A );

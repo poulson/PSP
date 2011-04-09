@@ -30,7 +30,7 @@
 #include "psp/lapack.hpp"
 #include "psp/vector.hpp"
 #include "psp/dense_matrix.hpp"
-#include "psp/factor_matrix.hpp"
+#include "psp/low_rank_matrix.hpp"
 #include "psp/sparse_matrix.hpp"
 #include "psp/abstract_hmatrix.hpp"
 
@@ -46,25 +46,25 @@ namespace hmatrix_tools {
 //----------------------------------------------------------------------------//
 
 /*\
-|*| Ensure that the factor matrix has a rank of at most 'maxRank'
+|*| Ensure that the low-rank matrix has a rank of at most 'maxRank'
 \*/
 template<typename Real,bool Conjugated>
 void Compress
 ( int maxRank, 
   DenseMatrix<Real>& D, 
-  FactorMatrix<Real,Conjugated>& F );
+  LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void Compress
 ( int maxRank, 
   DenseMatrix< std::complex<Real> >& D, 
-  FactorMatrix<std::complex<Real>,Conjugated>& F );
+  LowRankMatrix<std::complex<Real>,Conjugated>& F );
 template<typename Real,bool Conjugated>
-void Compress( int maxRank, FactorMatrix<Real,Conjugated>& F );
+void Compress( int maxRank, LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
-void Compress( int maxRank, FactorMatrix<std::complex<Real>,Conjugated>& F );
+void Compress( int maxRank, LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
-|*| Convert a subset of a sparse matrix to dense/factor form
+|*| Convert a subset of a sparse matrix to dense/low-rank form
 \*/
 template<typename Scalar>
 void ConvertSubmatrix
@@ -72,11 +72,11 @@ void ConvertSubmatrix
   int iStart, int iEnd, int jStart, int jEnd );
 template<typename Scalar,bool Conjugated>
 void ConvertSubmatrix
-( FactorMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
+( LowRankMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd );
 
 /*\
-|*| Generalized addition of two dense/factor matrices, C := alpha A + beta B
+|*| Generalized addition of two dense/low-rank matrices, C := alpha A + beta B
 \*/
 // D := alpha D + beta D
 template<typename Scalar>
@@ -87,30 +87,30 @@ void MatrixAdd
 // F := alpha F + beta F
 template<typename Scalar,bool Conjugated>
 void MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A,
-  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+  Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // D := alpha F + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A,
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
   Scalar beta,  const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D + beta F
 template<typename Scalar,bool Conjugated>
 void MatrixAdd
 ( Scalar alpha, const DenseMatrix<Scalar>& A,
-  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
+  Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F + beta F
 template<typename Scalar,bool Conjugated>
 void MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A,
-  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+  Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 
 /*\
-|*| Generalized update of two dense/factor matrices, B := alpha A + beta B
+|*| Generalized update of two dense/low-rank matrices, B := alpha A + beta B
 \*/
 // D := alpha D + beta D
 template<typename Scalar>
@@ -120,50 +120,49 @@ void MatrixUpdate
 // F := alpha F + beta F
 template<typename Scalar,bool Conjugated>
 void MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A,
-  Scalar beta,        FactorMatrix<Scalar,Conjugated>& B );
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+  Scalar beta,        LowRankMatrix<Scalar,Conjugated>& B );
 // D := alpha F + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixUpdate
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A,
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
   Scalar beta,        DenseMatrix<Scalar>& B );
 
 /*\
-|*| Generalized add of two factor matrices, C := alpha A + beta B, 
+|*| Generalized add of two low-rank matrices, C := alpha A + beta B, 
 |*| where C is then forced to be of rank at most 'maxRank'
 \*/
 template<typename Real,bool Conjugated>
 void MatrixAddRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real,Conjugated>& A,
-  Real beta,  const FactorMatrix<Real,Conjugated>& B,
-                    FactorMatrix<Real,Conjugated>& C );
+  Real alpha, const LowRankMatrix<Real,Conjugated>& A,
+  Real beta,  const LowRankMatrix<Real,Conjugated>& B,
+                    LowRankMatrix<Real,Conjugated>& C );
 template<typename Real,bool Conjugated>
 void MatrixAddRounded
 ( int maxRank,
   std::complex<Real> alpha, 
-  const FactorMatrix<std::complex<Real>,Conjugated>& A,
+  const LowRankMatrix<std::complex<Real>,Conjugated>& A,
   std::complex<Real> beta,  
-  const FactorMatrix<std::complex<Real>,Conjugated>& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& C
-);
+  const LowRankMatrix<std::complex<Real>,Conjugated>& B,
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 
 /*\
-|*| Generalized update of a factor matrix, B := alpha A + beta B, 
+|*| Generalized update of a low-rank matrix, B := alpha A + beta B, 
 |*| where B is then forced to be of rank at most 'maxRank'
 \*/
 template<typename Real,bool Conjugated>
 void MatrixUpdateRounded
 ( int maxRank,
-  Real alpha, const FactorMatrix<Real,Conjugated>& A,
-  Real beta,        FactorMatrix<Real,Conjugated>& B );
+  Real alpha, const LowRankMatrix<Real,Conjugated>& A,
+  Real beta,        LowRankMatrix<Real,Conjugated>& B );
 template<typename Real,bool Conjugated>
 void MatrixUpdateRounded
 ( int maxRank,
   std::complex<Real> alpha, 
-  const FactorMatrix<std::complex<Real>,Conjugated>& A,
+  const LowRankMatrix<std::complex<Real>,Conjugated>& A,
   std::complex<Real> beta, 
-        FactorMatrix<std::complex<Real>,Conjugated>& B
+        LowRankMatrix<std::complex<Real>,Conjugated>& B
 );
 
 /*\
@@ -172,7 +171,7 @@ void MatrixUpdateRounded
 |*| When the resulting matrix is dense, an update form is also provided, i.e.,
 |*| C := alpha A B + beta C
 |*|
-|*| A routine for forming a factor matrix from the product of two black-box 
+|*| A routine for forming a low-rank matrix from the product of two black-box 
 |*| matrix and matrix-transpose vector multiplication routines is also provided.
 \*/
 // D := alpha D D
@@ -187,62 +186,74 @@ void MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
-// F := alpha F F
-template<typename Scalar,bool Conjugated>
-void MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
 // D := alpha D F
 template<typename Scalar,bool Conjugated>
 void MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
+                const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D F + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
+                const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F D
 template<typename Scalar,bool Conjugated>
 void MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F D + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
+// D := alpha F F
+template<typename Scalar,bool Conjugated>
+void MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha F F + beta D
+template<typename Scalar,bool Conjugated>
+void MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
+// F := alpha F F
+template<typename Scalar,bool Conjugated>
+void MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D F
 template<typename Scalar,bool Conjugated>
 void MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha F D
 template<typename Scalar,bool Conjugated>
 void MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D D
 template<typename Real,bool Conjugated>
 void MatrixMatrix
 ( int maxRank, Real alpha, 
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& C );
+        LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D D
 template<typename Real,bool Conjugated>
 void MatrixMatrix
 ( int maxRank, std::complex<Real> alpha, 
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& C );
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha D D + beta F
 template<typename Real,bool Conjugated>
 void MatrixMatrix
@@ -250,7 +261,7 @@ void MatrixMatrix
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
   Real beta,
-        FactorMatrix<Real,Conjugated>& C );
+        LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D D + beta F
 template<typename Real,bool Conjugated>
 void MatrixMatrix
@@ -258,22 +269,22 @@ void MatrixMatrix
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
   std::complex<Real> beta,
-        FactorMatrix<std::complex<Real>,Conjugated>& C );
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void MatrixMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   Real alpha, 
   const AbstractHMatrix<Real>& A,
   const AbstractHMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& F );
+        LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void MatrixMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   std::complex<Real> alpha, 
   const AbstractHMatrix< std::complex<Real> >& A,
   const AbstractHMatrix< std::complex<Real> >& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& F );
+        LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
 |*| Matrix Transpose Matrix Multiply, C := alpha A^T B
@@ -281,7 +292,7 @@ void MatrixMatrix
 |*| When the resulting matrix is dense, an update form is also provided, i.e.,
 |*| C := alpha A^T B + beta C
 |*|
-|*| A routine for forming a factor matrix from the product of two black-box 
+|*| A routine for forming a low-rank matrix from the product of two black-box 
 |*| matrix and matrix-transpose vector multiplication routines is also provided.
 \*/
 // D := alpha D^T D
@@ -296,62 +307,74 @@ void MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
-// F := alpha F^T F
-template<typename Scalar,bool Conjugated>
-void MatrixTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
 // D := alpha D^T F
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
+                const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D^T F + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
+                const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F^T D
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F^T D + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
+// D := alpha F^T F
+template<typename Scalar,bool Conjugated>
+void MatrixTransposeMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha F^T F + beta D
+template<typename Scalar,bool Conjugated>
+void MatrixTransposeMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
+// F := alpha F^T F
+template<typename Scalar,bool Conjugated>
+void MatrixTransposeMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D^T F
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha F^T D
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D^T D
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
 ( int maxRank, Real alpha, 
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& C );
+        LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D^T D
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
 ( int maxRank, std::complex<Real> alpha, 
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& C );
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha D^T D + beta F
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
@@ -359,7 +382,7 @@ void MatrixTransposeMatrix
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
   Real beta,
-        FactorMatrix<Real,Conjugated>& C );
+        LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D^T D + beta F
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
@@ -367,22 +390,22 @@ void MatrixTransposeMatrix
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
   std::complex<Real> beta,
-        FactorMatrix<std::complex<Real>,Conjugated>& C );
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H^T H
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   Real alpha, 
   const AbstractHMatrix<Real>& A,
   const AbstractHMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& F );
+        LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void MatrixTransposeMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   std::complex<Real> alpha, 
   const AbstractHMatrix< std::complex<Real> >& A,
   const AbstractHMatrix< std::complex<Real> >& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& F );
+        LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
 |*| Matrix Hermitian Transpose Matrix Multiply, C := alpha A^H B
@@ -390,7 +413,7 @@ void MatrixTransposeMatrix
 |*| When the resulting matrix is dense, an update form is also provided, i.e.,
 |*| C := alpha A^H B + beta C
 |*|
-|*| A routine for forming a factor matrix from the product of two black-box 
+|*| A routine for forming a low-rank matrix from the product of two black-box 
 |*| matrix and matrix-transpose vector multiplication routines is also provided.
 \*/
 // D := alpha D^H D
@@ -405,62 +428,74 @@ void MatrixHermitianTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
-// F := alpha F^H F
-template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
 // D := alpha D^H F
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
+                const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D^H F + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
+                const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F^H D
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F^H D + beta D
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
+// D := alpha F^H F
+template<typename Scalar,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      DenseMatrix<Scalar>& C );
+// D := alpha F^H F + beta D
+template<typename Scalar,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C );
+// F := alpha F^H F
+template<typename Scalar,bool Conjugated>
+void MatrixHermitianTransposeMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D^H F
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha F^H D
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
-                      FactorMatrix<Scalar,Conjugated>& C );
+                      LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D^H D
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
 ( int maxRank, Real alpha, 
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& C );
+        LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D^H D
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
 ( int maxRank, std::complex<Real> alpha, 
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& C );
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha D^H D + beta F
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
@@ -468,7 +503,7 @@ void MatrixHermitianTransposeMatrix
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
   Real beta,
-        FactorMatrix<Real,Conjugated>& C );
+        LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D^H D + beta F
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
@@ -476,22 +511,22 @@ void MatrixHermitianTransposeMatrix
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
   std::complex<Real> beta,
-        FactorMatrix<std::complex<Real>,Conjugated>& C );
+        LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   Real alpha, 
   const AbstractHMatrix<Real>& A,
   const AbstractHMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& F );
+        LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void MatrixHermitianTransposeMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   std::complex<Real> alpha, 
   const AbstractHMatrix< std::complex<Real> >& A,
   const AbstractHMatrix< std::complex<Real> >& B,
-        FactorMatrix<std::complex<Real>,Conjugated>& F );
+        LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
 /*\
 |*| Matrix-Vector multiply, y := alpha A x + beta y
@@ -505,7 +540,7 @@ void MatrixVector
 // y := alpha F x + beta y
 template<typename Scalar,bool Conjugated>
 void MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& F, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
@@ -521,7 +556,7 @@ void MatrixVector
 // y := alpha F x
 template<typename Scalar,bool Conjugated>
 void MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& F, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
@@ -537,7 +572,7 @@ void MatrixTransposeVector
 // y := alpha F^T x + beta y
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& F, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
@@ -553,7 +588,7 @@ void MatrixTransposeVector
 // y := alpha F^T x
 template<typename Scalar,bool Conjugated>
 void MatrixTransposeVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& F, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
@@ -569,7 +604,7 @@ void MatrixHermitianTransposeVector
 // y := alpha F^H x + beta y
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& F, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
@@ -585,7 +620,7 @@ void MatrixHermitianTransposeVector
 // y := alpha F^H x
 template<typename Scalar,bool Conjugated>
 void MatrixHermitianTransposeVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& F, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
@@ -605,7 +640,7 @@ template<typename Scalar>
 void Scale( Scalar alpha, DenseMatrix<Scalar>& D );
 
 template<typename Scalar,bool Conjugated>
-void Scale( Scalar alpha, FactorMatrix<Scalar,Conjugated>& F );
+void Scale( Scalar alpha, LowRankMatrix<Scalar,Conjugated>& F );
 
 /*\
 |*| Copy a vector or matrix
@@ -622,8 +657,8 @@ template<typename Scalar>
 void Copy( const DenseMatrix<Scalar>& A, DenseMatrix<Scalar>& B );
 template<typename Scalar,bool Conjugated>
 void Copy
-( const FactorMatrix<Scalar,Conjugated>& A, 
-        FactorMatrix<Scalar,Conjugated>& B );
+( const LowRankMatrix<Scalar,Conjugated>& A, 
+        LowRankMatrix<Scalar,Conjugated>& B );
 
 /*\
 |*| Conjugate a vector or matrix
@@ -689,18 +724,18 @@ void Conjugate
         DenseMatrix< std::complex<Real> >& D2 );
 
 template<typename Real,bool Conjugated>
-void Conjugate( FactorMatrix<Real,Conjugated>& F );
+void Conjugate( LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
-void Conjugate( FactorMatrix<std::complex<Real>,Conjugated>& F );
+void Conjugate( LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
 template<typename Real,bool Conjugated>
 void Conjugate
-( const FactorMatrix<Real,Conjugated>& F1,
-        FactorMatrix<Real,Conjugated>& F2 );
+( const LowRankMatrix<Real,Conjugated>& F1,
+        LowRankMatrix<Real,Conjugated>& F2 );
 template<typename Real,bool Conjugated>
 void Conjugate
-( const FactorMatrix<std::complex<Real>,Conjugated>& F1,
-        FactorMatrix<std::complex<Real>,Conjugated>& F2 );
+( const LowRankMatrix<std::complex<Real>,Conjugated>& F1,
+        LowRankMatrix<std::complex<Real>,Conjugated>& F2 );
 
 /*\
 |*| For generating Gaussian random variables/vectors
@@ -786,8 +821,8 @@ void Copy( const psp::DenseMatrix<Scalar>& A, psp::DenseMatrix<Scalar>& B )
 
 template<typename Scalar,bool Conjugated>
 void Copy
-( const psp::FactorMatrix<Scalar,Conjugated>& A, 
-        psp::FactorMatrix<Scalar,Conjugated>& B )
+( const psp::LowRankMatrix<Scalar,Conjugated>& A, 
+        psp::LowRankMatrix<Scalar,Conjugated>& B )
 {
     Copy( A.U, B.U );
     Copy( A.V, B.V );
@@ -994,12 +1029,12 @@ void psp::hmatrix_tools::Conjugate
 
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Conjugate
-( psp::FactorMatrix<Real,Conjugated>& F )
+( psp::LowRankMatrix<Real,Conjugated>& F )
 { }
 
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Conjugate
-( psp::FactorMatrix<std::complex<Real>,Conjugated>& F )
+( psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
     Conjugate( F.U );
     Conjugate( F.V );
@@ -1007,8 +1042,8 @@ void psp::hmatrix_tools::Conjugate
 
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Conjugate
-( const psp::FactorMatrix<Real,Conjugated>& F1,
-        psp::FactorMatrix<Real,Conjugated>& F2 )
+( const psp::LowRankMatrix<Real,Conjugated>& F1,
+        psp::LowRankMatrix<Real,Conjugated>& F2 )
 {
     const int m = F1.Height();
     const int n = F1.Width();
@@ -1021,8 +1056,8 @@ void psp::hmatrix_tools::Conjugate
 
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Conjugate
-( const psp::FactorMatrix<std::complex<Real>,Conjugated>& F1,
-        psp::FactorMatrix<std::complex<Real>,Conjugated>& F2 )
+( const psp::LowRankMatrix<std::complex<Real>,Conjugated>& F1,
+        psp::LowRankMatrix<std::complex<Real>,Conjugated>& F2 )
 {
     const int m = F1.Height();
     const int n = F1.Width();
@@ -1087,7 +1122,7 @@ void psp::hmatrix_tools::Scale
 
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::Scale
-( Scalar alpha, psp::FactorMatrix<Scalar,Conjugated>& F )
+( Scalar alpha, psp::LowRankMatrix<Scalar,Conjugated>& F )
 {
     if( alpha == (Scalar)0 )
     {
@@ -1107,16 +1142,16 @@ void psp::hmatrix_tools::Scale
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( int maxRank, int oversampling, 
+( int oversampling, 
   Real alpha, 
   const psp::AbstractHMatrix<Real>& A, 
   const psp::AbstractHMatrix<Real>& B,
-        psp::FactorMatrix<Real,Conjugated>& F )
+        psp::LowRankMatrix<Real,Conjugated>& F )
 {
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
-    const int r = std::min( maxRank, maxRankAB );
+    const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Real> Omega( B.Width(), r+oversampling );
@@ -1194,18 +1229,18 @@ void psp::hmatrix_tools::MatrixMatrix
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( int maxRank, int oversampling, 
+( int oversampling, 
   std::complex<Real> alpha, 
   const psp::AbstractHMatrix< std::complex<Real> >& A, 
   const psp::AbstractHMatrix< std::complex<Real> >& B,
-        psp::FactorMatrix< std::complex<Real>,Conjugated>& F )
+        psp::LowRankMatrix< std::complex<Real>,Conjugated>& F )
 {
     typedef std::complex<Real> Scalar;
 
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
-    const int r = std::min( maxRank, maxRankAB );
+    const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Scalar> Omega( B.Width(), r+oversampling );
@@ -1286,16 +1321,16 @@ void psp::hmatrix_tools::MatrixMatrix
 // F := alpha H^T H,
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixTransposeMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   Real alpha, 
   const psp::AbstractHMatrix<Real>& A,
   const psp::AbstractHMatrix<Real>& B,
-        psp::FactorMatrix<Real,Conjugated>& F )
+        psp::LowRankMatrix<Real,Conjugated>& F )
 {
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
-    const int r = std::min( maxRank, maxRankAB );
+    const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Real> Omega( B.Width(), r+oversampling );
@@ -1373,18 +1408,18 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 // F := alpha H^T H,
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixTransposeMatrix
-( int maxRank, int oversampling,
+( int oversampling,
   std::complex<Real> alpha, 
   const psp::AbstractHMatrix< std::complex<Real> >& A,
   const psp::AbstractHMatrix< std::complex<Real> >& B,
-        psp::FactorMatrix<std::complex<Real>,Conjugated>& F )
+        psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
     typedef std::complex<Real> Scalar;
 
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
-    const int r = std::min( maxRank, maxRankAB );
+    const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Scalar> Omega( B.Width(), r+oversampling );
@@ -1475,7 +1510,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Real alpha, 
   const psp::AbstractHMatrix<Real>& A,
   const psp::AbstractHMatrix<Real>& B,
-        psp::FactorMatrix<Real,Conjugated>& F )
+        psp::LowRankMatrix<Real,Conjugated>& F )
 {
     MatrixTransposeMatrix( maxRank, oversampling, alpha, A, B, F );
 }
@@ -1483,18 +1518,18 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
-( int maxRank, int oversampling, 
+( int oversampling, 
   std::complex<Real> alpha, 
   const psp::AbstractHMatrix< std::complex<Real> >& A,
   const psp::AbstractHMatrix< std::complex<Real> >& B,
-        psp::FactorMatrix<std::complex<Real>,Conjugated>& F )
+        psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
     typedef std::complex<Real> Scalar;
 
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
-    const int r = std::min( maxRank, maxRankAB );
+    const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Scalar> Omega( B.Width(), r+oversampling );

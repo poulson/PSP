@@ -67,9 +67,9 @@ void psp::hmatrix_tools::MatrixAdd
 // Low-rank C := alpha A + beta B
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B, 
-                      FactorMatrix<Scalar,Conjugated>& C )
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+  Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B, 
+                      LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.Height() != B.Height() || A.Width() != B.Width() )
@@ -114,10 +114,10 @@ void psp::hmatrix_tools::MatrixAdd
     }
 }
 
-// Dense from sum of factor and dense:  C := alpha A + beta B
+// Dense from sum of low-rank and dense:  C := alpha A + beta B
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
   Scalar beta,  const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C )
 {
@@ -184,22 +184,22 @@ void psp::hmatrix_tools::MatrixAdd
     }
 }
 
-// Dense from sum of dense and factor:  C := alpha A + beta B
+// Dense from sum of dense and low-rank:  C := alpha A + beta B
 // The arguments are switched for generality, so just call the other version.
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
+  Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
     MatrixAdd( beta, B, alpha, A, C );
 }
 
-// Dense as sum of two factors
+// Dense as sum of two low-rank matrices
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixAdd
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-  Scalar beta,  const FactorMatrix<Scalar,Conjugated>& B,
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+  Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
@@ -248,140 +248,140 @@ template void psp::hmatrix_tools::MatrixAdd
 
 // Low-rank C := alpha A + beta B
 template void psp::hmatrix_tools::MatrixAdd
-( float alpha, const FactorMatrix<float,false>& A,
-  float beta,  const FactorMatrix<float,false>& B,
-                     FactorMatrix<float,false>& C );
+( float alpha, const LowRankMatrix<float,false>& A,
+  float beta,  const LowRankMatrix<float,false>& B,
+                     LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( float alpha, const FactorMatrix<float,true>& A,
-  float beta,  const FactorMatrix<float,true>& B,
-                     FactorMatrix<float,true>& C );
+( float alpha, const LowRankMatrix<float,true>& A,
+  float beta,  const LowRankMatrix<float,true>& B,
+                     LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( double alpha, const FactorMatrix<double,false>& A,
-  double beta,  const FactorMatrix<double,false>& B,
-                      FactorMatrix<double,false>& C );
+( double alpha, const LowRankMatrix<double,false>& A,
+  double beta,  const LowRankMatrix<double,false>& B,
+                      LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( double alpha, const FactorMatrix<double,true>& A,
-  double beta,  const FactorMatrix<double,true>& B,
-                      FactorMatrix<double,true>& C );
+( double alpha, const LowRankMatrix<double,true>& A,
+  double beta,  const LowRankMatrix<double,true>& B,
+                      LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,false>& B,
-                                   FactorMatrix<std::complex<float>,false>& C );
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,false>& A,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,false>& B,
+                                   LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,true>& B,
-                                   FactorMatrix<std::complex<float>,true>& C );
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,true>& A,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,true>& B,
+                                   LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,false>& B,
-                                    FactorMatrix<std::complex<double>,false>& C
+( std::complex<double> alpha, const LowRankMatrix<std::complex<double>,false>& A,
+  std::complex<double> beta,  const LowRankMatrix<std::complex<double>,false>& B,
+                                    LowRankMatrix<std::complex<double>,false>& C
 );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,true>& B,
-                                    FactorMatrix<std::complex<double>,true>& C
+( std::complex<double> alpha, const LowRankMatrix<std::complex<double>,true>& A,
+  std::complex<double> beta,  const LowRankMatrix<std::complex<double>,true>& B,
+                                    LowRankMatrix<std::complex<double>,true>& C
 );
 
 
-// Dense as sum of factor and dense, C := alpha A + beta B
+// Dense as sum of low-rank and dense, C := alpha A + beta B
 template void psp::hmatrix_tools::MatrixAdd
-( float alpha, const FactorMatrix<float,false>& A,
+( float alpha, const LowRankMatrix<float,false>& A,
   float beta,  const DenseMatrix<float>& B,
                      DenseMatrix<float>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( float alpha, const FactorMatrix<float,true>& A,
+( float alpha, const LowRankMatrix<float,true>& A,
   float beta,  const DenseMatrix<float>& B,
                      DenseMatrix<float>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( double alpha, const FactorMatrix<double,false>& A,
+( double alpha, const LowRankMatrix<double,false>& A,
   double beta,  const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( double alpha, const FactorMatrix<double,true>& A,
+( double alpha, const LowRankMatrix<double,true>& A,
   double beta,  const DenseMatrix<double>& B,
                       DenseMatrix<double>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,false>& A,
   std::complex<float> beta,  const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,true>& A,
   std::complex<float> beta,  const DenseMatrix< std::complex<float> >& B,
                                    DenseMatrix< std::complex<float> >& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
+( std::complex<double> alpha, const LowRankMatrix<std::complex<double>,false>& A,
   std::complex<double> beta,  const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
+( std::complex<double> alpha, const LowRankMatrix<std::complex<double>,true>& A,
   std::complex<double> beta,  const DenseMatrix< std::complex<double> >& B,
                                     DenseMatrix< std::complex<double> >& C );
 
-// Dense as sum of dense and factor, C := alpha A + beta B
+// Dense as sum of dense and low-rank, C := alpha A + beta B
 template void psp::hmatrix_tools::MatrixAdd
 ( float alpha, const DenseMatrix<float>& A,
-  float beta,  const FactorMatrix<float,false>& B,
+  float beta,  const LowRankMatrix<float,false>& B,
                      DenseMatrix<float>& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( float alpha, const DenseMatrix<float>& A,
-  float beta,  const FactorMatrix<float,true>& B,
+  float beta,  const LowRankMatrix<float,true>& B,
                      DenseMatrix<float>& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( double alpha, const DenseMatrix<double>& A,
-  double beta,  const FactorMatrix<double,false>& B,
+  double beta,  const LowRankMatrix<double,false>& B,
                       DenseMatrix<double>& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( double alpha, const DenseMatrix<double>& A,
-  double beta,  const FactorMatrix<double,true>& B,
+  double beta,  const LowRankMatrix<double,true>& B,
                       DenseMatrix<double>& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,false>& B,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,false>& B,
                                    DenseMatrix< std::complex<float> >& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,true>& B,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,true>& B,
                                    DenseMatrix< std::complex<float> >& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,false>& B,
+  std::complex<double> beta,  const LowRankMatrix<std::complex<double>,false>& B,
                                     DenseMatrix< std::complex<double> >& C );
 template void psp::hmatrix_tools::MatrixAdd
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,true>& B,
+  std::complex<double> beta,  const LowRankMatrix<std::complex<double>,true>& B,
                                     DenseMatrix< std::complex<double> >& C );
 
-// Dense as sum of two factors
+// Dense as sum of two low-rank matrices
 template void psp::hmatrix_tools::MatrixAdd
-( float alpha, const FactorMatrix<float,false>& A,
-  float beta,  const FactorMatrix<float,false>& B,
+( float alpha, const LowRankMatrix<float,false>& A,
+  float beta,  const LowRankMatrix<float,false>& B,
                      DenseMatrix<float>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( float alpha, const FactorMatrix<float,true>& A,
-  float beta,  const FactorMatrix<float,true>& B,
+( float alpha, const LowRankMatrix<float,true>& A,
+  float beta,  const LowRankMatrix<float,true>& B,
                      DenseMatrix<float>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( double alpha, const FactorMatrix<double,false>& A,
-  double beta,  const FactorMatrix<double,false>& B,
+( double alpha, const LowRankMatrix<double,false>& A,
+  double beta,  const LowRankMatrix<double,false>& B,
                       DenseMatrix<double>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( double alpha, const FactorMatrix<double,true>& A,
-  double beta,  const FactorMatrix<double,true>& B,
+( double alpha, const LowRankMatrix<double,true>& A,
+  double beta,  const LowRankMatrix<double,true>& B,
                       DenseMatrix<double>& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,false>& B,
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,false>& A,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,false>& B,
                                    DenseMatrix< std::complex<float> >& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-  std::complex<float> beta,  const FactorMatrix<std::complex<float>,true>& B,
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,true>& A,
+  std::complex<float> beta,  const LowRankMatrix<std::complex<float>,true>& B,
                                    DenseMatrix< std::complex<float> >& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,false>& B,
+( std::complex<double> alpha, const LowRankMatrix<std::complex<double>,false>& A,
+  std::complex<double> beta,  const LowRankMatrix<std::complex<double>,false>& B,
                                     DenseMatrix< std::complex<double> >& C );
 template void psp::hmatrix_tools::MatrixAdd
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-  std::complex<double> beta,  const FactorMatrix<std::complex<double>,true>& B,
+( std::complex<double> alpha, const LowRankMatrix<std::complex<double>,true>& A,
+  std::complex<double> beta,  const LowRankMatrix<std::complex<double>,true>& B,
                                     DenseMatrix< std::complex<double> >& C );
 

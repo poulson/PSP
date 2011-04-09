@@ -44,7 +44,7 @@ Conj( const std::complex<Real> alpha )
 #include "psp/lapack.hpp"
 #include "psp/vector.hpp"
 #include "psp/dense_matrix.hpp"
-#include "psp/factor_matrix.hpp"
+#include "psp/low_rank_matrix.hpp"
 #include "psp/sparse_matrix.hpp"
 #include "psp/abstract_hmatrix.hpp"
 #include "psp/hmatrix_tools.hpp"

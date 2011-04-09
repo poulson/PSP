@@ -70,12 +70,213 @@ void psp::hmatrix_tools::MatrixMatrix
     }
 }
 
+// Form a dense matrix from a dense matrix times a low-rank matrix
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const LowRankMatrix<Scalar,Conjugated>& B, 
+                      DenseMatrix<Scalar>& C )
+{
+    C.SetType( GENERAL );
+    C.Resize( A.Height(), B.Width() );
+    MatrixMatrix( alpha, A, B, (Scalar)0, C );
+}
+
+// Form a dense matrix from a dense matrix times a low-rank matrix
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& A, 
+                const LowRankMatrix<Scalar,Conjugated>& B, 
+  Scalar beta,        DenseMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.Width() != B.Height() )
+        throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Symmetric() )
+        throw std::logic_error("Update will probably not be symmetric.");
+#endif
+    // W := A B.U
+    DenseMatrix<Scalar> W( A.Height(), B.Rank() );
+    if( A.Symmetric() )
+    {
+        blas::Symm
+        ( 'L', 'L', A.Height(), B.Rank(),
+          1, A.LockedBuffer(),   A.LDim(), 
+             B.U.LockedBuffer(), B.U.LDim(), 
+          0, W.Buffer(),         W.LDim() );
+    }
+    else
+    {
+        blas::Gemm
+        ( 'N', 'N', A.Height(), B.Rank(), A.Width(),
+          1, A.LockedBuffer(),   A.LDim(), 
+             B.U.LockedBuffer(), B.U.LDim(), 
+          0, W.Buffer(),         W.LDim() );
+    }
+    // C := alpha W B.V^[T,H] + beta C
+    const char option = ( Conjugated ? 'C' : 'T' );
+    blas::Gemm
+    ( 'N', option, C.Height(), C.Width(), B.Rank(),
+      alpha, W.LockedBuffer(),   W.LDim(), 
+             B.V.LockedBuffer(), B.V.LDim(), 
+      beta,  C.Buffer(),         C.LDim() );
+}
+
+// Form a dense matrix from a low-rank matrix times a dense matrix
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+                const DenseMatrix<Scalar>& B, 
+                      DenseMatrix<Scalar>& C )
+{
+    C.SetType( GENERAL );
+    C.Resize( A.Height(), B.Width() );
+    MatrixMatrix( alpha, A, B, (Scalar)0, C );
+}
+
+// Form a dense matrix from a low-rank matrix times a dense matrix
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+                const DenseMatrix<Scalar>& B, 
+  Scalar beta,        DenseMatrix<Scalar>& C )
+{
+#ifndef RELEASE
+    if( A.Width() != B.Height() )
+        throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Symmetric() )
+        throw std::logic_error("Update will probably not be symmetric.");
+#endif
+    if( Conjugated )
+    {
+        if( B.Symmetric() )
+        {
+            // C := alpha (A.U A.V^H) B + beta C
+            //    = alpha A.U (A.V^H B) + beta C
+            //    = alpha A.U (B conj(A.V))^T + beta C
+            //
+            // AVConj := conj(A.V)
+            // W := B AVConj
+            // C := alpha A.U W^T + beta C
+            DenseMatrix<Scalar> AVConj;
+            Conjugate( A.V, AVConj );
+            DenseMatrix<Scalar> W( A.Width(), A.Rank() );
+            blas::Symm
+            ( 'L', 'L', A.Width(), A.Rank(),
+              1, B.LockedBuffer(),      B.LDim(), 
+                 AVConj.LockedBuffer(), AVConj.LDim(), 
+              0, W.Buffer(),            W.LDim() );
+            blas::Gemm
+            ( 'N', 'T', A.Height(), A.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
+        }
+        else
+        {
+            // C := alpha (A.U A.V^H) B + beta C
+            //    = alpha A.U (A.V^H B) + beta C
+            //
+            // W := A.V^H B
+            // C := alpha A.U W + beta C
+            DenseMatrix<Scalar> W( A.Rank(), B.Width() );
+            blas::Gemm
+            ( 'C', 'N', A.Rank(), B.Width(), A.Width(),
+              1, A.V.LockedBuffer(), A.V.LDim(), 
+                 B.LockedBuffer(),   B.LDim(), 
+              0, W.Buffer(),         W.LDim() );
+            blas::Gemm
+            ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
+        }
+    }
+    else
+    {
+        if( B.Symmetric() )
+        {
+            // C := alpha (A.U A.V^T) B + beta C
+            //    = alpha A.U (A.V^T B) + beta C
+            //    = alpha A.U (B A.V)^T + beta C
+            //
+            // W := B A.V
+            // C := alpha A.U W^T + beta C
+            DenseMatrix<Scalar> W( A.Width(), A.Rank() );
+            blas::Symm
+            ( 'L', 'L', A.Width(), A.Rank(),
+              1, B.LockedBuffer(),   B.LDim(), 
+                 A.V.LockedBuffer(), A.V.LDim(), 
+              0, W.Buffer(),         W.LDim() );
+            blas::Gemm
+            ( 'N', 'T', A.Height(), A.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
+        }
+        else
+        {
+            // C := alpha (A.U A.V^T) B + beta C
+            //    = alpha A.U (A.V^T B) + beta C
+            //
+            // W := A.V^T B
+            // C := alpha A.U W + beta C
+            DenseMatrix<Scalar> W( A.Rank(), B.Width() );
+            blas::Gemm
+            ( 'T', 'N', A.Rank(), B.Width(), A.Width(),
+              1, A.V.LockedBuffer(), A.V.LDim(), 
+                 B.LockedBuffer(),   B.LDim(), 
+              0, W.Buffer(),         A.Rank() );
+            blas::Gemm
+            ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
+              alpha, A.U.LockedBuffer(), A.U.LDim(), 
+                     W.LockedBuffer(),   W.LDim(), 
+              beta,  C.Buffer(),         C.LDim() );
+        }
+    }
+}
+
+// Form a dense matrix from the product of two low-rank matrices.
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+                      DenseMatrix<Scalar>& C )
+{
+    C.SetType( GENERAL ); C.Resize( A.Height(), B.Width() );
+    MatrixMatrix( alpha, A, B, (Scalar)0, C );
+}
+
+// Update a dense matrix from the product of two low-rank matrices.
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::MatrixMatrix
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
+                const LowRankMatrix<Scalar,Conjugated>& B,
+  Scalar beta,        DenseMatrix<Scalar>& C )
+{
+    const char option = ( Conjugated ? 'C' : 'T' );
+    DenseMatrix<Scalar> W( A.Rank(), B.Rank() );
+    blas::Gemm
+    ( option, 'N', A.Rank(), B.Rank(), A.Width(),
+      1, A.V.LockedBuffer(), A.V.LDim(), B.U.LockedBuffer(), B.U.LDim(),
+      0, W.Buffer(), W.LDim() );
+    DenseMatrix<Scalar> X( A.Height(), B.Rank() );
+    blas::Gemm
+    ( 'N', 'N', A.Height(), B.Rank(), A.Rank(),
+      1, A.U.LockedBuffer(), A.U.LDim(), W.LockedBuffer(), W.LDim(),
+      0, X.Buffer(), X.LDim() );
+    blas::Gemm
+    ( 'N', option, C.Height(), C.Width(), B.Rank(),
+      alpha, X.LockedBuffer(), X.LDim(), B.V.LockedBuffer(), B.V.LDim(),
+      beta,  C.Buffer(), C.LDim() );
+}
+
 // Low-rank C := alpha A B
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B, 
-                      FactorMatrix<Scalar,Conjugated>& C )
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
+                const LowRankMatrix<Scalar,Conjugated>& B, 
+                      LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.Width() != B.Height() )
@@ -188,12 +389,12 @@ void psp::hmatrix_tools::MatrixMatrix
     }
 }
 
-// Form a factor matrix from a dense matrix times a factor matrix
+// Form a low-rank matrix from a dense matrix times a low-rank matrix
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B, 
-                      FactorMatrix<Scalar,Conjugated>& C )
+                const LowRankMatrix<Scalar,Conjugated>& B, 
+                      LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.Width() != B.Height() )
@@ -228,12 +429,12 @@ void psp::hmatrix_tools::MatrixMatrix
     Copy( B.V, C.V );
 }
 
-// Form a factor matrix from a factor matrix times a dense matrix
+// Form a low-rank matrix from a low-rank matrix times a dense matrix
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B, 
-                      FactorMatrix<Scalar,Conjugated>& C )
+                      LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     if( A.Width() != B.Height() )
@@ -318,178 +519,12 @@ void psp::hmatrix_tools::MatrixMatrix
     }
 }
 
-// Form a dense matrix from a dense matrix times a factor matrix
-template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B, 
-                      DenseMatrix<Scalar>& C )
-{
-    C.SetType( GENERAL );
-    C.Resize( A.Height(), B.Width() );
-    MatrixMatrix( alpha, A, B, (Scalar)0, C );
-}
-
-// Form a dense matrix from a dense matrix times a factor matrix
-template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const DenseMatrix<Scalar>& A, 
-                const FactorMatrix<Scalar,Conjugated>& B, 
-  Scalar beta,        DenseMatrix<Scalar>& C )
-{
-#ifndef RELEASE
-    if( A.Width() != B.Height() )
-        throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( C.Symmetric() )
-        throw std::logic_error("Update will probably not be symmetric.");
-#endif
-    // W := A B.U
-    DenseMatrix<Scalar> W( A.Height(), B.Rank() );
-    if( A.Symmetric() )
-    {
-        blas::Symm
-        ( 'L', 'L', A.Height(), B.Rank(),
-          1, A.LockedBuffer(),   A.LDim(), 
-             B.U.LockedBuffer(), B.U.LDim(), 
-          0, W.Buffer(),         W.LDim() );
-    }
-    else
-    {
-        blas::Gemm
-        ( 'N', 'N', A.Height(), B.Rank(), A.Width(),
-          1, A.LockedBuffer(),   A.LDim(), 
-             B.U.LockedBuffer(), B.U.LDim(), 
-          0, W.Buffer(),         W.LDim() );
-    }
-    // C := alpha W B.V^[T,H] + beta C
-    const char option = ( Conjugated ? 'C' : 'T' );
-    blas::Gemm
-    ( 'N', option, C.Height(), C.Width(), B.Rank(),
-      alpha, W.LockedBuffer(),   W.LDim(), 
-             B.V.LockedBuffer(), B.V.LDim(), 
-      beta,  C.Buffer(),         C.LDim() );
-}
-
-// Form a dense matrix from a factor matrix times a dense matrix
-template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-                const DenseMatrix<Scalar>& B, 
-                      DenseMatrix<Scalar>& C )
-{
-    C.SetType( GENERAL );
-    C.Resize( A.Height(), B.Width() );
-    MatrixMatrix( alpha, A, B, (Scalar)0, C );
-}
-
-// Form a dense matrix from a factor matrix times a dense matrix
-template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::MatrixMatrix
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
-                const DenseMatrix<Scalar>& B, 
-  Scalar beta,        DenseMatrix<Scalar>& C )
-{
-#ifndef RELEASE
-    if( A.Width() != B.Height() )
-        throw std::logic_error("Cannot multiply nonconformal matrices.");
-    if( C.Symmetric() )
-        throw std::logic_error("Update will probably not be symmetric.");
-#endif
-    if( Conjugated )
-    {
-        if( B.Symmetric() )
-        {
-            // C := alpha (A.U A.V^H) B + beta C
-            //    = alpha A.U (A.V^H B) + beta C
-            //    = alpha A.U (B conj(A.V))^T + beta C
-            //
-            // AVConj := conj(A.V)
-            // W := B AVConj
-            // C := alpha A.U W^T + beta C
-            DenseMatrix<Scalar> AVConj;
-            Conjugate( A.V, AVConj );
-            DenseMatrix<Scalar> W( A.Width(), A.Rank() );
-            blas::Symm
-            ( 'L', 'L', A.Width(), A.Rank(),
-              1, B.LockedBuffer(),      B.LDim(), 
-                 AVConj.LockedBuffer(), AVConj.LDim(), 
-              0, W.Buffer(),            W.LDim() );
-            blas::Gemm
-            ( 'N', 'T', A.Height(), A.Width(), A.Rank(),
-              alpha, A.U.LockedBuffer(), A.U.LDim(), 
-                     W.LockedBuffer(),   W.LDim(), 
-              beta,  C.Buffer(),         C.LDim() );
-        }
-        else
-        {
-            // C := alpha (A.U A.V^H) B + beta C
-            //    = alpha A.U (A.V^H B) + beta C
-            //
-            // W := A.V^H B
-            // C := alpha A.U W + beta C
-            DenseMatrix<Scalar> W( A.Rank(), B.Width() );
-            blas::Gemm
-            ( 'C', 'N', A.Rank(), B.Width(), A.Width(),
-              1, A.V.LockedBuffer(), A.V.LDim(), 
-                 B.LockedBuffer(),   B.LDim(), 
-              0, W.Buffer(),         W.LDim() );
-            blas::Gemm
-            ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
-              alpha, A.U.LockedBuffer(), A.U.LDim(), 
-                     W.LockedBuffer(),   W.LDim(), 
-              beta,  C.Buffer(),         C.LDim() );
-        }
-    }
-    else
-    {
-        if( B.Symmetric() )
-        {
-            // C := alpha (A.U A.V^T) B + beta C
-            //    = alpha A.U (A.V^T B) + beta C
-            //    = alpha A.U (B A.V)^T + beta C
-            //
-            // W := B A.V
-            // C := alpha A.U W^T + beta C
-            DenseMatrix<Scalar> W( A.Width(), A.Rank() );
-            blas::Symm
-            ( 'L', 'L', A.Width(), A.Rank(),
-              1, B.LockedBuffer(),   B.LDim(), 
-                 A.V.LockedBuffer(), A.V.LDim(), 
-              0, W.Buffer(),         W.LDim() );
-            blas::Gemm
-            ( 'N', 'T', A.Height(), A.Width(), A.Rank(),
-              alpha, A.U.LockedBuffer(), A.U.LDim(), 
-                     W.LockedBuffer(),   W.LDim(), 
-              beta,  C.Buffer(),         C.LDim() );
-        }
-        else
-        {
-            // C := alpha (A.U A.V^T) B + beta C
-            //    = alpha A.U (A.V^T B) + beta C
-            //
-            // W := A.V^T B
-            // C := alpha A.U W + beta C
-            DenseMatrix<Scalar> W( A.Rank(), B.Width() );
-            blas::Gemm
-            ( 'T', 'N', A.Rank(), B.Width(), A.Width(),
-              1, A.V.LockedBuffer(), A.V.LDim(), 
-                 B.LockedBuffer(),   B.LDim(), 
-              0, W.Buffer(),         A.Rank() );
-            blas::Gemm
-            ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
-              alpha, A.U.LockedBuffer(), A.U.LDim(), 
-                     W.LockedBuffer(),   W.LDim(), 
-              beta,  C.Buffer(),         C.LDim() );
-        }
-    }
-}
-
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, Real alpha, 
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
-        FactorMatrix<Real,Conjugated>& C )
+        LowRankMatrix<Real,Conjugated>& C )
 {
     const int m = A.Height();
     const int n = B.Width();
@@ -532,7 +567,7 @@ void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<Real> alpha, 
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
-        FactorMatrix< std::complex<Real>,Conjugated>& C )
+        LowRankMatrix< std::complex<Real>,Conjugated>& C )
 {
     typedef std::complex<Real> Scalar;
 
@@ -595,14 +630,14 @@ void psp::hmatrix_tools::MatrixMatrix
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
   Real beta,
-  FactorMatrix<Real,Conjugated>& C )
+  LowRankMatrix<Real,Conjugated>& C )
 {
     // D := alpha A B + beta C
     DenseMatrix<Real> D;
     MatrixMatrix( alpha, A, B, D );
     MatrixUpdate( beta, C, (Real)1, D );
 
-    // Truncate D down to a factor matrix of rank 'maxRank'
+    // Truncate D down to a low-rank matrix of rank 'maxRank'
     Compress( maxRank, D, C );
 }
 
@@ -612,7 +647,7 @@ void psp::hmatrix_tools::MatrixMatrix
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
   std::complex<Real> beta,
-        FactorMatrix< std::complex<Real>,Conjugated>& C )
+        LowRankMatrix< std::complex<Real>,Conjugated>& C )
 {
     typedef std::complex<Real> Scalar;
 
@@ -621,7 +656,7 @@ void psp::hmatrix_tools::MatrixMatrix
     MatrixMatrix( alpha, A, B, D );
     MatrixUpdate( beta, C, (Scalar)1, D );
 
-    // Truncate D down to a factor matrix of rank 'maxRank'
+    // Truncate D down to a low-rank matrix of rank 'maxRank'
     Compress( maxRank, D, C );
 }
 
@@ -661,338 +696,442 @@ template void psp::hmatrix_tools::MatrixMatrix
                               const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
 
+// Form a dense matrix from a dense matrix times a low-rank matrix
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const DenseMatrix<float>& A, 
+               const LowRankMatrix<float,false>& B, 
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const DenseMatrix<float>& A, 
+               const LowRankMatrix<float,true>& B, 
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const DenseMatrix<double>& A,
+                const LowRankMatrix<double,false>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const DenseMatrix<double>& A,
+                const LowRankMatrix<double,true>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, 
+  const DenseMatrix< std::complex<float> >& A,
+  const LowRankMatrix<std::complex<float>,false>& B,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, 
+  const DenseMatrix< std::complex<float> >& A,
+  const LowRankMatrix<std::complex<float>,true>& B,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const DenseMatrix< std::complex<double> >& A,
+  const LowRankMatrix<std::complex<double>,false>& B,
+        DenseMatrix< std::complex<double> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const DenseMatrix< std::complex<double> >& A,
+  const LowRankMatrix<std::complex<double>,true>& B,
+        DenseMatrix< std::complex<double> >& C );
+
+// Form a dense matrix from a dense matrix times a low-rank matrix
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const DenseMatrix<float>& A, 
+               const LowRankMatrix<float,false>& B, 
+  float beta,        DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const DenseMatrix<float>& A, 
+               const LowRankMatrix<float,true>& B, 
+  float beta,        DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const DenseMatrix<double>& A,
+                const LowRankMatrix<double,false>& B,
+  double beta,        DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const DenseMatrix<double>& A,
+                const LowRankMatrix<double,true>& B,
+  double beta,        DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, 
+  const DenseMatrix< std::complex<float> >& A,
+  const LowRankMatrix<std::complex<float>,false>& B,
+  std::complex<float> beta, 
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, 
+  const DenseMatrix< std::complex<float> >& A,
+  const LowRankMatrix<std::complex<float>,true>& B,
+  std::complex<float> beta, 
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const DenseMatrix< std::complex<double> >& A,
+  const LowRankMatrix<std::complex<double>,false>& B,
+  std::complex<double> beta,        
+        DenseMatrix< std::complex<double> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const DenseMatrix< std::complex<double> >& A,
+  const LowRankMatrix<std::complex<double>,true>& B,
+  std::complex<double> beta,
+        DenseMatrix< std::complex<double> >& C );
+
+// Form a dense matrix from a low-rank matrix times a dense matrix
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,false>& A, 
+               const DenseMatrix<float>& B, 
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,true>& A, 
+               const DenseMatrix<float>& B, 
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,false>& A,
+                const DenseMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,true>& A,
+                const DenseMatrix<double>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const DenseMatrix< std::complex<float> >& B,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const DenseMatrix< std::complex<float> >& B,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const DenseMatrix< std::complex<double> >& B,
+        DenseMatrix< std::complex<double> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const DenseMatrix< std::complex<double> >& B,
+        DenseMatrix< std::complex<double> >& C );
+
+// Form a dense matrix from a low-rank matrix times a dense matrix
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,false>& A, 
+               const DenseMatrix<float>& B, 
+  float beta,        DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,true>& A, 
+               const DenseMatrix<float>& B, 
+  float beta,        DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,false>& A,
+                const DenseMatrix<double>& B,
+  double beta,        DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,true>& A,
+                const DenseMatrix<double>& B,
+  double beta,        DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,false>& A,
+                             const DenseMatrix< std::complex<float> >& B,
+  std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha, const LowRankMatrix<std::complex<float>,true>& A,
+                             const DenseMatrix< std::complex<float> >& B,
+  std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const DenseMatrix< std::complex<double> >& B,
+  std::complex<double> beta,        
+        DenseMatrix< std::complex<double> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const DenseMatrix< std::complex<double> >& B,
+  std::complex<double> beta,        
+        DenseMatrix< std::complex<double> >& C );
+
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,false>& A,
+               const LowRankMatrix<float,false>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,true>& A,
+               const LowRankMatrix<float,true>& B,
+                     DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,false>& A,
+                const LowRankMatrix<double,false>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,true>& A,
+                const LowRankMatrix<double,true>& B,
+                      DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha,
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const LowRankMatrix<std::complex<float>,false>& B,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha,
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const LowRankMatrix<std::complex<float>,true>& B,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha,
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const LowRankMatrix<std::complex<double>,false>& B,
+        DenseMatrix< std::complex<double> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha,
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const LowRankMatrix<std::complex<double>,true>& B,
+        DenseMatrix< std::complex<double> >& C );
+
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,false>& A,
+               const LowRankMatrix<float,false>& B,
+  float beta,        DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( float alpha, const LowRankMatrix<float,true>& A,
+               const LowRankMatrix<float,true>& B,
+  float beta,        DenseMatrix<float>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,false>& A,
+                const LowRankMatrix<double,false>& B,
+  double beta,        DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( double alpha, const LowRankMatrix<double,true>& A,
+                const LowRankMatrix<double,true>& B,
+  double beta,        DenseMatrix<double>& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha,
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const LowRankMatrix<std::complex<float>,false>& B,
+  std::complex<float> beta,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<float> alpha,
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const LowRankMatrix<std::complex<float>,true>& B,
+  std::complex<float> beta,
+        DenseMatrix< std::complex<float> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha,
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const LowRankMatrix<std::complex<double>,false>& B,
+  std::complex<double> beta,
+        DenseMatrix< std::complex<double> >& C );
+template void psp::hmatrix_tools::MatrixMatrix
+( std::complex<double> alpha,
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const LowRankMatrix<std::complex<double>,true>& B,
+  std::complex<double> beta,
+        DenseMatrix< std::complex<double> >& C );
+
 // Low-rank C := alpha A B
 template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,false>& A,
-               const FactorMatrix<float,false>& B,
-                     FactorMatrix<float,false>& C );
+( float alpha, const LowRankMatrix<float,false>& A,
+               const LowRankMatrix<float,false>& B,
+                     LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,true>& A,
-               const FactorMatrix<float,true>& B,
-                     FactorMatrix<float,true>& C );
+( float alpha, const LowRankMatrix<float,true>& A,
+               const LowRankMatrix<float,true>& B,
+                     LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,false>& A,
-                const FactorMatrix<double,false>& B,
-                      FactorMatrix<double,false>& C );
+( double alpha, const LowRankMatrix<double,false>& A,
+                const LowRankMatrix<double,false>& B,
+                      LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,true>& A,
-                const FactorMatrix<double,true>& B,
-                      FactorMatrix<double,true>& C );
+( double alpha, const LowRankMatrix<double,true>& A,
+                const LowRankMatrix<double,true>& B,
+                      LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-                             const FactorMatrix<std::complex<float>,false>& B,
-                                   FactorMatrix<std::complex<float>,false>& C );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const LowRankMatrix<std::complex<float>,false>& B,
+        LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-                             const FactorMatrix<std::complex<float>,true>& B,
-                                   FactorMatrix<std::complex<float>,true>& C );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const LowRankMatrix<std::complex<float>,true>& B,
+        LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-                              const FactorMatrix<std::complex<double>,false>& B,
-                                    FactorMatrix<std::complex<double>,false>& C
-);
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const LowRankMatrix<std::complex<double>,false>& B,
+        LowRankMatrix<std::complex<double>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-                              const FactorMatrix<std::complex<double>,true>& B,
-                                    FactorMatrix<std::complex<double>,true>& C
-);
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const LowRankMatrix<std::complex<double>,true>& B,
+        LowRankMatrix<std::complex<double>,true>& C );
 
-// Form a dense matrix from a dense matrix times a factor matrix
+// Form a low-rank matrix from a dense matrix times a low-rank matrix
 template void psp::hmatrix_tools::MatrixMatrix
 ( float alpha, const DenseMatrix<float>& A, 
-               const FactorMatrix<float,false>& B, 
-                     DenseMatrix<float>& C );
+               const LowRankMatrix<float,false>& B, 
+                     LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( float alpha, const DenseMatrix<float>& A, 
-               const FactorMatrix<float,true>& B, 
-                     DenseMatrix<float>& C );
+               const LowRankMatrix<float,true>& B, 
+                     LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( double alpha, const DenseMatrix<double>& A,
-                const FactorMatrix<double,false>& B,
-                      DenseMatrix<double>& C );
+                const LowRankMatrix<double,false>& B,
+                      LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( double alpha, const DenseMatrix<double>& A,
-                const FactorMatrix<double,true>& B,
-                      DenseMatrix<double>& C );
+                const LowRankMatrix<double,true>& B,
+                      LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-                             const FactorMatrix<std::complex<float>,false>& B,
-                                   DenseMatrix< std::complex<float> >& C );
+( std::complex<float> alpha, 
+  const DenseMatrix< std::complex<float> >& A,
+  const LowRankMatrix<std::complex<float>,false>& B,
+        LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-                             const FactorMatrix<std::complex<float>,true>& B,
-                                   DenseMatrix< std::complex<float> >& C );
+( std::complex<float> alpha, 
+  const DenseMatrix< std::complex<float> >& A,
+  const LowRankMatrix<std::complex<float>,true>& B,
+        LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-                              const FactorMatrix<std::complex<double>,false>& B,
-                                    DenseMatrix< std::complex<double> >& C );
+( std::complex<double> alpha, 
+  const DenseMatrix< std::complex<double> >& A,
+  const LowRankMatrix<std::complex<double>,false>& B,
+        LowRankMatrix<std::complex<double>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-                              const FactorMatrix<std::complex<double>,true>& B,
-                                    DenseMatrix< std::complex<double> >& C );
+( std::complex<double> alpha, 
+  const DenseMatrix< std::complex<double> >& A,
+  const LowRankMatrix<std::complex<double>,true>& B,
+        LowRankMatrix<std::complex<double>,true>& C );
 
-// Form a dense matrix from a dense matrix times a factor matrix
+// Form a low-rank matrix from a low-rank matrix times a dense matrix
 template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const DenseMatrix<float>& A, 
-               const FactorMatrix<float,false>& B, 
-  float beta,        DenseMatrix<float>& C );
+( float alpha, const LowRankMatrix<float,false>& A, 
+               const DenseMatrix<float>& B, 
+                     LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const DenseMatrix<float>& A, 
-               const FactorMatrix<float,true>& B, 
-  float beta,        DenseMatrix<float>& C );
+( float alpha, const LowRankMatrix<float,true>& A, 
+               const DenseMatrix<float>& B, 
+                     LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const DenseMatrix<double>& A,
-                const FactorMatrix<double,false>& B,
-  double beta,        DenseMatrix<double>& C );
+( double alpha, const LowRankMatrix<double,false>& A,
+                const DenseMatrix<double>& B,
+                      LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const DenseMatrix<double>& A,
-                const FactorMatrix<double,true>& B,
-  double beta,        DenseMatrix<double>& C );
+( double alpha, const LowRankMatrix<double,true>& A,
+                const DenseMatrix<double>& B,
+                      LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-                             const FactorMatrix<std::complex<float>,false>& B,
-  std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const DenseMatrix< std::complex<float> >& B,
+        LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-                             const FactorMatrix<std::complex<float>,true>& B,
-  std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const DenseMatrix< std::complex<float> >& B,
+        LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-                              const FactorMatrix<std::complex<double>,false>& B,
-  std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const DenseMatrix< std::complex<double> >& B,
+        LowRankMatrix<std::complex<double>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-                              const FactorMatrix<std::complex<double>,true>& B,
-  std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const DenseMatrix< std::complex<double> >& B,
+        LowRankMatrix<std::complex<double>,true>& C );
 
-// Form a dense matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,false>& A, 
-               const DenseMatrix<float>& B, 
-                     DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,true>& A, 
-               const DenseMatrix<float>& B, 
-                     DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,false>& A,
-                const DenseMatrix<double>& B,
-                      DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,true>& A,
-                const DenseMatrix<double>& B,
-                      DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-                             const DenseMatrix< std::complex<float> >& B,
-                                   DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-                             const DenseMatrix< std::complex<float> >& B,
-                                   DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-                              const DenseMatrix< std::complex<double> >& B,
-                                    DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-                              const DenseMatrix< std::complex<double> >& B,
-                                    DenseMatrix< std::complex<double> >& C );
-
-// Form a dense matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,false>& A, 
-               const DenseMatrix<float>& B, 
-  float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,true>& A, 
-               const DenseMatrix<float>& B, 
-  float beta,        DenseMatrix<float>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,false>& A,
-                const DenseMatrix<double>& B,
-  double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,true>& A,
-                const DenseMatrix<double>& B,
-  double beta,        DenseMatrix<double>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-                             const DenseMatrix< std::complex<float> >& B,
-  std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-                             const DenseMatrix< std::complex<float> >& B,
-  std::complex<float> beta,        DenseMatrix< std::complex<float> >& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-                              const DenseMatrix< std::complex<double> >& B,
-  std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-                              const DenseMatrix< std::complex<double> >& B,
-  std::complex<double> beta,        DenseMatrix< std::complex<double> >& C );
-
-// Form a factor matrix from a dense matrix times a factor matrix
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const DenseMatrix<float>& A, 
-               const FactorMatrix<float,false>& B, 
-                     FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const DenseMatrix<float>& A, 
-               const FactorMatrix<float,true>& B, 
-                     FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const DenseMatrix<double>& A,
-                const FactorMatrix<double,false>& B,
-                      FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const DenseMatrix<double>& A,
-                const FactorMatrix<double,true>& B,
-                      FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-                             const FactorMatrix<std::complex<float>,false>& B,
-                                   FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
-                             const FactorMatrix<std::complex<float>,true>& B,
-                                   FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-                              const FactorMatrix<std::complex<double>,false>& B,
-                                    FactorMatrix<std::complex<double>,false>& C
-);
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
-                              const FactorMatrix<std::complex<double>,true>& B,
-                                    FactorMatrix<std::complex<double>,true>& C
-);
-
-// Form a factor matrix from a factor matrix times a dense matrix
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,false>& A, 
-               const DenseMatrix<float>& B, 
-                     FactorMatrix<float,false>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( float alpha, const FactorMatrix<float,true>& A, 
-               const DenseMatrix<float>& B, 
-                     FactorMatrix<float,true>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,false>& A,
-                const DenseMatrix<double>& B,
-                      FactorMatrix<double,false>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( double alpha, const FactorMatrix<double,true>& A,
-                const DenseMatrix<double>& B,
-                      FactorMatrix<double,true>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-                             const DenseMatrix< std::complex<float> >& B,
-                                   FactorMatrix<std::complex<float>,false>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-                             const DenseMatrix< std::complex<float> >& B,
-                                   FactorMatrix<std::complex<float>,true>& C );
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-                              const DenseMatrix< std::complex<double> >& B,
-                                    FactorMatrix<std::complex<double>,false>& C 
-);
-template void psp::hmatrix_tools::MatrixMatrix
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-                              const DenseMatrix< std::complex<double> >& B,
-                                    FactorMatrix<std::complex<double>,true>& C 
-);
-
-// Generate a factor matrix from the product of two dense matrices
+// Generate a low-rank matrix from the product of two dense matrices
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, float alpha, 
   const DenseMatrix<float>& A,
   const DenseMatrix<float>& B,
-        FactorMatrix<float,false>& C );
+        LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, float alpha, 
   const DenseMatrix<float>& A,
   const DenseMatrix<float>& B,
-        FactorMatrix<float,true>& C );
+        LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, double alpha,
   const DenseMatrix<double>& A,
   const DenseMatrix<double>& B,
-        FactorMatrix<double,false>& C );
+        LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, double alpha,
   const DenseMatrix<double>& A,
   const DenseMatrix<double>& B,
-        FactorMatrix<double,true>& C );
+        LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<float> alpha,
   const DenseMatrix< std::complex<float> >& A,
   const DenseMatrix< std::complex<float> >& B,
-        FactorMatrix<std::complex<float>,false>& C );
+        LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<float> alpha,
   const DenseMatrix< std::complex<float> >& A,
   const DenseMatrix< std::complex<float> >& B,
-        FactorMatrix<std::complex<float>,true>& C );
+        LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<double> alpha,
   const DenseMatrix< std::complex<double> >& A,
   const DenseMatrix< std::complex<double> >& B,
-        FactorMatrix<std::complex<double>,false>& C );
+        LowRankMatrix<std::complex<double>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<double> alpha,
   const DenseMatrix< std::complex<double> >& A,
   const DenseMatrix< std::complex<double> >& B,
-        FactorMatrix<std::complex<double>,true>& C );
+        LowRankMatrix<std::complex<double>,true>& C );
 
-// Update a factor matrix from the product of two dense matrices
+// Update a low-rank matrix from the product of two dense matrices
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, float alpha, 
   const DenseMatrix<float>& A,
   const DenseMatrix<float>& B,
   float beta,
-        FactorMatrix<float,false>& C );
+        LowRankMatrix<float,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, float alpha, 
   const DenseMatrix<float>& A,
   const DenseMatrix<float>& B,
   float beta,
-        FactorMatrix<float,true>& C );
+        LowRankMatrix<float,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, double alpha,
   const DenseMatrix<double>& A,
   const DenseMatrix<double>& B,
   double beta,
-        FactorMatrix<double,false>& C );
+        LowRankMatrix<double,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, double alpha,
   const DenseMatrix<double>& A,
   const DenseMatrix<double>& B,
   double beta,
-        FactorMatrix<double,true>& C );
+        LowRankMatrix<double,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<float> alpha,
   const DenseMatrix< std::complex<float> >& A,
   const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,
-        FactorMatrix<std::complex<float>,false>& C );
+        LowRankMatrix<std::complex<float>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<float> alpha,
   const DenseMatrix< std::complex<float> >& A,
   const DenseMatrix< std::complex<float> >& B,
   std::complex<float> beta,
-        FactorMatrix<std::complex<float>,true>& C );
+        LowRankMatrix<std::complex<float>,true>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<double> alpha,
   const DenseMatrix< std::complex<double> >& A,
   const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,
-        FactorMatrix<std::complex<double>,false>& C );
+        LowRankMatrix<std::complex<double>,false>& C );
 template void psp::hmatrix_tools::MatrixMatrix
 ( int maxRank, std::complex<double> alpha,
   const DenseMatrix< std::complex<double> >& A,
   const DenseMatrix< std::complex<double> >& B,
   std::complex<double> beta,
-        FactorMatrix<std::complex<double>,true>& C );
+        LowRankMatrix<std::complex<double>,true>& C );

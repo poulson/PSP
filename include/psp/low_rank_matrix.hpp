@@ -18,8 +18,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_FACTOR_MATRIX_HPP
-#define PSP_FACTOR_MATRIX_HPP 1
+#ifndef PSP_LOW_RANK_MATRIX_HPP
+#define PSP_LOW_RANK_MATRIX_HPP 1
 
 #include "psp/dense_matrix.hpp"
 
@@ -35,7 +35,7 @@ namespace psp {
 // U and V will always be assumed to be of general type 
 // (they should be non-square except in pathological cases).
 template<typename Scalar,bool Conjugated>
-struct FactorMatrix
+struct LowRankMatrix
 {
     // If Conjugated == true, then A = U V^H, otherwise, A = U V^T. 
     DenseMatrix<Scalar> U;
@@ -48,4 +48,4 @@ struct FactorMatrix
 
 } // namespace psp
 
-#endif // PSP_FACTOR_MATRIX_HPP
+#endif // PSP_LOW_RANK_MATRIX_HPP

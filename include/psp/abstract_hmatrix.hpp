@@ -22,7 +22,7 @@
 #define PSP_ABSTRACT_HMATRIX_HPP 1
 
 #include "psp/dense_matrix.hpp"
-#include "psp/factor_matrix.hpp"
+#include "psp/low_rank_matrix.hpp"
 #include "psp/vector.hpp"
 
 namespace psp {
@@ -33,19 +33,22 @@ class AbstractHMatrix
 protected:
     int _height, _width;
     int _numLevels;
+    int _maxRank;
     int _sourceOffset, _targetOffset;
     bool _symmetric;
     bool _stronglyAdmissible;
 
     AbstractHMatrix()
-    : _height(0), _width(0), _numLevels(0), _sourceOffset(0), _targetOffset(0),
+    : _height(0), _width(0), _numLevels(0), _maxRank(0), 
+      _sourceOffset(0), _targetOffset(0),
       _symmetric(false), _stronglyAdmissible(false)
     { }
 
     AbstractHMatrix
-    ( int height, int width, int numLevels, int sourceOffset, int targetOffset,
+    ( int height, int width, int numLevels, int maxRank,
+      int sourceOffset, int targetOffset,
       bool symmetric, bool stronglyAdmissible )
-    : _height(height), _width(width), _numLevels(numLevels), 
+    : _height(height), _width(width), _numLevels(numLevels), _maxRank(maxRank),
       _sourceOffset(sourceOffset), _targetOffset(targetOffset),
       _symmetric(symmetric), _stronglyAdmissible(stronglyAdmissible)
     { }
@@ -54,6 +57,7 @@ public:
     int Height() const { return _height; }
     int Width() const  { return _width; }
     int NumLevels() const { return _numLevels; }
+    int MaxRank() const { return _maxRank; }
     int SourceOffset() const { return _sourceOffset; }
     int TargetOffset() const { return _targetOffset; }
     bool Symmetric() const { return _symmetric; }

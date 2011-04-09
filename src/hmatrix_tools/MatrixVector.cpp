@@ -74,7 +74,7 @@ void psp::hmatrix_tools::MatrixVector
 // Low-rank y := alpha A x + beta y
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
@@ -100,7 +100,7 @@ void psp::hmatrix_tools::MatrixVector
 // Low-rank y := alpha A x
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::MatrixVector
-( Scalar alpha, const FactorMatrix<Scalar,Conjugated>& A, 
+( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
@@ -159,68 +159,80 @@ template void psp::hmatrix_tools::MatrixVector
                                     Vector< std::complex<double> >& y );
 
 template void psp::hmatrix_tools::MatrixVector
-( float alpha, const FactorMatrix<float,false>& A,
+( float alpha, const LowRankMatrix<float,false>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
 template void psp::hmatrix_tools::MatrixVector
-( float alpha, const FactorMatrix<float,true>& A,
+( float alpha, const LowRankMatrix<float,true>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
 template void psp::hmatrix_tools::MatrixVector
-( double alpha, const FactorMatrix<double,false>& A,
+( double alpha, const LowRankMatrix<double,false>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
 template void psp::hmatrix_tools::MatrixVector
-( double alpha, const FactorMatrix<double,true>& A,
+( double alpha, const LowRankMatrix<double,true>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-                             const Vector< std::complex<float> >& x,
-  std::complex<float> beta,        Vector< std::complex<float> >& y );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const Vector< std::complex<float> >& x,
+  std::complex<float> beta,
+        Vector< std::complex<float> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-                             const Vector< std::complex<float> >& x,
-  std::complex<float> beta,        Vector< std::complex<float> >& y );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const Vector< std::complex<float> >& x,
+  std::complex<float> beta, 
+        Vector< std::complex<float> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-                              const Vector< std::complex<double> >& x,
-  std::complex<double> beta,        Vector< std::complex<double> >& y );
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const Vector< std::complex<double> >& x,
+  std::complex<double> beta,
+        Vector< std::complex<double> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-                              const Vector< std::complex<double> >& x,
-  std::complex<double> beta,        Vector< std::complex<double> >& y );
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const Vector< std::complex<double> >& x,
+  std::complex<double> beta,
+        Vector< std::complex<double> >& y );
 
 template void psp::hmatrix_tools::MatrixVector
-( float alpha, const FactorMatrix<float,false>& A,
+( float alpha, const LowRankMatrix<float,false>& A,
                const Vector<float>& x,
                      Vector<float>& y );
 template void psp::hmatrix_tools::MatrixVector
-( float alpha, const FactorMatrix<float,true>& A,
+( float alpha, const LowRankMatrix<float,true>& A,
                const Vector<float>& x,
                      Vector<float>& y );
 template void psp::hmatrix_tools::MatrixVector
-( double alpha, const FactorMatrix<double,false>& A,
+( double alpha, const LowRankMatrix<double,false>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
 template void psp::hmatrix_tools::MatrixVector
-( double alpha, const FactorMatrix<double,true>& A,
+( double alpha, const LowRankMatrix<double,true>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,false>& A,
-                             const Vector< std::complex<float> >& x,
-                                   Vector< std::complex<float> >& y );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,false>& A,
+  const Vector< std::complex<float> >& x,
+        Vector< std::complex<float> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<float> alpha, const FactorMatrix<std::complex<float>,true>& A,
-                             const Vector< std::complex<float> >& x,
-                                   Vector< std::complex<float> >& y );
+( std::complex<float> alpha, 
+  const LowRankMatrix<std::complex<float>,true>& A,
+  const Vector< std::complex<float> >& x,
+        Vector< std::complex<float> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,false>& A,
-                              const Vector< std::complex<double> >& x,
-                                    Vector< std::complex<double> >& y );
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,false>& A,
+  const Vector< std::complex<double> >& x,
+        Vector< std::complex<double> >& y );
 template void psp::hmatrix_tools::MatrixVector
-( std::complex<double> alpha, const FactorMatrix<std::complex<double>,true>& A,
-                              const Vector< std::complex<double> >& x,
-                                    Vector< std::complex<double> >& y );
+( std::complex<double> alpha, 
+  const LowRankMatrix<std::complex<double>,true>& A,
+  const Vector< std::complex<double> >& x,
+        Vector< std::complex<double> >& y );
 
