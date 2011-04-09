@@ -192,7 +192,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
     hmatrix_tools::Scale( beta, y );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -216,18 +218,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
             }
             targetOffset += targetSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
-    {
+    case NODE_SYMMETRIC:
         UpdateVectorWithNodeSymmetric( alpha, x, y );
-    }
-    else if( _shell.type == LOW_RANK )
-    {
+        break;
+    case LOW_RANK:
         hmatrix_tools::MatrixVector( alpha, *_shell.data.F, x, (Scalar)1, y );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixVector( alpha, *_shell.data.D, x, (Scalar)1, y );
+        break;
     }
 }
 
@@ -246,7 +247,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
     hmatrix_tools::Scale( beta, y );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -270,20 +273,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
             }
             targetOffset += sourceSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
-    {
+    case NODE_SYMMETRIC:
         UpdateVectorWithNodeSymmetric( alpha, x, y );
-    }
-    else if( _shell.type == LOW_RANK )
-    {
+        break;
+    case LOW_RANK:
         hmatrix_tools::MatrixTransposeVector
         ( alpha, *_shell.data.F, x, (Scalar)1, y );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixTransposeVector
         ( alpha, *_shell.data.D, x, (Scalar)1, y );
+        break;
     }
 }
 
@@ -302,7 +304,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
     hmatrix_tools::Scale( beta, y );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -327,24 +331,25 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
             }
             targetOffset += sourceSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
+    case NODE_SYMMETRIC:
     {
         Vector<Scalar> xConj;
         hmatrix_tools::Conjugate( x, xConj );
         hmatrix_tools::Conjugate( y );
         UpdateVectorWithNodeSymmetric( Conj(alpha), xConj, y ); 
         hmatrix_tools::Conjugate( y );
+        break;
     }
-    else if( _shell.type == LOW_RANK )
-    {
+    case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeVector
         ( alpha, *_shell.data.F, x, (Scalar)1, y );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixHermitianTransposeVector
         ( alpha, *_shell.data.D, x, (Scalar)1, y );
+        break;
     }
 }
 
@@ -356,7 +361,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
     hmatrix_tools::Scale( beta, y );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -381,24 +388,23 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
             }
             targetOffset += sourceSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
-    {
+    case NODE_SYMMETRIC:
         hmatrix_tools::Conjugate( x );
         hmatrix_tools::Conjugate( y );
         UpdateVectorWithNodeSymmetric( Conj(alpha), x, y ); 
         hmatrix_tools::Conjugate( x );
         hmatrix_tools::Conjugate( y );
-    }
-    else if( _shell.type == LOW_RANK )
-    {
+        break;
+    case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeVector
         ( alpha, *_shell.data.F, x, (Scalar)1, y );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixHermitianTransposeVector
         ( alpha, *_shell.data.D, x, (Scalar)1, y );
+        break;
     }
 }
 
@@ -428,7 +434,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
     hmatrix_tools::Scale( beta, C );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -453,18 +461,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             }
             targetOffset += targetSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
-    {
+    case NODE_SYMMETRIC:
         UpdateMatrixWithNodeSymmetric( alpha, B, C );
-    }
-    else if( _shell.type == LOW_RANK )
-    {
+        break;
+    case LOW_RANK:
         hmatrix_tools::MatrixMatrix( alpha, *_shell.data.F, B, (Scalar)1, C );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixMatrix( alpha, *_shell.data.D, B, (Scalar)1, C );
+        break;
     }
 }
 
@@ -486,7 +493,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
     hmatrix_tools::Scale( beta, C );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -511,20 +520,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
             }
             targetOffset += sourceSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
-    {
+    case NODE_SYMMETRIC:
         UpdateMatrixWithNodeSymmetric( alpha, B, C );
-    }
-    else if( _shell.type == LOW_RANK )
-    {
+        break;
+    case LOW_RANK:
         hmatrix_tools::MatrixTransposeMatrix
         ( alpha, *_shell.data.F, B, (Scalar)1, C );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixTransposeMatrix
         ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        break;
     }
 }
 
@@ -546,7 +554,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
     hmatrix_tools::Scale( beta, C );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -572,24 +582,25 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
             }
             targetOffset += sourceSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
+    case NODE_SYMMETRIC:
     {
         DenseMatrix<Scalar> BConj;
         hmatrix_tools::Conjugate( B, BConj );
         hmatrix_tools::Conjugate( C );
         UpdateMatrixWithNodeSymmetric( alpha, B, C );
         hmatrix_tools::Conjugate( C );
+        break;
     }
-    else if( _shell.type == LOW_RANK )
-    {
+    case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeMatrix
         ( alpha, *_shell.data.F, B, (Scalar)1, C );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixHermitianTransposeMatrix
         ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        break;
     }
 }
 
@@ -601,7 +612,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
   Scalar beta,  DenseMatrix<Scalar>& C ) const
 {
     hmatrix_tools::Scale( beta, C );
-    if( _shell.type == NODE )
+    switch( _shell.type )
+    {
+    case NODE:
     {
         // Loop over all 16 children, summing in each row
         int targetOffset = 0;
@@ -627,24 +640,23 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
             }
             targetOffset += sourceSizes[t];
         }
+        break;
     }
-    else if( _shell.type == NODE_SYMMETRIC )
-    {
+    case NODE_SYMMETRIC:
         hmatrix_tools::Conjugate( B );
         hmatrix_tools::Conjugate( C );
         UpdateMatrixWithNodeSymmetric( alpha, B, C );
         hmatrix_tools::Conjugate( B );
         hmatrix_tools::Conjugate( C );
-    }
-    else if( _shell.type == LOW_RANK )
-    {
+        break;
+    case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeMatrix
         ( alpha, *_shell.data.F, B, (Scalar)1, C );
-    }
-    else /* _shell.type == DENSE */
-    {
+        break;
+    case DENSE:
         hmatrix_tools::MatrixHermitianTransposeMatrix
         ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        break;
     }
 }
 
@@ -671,6 +683,143 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     HermitianTransposeMapMatrix( alpha, B, 0, C );
 }
 
+/*\
+|*| Computational routines specific to Quasi2dHMatrix
+\*/
+
+// A := B
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
+( const Quasi2dHMatrix<Scalar,Conjugated>& B )
+{
+    this->_height = B.Height();
+    this->_width = B.Width();
+    this->_numLevels = B.NumLevels();
+    this->_maxRank = B.MaxRank();
+    this->_sourceOffset = B.SourceOffset();
+    this->_targetOffset = B.TargetOffset();
+    this->_symmetric = B.Symmetric();
+    this->_stronglyAdmissible = B.StronglyAdmissible();
+    _xSizeSource = B.XSizeSource();
+    _xSizeTarget = B.XSizeTarget();
+    _ySizeSource = B.YSizeSource();
+    _ySizeTarget = B.YSizeTarget();
+    _zSize = B.ZSize();
+    _xSource = B.XSource();
+    _xTarget = B.XTarget();
+    _ySource = B.YSource();
+    _yTarget = B.YTarget();
+
+    _shell.type = B._shell.type;
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        _shell.data.node = 
+            new Node
+            ( _xSizeSource, _xSizeTarget,
+              _ySizeSource, _ySizeTarget, _zSize );
+        Node& thisNode = *_shell.data.node;
+        const Node& nodeB = *B._shell.data.node;
+        for( int i=0; i<16; ++i )
+        {
+            thisNode.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            thisNode.children[i]->CopyFrom( *nodeB.children[i] );
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        _shell.data.nodeSymmetric = 
+            new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+        NodeSymmetric& thisNode = *_shell.data.nodeSymmetric;
+        const NodeSymmetric& nodeB = *B._shell.data.nodeSymmetric;
+        for( int i=0; i<10; ++i )
+        {
+            thisNode.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            thisNode.children[i]->CopyFrom( *nodeB.children[i] );
+        }
+        break;
+    }
+    case LOW_RANK:
+        _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        hmatrix_tools::Copy( *B._shell.data.F, *_shell.data.F );
+        break;
+    case DENSE:
+        _shell.data.D = new DenseMatrix<Scalar>;
+        hmatrix_tools::Copy( *B._shell.data.D, *_shell.data.D );
+        break;
+    }
+}
+
+// A := alpha A
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
+{
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        Node& thisNode = *_shell.data.node;
+        for( int i=0; i<16; ++i )
+            thisNode.children[i]->Scale( alpha );
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        NodeSymmetric& thisNode = *_shell.data.nodeSymmetric;
+        for( int i=0; i<10; ++i )
+            thisNode.children[i]->Scale( alpha );
+        break;
+    }
+    case LOW_RANK:
+        hmatrix_tools::Scale( alpha, *_shell.data.F );
+        break;
+    case DENSE:
+        hmatrix_tools::Scale( alpha, *_shell.data.D );
+        break;
+    }
+}
+
+// A := alpha B + A
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWith
+( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B )
+{
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        Node& nodeA = *_shell.data.node;
+        const Node& nodeB = *B._shell.data.node;
+        for( int i=0; i<16; ++i )
+            nodeA.children[i]->UpdateWith( alpha, *nodeB.children[i] );
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
+        const NodeSymmetric& nodeB = *B._shell.data.nodeSymmetric;
+        for( int i=0; i<10; ++i )
+            nodeA.children[i]->UpdateWith( alpha, *nodeB.children[i] );
+        break;
+    }
+    case LOW_RANK:
+        hmatrix_tools::MatrixUpdateRounded
+        ( this->_maxRank, 
+          alpha, *B._shell.data.F, (Scalar)1, *_shell.data.F );
+        break;
+    case DENSE:
+        hmatrix_tools::MatrixUpdate
+        ( alpha, *B._shell.data.D, (Scalar)1, *_shell.data.D );
+        break;
+    }
+}
+
+// C := alpha A B
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
@@ -690,6 +839,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     C._height = this->Height();
     C._width = B.Width();
     C._numLevels = this->NumLevels();
+    C._maxRank = this->MaxRank();
     C._sourceOffset = B.SourceOffset();
     C._targetOffset = this->TargetOffset();
     C._symmetric = false;
@@ -716,16 +866,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // C.F := alpha A.F B.F
             hmatrix_tools::MatrixMatrix
-            ( alpha, *this->_shell.data.F, *B._shell.data.F, *C._shell.data.F );
+            ( alpha, *_shell.data.F, *B._shell.data.F, *C._shell.data.F );
         }
         else if( this->IsLowRank() && B.IsHierarchical() )
         {
             // C.F.U := A.F.U
-            Copy( this->_shell.data.F->U, C._shell.data.F->U );
+            Copy( _shell.data.F->U, C._shell.data.F->U );
             // C.F.V := scale B^H A.F.V
             const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
             B.HermitianTransposeMapMatrix
-            ( scale, this->_shell.data.F->V, C._shell.data.F->V );
+            ( scale, _shell.data.F->V, C._shell.data.F->V );
         }
         else if( this->IsHierarchical() && B.IsLowRank() )
         {
@@ -734,7 +884,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // C.F.V := B.F.V
             hmatrix_tools::Copy( B._shell.data.F->V, C._shell.data.F->V );
         }
-        else
+        else /* both hierarchical */
         {
             // C.F := alpha H H
             const int oversampling = 4; // lift this definition
@@ -747,7 +897,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         // A product of two matrices will be assumed non-symmetric.
         C._shell.type = NODE;
         C._shell.data.node = 
-            new NodeData
+            new Node
             ( C._xSizeSource, C._xSizeTarget, C._ySizeSource, C._ySizeTarget, 
               C._zSize );
 
@@ -804,22 +954,22 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         if( this->IsDense() && B.IsDense() )
         {
             hmatrix_tools::MatrixMatrix
-            ( alpha, *this->_shell.data.D, *B._shell.data.D, *C._shell.data.D );
+            ( alpha, *_shell.data.D, *B._shell.data.D, *C._shell.data.D );
         }
         else if( this->IsDense() && B.IsLowRank() )
         {
             hmatrix_tools::MatrixMatrix
-            ( alpha, *this->_shell.data.D, *B._shell.data.F, *C._shell.data.D );
+            ( alpha, *_shell.data.D, *B._shell.data.F, *C._shell.data.D );
         }
         else if( this->IsLowRank() && B.IsDense() )
         {
             hmatrix_tools::MatrixMatrix
-            ( alpha, *this->_shell.data.F, *B._shell.data.D, *C._shell.data.D );
+            ( alpha, *_shell.data.F, *B._shell.data.D, *C._shell.data.D );
         }
-        else /* this->IsLowRank() && B.IsLowRank() */
+        else /* both low-rank */
         {
             hmatrix_tools::MatrixMatrix
-            ( alpha, *this->_shell.data.F, *B._shell.data.F, *C._shell.data.D );
+            ( alpha, *_shell.data.F, *B._shell.data.F, *C._shell.data.D );
         }
     }
 }
@@ -853,7 +1003,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
     {
         _shell.type = LOW_RANK;
         _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
-        // HERE
         hmatrix_tools::Copy( FUSub, _shell.data.F->U );
         hmatrix_tools::Copy( FVSub, _shell.data.F->V );
     }
@@ -863,7 +1012,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
         {
             _shell.type = NODE_SYMMETRIC;
             _shell.data.nodeSymmetric = 
-                new NodeSymmetricData( _xSizeSource, _ySizeSource, _zSize );
+                new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
 
             const int* xSizes = _shell.data.nodeSymmetric->xSizes;
             const int* ySizes = _shell.data.nodeSymmetric->ySizes;
@@ -896,7 +1045,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
         {
             _shell.type = NODE;
             _shell.data.node = 
-                new NodeData
+                new Node
                 ( _xSizeSource, _xSizeTarget,
                   _ySizeSource, _ySizeTarget, _zSize );
 
@@ -962,7 +1111,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
         {
             _shell.type = NODE_SYMMETRIC;
             _shell.data.nodeSymmetric = 
-                new NodeSymmetricData( _xSizeSource, _ySizeSource, _zSize );
+                new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
 
             int* xSizes = _shell.data.nodeSymmetric->xSizes;
             int* ySizes = _shell.data.nodeSymmetric->ySizes;
@@ -995,7 +1144,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
         {
             _shell.type = NODE;
             _shell.data.node = 
-                new NodeData
+                new Node
                 ( _xSizeSource, _xSizeTarget,
                   _ySizeSource, _ySizeTarget, _zSize );
             
@@ -1161,7 +1310,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
         }
     }
 }
-
 
 template class psp::Quasi2dHMatrix<float,false>;
 template class psp::Quasi2dHMatrix<float,true>;

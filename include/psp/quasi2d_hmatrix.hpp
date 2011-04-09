@@ -32,7 +32,7 @@ class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 // Put the public section first since the private section depends upon 
 // this class's public data structures.
 public:    
-    struct NodeData
+    struct Node
     {
         std::vector<Quasi2dHMatrix*> children;
         int xSourceSizes[2];
@@ -42,7 +42,7 @@ public:
         int yTargetSizes[2];
         int targetSizes[4];
 
-        NodeData
+        Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
           int zSize )
@@ -69,7 +69,7 @@ public:
             targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
         }
 
-        ~NodeData()
+        ~Node()
         {
             for( int i=0; i<16; ++i )
                 delete children[i];
@@ -77,14 +77,14 @@ public:
         }
     };
 
-    struct NodeSymmetricData
+    struct NodeSymmetric
     {
         std::vector<Quasi2dHMatrix*> children;
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
 
-        NodeSymmetricData( int xSize, int ySize, int zSize )
+        NodeSymmetric( int xSize, int ySize, int zSize )
         : children(10)
         {
             xSizes[0] = xSize/2;
@@ -98,7 +98,7 @@ public:
             sizes[3] = xSizes[1]*ySizes[1]*zSize;
         }
 
-        ~NodeSymmetricData()
+        ~NodeSymmetric()
         {
             for( int i=0; i<10; ++i )
                 delete children[i];
@@ -113,8 +113,8 @@ public:
         ShellType type;
         union 
         {
-            NodeData* node;
-            NodeSymmetricData* nodeSymmetric;
+            Node* node;
+            NodeSymmetric* nodeSymmetric;
             DenseMatrix<Scalar>* D;
             LowRankMatrix<Scalar,Conjugated>* F;
         } data;
@@ -267,6 +267,14 @@ public:
     // Computational routines specific to Quasi2dHMatrix                      //
     //------------------------------------------------------------------------//
 
+    // A := B
+    void CopyFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
+
+    // A := alpha A
+    void Scale( Scalar alpha );
+
+    // A := alpha B + A
+    void UpdateWith( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B );
 
     void MapMatrix
     ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
