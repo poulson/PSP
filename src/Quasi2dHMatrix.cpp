@@ -720,12 +720,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
             new Node
             ( _xSizeSource, _xSizeTarget,
               _ySizeSource, _ySizeTarget, _zSize );
-        Node& thisNode = *_shell.data.node;
+        Node& nodeA = *_shell.data.node;
         const Node& nodeB = *B._shell.data.node;
         for( int i=0; i<16; ++i )
         {
-            thisNode.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
-            thisNode.children[i]->CopyFrom( *nodeB.children[i] );
+            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i]->CopyFrom( *nodeB.children[i] );
         }
         break;
     }
@@ -733,12 +733,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
     {
         _shell.data.nodeSymmetric = 
             new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
-        NodeSymmetric& thisNode = *_shell.data.nodeSymmetric;
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
         const NodeSymmetric& nodeB = *B._shell.data.nodeSymmetric;
         for( int i=0; i<10; ++i )
         {
-            thisNode.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
-            thisNode.children[i]->CopyFrom( *nodeB.children[i] );
+            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i]->CopyFrom( *nodeB.children[i] );
         }
         break;
     }
@@ -762,16 +762,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
     {
     case NODE:
     {
-        Node& thisNode = *_shell.data.node;
+        Node& nodeA = *_shell.data.node;
         for( int i=0; i<16; ++i )
-            thisNode.children[i]->Scale( alpha );
+            nodeA.children[i]->Scale( alpha );
         break;
     }
     case NODE_SYMMETRIC:
     {
-        NodeSymmetric& thisNode = *_shell.data.nodeSymmetric;
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
         for( int i=0; i<10; ++i )
-            thisNode.children[i]->Scale( alpha );
+            nodeA.children[i]->Scale( alpha );
         break;
     }
     case LOW_RANK:
@@ -898,47 +898,48 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         C._shell.type = NODE;
         C._shell.data.node = 
             new Node
-            ( C._xSizeSource, C._xSizeTarget, C._ySizeSource, C._ySizeTarget, 
+            ( C._xSizeSource, C._xSizeTarget, C._ySizeSource, C._ySizeTarget,
               C._zSize );
 
-        // Temporarily remove these assignments until we make use of them
-        // in order to avoid compiler warnings.
-        /*
-        const int* xSourceSizes = _shell.data.node->xSourceSizes;
-        const int* xTargetSizes = _shell.data.node->xTargetSizes;
-        const int* ySourceSizes = _shell.data.node->ySourceSizes;
-        const int* yTargetSizes = _shell.data.node->yTargetSizes;
-        */
-        const int* sourceSizes  = _shell.data.node->sourceSizes;
-        const int* targetSizes  = _shell.data.node->targetSizes;
+        const Node& nodeA = *this->_shell.data.node;
+        const Node& nodeB = *B._shell.data.node;
+        Node& nodeC = *C._shell.data.node;
 
-        int targetOffset = this->_targetOffset;
-        for( int t=0; t<4; ++t )
+        if( this->Symmetric() && B.Symmetric() )
         {
-            int sourceOffset = this->_sourceOffset;
-            for( int s=0; s<4; ++s )
+            throw std::logic_error("Unsupported h-matrix multipy case.");
+        }
+        else if( this->Symmetric() && !B.Symmetric() )
+        {
+            throw std::logic_error("Unsupported h-matrix multiply case.");
+        }
+        else if( !this->Symmetric() && B.Symmetric() )
+        {
+            throw std::logic_error("Unsupported h-matrix multiply case.");
+        }
+        else /* !this->Symmetric() && !B.Symmetric() */
+        {
+            for( int t=0; t<4; ++t )
             {
-                // HERE
-                throw std::logic_error("Have not finished H-matrix mult.");
-                // Create the H-matrix here
-                // Add loop over the 4 inner multiply updates
+                for( int s=0; s<4; ++s )
+                {
+                    // Create the H-matrix here
+                    nodeC.children[s+4*t] = 
+                        new Quasi2dHMatrix<Scalar,Conjugated>;
 
-                /*
-                _shell.data.node->children[s+4*t] =
-                  new Quasi2dHMatrix
-                  ( F,
-                    this->_numLevels-1, this->_maxRank,
-                    this->_stronglyAdmissible,
-                    xSourceSizes[s&1], xTargetSizes[t&1],
-                    ySourceSizes[s/2], yTargetSizes[t/2],
-                    _zSize,
-                    _xSource+(s&1), _xTarget+(t&1),
-                    _ySource+(s/2), _yTarget+(t/2),
-                    sourceOffset, targetOffset );
-                sourceOffset += sourceSizes[s];
-                */
+                    // Initialize the [t,s] box of C with the first product
+                    nodeA.children[0+4*t]->MapMatrix
+                    ( alpha, *nodeB.children[s+4*0], *nodeC.children[s+4*t] );
+    
+                    // Add the other three products onto it
+                    for( int u=1; u<4; ++u )
+                    {
+                        nodeA.children[u+4*t]->MapMatrix
+                        ( alpha, *nodeB.children[s+4*u], 
+                          1, *nodeC.children[s+4*t] );
+                    }
+                }
             }
-            targetOffset += targetSizes[t];
         }
     }
     else /* C is dense */
@@ -970,6 +971,166 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             hmatrix_tools::MatrixMatrix
             ( alpha, *_shell.data.F, *B._shell.data.F, *C._shell.data.D );
+        }
+    }
+}
+
+// C := alpha A B + beta C
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
+( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B,
+  Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C )
+{
+#ifndef RELEASE
+    if( this->Width() != B.Height() || 
+        this->Height() != C.Height() || B.Width() != C.Width() )
+        throw std::logic_error("Attempted nonconformal matrix-matrix multiply");
+    if( this->NumLevels() != B.NumLevels() || 
+        this->NumLevels() != C.NumLevels() )
+        throw std::logic_error
+        ("Can only multiply H-matrices with same number of levels.");
+    if( this->StronglyAdmissible() != B.StronglyAdmissible() ||
+        this->StronglyAdmissible() != C.StronglyAdmissible() )
+        throw std::logic_error
+        ("Can only multiply H-matrices with same admissiblity.");
+    if( C.Symmetric() )
+        throw std::logic_error("Symmetric updates not yet supported.");
+#endif
+    if( C.Admissible( C._xSource, C._xTarget, C._ySource, C._yTarget ) )
+    {
+#ifndef RELEASE
+        if( this->IsDense() || B.IsDense() )
+            throw std::logic_error("Invalid H-matrix combinations.");
+#endif
+        if( this->IsLowRank() && B.IsLowRank() )
+        {
+            // W := alpha A.F B.F
+            LowRankMatrix<Scalar,Conjugated> W;
+            hmatrix_tools::MatrixMatrix
+            ( alpha, *_shell.data.F, *B._shell.data.F, W );
+
+            // C.F :~= W + beta C.F
+            hmatrix_tools::MatrixUpdateRounded
+            ( C.MaxRank(), (Scalar)1, W, beta, *C._shell.data.F );
+        }
+        else if( this->IsLowRank() && B.IsHierarchical() )
+        {
+            // W := alpha A.F B.F
+            LowRankMatrix<Scalar,Conjugated> W;
+            Copy( _shell.data.F->U, W.U );
+            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
+            B.HermitianTransposeMapMatrix
+            ( scale, _shell.data.F->V, W.V );
+
+            // C.F :~= W + beta C.F
+            hmatrix_tools::MatrixUpdateRounded
+            ( C.MaxRank(), (Scalar)1, W, beta, *C._shell.data.F );
+        }
+        else if( this->IsHierarchical() && B.IsLowRank() )
+        {
+            // W := alpha A.F B.F
+            LowRankMatrix<Scalar,Conjugated> W;
+            this->MapMatrix( alpha, B._shell.data.F->U, W.U );
+            hmatrix_tools::Copy( B._shell.data.F->V, W.V );
+
+            // C.F :~= W + beta C.F
+            hmatrix_tools::MatrixUpdateRounded
+            ( C.MaxRank(), (Scalar)1, W, beta, *C._shell.data.F );
+        }
+        else /* both hierarchical */
+        {
+            // W := alpha H H
+            LowRankMatrix<Scalar,Conjugated> W;
+            const int oversampling = 4; // lift this definition
+            hmatrix_tools::MatrixMatrix
+            ( oversampling, alpha, *this, B, W );
+
+            // C.F :~= W + beta C.F
+            hmatrix_tools::MatrixUpdateRounded
+            ( C.MaxRank(), (Scalar)1, W, beta, *C._shell.data.F );
+        }
+    }
+    else if( C.NumLevels() > 1 )
+    {
+        // A product of two matrices will be assumed non-symmetric.
+        C._shell.type = NODE;
+        C._shell.data.node = 
+            new Node
+            ( C._xSizeSource, C._xSizeTarget, C._ySizeSource, C._ySizeTarget,
+              C._zSize );
+
+        const Node& nodeA = *this->_shell.data.node;
+        const Node& nodeB = *B._shell.data.node;
+        Node& nodeC = *C._shell.data.node;
+
+        if( this->Symmetric() && B.Symmetric() )
+        {
+            throw std::logic_error("Unsupported h-matrix multipy case.");
+        }
+        else if( this->Symmetric() && !B.Symmetric() )
+        {
+            throw std::logic_error("Unsupported h-matrix multiply case.");
+        }
+        else if( !this->Symmetric() && B.Symmetric() )
+        {
+            throw std::logic_error("Unsupported h-matrix multiply case.");
+        }
+        else /* !this->Symmetric() && !B.Symmetric() */
+        {
+            for( int t=0; t<4; ++t )
+            {
+                for( int s=0; s<4; ++s )
+                {
+                    // Create the H-matrix here
+                    nodeC.children[s+4*t] = 
+                        new Quasi2dHMatrix<Scalar,Conjugated>;
+
+                    // Initialize the [t,s] box of C with the first product
+                    nodeA.children[0+4*t]->MapMatrix
+                    ( alpha, *nodeB.children[s+4*0], 
+                      beta, *nodeC.children[s+4*t] );
+    
+                    // Add the other three products onto it
+                    for( int u=1; u<4; ++u )
+                    {
+                        nodeA.children[u+4*t]->MapMatrix
+                        ( alpha, *nodeB.children[s+4*u], 
+                          (Scalar)1, *nodeC.children[s+4*t] );
+                    }
+                }
+            }
+        }
+    }
+    else /* C is dense */
+    {
+#ifndef RELEASE
+        if( this->IsHierarchical() || B.IsHierarchical() )
+            throw std::logic_error("Invalid combination of H-matrices.");
+#endif
+        C._shell.type = DENSE;
+        C._shell.data.D = 
+            new DenseMatrix<Scalar>( this->_height, this->_width );
+
+        if( this->IsDense() && B.IsDense() )
+        {
+            hmatrix_tools::MatrixMatrix
+            ( alpha, *_shell.data.D, *B._shell.data.D, beta, *C._shell.data.D );
+        }
+        else if( this->IsDense() && B.IsLowRank() )
+        {
+            hmatrix_tools::MatrixMatrix
+            ( alpha, *_shell.data.D, *B._shell.data.F, beta, *C._shell.data.D );
+        }
+        else if( this->IsLowRank() && B.IsDense() )
+        {
+            hmatrix_tools::MatrixMatrix
+            ( alpha, *_shell.data.F, *B._shell.data.D, beta, *C._shell.data.D );
+        }
+        else /* both low-rank */
+        {
+            hmatrix_tools::MatrixMatrix
+            ( alpha, *_shell.data.F, *B._shell.data.F, beta, *C._shell.data.D );
         }
     }
 }
@@ -1105,7 +1266,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
           this->_targetOffset, this->_targetOffset+this->_height,
           this->_sourceOffset, this->_sourceOffset+this->_width );
     }
-    else if( this->_numLevels > 1 )
+    else if( this->NumLevels() > 1 )
     {
         if( this->_symmetric && this->_sourceOffset == this->_targetOffset )
         {
