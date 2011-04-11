@@ -273,18 +273,24 @@ public:
     // A := alpha A
     void Scale( Scalar alpha );
 
+    // A := I
+    void SetToIdentity();
+
     // A :~= alpha B + A
     void UpdateWith( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B );
 
     // C :~= alpha A B
     void MapMatrix
     ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
-                          Quasi2dHMatrix<Scalar,Conjugated>& C );
+                          Quasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
     // C :~= alpha A B + beta C
     void MapMatrix
     ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
-      Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C );
+      Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
+    // A :~= inv(A)
+    void Invert();
 
 private:
     // Data specific to our quasi-2d H-matrix

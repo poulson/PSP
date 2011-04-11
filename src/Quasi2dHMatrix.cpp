@@ -783,6 +783,63 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
     }
 }
 
+// A := I
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::SetToIdentity()
+{
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        Node& nodeA = *_shell.data.node;
+        for( int i=0; i<4; ++i )
+        {
+            for( int j=0; j<4; ++j )
+            {
+                if( i ==j )
+                    nodeA.children[j+4*i]->SetToIdentity();
+                else
+                    nodeA.children[j+4*i]->Scale( (Scalar)0 );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
+        int child = 0;
+        for( int i=0; i<4; ++i )
+        {
+            for( int j=0; j<i; ++j )
+                nodeA.children[child++]->Scale( (Scalar)0 );
+            nodeA.children[child++]->SetToIdentity();
+        }
+        break;
+    }
+    case LOW_RANK:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Error in SetToIdentity logic.");
+#endif
+        break;
+    }
+    case DENSE:
+    {
+        DenseMatrix<Scalar>& D = *_shell.data.D;
+        hmatrix_tools::Scale( (Scalar)0, D );
+        for( int j=0; j<D.Width(); ++j )
+        {
+            if( j < D.Height() )
+                D.Set( j, j, (Scalar)1 );
+            else
+                break;
+        }
+        break;
+    }
+    }
+}
+
 // A := alpha B + A
 template<typename Scalar,bool Conjugated>
 void
@@ -824,7 +881,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B,
-                      Quasi2dHMatrix<Scalar,Conjugated>& C )
+                      Quasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     if( this->Width() != B.Height() )
@@ -980,7 +1037,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B,
-  Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C )
+  Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     if( this->Width() != B.Height() || 
@@ -1132,6 +1189,103 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixMatrix
             ( alpha, *_shell.data.F, *B._shell.data.F, beta, *C._shell.data.D );
         }
+    }
+}
+
+// A := inv(A)
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
+{
+#ifndef RELEASE
+    if( this->Height() != this->Width() )
+        throw std::logic_error("Cannot invert non-square matrices");
+    if( this->LowRank() )
+        throw std::logic_error("Cannot invert low-rank matrices");
+#endif
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        // We will form the inverse in the original matrix, so we only need to 
+        // create a temporary matrix.
+        Quasi2dHMatrix<Scalar,Conjugated> B; 
+        B.CopyFrom( *this );
+
+        // Initialize our soon-to-be inverse as the identity
+        this->SetToIdentity();
+
+        Node& nodeA = *_shell.data.node;
+        Node& nodeB = *B._shell.data.node;
+        for( int l=0; l<4; ++l )
+        {
+            // A_ll := inv(B_ll)
+            nodeA.children[l+4*l]->CopyFrom( *nodeB.children[l+4*l] );
+            nodeA.children[l+4*l]->Invert();
+
+            for( int j=0; j<4; ++j )
+            {
+                // A_lj := A_ll A_lj
+                Quasi2dHMatrix<Scalar,Conjugated> C;
+                C.CopyFrom( *nodeA.children[j+4*l] );
+                nodeA.children[l+4*l]->MapMatrix
+                ( (Scalar)1, C, *nodeA.children[j+4*l] );
+            }
+
+            for( int j=l+1; j<4; ++j )
+            {
+                // B_lj := A_ll B_lj
+                Quasi2dHMatrix<Scalar,Conjugated> C;
+                C.CopyFrom( *nodeB.children[j+4*l] );
+                nodeA.children[l+4*l]->MapMatrix
+                ( (Scalar)1, C, *nodeB.children[j+4*l] );
+            }
+
+            for( int i=l+1; i<4; ++i )
+            {
+                for( int j=0; j<=l; ++j )
+                {
+                    // A_ij -= B_il A_lj
+                    nodeB.children[l+4*i]->MapMatrix
+                    ( (Scalar)-1, *nodeA.children[j+4*l], 
+                      (Scalar)1,  *nodeA.children[j+4*i] );
+                }
+                for( int j=l+1; j<4; ++j )
+                {
+                    // B_ij -= B_il B_ij
+                    nodeB.children[l+4*i]->MapMatrix
+                    ( (Scalar)-1, *nodeB.children[j+4*l],
+                      (Scalar)1,  *nodeB.children[j+4*i] );
+                }
+            }
+        }
+
+        for( int l=3; l>=0; --l )
+        {
+            for( int i=l-1; i>=0; --i )
+            {
+                for( int j=0; j<4; ++j )
+                {
+                    // A_ij -= B_il A_lj
+                    nodeB.children[l+4*i]->MapMatrix
+                    ( (Scalar)-1, *nodeA.children[j+4*l],
+                      (Scalar)1,  *nodeA.children[j+4*i] );
+                }
+            }
+        }
+
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        throw std::logic_error("Symmetric inversion not yet supported.");
+        break;
+    }
+    case DENSE:
+        hmatrix_tools::Invert( *_shell.data.D );
+        break;
+    case LOW_RANK:
+        break;
     }
 }
 
