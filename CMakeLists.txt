@@ -263,7 +263,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(HMATRIX_TOOLS_TESTS MatrixAdd)
+  set(HMATRIX_TOOLS_TESTS MatrixAdd Compress)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries

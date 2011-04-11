@@ -775,35 +775,40 @@ void GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
 |*| Copy a vector or matrix
 \*/
 template<typename Scalar>
-void Copy( const psp::Vector<Scalar>& x, psp::Vector<Scalar>& y )
+void psp::hmatrix_tools::Copy
+( const psp::Vector<Scalar>& x, psp::Vector<Scalar>& y )
 {
     y.Resize( x.Size() );
     std::memcpy( y.Buffer(), x.LockedBuffer(), x.Size()*sizeof(Scalar) );
 }
 
 template<typename Scalar>
-void Copy( const std::vector<Scalar>& x, std::vector<Scalar>& y )
+void psp::hmatrix_tools::Copy
+( const std::vector<Scalar>& x, std::vector<Scalar>& y )
 {
     y.resize( x.size() );
     std::memcpy( &y[0], &x[0], x.size()*sizeof(Scalar) );
 }
 
 template<typename Scalar>
-void Copy( const psp::Vector<Scalar>& x, std::vector<Scalar>& y )
+void psp::hmatrix_tools::Copy
+( const psp::Vector<Scalar>& x, std::vector<Scalar>& y )
 {
     y.resize( x.Size() );
     std::memcpy( &y[0], x.LockedBuffer(), x.Size()*sizeof(Scalar) );
 }
 
 template<typename Scalar>
-void Copy( const std::vector<Scalar>& x, psp::Vector<Scalar>& y )
+void psp::hmatrix_tools::Copy
+( const std::vector<Scalar>& x, psp::Vector<Scalar>& y )
 {
     y.Resize( x.size() );
     std::memcpy( y.Buffer(), &x[0], x.size()*sizeof(Scalar) );
 }
 
 template<typename Scalar>
-void Copy( const psp::DenseMatrix<Scalar>& A, psp::DenseMatrix<Scalar>& B )
+void psp::hmatrix_tools::Copy
+( const psp::DenseMatrix<Scalar>& A, psp::DenseMatrix<Scalar>& B )
 {
     const int m = A.Height();
     const int n = A.Width();
@@ -827,7 +832,7 @@ void Copy( const psp::DenseMatrix<Scalar>& A, psp::DenseMatrix<Scalar>& B )
 }
 
 template<typename Scalar,bool Conjugated>
-void Copy
+void psp::hmatrix_tools::Copy
 ( const psp::LowRankMatrix<Scalar,Conjugated>& A, 
         psp::LowRankMatrix<Scalar,Conjugated>& B )
 {

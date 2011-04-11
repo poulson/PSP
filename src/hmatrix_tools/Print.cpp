@@ -80,13 +80,9 @@ template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::Print
 ( const std::string& tag, const LowRankMatrix<Scalar,Conjugated>& F )
 {
-    std::ostringstream streamU;
-    streamU << tag << ".U";
-    Print( streamU.str(), F.U );
-    
-    std::ostringstream streamV;
-    streamV << tag << ".V";
-    Print( streamV.str(), F.V );
+    std::cout << tag << ":\n";
+    Print( "U", F.U );
+    Print( "V", F.V ); 
 }
 
 template<typename Scalar>

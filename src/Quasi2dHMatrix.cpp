@@ -928,7 +928,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         else if( this->IsLowRank() && B.IsHierarchical() )
         {
             // C.F.U := A.F.U
-            Copy( _shell.data.F->U, C._shell.data.F->U );
+            hmatrix_tools::Copy( _shell.data.F->U, C._shell.data.F->U );
             // C.F.V := scale B^H A.F.V
             const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
             B.HermitianTransposeMapMatrix
@@ -1075,7 +1075,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // W := alpha A.F B.F
             LowRankMatrix<Scalar,Conjugated> W;
-            Copy( _shell.data.F->U, W.U );
+            hmatrix_tools::Copy( _shell.data.F->U, W.U );
             const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
             B.HermitianTransposeMapMatrix
             ( scale, _shell.data.F->V, W.V );

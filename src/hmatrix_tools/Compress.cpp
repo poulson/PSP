@@ -100,7 +100,7 @@ void psp::hmatrix_tools::Compress
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
             const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
-                VCol[i] = sigma*VHRow[i*VHLDim];
+                VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
         }
     }
     else
@@ -113,7 +113,7 @@ void psp::hmatrix_tools::Compress
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
             const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
-                VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
+                VCol[i] = sigma*VHRow[i*VHLDim];
         }
     }
 }
