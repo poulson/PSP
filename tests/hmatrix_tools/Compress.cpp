@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
+#include <iostream>
 
 int
 main( int argc, char* argv[] )
