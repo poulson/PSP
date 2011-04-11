@@ -32,9 +32,39 @@ struct SparseMatrix
     std::vector<Scalar> nonzeros;
     std::vector<int> columnIndices;
     std::vector<int> rowOffsets;
+
+    void Print( const std::string& tag ) const;
     // TODO: Routines for outputting in Matlab and PETSc formats?
 };
 
 } // namespace psp
+
+//----------------------------------------------------------------------------//
+// Implementation begins here                                                 //
+//----------------------------------------------------------------------------//
+
+template<typename Scalar>
+inline void
+psp::SparseMatrix<Scalar>::Print( const std::string& tag ) const
+{
+    if( symmetric )
+        std::cout << tag << "(symmetric)\n";
+    else
+        std::cout << tag << "\n";
+
+    for( int i=0; i<height; ++i )
+    {
+        const int numCols = rowOffsets[i+1]-rowOffsets[i];
+        const int rowOffset = rowOffsets[i];
+        for( int k=0; k<numCols; ++k )
+        {
+            const int j = columnIndices[rowOffset+k];
+            const Scalar alpha = nonzeros[rowOffset+k];
+            std::cout << "(" << i << "," << j << "): " 
+                      << WrapScalar(alpha) << "\n";
+        }
+    }
+    std::cout << std::endl;
+}
 
 #endif // PSP_SPARSE_MATRIX_HPP

@@ -24,7 +24,7 @@ project(PSP)
 set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 2)
 
-option(RELEASE "Avoid unnecessary assertions." ON)
+option(RELEASE "Avoid unnecessary assertions." OFF)
 option(VIEW_MATRICES "Print/draw the preconditioner matrices." OFF)
 option(BUILT_PETSC_WITH_X11 "Was petsc-dev built with X11 support?" OFF)
 
@@ -263,7 +263,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(HMATRIX_TOOLS_TESTS MatrixAdd Compress)
+  set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries

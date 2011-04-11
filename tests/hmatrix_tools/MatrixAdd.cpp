@@ -32,6 +32,7 @@ main( int argc, char* argv[] )
               << "Testing double-precision dense MatrixAdd            \n"
               << "----------------------------------------------------" 
               << std::endl;
+    try
     {
         psp::DenseMatrix<double> A( m, n );
         psp::DenseMatrix<double> B( m, n );
@@ -41,25 +42,28 @@ main( int argc, char* argv[] )
         for( int j=0; j<n; ++j )
             for( int i=0; i<m; ++i )
                 A.Set( i, j, 1.0 );
+        A.Print( "A" );
 
         // Set B to all 2's
         for( int j=0; j<n; ++j )
             for( int i=0; i<m; ++i )
                 B.Set( i, j, 2.0 );
-
-        psp::hmatrix_tools::Print( "A", A );
-        psp::hmatrix_tools::Print( "B", B );
+        B.Print( "B" );
 
         // C := 3 A + 5 B
         psp::hmatrix_tools::MatrixAdd( 3.0, A, 5.0, B, C );
-
-        psp::hmatrix_tools::Print( "C := 3A + 5B", C );
+        C.Print( "C := 3A + 5B" );
+    }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught message: " << e.what() << std::endl;
     }
 
     std::cout << "----------------------------------------------------\n"
               << "Testing complex single-precision dense MatrixAdd    \n"
               << "----------------------------------------------------" 
               << std::endl;
+    try
     {
         psp::DenseMatrix< std::complex<float> > A( m, n );
         psp::DenseMatrix< std::complex<float> > B( m, n );
@@ -69,26 +73,29 @@ main( int argc, char* argv[] )
         for( int j=0; j<n; ++j )
             for( int i=0; i<m; ++i )
                 A.Set( i, j, std::complex<float>(1,2) );
+        A.Print( "A" );
 
         // Set each entry of B to (3 + 4i)
         for( int j=0; j<n; ++j )
             for( int i=0; i<m; ++i )
                 B.Set( i, j, std::complex<float>(3,4) );
-
-        psp::hmatrix_tools::Print( "A", A );
-        psp::hmatrix_tools::Print( "B", B );
+        B.Print( "B" );
 
         // C := (5 + 6i)A + (7 + 8i)B
         psp::hmatrix_tools::MatrixAdd
         ( std::complex<float>(5,6), A, std::complex<float>(7,8), B, C );
-
-        psp::hmatrix_tools::Print( "C := (5+6i)A + (7+8i)B", C );
+        C.Print( "C := (5+6i)A + (7+8i)B" );
+    }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught message: " << e.what() << std::endl;
     }
 
     std::cout << "----------------------------------------------------\n"
               << "Testing double-precision low-rank MatrixAdd         \n"
               << "----------------------------------------------------" 
               << std::endl;
+    try
     {
         psp::LowRankMatrix<double,false> A; 
         psp::LowRankMatrix<double,false> B;
@@ -105,6 +112,7 @@ main( int argc, char* argv[] )
         for( int j=0; j<r; ++j )
             for( int i=0; i<n; ++i )
                 A.V.Set( i, j, (double)i+j );
+        A.Print( "A" );
 
         for( int j=0; j<r; ++j )
             for( int i=0; i<m; ++i )
@@ -112,14 +120,15 @@ main( int argc, char* argv[] )
         for( int j=0; j<r; ++j )
             for( int i=0; i<n; ++i )
                 B.V.Set( i, j, (double)-(i+j) );
-
-        psp::hmatrix_tools::Print( "A", A );
-        psp::hmatrix_tools::Print( "B", B );
+        B.Print( "B" );
 
         // C := 3A + 5B
         psp::hmatrix_tools::MatrixAdd( 3.0, A, 5.0, B, C );
-
-        psp::hmatrix_tools::Print( "C := 3A + 5B", C );
+        C.Print( "C := 3A + 5B" );
+    }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught message: " << e.what() << std::endl;
     }
 
     return 0;

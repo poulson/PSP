@@ -30,8 +30,7 @@ enum MatrixType { GENERAL, SYMMETRIC /*, HERMITIAN*/ };
 template<typename Scalar>
 class DenseMatrix
 {
-    int _m; // height of matrix
-    int _n; // width of matrix
+    int _height, _width;
     int _ldim; // leading dimension of matrix
     bool _viewing;
     bool _lockedView;
@@ -44,13 +43,14 @@ public:
     DenseMatrix
     ( MatrixType type=GENERAL );
     DenseMatrix
-    ( int m, int n, MatrixType type=GENERAL );
+    ( int height, int width, MatrixType type=GENERAL );
     DenseMatrix
-    ( int m, int n, int ldim, MatrixType type=GENERAL );
+    ( int height, int width, int ldim, MatrixType type=GENERAL );
     DenseMatrix
-    ( Scalar* buffer, int m, int n, int ldim, MatrixType type=GENERAL );
+    ( Scalar* buffer, int height, int width, int ldim, 
+      MatrixType type=GENERAL );
     DenseMatrix
-    ( const Scalar* lockedBuffer, int m, int n, int ldim, 
+    ( const Scalar* lockedBuffer, int height, int width, int ldim, 
       MatrixType type=GENERAL );
     ~DenseMatrix();
 
@@ -63,20 +63,22 @@ public:
     int Height() const;
     int Width() const;
     int LDim() const;
-    void Resize( int m, int n );
-    void Resize( int m, int n, int ldim );
+    void Resize( int height, int width );
+    void Resize( int height, int width, int ldim );
 
     void Set( int i, int j, Scalar value );
     Scalar Get( int i, int j ) const;
+    void Print( const std::string& tag ) const;
 
     Scalar* Buffer( int i=0, int j=0 );
     const Scalar* LockedBuffer( int i=0, int j=0 ) const;
 
     void View( DenseMatrix<Scalar>& A );
-    void View( DenseMatrix<Scalar>& A, int i, int j, int m, int n );
+    void View( DenseMatrix<Scalar>& A, int i, int j, int height, int width );
 
     void LockedView( const DenseMatrix<Scalar>& A );
-    void LockedView( const DenseMatrix<Scalar>& A, int i, int j, int m, int n );
+    void LockedView
+    ( const DenseMatrix<Scalar>& A, int i, int j, int height, int width );
 };
 
 } // namespace psp
@@ -89,7 +91,7 @@ template<typename Scalar>
 inline
 psp::DenseMatrix<Scalar>::DenseMatrix
 ( MatrixType type )
-: _m(0), _n(0), _ldim(1), 
+: _height(0), _width(0), _ldim(1), 
   _viewing(false), _lockedView(false),
   _memory(), _buffer(0), _lockedBuffer(0),
   _type(type)
@@ -98,16 +100,16 @@ psp::DenseMatrix<Scalar>::DenseMatrix
 template<typename Scalar>
 inline
 psp::DenseMatrix<Scalar>::DenseMatrix
-( int m, int n, MatrixType type )
-: _m(m), _n(n), _ldim(std::max(m,1)),
+( int height, int width, MatrixType type )
+: _height(height), _width(width), _ldim(std::max(height,1)),
   _viewing(false), _lockedView(false),
-  _memory(_ldim*_n), _buffer(&_memory[0]), _lockedBuffer(0),
+  _memory(_ldim*_width), _buffer(&_memory[0]), _lockedBuffer(0),
   _type(type)
 {
 #ifndef RELEASE
-    if( m < 0 || n < 0 )
+    if( height < 0 || width < 0 )
         throw std::logic_error("Height and width must be non-negative");
-    if( type == SYMMETRIC && m != n )
+    if( type == SYMMETRIC && height != width )
         throw std::logic_error("Symmetric matrices must be square");
 #endif
 }
@@ -115,16 +117,16 @@ psp::DenseMatrix<Scalar>::DenseMatrix
 template<typename Scalar>
 inline 
 psp::DenseMatrix<Scalar>::DenseMatrix
-( int m, int n, int ldim, MatrixType type )
-: _m(m), _n(n), _ldim(ldim), 
+( int height, int width, int ldim, MatrixType type )
+: _height(height), _width(width), _ldim(ldim), 
   _viewing(false), _lockedView(false),
-  _memory(_ldim*_n), _buffer(&_memory[0]), _lockedBuffer(0),
+  _memory(_ldim*_width), _buffer(&_memory[0]), _lockedBuffer(0),
   _type(type)
 {
 #ifndef RELEASE
-    if( m < 0 || n < 0 )
+    if( height < 0 || width < 0 )
         throw std::logic_error("Height and width must be non-negative");
-    if( type == SYMMETRIC && m != n )
+    if( type == SYMMETRIC && height != width )
         throw std::logic_error("Symmetric matrices must be square");
     if( ldim <= 0 )
         throw std::logic_error("Leading dimensions must be positive");
@@ -134,16 +136,16 @@ psp::DenseMatrix<Scalar>::DenseMatrix
 template<typename Scalar>
 inline 
 psp::DenseMatrix<Scalar>::DenseMatrix
-( Scalar* buffer, int m, int n, int ldim, MatrixType type )
-: _m(m), _n(n), _ldim(ldim), 
+( Scalar* buffer, int height, int width, int ldim, MatrixType type )
+: _height(height), _width(width), _ldim(ldim), 
   _viewing(true), _lockedView(false),
   _memory(), _buffer(buffer), _lockedBuffer(0),
   _type(type)
 {
 #ifndef RELEASE
-    if( m < 0 || n < 0 )
-        throw std::logic_erorr("Height and width must be non-negative");
-    if( type == SYMMETRIC && m != n )
+    if( height < 0 || width < 0 )
+        throw std::logic_error("Height and width must be non-negative");
+    if( type == SYMMETRIC && height != width )
         throw std::logic_error("Symmetric matrices must be square");
     if( ldim <= 0 )
         throw std::logic_error("Leading dimensions must be positive");
@@ -153,16 +155,16 @@ psp::DenseMatrix<Scalar>::DenseMatrix
 template<typename Scalar>
 inline 
 psp::DenseMatrix<Scalar>::DenseMatrix
-( const Scalar* lockedBuffer, int m, int n, int ldim, MatrixType type )
-: _m(m), _n(n), _ldim(ldim),
+( const Scalar* lockedBuffer, int height, int width, int ldim, MatrixType type )
+: _height(height), _width(width), _ldim(ldim),
   _viewing(true), _lockedView(true),
   _memory(), _buffer(0), _lockedBuffer(lockedBuffer),
   _type(type)
 {
 #ifndef RELEASE
-    if( m < 0 || n < 0 )
+    if( height < 0 || width < 0 )
         throw std::logic_error("Height and width must be non-negative");
-    if( type == SYMMETRIC && m != n )
+    if( type == SYMMETRIC && height != width )
         throw std::logic_error("Symmetric matrices must be square");
     if( ldim <= 0 )
         throw std::logic_error("Leading dimensions must be positive");
@@ -179,7 +181,7 @@ inline void
 psp::DenseMatrix<Scalar>::SetType( MatrixType type )
 {
 #ifndef RELEASE
-    if( type == SYMMETRIC && _m != _n )
+    if( type == SYMMETRIC && _height != _width )
         throw std::logic_error("Symmetric matrices must be square");
 #endif
     _type = type;
@@ -219,14 +221,14 @@ template<typename Scalar>
 inline int
 psp::DenseMatrix<Scalar>::Height() const
 {
-    return _m;
+    return _height;
 }
 
 template<typename Scalar>
 inline int
 psp::DenseMatrix<Scalar>::Width() const
 {
-    return _n;
+    return _width;
 }
 
 template<typename Scalar>
@@ -238,45 +240,45 @@ psp::DenseMatrix<Scalar>::LDim() const
 
 template<typename Scalar>
 inline void
-psp::DenseMatrix<Scalar>::Resize( int m, int n )
+psp::DenseMatrix<Scalar>::Resize( int height, int width )
 {
 #ifndef RELEASE
     if( _viewing )
         throw std::logic_error("Cannot resize views");
-    if( m < 0 || n < 0 )
+    if( height < 0 || width < 0 )
         throw std::logic_error("Height and width must be non-negative");
-    if( _type == SYMMETRIC && m != n )
+    if( _type == SYMMETRIC && height != width )
         throw std::logic_error("Destroyed symmetry of symmetric matrix");
 #endif
-    if( m > _m )
+    if( height > _height )
     {
         // We cannot trivially preserve the old contents
-        _ldim = std::max( m, 1 );
+        _ldim = std::max( height, 1 );
     }
-    _m = m;
-    _n = n;
-    _memory.resize( _ldim*n );
+    _height = height;
+    _width = width;
+    _memory.resize( _ldim*width );
     _buffer = &_memory[0];
 }
 
 template<typename Scalar>
 inline void
-psp::DenseMatrix<Scalar>::Resize( int m, int n, int ldim )
+psp::DenseMatrix<Scalar>::Resize( int height, int width, int ldim )
 {
 #ifndef RELEASE
     if( _viewing )
         throw std::logic_error("Cannot resize views");
-    if( m < 0 || n < 0 )
+    if( height < 0 || width < 0 )
         throw std::logic_error("Height and width must be non-negative");
-    if( ldim < m || ldim < 0 )
+    if( ldim < height || ldim < 0 )
         throw std::logic_error("LDim must be positive and >= the height");
-    if( _type == SYMMETRIC && m != n )
+    if( _type == SYMMETRIC && height != width )
         throw std::logic_error("Destroyed symmetry of symmetric matrix");
 #endif
-    _m = m;
-    _n = n;
+    _height = height;
+    _width = width;
     _ldim = ldim;
-    _memory.resize( ldim*n );
+    _memory.resize( ldim*width );
     _buffer = &_memory[0];
 }
 
@@ -289,7 +291,7 @@ psp::DenseMatrix<Scalar>::Set( int i, int j, Scalar value )
         throw std::logic_error("Cannot change data in a locked view");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i >= m || j >= n )
+    if( i >= _height || j >= _width )
         throw std::logic_error("Indices are out of bound");
     if( _type == SYMMETRIC && j > i )
         throw std::logic_error("Setting upper entry from symmetric matrix");
@@ -304,7 +306,7 @@ psp::DenseMatrix<Scalar>::Get( int i, int j ) const
 #ifndef RELEASE
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i >= m || j >= n )
+    if( i >= _height || j >= _width )
         throw std::logic_error("Indices are out of bound");
     if( _type == SYMMETRIC && j > i )
         throw std::logic_error("Retrieving upper entry from symmetric matrix");
@@ -316,6 +318,34 @@ psp::DenseMatrix<Scalar>::Get( int i, int j ) const
 }
 
 template<typename Scalar>
+inline void
+psp::DenseMatrix<Scalar>::Print( const std::string& tag ) const
+{
+    std::cout << tag << "\n";
+    if( _type == SYMMETRIC )
+    {
+        for( int i=0; i<_height; ++i )
+        {
+            for( int j=0; j<=i; ++j )
+                std::cout << WrapScalar(Get(i,j)) << " ";
+            for( int j=i+1; j<_width; ++j )
+                std::cout << WrapScalar(Get(j,i)) << " ";
+            std::cout << "\n";
+        }
+    }
+    else
+    {
+        for( int i=0; i<_height; ++i )
+        {
+            for( int j=0; j<_width; ++j )
+                std::cout << WrapScalar(Get(i,j)) << " ";
+            std::cout << "\n";
+        }
+    }
+    std::cout << std::endl;
+}
+
+template<typename Scalar>
 inline Scalar*
 psp::DenseMatrix<Scalar>::Buffer( int i, int j )
 {
@@ -324,7 +354,7 @@ psp::DenseMatrix<Scalar>::Buffer( int i, int j )
         throw std::logic_error("Cannot modify the buffer from a locked view");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i >= m || j >= n )
+    if( i >= _height || j >= _width )
         throw std::logic_error("Indices are out of bound");
 #endif
     return &_buffer[i+j*_ldim];
@@ -337,7 +367,7 @@ psp::DenseMatrix<Scalar>::LockedBuffer( int i, int j ) const
 #ifndef RELEASE
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i >= m || j >= n )
+    if( i >= _height || j >= _width )
         throw std::logic_error("Indices are out of bound");
 #endif
     if( _lockedView )
@@ -350,8 +380,8 @@ template<typename Scalar>
 inline void
 psp::DenseMatrix<Scalar>::View( DenseMatrix<Scalar>& A )
 {
-    _m = A.Height();
-    _n = A.Width();
+    _height = A.Height();
+    _width = A.Width();
     _ldim = A.LDim();
     _viewing = true;
     _lockedView = false;
@@ -362,18 +392,18 @@ psp::DenseMatrix<Scalar>::View( DenseMatrix<Scalar>& A )
 template<typename Scalar>
 inline void
 psp::DenseMatrix<Scalar>::View
-( DenseMatrix<Scalar>& A, int i, int j, int m, int n )
+( DenseMatrix<Scalar>& A, int i, int j, int height, int width )
 {
 #ifndef RELEASE
-    if( A.Type() == SYMMETRIC && i != j || m != n )
+    if( A.Type() == SYMMETRIC && (i != j || height != width) )
         throw std::logic_error("Invalid submatrix of symmetric matrix");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i+m > A.Height() || j+n > A.Width() )
+    if( i+height > A.Height() || j+width > A.Width() )
         throw std::logic_error("Submatrix out of bound");
 #endif
-    _m = m;
-    _n = n;
+    _height = height;
+    _width = width;
     _ldim = A.LDim();
     _viewing = true;
     _lockedView = false;
@@ -385,8 +415,8 @@ template<typename Scalar>
 inline void
 psp::DenseMatrix<Scalar>::LockedView( const DenseMatrix<Scalar>& A )
 {
-    _m = A.Height();
-    _n = A.Width();
+    _height = A.Height();
+    _width = A.Width();
     _ldim = A.LDim();
     _viewing = true;
     _lockedView = true;
@@ -397,18 +427,18 @@ psp::DenseMatrix<Scalar>::LockedView( const DenseMatrix<Scalar>& A )
 template<typename Scalar>
 inline void
 psp::DenseMatrix<Scalar>::LockedView
-( const DenseMatrix<Scalar>& A, int i, int j, int m, int n )
+( const DenseMatrix<Scalar>& A, int i, int j, int height, int width )
 {
 #ifndef RELEASE
-    if( A.Type() == SYMMETRIC && i != j || m != n )
+    if( A.Type() == SYMMETRIC && (i != j || height != width) )
         throw std::logic_error("Invalid submatrix of symmetric matrix");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i+m > A.Height() || j+n > A.Width() )
+    if( i+height > A.Height() || j+width > A.Width() )
         throw std::logic_error("Submatrix out of bound");
 #endif
-    _m = m;
-    _n = n;
+    _height = height;
+    _width = width;
     _ldim = A.LDim();
     _viewing = true;
     _lockedView = true;

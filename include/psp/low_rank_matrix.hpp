@@ -44,6 +44,13 @@ struct LowRankMatrix
     int Height() const { return U.Height(); }
     int Width() const { return V.Height(); }
     int Rank() const { return U.Width(); }
+
+    void Print( const std::string& tag ) const
+    { 
+        std::cout << tag << ":\n";
+        U.Print( "U" );
+        V.Print( "V" );
+    }
 };
 
 } // namespace psp

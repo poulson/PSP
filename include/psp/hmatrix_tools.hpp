@@ -37,13 +37,6 @@
 namespace psp {
 namespace hmatrix_tools {
 
-template<typename Scalar>
-void Print( const std::string& tag, const DenseMatrix<Scalar>& D );
-template<typename Scalar,bool Conjugated>
-void Print( const std::string& tag, const LowRankMatrix<Scalar,Conjugated>& F );
-template<typename Scalar>
-void Print( const std::string& tag, const SparseMatrix<Scalar>& S );
-
 //----------------------------------------------------------------------------//
 // Building blocks for H-algebra.                                             //
 //                                                                            //
@@ -778,8 +771,8 @@ template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const psp::Vector<Scalar>& x, psp::Vector<Scalar>& y )
 {
-    y.Resize( x.Size() );
-    std::memcpy( y.Buffer(), x.LockedBuffer(), x.Size()*sizeof(Scalar) );
+    y.Resize( x.Height() );
+    std::memcpy( y.Buffer(), x.LockedBuffer(), x.Height()*sizeof(Scalar) );
 }
 
 template<typename Scalar>
@@ -794,8 +787,8 @@ template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const psp::Vector<Scalar>& x, std::vector<Scalar>& y )
 {
-    y.resize( x.Size() );
-    std::memcpy( &y[0], x.LockedBuffer(), x.Size()*sizeof(Scalar) );
+    y.resize( x.Height() );
+    std::memcpy( &y[0], x.LockedBuffer(), x.Height()*sizeof(Scalar) );
 }
 
 template<typename Scalar>
@@ -853,7 +846,7 @@ template<typename Real>
 void psp::hmatrix_tools::Conjugate
 ( psp::Vector< std::complex<Real> >& x )
 {
-    const int n = x.Size();
+    const int n = x.Height();
     std::complex<Real>* xBuffer = x.Buffer();
     for( int i=0; i<n; ++i ) 
         xBuffer[i] = Conj( xBuffer[i] );
@@ -864,8 +857,8 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector<Real>& x,
         psp::Vector<Real>& y )
 { 
-    y.Resize( x.Size() );
-    std::memcpy( y.Buffer(), x.LockedBuffer(), x.Size()*sizeof(Real) );
+    y.Resize( x.Height() );
+    std::memcpy( y.Buffer(), x.LockedBuffer(), x.Height()*sizeof(Real) );
 }
 
 template<typename Real>
@@ -873,7 +866,7 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector< std::complex<Real> >& x, 
         psp::Vector< std::complex<Real> >& y )
 {
-    const int n = x.Size();
+    const int n = x.Height();
     y.Resize( n );
     const std::complex<Real>* RESTRICT xBuffer = x.LockedBuffer();
     std::complex<Real>* RESTRICT yBuffer = y.Buffer();
@@ -923,8 +916,8 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector<Real>& x,
         std::vector<Real>& y )
 {
-    y.resize( x.Size() );
-    std::memcpy( &y[0], x.Buffer(), x.Size()*sizeof(Real) );
+    y.resize( x.Height() );
+    std::memcpy( &y[0], x.Buffer(), x.Height()*sizeof(Real) );
 }
 
 template<typename Real>
@@ -932,7 +925,7 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector< std::complex<Real> >& x,
         std::vector< std::complex<Real> >& y )
 {
-    const int n = x.Size();
+    const int n = x.Height();
     y.resize( n );
     const std::complex<Real>* RESTRICT xBuffer = x.LockedBuffer();
     std::complex<Real>* RESTRICT yBuffer = &y[0];
@@ -1089,9 +1082,9 @@ void psp::hmatrix_tools::Scale
 ( Scalar alpha, psp::Vector<Scalar>& x )
 {
     if( alpha == (Scalar)0 )
-        std::memset( x.Buffer(), 0, x.Size()*sizeof(Scalar) );
+        std::memset( x.Buffer(), 0, x.Height()*sizeof(Scalar) );
     else
-        blas::Scal( x.Size(), alpha, x.Buffer(), 1 );
+        blas::Scal( x.Height(), alpha, x.Buffer(), 1 );
 }
 
 template<typename Scalar>

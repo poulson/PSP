@@ -52,7 +52,7 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
-    y.Resize( x.Size() );
+    y.Resize( x.Height() );
     if( A.Symmetric() )
     {
         blas::Symv
@@ -127,7 +127,7 @@ void psp::hmatrix_tools::MatrixTransposeVector
              x.LockedBuffer(),   1, 
       0,     t.Buffer(),         1 );
 
-    y.Resize( x.Size() );
+    y.Resize( x.Height() );
     if( Conjugated )
     {
         Conjugate( t );

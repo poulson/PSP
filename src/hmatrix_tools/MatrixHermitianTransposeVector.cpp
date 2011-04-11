@@ -56,7 +56,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
-    y.Resize( x.Size() );
+    y.Resize( x.Height() );
     if( A.Symmetric() )
     {
         Vector<Scalar> xConj;
@@ -138,7 +138,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
              x.LockedBuffer(),   1, 
       0,     t.Buffer(),         1 );
 
-    y.Resize( x.Size() );
+    y.Resize( x.Height() );
     if( Conjugated )
     {
         // Form y := (A.V) t

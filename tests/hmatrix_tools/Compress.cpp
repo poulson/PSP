@@ -32,45 +32,54 @@ main( int argc, char* argv[] )
               << "Testing double-precision Compress                   \n"
               << "----------------------------------------------------" 
               << std::endl;
+    try
     {
         psp::DenseMatrix<double> D( m, n );
 
         for( int j=0; j<r; ++j )
             for( int i=0; i<m; ++i )
                 D.Set( i, j, (double)i+j );
-        psp::hmatrix_tools::Print( "D", D );
+        D.Print( "D" );
 
         psp::LowRankMatrix<double,false> F;
         psp::hmatrix_tools::Compress( r, D, F );
 
-        psp::hmatrix_tools::Print( "F.U F.V^T ~= D", F );
+        F.Print( "F.U F.V^T ~= D" );
+    }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught message: " << e.what() << std::endl;
     }
 
     std::cout << "----------------------------------------------------\n"
               << "Testing complex double-precision Compress           \n"
               << "----------------------------------------------------" 
               << std::endl;
+    try
     {
         psp::DenseMatrix< std::complex<double> > D( m, n );
 
         for( int j=0; j<r; ++j )
             for( int i=0; i<m; ++i )
                 D.Set( i, j, std::complex<double>(i+j,i-j) );
-        psp::hmatrix_tools::Print( "D", D );
+        D.Print( "D" );
 
         // F = F.U F.V^T
         psp::LowRankMatrix<std::complex<double>,false> FFalse;
         psp::DenseMatrix< std::complex<double> > DCopy;
         psp::hmatrix_tools::Copy( D, DCopy );
         psp::hmatrix_tools::Compress( r, DCopy, FFalse );
+        FFalse.Print( "F.U F.V^T ~= D" );
 
         // F = F.U F.V^H
         psp::LowRankMatrix<std::complex<double>,true> FTrue;
         psp::hmatrix_tools::Copy( D, DCopy );
         psp::hmatrix_tools::Compress( r, DCopy, FTrue );
-
-        psp::hmatrix_tools::Print( "F.U F.V^T ~= D", FFalse );
-        psp::hmatrix_tools::Print( "F.U F.V^H ~= D", FTrue );
+        FTrue.Print( "F.U F.V^H ~= D" );
+    }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught message: " << e.what() << std::endl;
     }
 
     return 0;

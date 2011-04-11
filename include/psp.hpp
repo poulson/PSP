@@ -23,6 +23,7 @@
 
 #include "mpi.h"
 #include <complex>
+#include <iostream>
 
 #include "psp/config.h"
 
@@ -30,13 +31,55 @@ namespace psp {
 
 template<typename Real>
 inline Real
-Conj( const Real alpha )
+Conj( Real alpha )
 { return alpha; }
 
 template<typename Real>
 inline std::complex<Real>
-Conj( const std::complex<Real> alpha )
+Conj( std::complex<Real> alpha )
 { return std::conj( alpha ); }
+
+// Create a wrappers around real and std::complex<real> types so that they
+// can be conveniently printed in a more Matlab-compatible format.
+//
+// All printing of scalars should now be performed in the fashion:
+//     std::cout << WrapScalar(alpha);
+// where 'alpha' can be real or complex.
+
+template<typename Real>
+class ScalarWrapper
+{
+    Real _value;
+public:
+    ScalarWrapper( const Real& alpha ) : _value(alpha) { }
+
+    friend std::ostream& operator<<
+    ( std::ostream& out, const ScalarWrapper<Real>& alpha )
+    {
+        out << alpha._value;
+        return out;
+    }
+};
+
+template<typename Real>
+class ScalarWrapper< std::complex<Real> >
+{
+    std::complex<Real> _value;
+public:
+    ScalarWrapper( const std::complex<Real>& alpha ) : _value(alpha) { }
+
+    friend std::ostream& operator<<
+    ( std::ostream& out, const ScalarWrapper< std::complex<Real> >& alpha )
+    {
+        out << std::real(alpha._value) << "+" << std::imag(alpha._value) << "i";
+        return out;
+    }
+};
+
+template<typename Scalar>
+ScalarWrapper<Scalar>
+WrapScalar( Scalar alpha )
+{ return ScalarWrapper<Scalar>( alpha ); }
 
 } // namespace psp
 

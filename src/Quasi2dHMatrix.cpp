@@ -1200,7 +1200,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
 #ifndef RELEASE
     if( this->Height() != this->Width() )
         throw std::logic_error("Cannot invert non-square matrices");
-    if( this->LowRank() )
+    if( this->IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
 #endif
     switch( _shell.type )

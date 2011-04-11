@@ -52,7 +52,7 @@ void psp::hmatrix_tools::MatrixVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
-    y.Resize( x.Size() );
+    y.Resize( x.Height() );
     if( A.Symmetric() )
     {
         blas::Symv
@@ -116,7 +116,7 @@ void psp::hmatrix_tools::MatrixVector
       0,     t.Buffer(),         1 );
 
     // Form y := (A.U) t
-    y.Resize( x.Size() );
+    y.Resize( x.Height() );
     blas::Gemv
     ( 'N', A.Height(), r, 
       1, A.U.LockedBuffer(), A.U.LDim(), 
