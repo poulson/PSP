@@ -49,7 +49,7 @@ Conj( std::complex<Real> alpha )
 template<typename Real>
 class ScalarWrapper
 {
-    Real _value;
+    const Real& _value;
 public:
     ScalarWrapper( const Real& alpha ) : _value(alpha) { }
 
@@ -64,7 +64,7 @@ public:
 template<typename Real>
 class ScalarWrapper< std::complex<Real> >
 {
-    std::complex<Real> _value;
+    const std::complex<Real>& _value;
 public:
     ScalarWrapper( const std::complex<Real>& alpha ) : _value(alpha) { }
 

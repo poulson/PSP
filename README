@@ -8,8 +8,8 @@ The following configure flags were used in Ubuntu with BLAS/LAPACK in /usr/lib:
 
     ./config/configure.py --with-clanguage=cxx --with-scalar-type=complex \
       --with-blas-lapack-lib="[-L/usr/lib,-llapack,-lblas,-lgfortran]" \
-      --with-cxx=mpicxx --with-cc=mpicc --with-fc=mpif90 --with-debugging=0 \
-      --with-x=0 --with-c2html=0
+      --with-cxx=mpicxx --with-cc=mpicc --with-debugging=0 \
+      --with-fortran=0 --with-x=0 --with-c2html=0
 
 The above flags are far from optimal since it builds the debug version of PETSc.
 
@@ -18,9 +18,10 @@ PSP can then be built using:
     cd psp 
     mkdir build
     cd build
-    cmake -DCMAKE_CXX_COMPILER=`which mpicxx` -DCMAKE_C_COMPILER=`which mpicc` \
+    cmake -DCMAKE_CXX_COMPILER=`which mpicxx` 
+      -DCMAKE_C_COMPILER=`which mpicc` \
       -DPETSC_DIR=/path/to/top/of/petsc-dev \
-      -DPETSC_ARCH_DIR=/path/to/top/of/petsc-dev/arch ..
+      -DPETSC_ARCH_SUBDIR=your-arch-subdirectory ..
     make
 
 If something other than the reference BLAS/LAPACK libs are desired for PSP, 

@@ -43,20 +43,20 @@ if(NOT PETSC_DIR)
     "PETSC_DIR must be set to the location of the top-level PETSc folder."
   )
 endif(NOT PETSC_DIR)
-if(NOT PETSC_ARCH_DIR)
+if(NOT PETSC_ARCH_SUBDIR)
   message(
     FATAL_ERROR
-    "PETSC_ARCH_DIR must be set to the architecture-specific PETSc directory."
+    "PETSC_ARCH_SUBDIR must be set to the architecture-specific PETSc subdirectory."
   )
-endif(NOT PETSC_ARCH_DIR)
+endif(NOT PETSC_ARCH_SUBDIR)
 set(PETSC_INCLUDE_DIR "${PETSC_DIR}/include")
-set(PETSC_ARCH_INCLUDE_DIR "${PETSC_ARCH_DIR}/include")
-set(PETSC_LIB_DIR "${PETSC_ARCH_DIR}/lib")
+set(PETSC_ARCH_INCLUDE_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/include")
+set(PETSC_LIB_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/lib")
 find_library(PETSC_LIB NAMES petsc HINTS ${PETSC_LIB_DIR})
 if(NOT PETSC_LIB)
   message(
     FATAL_ERROR
-    "Could not find PETSc using PETSC_ARCH_DIR. Please make sure it was built."
+    "Could not find PETSc using PETSC_DIR and PETSC_ARCH_SUBDIR. Please make sure it was built."
   )
 endif(NOT PETSC_LIB)
 
