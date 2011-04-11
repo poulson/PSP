@@ -327,7 +327,7 @@ psp::DenseMatrix<Scalar>::Buffer( int i, int j )
     if( i >= m || j >= n )
         throw std::logic_error("Indices are out of bound");
 #endif
-    return _buffer;
+    return &_buffer[i+j*_ldim];
 }
 
 template<typename Scalar>
@@ -341,9 +341,9 @@ psp::DenseMatrix<Scalar>::LockedBuffer( int i, int j ) const
         throw std::logic_error("Indices are out of bound");
 #endif
     if( _lockedView )
-        return _lockedBuffer;
+        return &_lockedBuffer[i+j*_ldim];
     else
-        return _buffer;
+        return &_buffer[i+j*_ldim];
 }
 
 template<typename Scalar>

@@ -76,7 +76,7 @@ if(NOT DL_LIB)
   message(FATAL_ERROR "Could not find dl library.")
 endif(NOT DL_LIB)
 
-#option(BUILD_TESTS "Build the test drivers" ON)
+option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
 mark_as_advanced(AVOID_COMPLEX_MPI)
 
@@ -262,8 +262,8 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # Create the lists of test executables and configure the compile flags
 # for the various build modes
 if(BUILD_TESTS)
-  set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
-  #set(TESTS BasicTest)
+  set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
+  set(HMATRIX_TOOLS_TESTS MatrixAdd)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
@@ -296,10 +296,10 @@ add_library(psp STATIC ${PSP_SRC})
 
 # Build the test drivers if necessary
 if(BUILD_TESTS)
- # Build the core tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/")
-  foreach(TEST ${TESTS})
-    add_executable(${TEST} ${TEST_DIR}/${TEST}.cpp)
+  # Build the hmatrix_tools tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmatrix_tools")
+  foreach(TEST ${HMATRIX_TOOLS_TESTS})
+    add_executable(${TEST} ${TEST_DIR}/hmatrix_tools/${TEST}.cpp)
     target_link_libraries(${TEST} psp cmake-dummy-lib)
     set_target_properties(${TEST} 
                           PROPERTIES OUTPUT_NAME ${TEST}

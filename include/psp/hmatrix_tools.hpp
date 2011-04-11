@@ -37,6 +37,13 @@
 namespace psp {
 namespace hmatrix_tools {
 
+template<typename Scalar>
+void Print( const std::string& tag, const DenseMatrix<Scalar>& D );
+template<typename Scalar,bool Conjugated>
+void Print( const std::string& tag, const LowRankMatrix<Scalar,Conjugated>& F );
+template<typename Scalar>
+void Print( const std::string& tag, const SparseMatrix<Scalar>& S );
+
 //----------------------------------------------------------------------------//
 // Building blocks for H-algebra.                                             //
 //                                                                            //

@@ -34,8 +34,8 @@ void psp::hmatrix_tools::MatrixAdd
     if( A.Type() != B.Type() )
         throw std::logic_error("MatrixAdd with different types not written");
 #endif
-    const int m = C.Height();
-    const int n = C.Width();
+    const int m = A.Height();
+    const int n = A.Width();
 
     C.SetType( A.Type() );
     C.Resize( m, n );
