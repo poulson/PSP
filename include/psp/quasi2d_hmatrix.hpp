@@ -77,10 +77,26 @@ public:
         }
 
         Quasi2dHMatrix& Child( int i, int j )
-        { return *children[j+4*i]; }
+        { 
+#ifndef RELEASE
+            if( i < 0 || j < 0 )
+                throw std::logic_error("Child indices must be non-negative");
+            if( i > 3 || j > 3 )
+                throw std::logic_error("Child indices out of bounds");
+#endif
+            return *children[j+4*i]; 
+        }
 
         const Quasi2dHMatrix& Child( int i, int j ) const
-        { return *children[j+4*i]; }
+        { 
+#ifndef RELEASE
+            if( i < 0 || j < 0 )
+                throw std::logic_error("Child indices must be non-negative");
+            if( i > 3 || j > 3 )
+                throw std::logic_error("Child indices out of bounds");
+#endif
+            return *children[j+4*i]; 
+        }
     };
 
     struct NodeSymmetric
@@ -112,10 +128,30 @@ public:
         }
 
         Quasi2dHMatrix& Child( int i, int j )
-        { return *children[(i*(i+1))/2 + j]; }
+        { 
+#ifndef RELEASE
+            if( i < 0 || j < 0 )
+                throw std::logic_error("Child indices must be non-negative");
+            if( i > 3 || j > 3 )
+                throw std::logic_error("Child indices out of bounds");
+            if( j > i )
+                throw std::logic_error("Child index outside of lower triangle");
+#endif
+            return *children[(i*(i+1))/2 + j]; 
+        }
 
         const Quasi2dHMatrix& Child( int i, int j ) const
-        { return *children[(i*(i+1))/2 + j]; }
+        {
+#ifndef RELEASE
+            if( i < 0 || j < 0 )
+                throw std::logic_error("Child indices must be non-negative");
+            if( i > 3 || j > 3 )
+                throw std::logic_error("Child indices out of bounds");
+            if( j > i )
+                throw std::logic_error("Child index outside of lower triangle");
+#endif
+            return *children[(i*(i+1))/2 + j];
+        }
     };
 
     enum ShellType { NODE, NODE_SYMMETRIC, DENSE, LOW_RANK };
