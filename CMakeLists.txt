@@ -264,7 +264,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
-  set(QUASI2D_TESTS SparseConstructor)
+  set(QUASI2D_TESTS LowRankConstructor SparseConstructor)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries

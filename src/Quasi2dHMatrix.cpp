@@ -1398,8 +1398,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
     {
         _shell.type = DENSE;
         _shell.data.D = new DenseMatrix<Scalar>( this->_height, this->_width );
+        const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
-        ( 'N', 'C', this->_height, this->_width, F.Rank(),
+        ( 'N', option, this->_height, this->_width, F.Rank(),
           1, FUSub.LockedBuffer(), FUSub.LDim(),
              FVSub.LockedBuffer(), FVSub.LDim(),
           0, _shell.data.D->Buffer(), _shell.data.D->LDim() );
