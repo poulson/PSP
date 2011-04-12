@@ -69,9 +69,9 @@ main( int argc, char* argv[] )
         std::cerr << "Caught message: " << e.what() << std::endl;
     }
     
-    std::cout << "-------------------------------------------------------------\n"
-              << "Converting complex double-precision sparse to Quasi2dHMatrix \n"
-              << "-------------------------------------------------------------" 
+    std::cout << "--------------------------------------------------\n"
+              << "Converting double-complex sparse to Quasi2dHMatrix\n"
+              << "---------------------------------------------------" 
               << std::endl;
     try
     {

@@ -354,7 +354,7 @@ psp::DenseMatrix<Scalar>::Buffer( int i, int j )
         throw std::logic_error("Cannot modify the buffer from a locked view");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i >= _height || j >= _width )
+    if( i > _height || j > _width )
         throw std::logic_error("Indices are out of bound");
 #endif
     return &_buffer[i+j*_ldim];
@@ -367,7 +367,7 @@ psp::DenseMatrix<Scalar>::LockedBuffer( int i, int j ) const
 #ifndef RELEASE
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
-    if( i >= _height || j >= _width )
+    if( i > _height || j > _width )
         throw std::logic_error("Indices are out of bound");
 #endif
     if( _lockedView )

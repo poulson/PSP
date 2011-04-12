@@ -181,7 +181,7 @@ psp::Vector<Scalar>::Buffer( int i )
         throw std::logic_error("Cannot get modifiable buffer from locked view");
     if( i < 0 )
         throw std::logic_error("Negative buffer offset is nonsensical");
-    if( i >= _height )
+    if( i > _height )
         throw std::logic_error("Out of bounds of buffer");
 #endif
     return &_buffer[i];
@@ -194,7 +194,7 @@ psp::Vector<Scalar>::LockedBuffer( int i ) const
 #ifndef RELEASE
     if( i < 0 )
         throw std::logic_error("Negative buffer offset is nonsensical");
-    if( i >= _height )
+    if( i > _height )
         throw std::logic_error("Out of bounds of buffer");
 #endif
     if( _lockedView )
