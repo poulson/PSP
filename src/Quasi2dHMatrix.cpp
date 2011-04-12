@@ -1166,13 +1166,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     }
     else if( C.NumLevels() > 1 )
     {
-        // A product of two matrices will be assumed non-symmetric.
-        C._shell.type = NODE;
-        C._shell.data.node = 
-            new Node
-            ( C._xSizeSource, C._xSizeTarget, C._ySizeSource, C._ySizeTarget,
-              C._zSize );
-
         const Node& nodeA = *this->_shell.data.node;
         const Node& nodeB = *B._shell.data.node;
         Node& nodeC = *C._shell.data.node;
@@ -1195,11 +1188,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             {
                 for( int s=0; s<4; ++s )
                 {
-                    // Create the H-matrix here
-                    nodeC.children[s+4*t] = 
-                        new Quasi2dHMatrix<Scalar,Conjugated>;
-
-                    // Initialize the [t,s] box of C with the first product
+                    // Scale the [t,s] box of C in the first product
                     nodeA.Child(t,0).MapMatrix
                     ( alpha, nodeB.Child(0,s), beta, nodeC.Child(t,s) ); 
     
@@ -1220,10 +1209,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         if( this->IsHierarchical() || B.IsHierarchical() )
             throw std::logic_error("Invalid combination of H-matrices.");
 #endif
-        C._shell.type = DENSE;
-        C._shell.data.D = 
-            new DenseMatrix<Scalar>( this->_height, this->_width );
-
         if( this->IsDense() && B.IsDense() )
         {
             hmatrix_tools::MatrixMatrix

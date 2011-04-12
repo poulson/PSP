@@ -68,11 +68,6 @@ void psp::hmatrix_tools::ConvertSubmatrix
 ( LowRankMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd )
 {
-    // Count the number of nonzeros in the submatrix
-    const int nonzeroStart = S.rowOffsets[iStart];
-    const int nonzeroEnd = S.rowOffsets[iEnd];
-    const int numNonzeros = nonzeroEnd - nonzeroStart;
-
     // Figure out the matrix sizes
     const int m = iEnd - iStart;
     const int n = jEnd - jStart;

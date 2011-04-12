@@ -28,7 +28,7 @@ main( int argc, char* argv[] )
     const int zSize = 2;
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
-    const int r = 3;
+    const int r = 4;
 
     std::cout << "-----------------------------------------------------\n"
               << "Converting double-precision sparse to Quasi2dHMatrix \n"

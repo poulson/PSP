@@ -187,7 +187,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     std::vector<Real> s( r );
     lapack::SVD
     ( 'O', 'A', r, r, &buffer[offset], r, 
-      &s[0], 0, 0, &buffer[offset+blockSize], r, 
+      &s[0], 0, 1, &buffer[offset+blockSize], r, 
       &buffer[offset+2*blockSize], lworkSVD );
 
     //------------------------------------------------------------------------//
@@ -407,7 +407,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     std::vector<Real> realBuffer( 6*r );
     lapack::SVD
     ( 'O', 'A', r, r, &buffer[offset], r, 
-      &realBuffer[0], 0, 0, &buffer[offset+blockSize], r, 
+      &realBuffer[0], 0, 1, &buffer[offset+blockSize], r, 
       &buffer[offset+2*blockSize], lworkSVD, &realBuffer[r] );
 
     //------------------------------------------------------------------------//
