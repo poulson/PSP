@@ -1265,7 +1265,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
     {
     case NODE:
     {
-        // We will form the inverse in the original matrix, so we only need to 
+        // We will form the inverse in the original matrix, so we only need to
         // create a temporary matrix.
         Quasi2dHMatrix<Scalar,Conjugated> B; 
         B.CopyFrom( *this );
@@ -1281,7 +1281,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
             nodeA.children[l+4*l]->CopyFrom( *nodeB.children[l+4*l] );
             nodeA.children[l+4*l]->Invert();
 
-            for( int j=0; j<4; ++j )
+            // NOTE: Can be skipped for upper-triangular matrices
+            for( int j=0; j<l; ++j )
             {
                 // A_lj := A_ll A_lj
                 Quasi2dHMatrix<Scalar,Conjugated> C;
@@ -1290,6 +1291,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
                 ( (Scalar)1, C, *nodeA.children[j+4*l] );
             }
 
+            // NOTE: Can be skipped for lower-triangular matrices
             for( int j=l+1; j<4; ++j )
             {
                 // B_lj := A_ll B_lj
@@ -1301,6 +1303,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
 
             for( int i=l+1; i<4; ++i )
             {
+                // NOTE: Can be skipped for upper triangular matrices.
                 for( int j=0; j<=l; ++j )
                 {
                     // A_ij -= B_il A_lj
@@ -1308,9 +1311,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
                     ( (Scalar)-1, *nodeA.children[j+4*l], 
                       (Scalar)1,  *nodeA.children[j+4*i] );
                 }
+                // NOTE: Can be skipped for either lower or upper-triangular
+                //       matrices, effectively decoupling the diagonal block
+                //       inversions.
                 for( int j=l+1; j<4; ++j )
                 {
-                    // B_ij -= B_il B_ij
+                    // B_ij -= B_il B_lj
                     nodeB.children[l+4*i]->MapMatrix
                     ( (Scalar)-1, *nodeB.children[j+4*l],
                       (Scalar)1,  *nodeB.children[j+4*i] );
@@ -1318,10 +1324,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
             }
         }
 
+        // NOTE: Can be skipped for upper-triangular matrices.
         for( int l=3; l>=0; --l )
         {
             for( int i=l-1; i>=0; --i )
             {
+                // NOTE: For low-triangular matrices, change the loop guard
+                //       to j<=l.
                 for( int j=0; j<4; ++j )
                 {
                     // A_ij -= B_il A_lj
