@@ -1478,6 +1478,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
         ( *_shell.data.F, S, 
           this->_targetOffset, this->_targetOffset+this->_height,
           this->_sourceOffset, this->_sourceOffset+this->_width );
+#ifndef RELEASE
+        std::cout << "Converted sparse " 
+                  << this->_height << " x " << this->_width 
+                  << " matrix with offsets (" << this->_targetOffset << ","
+                  << this->_sourceOffset << ") to rank "
+                  << _shell.data.F->Rank() << std::endl;
+#endif
     }
     else if( this->NumLevels() > 1 )
     {

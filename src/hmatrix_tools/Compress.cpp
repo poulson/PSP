@@ -129,6 +129,13 @@ void psp::hmatrix_tools::Compress
     const int n = A.Width();
     const int r = A.Rank();
     const int roundedRank = std::min( r, maxRank );
+#ifndef RELEASE
+    if( r > std::min(m,n) )
+    {
+        throw std::logic_error
+        ("Rank entering Compress was larger than the minimum dimension");
+    }
+#endif
     if( roundedRank == r )
         return;
 
@@ -260,6 +267,12 @@ void psp::hmatrix_tools::Compress
     const int n = A.Width();
     const int r = A.Rank();
     const int roundedRank = std::min( r, maxRank );
+#ifndef RELEASE
+    if( r > std::min(m,n) )
+    {        throw std::logic_error
+        ("Rank entering Compress was larger than the minimum dimension");
+    }
+#endif
     if( roundedRank == r )
         return;
 

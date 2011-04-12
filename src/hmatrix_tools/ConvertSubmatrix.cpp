@@ -73,10 +73,29 @@ void psp::hmatrix_tools::ConvertSubmatrix
     const int nonzeroEnd = S.rowOffsets[iEnd];
     const int numNonzeros = nonzeroEnd - nonzeroStart;
 
-    // Initialize the low-rank matrix to all zeros
+    // Figure out the matrix sizes
     const int m = iEnd - iStart;
     const int n = jEnd - jStart;
-    const int r = numNonzeros;
+    int rankCounter = 0;
+    for( int iOffset=0; iOffset<m; ++iOffset )
+    {
+        const int thisRowOffset = S.rowOffsets[iStart+iOffset];
+        const int nextRowOffset = S.rowOffsets[iStart+iOffset+1];
+
+        const int* thisSetOfColIndices = &S.columnIndices[thisRowOffset];
+        for( int k=0; k<nextRowOffset-thisRowOffset; ++k )
+        {
+            const int thisColIndex = thisSetOfColIndices[k];
+            if( thisColIndex < jStart )
+                continue;
+            else if( thisColIndex < jEnd )
+                ++rankCounter;
+            else
+                break;
+        }
+    }
+
+    const int r = rankCounter;
     F.U.SetType( GENERAL ); F.U.Resize( m, r );
     F.V.SetType( GENERAL ); F.V.Resize( n, r );
     Scale( (Scalar)0, F.U );
@@ -85,7 +104,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
     // Fill in the representation of each nonzero using the appropriate column
     // of identity in F.U and the appropriate scaled column of identity in 
     // F.V
-    int rankCounter = 0;
+    rankCounter = 0;
     for( int iOffset=0; iOffset<m; ++iOffset )
     {
         const int thisRowOffset = S.rowOffsets[iStart+iOffset];

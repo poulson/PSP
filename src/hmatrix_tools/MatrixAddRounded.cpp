@@ -45,12 +45,32 @@ void psp::hmatrix_tools::MatrixAddRounded
   Real beta,  const LowRankMatrix<Real,Conjugated>& B, 
                     LowRankMatrix<Real,Conjugated>& C )
 {
+#ifndef RELEASE
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
+    {
+        throw std::logic_error
+        ("Incompatible matrix dimensions in MatrixAddRounded");
+    }
+#endif
     const int m = A.Height();
     const int n = A.Width();
+    const int minDim = std::min(m,n);
     const int Ar = A.Rank();
     const int Br = B.Rank();
     const int r = Ar + Br;
-    const int roundedRank = std::min( r, maxRank );
+    const int roundedRank = std::min( std::min(r,minDim), maxRank );
+#ifndef RELEASE
+    if( Ar > minDim )
+    {
+        throw std::logic_error
+        ("rank(A) entering MatrixAddRounded larger than minimum dimension");
+    }
+    if( Br > minDim )
+    {
+        throw std::logic_error
+        ("rank(B) entering MatrixAddRounded larger than minimum dimension");
+    }
+#endif
 
     C.U.SetType( GENERAL ); C.U.Resize( m, roundedRank );
     C.V.SetType( GENERAL ); C.V.Resize( n, roundedRank );
@@ -256,14 +276,34 @@ void psp::hmatrix_tools::MatrixAddRounded
   const LowRankMatrix<std::complex<Real>,Conjugated>& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& C )
 {
+#ifndef RELEASE
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
+    {
+        throw std::logic_error
+        ("Incompatible matrix dimensions in MatrixAddRounded");
+    }
+#endif
     typedef std::complex<Real> Scalar;
 
     const int m = A.Height();
     const int n = A.Width();
+    const int minDim = std::min(m,n);
     const int Ar = A.Rank();
     const int Br = B.Rank();
     const int r = Ar + Br;
     const int roundedRank = std::min( r, maxRank );
+#ifndef RELEASE
+    if( Ar > minDim )
+    {
+        throw std::logic_error
+        ("rank(A) entering MatrixAddRounded larger than minimum dimension");
+    }
+    if( Br > minDim )
+    {
+        throw std::logic_error
+        ("rank(B) entering MatrixAddRounded larger than minimum dimension");
+    }
+#endif
 
     C.U.SetType( GENERAL ); C.U.Resize( m, roundedRank );
     C.V.SetType( GENERAL ); C.V.Resize( n, roundedRank );

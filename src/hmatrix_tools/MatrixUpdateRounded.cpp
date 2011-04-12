@@ -27,12 +27,32 @@ void psp::hmatrix_tools::MatrixUpdateRounded
   Real alpha, const LowRankMatrix<Real,Conjugated>& A, 
   Real beta,        LowRankMatrix<Real,Conjugated>& B )
 {
+#ifndef RELEASE
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
+    {
+        throw std::logic_error
+        ("Incompatible matrix dimensions in MatrixUpdateRounded");
+    }
+#endif
     const int m = A.Height();
     const int n = A.Width();
+    const int minDim = std::min(m,n);
     const int Ar = A.Rank();
     const int Br = B.Rank();
     const int r = Ar + Br;
-    const int roundedRank = std::min( r, maxRank );
+    const int roundedRank = std::min( std::min(r,minDim), maxRank );
+#ifndef RELEASE
+    if( Ar > minDim )
+    {
+        throw std::logic_error
+        ("rank(A) entering MatrixUpdateRounded larger than minimum dimension");
+    }
+    if( Br > minDim )
+    {
+        throw std::logic_error
+        ("rank(B) entering MatrixUpdateRounded larger than minimum dimension");
+    }
+#endif
 
     // Early exit if possible
     if( roundedRank == r )
@@ -226,13 +246,32 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         LowRankMatrix<std::complex<Real>,Conjugated>& B )
 {
     typedef std::complex<Real> Scalar;
-
+#ifndef RELEASE
+    if( A.Height() != B.Height() || A.Width() != B.Width() )
+    {        
+        throw std::logic_error
+        ("Incompatible matrix dimensions in MatrixUpdateRounded");
+    }
+#endif
     const int m = A.Height();
     const int n = A.Width();
+    const int minDim = std::min(m,n);
     const int Ar = A.Rank();
     const int Br = B.Rank();
     const int r = Ar + Br;
-    const int roundedRank = std::min( r, maxRank );
+    const int roundedRank = std::min( std::min(r,minDim), maxRank );
+#ifndef RELEASE
+    if( Ar > minDim )
+    {
+        throw std::logic_error
+        ("rank(A) entering MatrixUpdateRounded larger than minimum dimension");
+    }
+    if( Br > minDim )
+    {
+        throw std::logic_error
+        ("rank(B) entering MatrixUpdateRounded larger than minimum dimension");
+    }
+#endif
 
     // Early exit if possible
     if( roundedRank == r )
