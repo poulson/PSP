@@ -85,13 +85,84 @@ main( int argc, char* argv[] )
         x.Print( "x" );
 
         psp::Vector<double> y;
-        H.MapVector( 1.0, x, y );
-        y.Print( "y := H x ~= S x" );
+        H.MapVector( 2.0, x, y );
+        y.Print( "y := 2 H x ~= 2 S x" );
+        H.TransposeMapVector( 2.0, x, y );
+        y.Print( "y := 2 H^T x ~= 2 S^T x" );
+        H.HermitianTransposeMapVector( 2.0, x, y );
+        y.Print( "y := 2 H^H x ~= 2 H^T x" );
     }
     catch( std::exception& e )
     {
         std::cerr << "Caught message: " << e.what() << std::endl;
     }
     
+    std::cout << "-------------------------------------------------------------\n"
+              << "Converting complex double-precision sparse to Quasi2dHMatrix \n"
+              << "-------------------------------------------------------------" 
+              << std::endl;
+    try
+    {
+        psp::SparseMatrix< std::complex<double> > S;
+        S.height = m;
+        S.width = n;
+        S.symmetric = false;
+
+        for( int i=0; i<m; ++i )
+        {
+            S.rowOffsets.push_back( S.nonzeros.size() );
+
+            if( i >= xSize )
+            {
+                S.nonzeros.push_back( std::complex<double>(i,S.nonzeros.size()+1) );
+                S.columnIndices.push_back( i-xSize );
+            }
+
+            if( i >= 1 )
+            {
+                S.nonzeros.push_back( std::complex<double>(i,S.nonzeros.size()+1) );
+                S.columnIndices.push_back( i-1 );
+            }
+
+            S.nonzeros.push_back( std::complex<double>(i,S.nonzeros.size()+1) );
+            S.columnIndices.push_back( i );
+
+            if( i+1 < n )
+            {
+                S.nonzeros.push_back( std::complex<double>(i,S.nonzeros.size()+1) );
+                S.columnIndices.push_back( i+1 );
+            }
+
+            if( i+xSize < n )
+            {
+                S.nonzeros.push_back( std::complex<double>(i,S.nonzeros.size()+1) );
+                S.columnIndices.push_back( i+xSize );
+            }
+        }
+        S.rowOffsets.push_back( S.nonzeros.size() );
+        S.Print( "S" );
+
+        psp::Quasi2dHMatrix<std::complex<double>,false> 
+            H( S, 2, r, false, xSize, ySize, zSize );
+
+        psp::Vector< std::complex<double> > x( n );
+        std::complex<double>* xBuffer = x.Buffer();
+        for( int i=0; i<n; ++i )
+            xBuffer[i] = std::complex<double>(1.0,3.0);
+        x.Print( "x" );
+
+        psp::Vector< std::complex<double> > y;
+        H.MapVector( std::complex<double>(4.0,5.0), x, y );
+        y.Print( "y := (4+5i)H x ~= (4+5i)S x" );
+        H.TransposeMapVector( std::complex<double>(4.0,5.0), x, y );
+        y.Print( "y := (4+5i)H^T x ~= (4+5i)S^T x" );
+        H.HermitianTransposeMapVector( std::complex<double>(4.0,5.0), x, y );
+        y.Print( "y := (4+5i)H^H x ~= (4+5i)H^T x" );
+    }
+    catch( std::exception& e )
+    {
+        std::cerr << "Caught message: " << e.what() << std::endl;
+    }
+
     return 0;
 }

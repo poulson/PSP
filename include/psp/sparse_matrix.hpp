@@ -34,7 +34,6 @@ struct SparseMatrix
     std::vector<int> rowOffsets;
 
     void Print( const std::string& tag ) const;
-    // TODO: Routines for outputting in Matlab and PETSc formats?
 };
 
 } // namespace psp
@@ -60,8 +59,7 @@ psp::SparseMatrix<Scalar>::Print( const std::string& tag ) const
         {
             const int j = columnIndices[rowOffset+k];
             const Scalar alpha = nonzeros[rowOffset+k];
-            std::cout << "(" << i << "," << j << "): " 
-                      << WrapScalar(alpha) << "\n";
+            std::cout << i << " " << j << " " << WrapScalar(alpha) << "\n";
         }
     }
     std::cout << std::endl;
