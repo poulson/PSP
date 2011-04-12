@@ -264,6 +264,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
+  set(QUASI2D_TESTS SparseConstructor)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
@@ -302,6 +303,15 @@ if(BUILD_TESTS)
     add_executable(${TEST} ${TEST_DIR}/hmatrix_tools/${TEST}.cpp)
     target_link_libraries(${TEST} psp cmake-dummy-lib)
     set_target_properties(${TEST} 
+                          PROPERTIES OUTPUT_NAME ${TEST}
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+  endforeach(TEST)
+  # Build the Quasi2dHMatrix tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/quasi2d_hmatrix")
+  foreach(TEST ${QUASI2D_TESTS})
+    add_executable(${TEST} ${TEST_DIR}/quasi2d_hmatrix/${TEST}.cpp)
+    target_link_libraries(${TEST} psp cmake-dummy-lib)
+    set_target_properties(${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
   endforeach(TEST)

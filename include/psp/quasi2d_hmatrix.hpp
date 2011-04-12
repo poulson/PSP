@@ -61,7 +61,7 @@ public:
             xTargetSizes[0] = xSizeTarget/2;
             xTargetSizes[1] = xSizeTarget - xTargetSizes[0];
             yTargetSizes[0] = ySizeTarget/2;
-            yTargetSizes[1] = ySizeTarget - yTargetSizes[1];
+            yTargetSizes[1] = ySizeTarget - yTargetSizes[0];
 
             targetSizes[0] = xTargetSizes[0]*yTargetSizes[0]*zSize;
             targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
@@ -90,7 +90,7 @@ public:
             xSizes[0] = xSize/2;
             xSizes[1] = xSize - xSizes[0];
             ySizes[0] = ySize/2;
-            ySizes[1] = ySize - ySizes[1];
+            ySizes[1] = ySize - ySizes[0];
 
             sizes[0] = xSizes[0]*ySizes[0]*zSize;
             sizes[1] = xSizes[1]*ySizes[0]*zSize;

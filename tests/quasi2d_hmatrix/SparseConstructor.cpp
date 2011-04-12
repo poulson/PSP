@@ -30,9 +30,9 @@ main( int argc, char* argv[] )
     const int n = xSize*ySize*zSize;
     const int r = 3;
 
-    std::cout << "----------------------------------------------------\n"
-              << "Converting double-precision sparse to dense         \n"
-              << "----------------------------------------------------" 
+    std::cout << "-----------------------------------------------------\n"
+              << "Converting double-precision sparse to Quasi2dHMatrix \n"
+              << "-----------------------------------------------------" 
               << std::endl;
     try
     {
@@ -75,51 +75,23 @@ main( int argc, char* argv[] )
         S.rowOffsets.push_back( S.nonzeros.size() );
         S.Print( "S" );
 
-        psp::DenseMatrix<double> D;
-        psp::hmatrix_tools::ConvertSubmatrix( D, S, 0, m, 0, n );
-        D.Print( "D" );
+        psp::Quasi2dHMatrix<double,false> 
+            H( S, 2, r, false, xSize, ySize, zSize );
+
+        psp::Vector<double> x( n );
+        double* xBuffer = x.Buffer();
+        for( int i=0; i<n; ++i )
+            xBuffer[i] = 1.0;
+        x.Print( "x" );
+
+        psp::Vector<double> y;
+        H.MapVector( 1.0, x, y );
+        y.Print( "y := H x ~= S x" );
     }
     catch( std::exception& e )
     {
         std::cerr << "Caught message: " << e.what() << std::endl;
     }
     
-    std::cout << "----------------------------------------------------\n"
-              << "Converting double-precision sparse to low-rank      \n"
-              << "----------------------------------------------------" 
-              << std::endl;
-    try
-    {
-        psp::SparseMatrix<double> S;
-        S.height = m;
-        S.width = n;
-        S.symmetric = false;
-
-        for( int i=0; i<r; ++i )
-        {
-            S.rowOffsets.push_back( S.nonzeros.size() );
-
-            if( i+xSize < n )
-            {
-                S.nonzeros.push_back( S.nonzeros.size()+1 );    
-                S.columnIndices.push_back( i+xSize );
-            }
-        }
-        for( int i=r; i<m; ++i )
-        {
-            S.rowOffsets.push_back( S.nonzeros.size() );
-        }
-        S.rowOffsets.push_back( S.nonzeros.size() );
-        S.Print( "S" );
-
-        psp::LowRankMatrix<double,false> F;
-        psp::hmatrix_tools::ConvertSubmatrix( F, S, 0, m, 0, n );
-        F.Print( "F" );
-    }
-    catch( std::exception& e )
-    {
-        std::cerr << "Caught message: " << e.what() << std::endl;
-    }
-
     return 0;
 }

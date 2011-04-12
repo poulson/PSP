@@ -118,6 +118,7 @@ psp::Vector<Scalar>::Resize( int height )
     if( _viewing || _lockedView )
         throw std::logic_error("Cannot resize a Vector that is a view.");
 #endif
+    _height = height;
     _memory.resize( height );
     _buffer = &_memory[0];
 }
