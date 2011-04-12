@@ -1324,13 +1324,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
             }
         }
 
-        // NOTE: Can be skipped for upper-triangular matrices.
+        // NOTE: Can be skipped for lower-triangular matrices.
         for( int l=3; l>=0; --l )
         {
             for( int i=l-1; i>=0; --i )
             {
-                // NOTE: For low-triangular matrices, change the loop guard
-                //       to j<=l.
+                // NOTE: For upper-triangular matrices, change the loop to
+                //       for( int j=l; j<4; ++j )
                 for( int j=0; j<4; ++j )
                 {
                     // A_ij -= B_il A_lj
