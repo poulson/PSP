@@ -23,7 +23,7 @@
 template<typename Scalar>
 void psp::hmatrix_tools::ConvertSubmatrix
 ( DenseMatrix<Scalar>& D, const SparseMatrix<Scalar>& S, 
-  int iStart, int iEnd, int jStart, int jEnd )
+  int iStart, int jStart, int height, int width )
 {
 #ifndef RELEASE
     PushCallStack("hmatrix_tools::ConvertSubmatrix (DenseMatrix,SparseMatrix)");
@@ -33,18 +33,17 @@ void psp::hmatrix_tools::ConvertSubmatrix
         D.SetType( SYMMETRIC );
     else 
         D.SetType( GENERAL );
-    D.Resize( iEnd-iStart, jEnd-jStart );
+    D.Resize( height, width );
     Scale( (Scalar)0, D );
 #ifndef RELEASE
-    if( D.Symmetric() && iEnd != jEnd )
+    if( D.Symmetric() && height != width )
         throw std::logic_error("Invalid submatrix of symmetric sparse matrix.");
 #endif
 
     // Add in the nonzeros, one row at a time
-    const int m = D.Height();
     const int ldim = D.LDim();
     Scalar* DBuffer = D.Buffer();
-    for( int iOffset=0; iOffset<m; ++iOffset )
+    for( int iOffset=0; iOffset<height; ++iOffset )
     {
         const int thisRowOffset = S.rowOffsets[iStart+iOffset];
         const int nextRowOffset = S.rowOffsets[iStart+iOffset+1];
@@ -55,7 +54,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
             const int thisColIndex = thisSetOfColIndices[k];
             if( thisColIndex < jStart )
                 continue;
-            else if( thisColIndex < jEnd )
+            else if( thisColIndex < jStart+width )
             {
                 const int jOffset = thisColIndex - jStart;
                 DBuffer[iOffset+jOffset*ldim] = S.nonzeros[thisRowOffset+k];
@@ -72,17 +71,15 @@ void psp::hmatrix_tools::ConvertSubmatrix
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::ConvertSubmatrix
 ( LowRankMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
-  int iStart, int iEnd, int jStart, int jEnd )
+  int iStart, int jStart, int height, int width )
 {
 #ifndef RELEASE
     PushCallStack
     ("hmatrix_tools::ConvertSubmatrix (LowRankMatrix,SparseMatrix)");
 #endif
     // Figure out the matrix sizes
-    const int m = iEnd - iStart;
-    const int n = jEnd - jStart;
     int rankCounter = 0;
-    for( int iOffset=0; iOffset<m; ++iOffset )
+    for( int iOffset=0; iOffset<height; ++iOffset )
     {
         const int thisRowOffset = S.rowOffsets[iStart+iOffset];
         const int nextRowOffset = S.rowOffsets[iStart+iOffset+1];
@@ -93,7 +90,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
             const int thisColIndex = thisSetOfColIndices[k];
             if( thisColIndex < jStart )
                 continue;
-            else if( thisColIndex < jEnd )
+            else if( thisColIndex < jStart+width )
                 ++rankCounter;
             else
                 break;
@@ -101,8 +98,8 @@ void psp::hmatrix_tools::ConvertSubmatrix
     }
 
     const int r = rankCounter;
-    F.U.SetType( GENERAL ); F.U.Resize( m, r );
-    F.V.SetType( GENERAL ); F.V.Resize( n, r );
+    F.U.SetType( GENERAL ); F.U.Resize( height, r );
+    F.V.SetType( GENERAL ); F.V.Resize( width, r );
     Scale( (Scalar)0, F.U );
     Scale( (Scalar)0, F.V );
 
@@ -110,7 +107,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
     // of identity in F.U and the appropriate scaled column of identity in 
     // F.V
     rankCounter = 0;
-    for( int iOffset=0; iOffset<m; ++iOffset )
+    for( int iOffset=0; iOffset<height; ++iOffset )
     {
         const int thisRowOffset = S.rowOffsets[iStart+iOffset];
         const int nextRowOffset = S.rowOffsets[iStart+iOffset+1];
@@ -121,7 +118,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
             const int thisColIndex = thisSetOfColIndices[k];
             if( thisColIndex < jStart )
                 continue;
-            else if( thisColIndex < jEnd )
+            else if( thisColIndex < jStart+width )
             {
                 const int jOffset = thisColIndex - jStart;
                 const Scalar value = S.nonzeros[thisRowOffset+k];
@@ -137,7 +134,7 @@ void psp::hmatrix_tools::ConvertSubmatrix
         }
     }
 #ifndef RELEASE
-    if( F.Rank() > std::min(S.height,S.width) )
+    if( F.Rank() > std::min(height,width) )
         std::logic_error("Rank is larger than minimum dimension");
     PopCallStack();
 #endif

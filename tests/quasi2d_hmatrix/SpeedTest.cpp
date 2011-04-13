@@ -58,8 +58,8 @@ main( int argc, char* argv[] )
         psp::Quasi2dHMatrix<double,false>::BuildNaturalToHierarchicalMap
         ( map, xSize, ySize, zSize, numLevels );
 
-        std::vector<int> inverseMap( map.size() );
-        for( int i=0; i<map.size(); ++i )
+        std::vector<int> inverseMap( m );
+        for( int i=0; i<m; ++i )
             inverseMap[map[i]] = i;
 
         std::cout << "Filling sparse matrix...";

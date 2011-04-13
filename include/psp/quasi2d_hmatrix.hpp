@@ -71,7 +71,7 @@ public:
 
         ~Node()
         {
-            for( int i=0; i<16; ++i )
+            for( unsigned i=0; i<children.size(); ++i )
                 delete children[i];
             children.clear();
         }
@@ -83,6 +83,8 @@ public:
                 throw std::logic_error("Child indices must be non-negative");
             if( i > 3 || j > 3 )
                 throw std::logic_error("Child indices out of bounds");
+            if( children.size() != 16 )
+                throw std::logic_error("children array not yet set up");
 #endif
             return *children[j+4*i]; 
         }
@@ -94,6 +96,8 @@ public:
                 throw std::logic_error("Child indices must be non-negative");
             if( i > 3 || j > 3 )
                 throw std::logic_error("Child indices out of bounds");
+            if( children.size() != 16 )
+                throw std::logic_error("children array not yet set up");
 #endif
             return *children[j+4*i]; 
         }
@@ -122,7 +126,7 @@ public:
 
         ~NodeSymmetric()
         {
-            for( int i=0; i<10; ++i )
+            for( unsigned i=0; i<children.size(); ++i )
                 delete children[i];
             children.clear();
         }
@@ -136,6 +140,8 @@ public:
                 throw std::logic_error("Child indices out of bounds");
             if( j > i )
                 throw std::logic_error("Child index outside of lower triangle");
+            if( children.size() != 10 )
+                throw std::logic_error("children array not yet set up");
 #endif
             return *children[(i*(i+1))/2 + j]; 
         }
@@ -149,6 +155,8 @@ public:
                 throw std::logic_error("Child indices out of bounds");
             if( j > i )
                 throw std::logic_error("Child index outside of lower triangle");
+            if( children.size() != 10 )
+                throw std::logic_error("children array not yet set up");
 #endif
             return *children[(i*(i+1))/2 + j];
         }
@@ -159,13 +167,28 @@ public:
     struct Shell
     {
         ShellType type;
-        union 
+        union Data
         {
             Node* node;
             NodeSymmetric* nodeSymmetric;
             DenseMatrix<Scalar>* D;
             LowRankMatrix<Scalar,Conjugated>* F;
+
+            Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
+
+        Shell() : type(NODE), data() { }
+
+        ~Shell()
+        {
+            switch( type )
+            {
+            case NODE:           delete data.node; break;
+            case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
+            case LOW_RANK:       delete data.F; break;
+            case DENSE:          delete data.D; break;
+            }
+        }
     };
 
     static void BuildNaturalToHierarchicalMap
@@ -351,10 +374,14 @@ private:
 
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
-    // Since a constructor cannot call another constructor, have both of our
-    // constructors call this routine.
-    void ImportLowRankMatrix( const LowRankMatrix<Scalar,Conjugated>& F );
-    void ImportSparseMatrix( const SparseMatrix<Scalar>& S );
+    void ImportLowRankMatrix
+    ( const LowRankMatrix<Scalar,Conjugated>& F, int iOffset=0, int jOffset=0 );
+    void ImportSparseMatrix
+    ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
+
+    void UpdateWithLowRankMatrix
+    ( Scalar alpha,
+      const LowRankMatrix<Scalar,Conjugated>& F, int iOffset=0, int jOffset=0 );
 
     // y += alpha A x
     void UpdateVectorWithNodeSymmetric

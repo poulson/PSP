@@ -69,11 +69,11 @@ void Compress( int maxRank, LowRankMatrix<std::complex<Real>,Conjugated>& F );
 template<typename Scalar>
 void ConvertSubmatrix
 ( DenseMatrix<Scalar>& D, const SparseMatrix<Scalar>& S,
-  int iStart, int iEnd, int jStart, int jEnd );
+  int iStart, int jStart, int height, int width );
 template<typename Scalar,bool Conjugated>
 void ConvertSubmatrix
 ( LowRankMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
-  int iStart, int iEnd, int jStart, int jEnd );
+  int iStart, int jStart, int height, int width );
 
 /*\
 |*| Generalized addition of two dense/low-rank matrices, C := alpha A + beta B

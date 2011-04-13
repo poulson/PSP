@@ -22,14 +22,18 @@
 #include <stack>
 
 namespace { 
-    std::stack<std::string> callStack; 
+std::stack<std::string> callStack; 
 }
 
 void psp::PushCallStack( const std::string& s ) 
-{ ::callStack.push(s); }
+{ 
+    ::callStack.push(s); 
+}
 
 void psp::PopCallStack() 
-{ ::callStack.pop(); }
+{ 
+    ::callStack.pop(); 
+}
 
 void psp::DumpCallStack() 
 {
