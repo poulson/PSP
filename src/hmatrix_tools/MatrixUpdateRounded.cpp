@@ -39,12 +39,6 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     const int Br = B.Rank();
     const int r = Ar + Br;
     const int roundedRank = std::min( std::min(r,minDim), maxRank );
-#ifndef RELEASE
-    if( Ar > minDim )
-        throw std::logic_error("rank(A) larger than minimum dimension");
-    if( Br > minDim )
-        throw std::logic_error("rank(B) larger than minimum dimension");
-#endif
 
     // Early exit if possible
     if( roundedRank == r )
@@ -127,7 +121,8 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     throw std::logic_error("Pivoted QR is not yet supported.");
 #else
     // Perform an unpivoted QR decomposition on [(alpha A.U), (beta B.U)]
-    std::vector<Real> tauU( std::min( m, r ) );
+    const int minDimU = std::min(m,r);
+    std::vector<Real> tauU( minDimU );
     lapack::QR( m, r, &buffer[0], m, &tauU[0], &buffer[offset], leftPanelSize );
 
     //------------------------------------------------------------------------//
@@ -137,7 +132,8 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //------------------------------------------------------------------------//
 
     // Perform an unpivoted QR decomposition on [A.V, B.V]
-    std::vector<Real> tauV( std::min( n, r ) );
+    const int minDimV = std::min(n,r);
+    std::vector<Real> tauV( minDimV );
     lapack::QR
     ( n, r, &buffer[leftPanelSize], n, &tauV[0], 
       &buffer[offset], rightPanelSize );
@@ -153,7 +149,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         Real* RESTRICT W = &buffer[offset];
         const Real* RESTRICT R1 = &buffer[0];
         std::memset( W, 0, blockSize*sizeof(Real) );
-        for( int j=0; j<r; ++j )
+        for( int j=0; j<minDimU; ++j )
             for( int i=0; i<=j; ++i )
                 W[i+j*r] = R1[i+j*m];
     }
@@ -168,7 +164,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // Update W := R1 R2^T. We are unfortunately performing 2x as many
     // flops as are required.
     blas::Trmm
-    ( 'R', 'U', 'T', 'N', r, r, 
+    ( 'R', 'U', 'T', 'N', minDimU, minDimV, 
       1, &buffer[leftPanelSize], n, &buffer[offset], r );
 
     //------------------------------------------------------------------------//
@@ -179,9 +175,9 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //------------------------------------------------------------------------//
 
     // Get the SVD of R1 R2^T, overwriting R1 R2^T with U
-    std::vector<Real> s( r );
+    std::vector<Real> s( std::min(minDimU,minDimV) );
     lapack::SVD
-    ( 'O', 'A', r, r, &buffer[offset], r, 
+    ( 'O', 'A', minDimU, minDimV, &buffer[offset], r, 
       &s[0], 0, 1, &buffer[offset+blockSize], r, 
       &buffer[offset+2*blockSize], lworkSVD );
 
@@ -206,12 +202,12 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         const Real sigma = s[j];
         const Real* RESTRICT UCol = &buffer[offset+j*r];
         Real* RESTRICT UColScaled = B.U.Buffer(0,j);
-        for( int i=0; i<r; ++i )
+        for( int i=0; i<minDimU; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', m, roundedRank, r, &buffer[0], B.Height(), &tauU[0], 
+    ( 'L', 'N', m, roundedRank, minDimU, &buffer[0], B.Height(), &tauU[0], 
       B.U.Buffer(), B.U.LDim(), &buffer[offset], blockSize );
 
     // Form the rounded B.V by first filling it with 
@@ -222,13 +218,13 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     {
         const Real* RESTRICT VTRow = &buffer[offset+blockSize+j];
         Real* RESTRICT VCol = B.V.Buffer(0,j);
-        for( int i=0; i<r; ++i )
+        for( int i=0; i<minDimV; ++i )
             VCol[i] = VTRow[i*r];
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], B.Width(), &tauV[0],
-      B.V.Buffer(), B.V.LDim(), &buffer[offset], blockSize );
+    ( 'L', 'N', n, roundedRank, minDimV, &buffer[leftPanelSize], B.Width(), 
+      &tauV[0], B.V.Buffer(), B.V.LDim(), &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 #ifndef RELEASE
     PopCallStack();
@@ -256,12 +252,6 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     const int Br = B.Rank();
     const int r = Ar + Br;
     const int roundedRank = std::min( std::min(r,minDim), maxRank );
-#ifndef RELEASE
-    if( Ar > minDim )
-        throw std::logic_error("rank(A) larger than minimum dimension");
-    if( Br > minDim )
-        throw std::logic_error("rank(B) larger than minimum dimension");
-#endif
 
     // Early exit if possible
     if( roundedRank == r )
@@ -344,7 +334,8 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     throw std::logic_error("Pivoted QR is not yet supported.");
 #else
     // Perform an unpivoted QR decomposition on [(alpha A.U), (beta B.U)]
-    std::vector<Scalar> tauU( std::min( m, r ) );
+    const int minDimU = std::min(m,r);
+    std::vector<Scalar> tauU( minDimU );
     lapack::QR( m, r, &buffer[0], m, &tauU[0], &buffer[offset], leftPanelSize );
 
     //------------------------------------------------------------------------//
@@ -354,7 +345,8 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     //------------------------------------------------------------------------//
 
     // Perform an unpivoted QR decomposition on [A.V, B.V]
-    std::vector<Scalar> tauV( std::min( n, r ) );
+    const int minDimV = std::min(n,r);
+    std::vector<Scalar> tauV( minDimV );
     lapack::QR
     ( n, r, &buffer[leftPanelSize], n, &tauV[0], 
       &buffer[offset], rightPanelSize );
@@ -370,7 +362,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         Scalar* RESTRICT W = &buffer[offset];
         const Scalar* RESTRICT R1 = &buffer[0];
         std::memset( W, 0, blockSize*sizeof(Scalar) );
-        for( int j=0; j<r; ++j )
+        for( int j=0; j<minDimU; ++j )
             for( int i=0; i<=j; ++i )
                 W[i+j*r] = R1[i+j*m];
     }
@@ -386,7 +378,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // flops as are required.
     const char option = ( Conjugated ? 'C' : 'T' );
     blas::Trmm
-    ( 'R', 'U', option, 'N', r, r, 
+    ( 'R', 'U', option, 'N', minDimU, minDimV, 
       1, &buffer[leftPanelSize], n, &buffer[offset], r );
 
     //------------------------------------------------------------------------//
@@ -399,7 +391,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // Get the SVD of R1 R2^[T,H], overwriting R1 R2^[T,H] with U
     std::vector<Real> realBuffer( 6*r );
     lapack::SVD
-    ( 'O', 'A', r, r, &buffer[offset], r, 
+    ( 'O', 'A', minDimU, minDimV, &buffer[offset], r, 
       &realBuffer[0], 0, 1, &buffer[offset+blockSize], r, 
       &buffer[offset+2*blockSize], lworkSVD, &realBuffer[r] );
 
@@ -427,12 +419,12 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         const Real sigma = realBuffer[j];
         const Scalar* RESTRICT UCol = &buffer[offset+j*r];
         Scalar* RESTRICT UColScaled = B.U.Buffer(0,j);
-        for( int i=0; i<r; ++i )
+        for( int i=0; i<minDimU; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', m, roundedRank, r, &buffer[0], B.Height(), &tauU[0], 
+    ( 'L', 'N', m, roundedRank, minDimU, &buffer[0], B.Height(), &tauU[0], 
       B.U.Buffer(), B.U.LDim(), &buffer[offset], blockSize );
 
     // Form the rounded B.V by first filling it with 
@@ -445,7 +437,7 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         {
             const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
             Scalar* RESTRICT VCol = B.V.Buffer(0,j);
-            for( int i=0; i<r; ++i )
+            for( int i=0; i<minDimV; ++i )
                 VCol[i] = Conj( VHRow[i*r] );
         }
     }
@@ -455,14 +447,14 @@ void psp::hmatrix_tools::MatrixUpdateRounded
         {
             const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
             Scalar* RESTRICT VColConj = B.V.Buffer(0,j);
-            for( int i=0; i<r; ++i )
+            for( int i=0; i<minDimV; ++i )
                 VColConj[i] = VHRow[i*r];
         }
     }
     // Apply Q2 and use the unneeded U space for our work buffer
     lapack::ApplyQ
-    ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], B.Width(), &tauV[0],
-      B.V.Buffer(), B.V.LDim(), &buffer[offset], blockSize );
+    ( 'L', 'N', n, roundedRank, minDimV, &buffer[leftPanelSize], B.Width(), 
+      &tauV[0], B.V.Buffer(), B.V.LDim(), &buffer[offset], blockSize );
 #endif // PIVOTED_QR
 #ifndef RELEASE
     PopCallStack();

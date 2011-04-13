@@ -1780,15 +1780,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
     }
     else if( this->_numLevels > 1 )
     {
-        if( this->_symmetric && this->_sourceOffset == this->_targetOffset )
+        if( this->_symmetric )
         {
             NodeSymmetric& node = *_shell.data.nodeSymmetric;
             const int* sizes = node.sizes;
 
-            int targetOffset = this->_targetOffset;
+            int targetOffset = 0;
             for( int t=0; t<4; ++t )
             {
-                int sourceOffset = this->_targetOffset;
+                int sourceOffset = 0;
                 for( int s=0; s<=t; ++s )
                 {
                     node.Child(t,s).UpdateWithLowRankMatrix
@@ -1805,10 +1805,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
             const int* sourceSizes  = node.sourceSizes;
             const int* targetSizes  = node.targetSizes;
 
-            int targetOffset = this->_targetOffset;
+            int targetOffset = 0;
             for( int t=0; t<4; ++t )
             {
-                int sourceOffset = this->_sourceOffset;
+                int sourceOffset = 0;
                 for( int s=0; s<4; ++s )
                 {
                     node.Child(t,s).UpdateWithLowRankMatrix

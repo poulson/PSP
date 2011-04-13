@@ -22,14 +22,14 @@
 
 void Usage()
 {
-    std::cout << "SpeedTest <xSize> <ySize> <zSize> <numLevels> <r>" 
+    std::cout << "Invert <xSize> <ySize> <zSize> <numLevels> <r> <print?>" 
               << std::endl;
 }
 
 int
 main( int argc, char* argv[] )
 {
-    if( argc < 6 )
+    if( argc < 7 )
     {
         Usage();
         return 0;
@@ -39,6 +39,7 @@ main( int argc, char* argv[] )
     const int zSize = atoi( argv[3] );
     const int numLevels = atoi( argv[4] );
     const int r = atoi( argv[5] );
+    const bool print = atoi( argv[6] );
 
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
@@ -115,6 +116,8 @@ main( int argc, char* argv[] )
         }
         S.rowOffsets.push_back( S.nonzeros.size() );
         std::cout << "done." << std::endl;
+        if( print )
+            S.Print( "S" );
 
         std::cout << "Constructing H-matrix...";
         std::cout.flush();
@@ -122,10 +125,30 @@ main( int argc, char* argv[] )
             H( S, numLevels, r, false, xSize, ySize, zSize );
         std::cout << "done" << std::endl;
 
+        psp::Vector<double> x;
+        if( print )
+        {
+            x.Resize( m );
+            double* xBuffer = x.Buffer();
+            for( int i=0; i<m; ++i )
+                xBuffer[i] = 1.0;
+            x.Print( "x" );
+
+            psp::Vector<double> y;
+            H.MapVector( 2.0, x, y );
+            y.Print( "y := 2 H x ~= 2 S x" );
+        }
+
         std::cout << "Inverting the H-matrix...";
         std::cout.flush();
         H.Invert();
         std::cout << "done" << std::endl;
+        if( print )
+        {
+            psp::Vector<double> y; 
+            H.MapVector( 2.0, x, y );
+            y.Print( "y := 2 inv(H) x ~= 2 inv(S) x" );
+        }
     }
     catch( std::exception& e )
     {
