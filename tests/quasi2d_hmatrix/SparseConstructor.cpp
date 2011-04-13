@@ -99,6 +99,9 @@ main( int argc, char* argv[] )
     catch( std::exception& e )
     {
         std::cerr << "Caught message: " << e.what() << std::endl;
+#ifndef RELEASE
+        psp::DumpCallStack();
+#endif
     }
     
     std::cout << "--------------------------------------------------\n"
@@ -170,6 +173,9 @@ main( int argc, char* argv[] )
     catch( std::exception& e )
     {
         std::cerr << "Caught message: " << e.what() << std::endl;
+#ifndef RELEASE
+        psp::DumpCallStack();
+#endif
     }
 
     return 0;

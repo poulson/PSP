@@ -25,6 +25,9 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
 ( int maxRank, DenseMatrix<Real>& D, LowRankMatrix<Real,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Compress (DenseMatrix,LowRankMatrix)");
+#endif
     const int m = D.Height();
     const int n = D.Width();
     const int minDim = std::min( m, n );
@@ -57,6 +60,9 @@ void psp::hmatrix_tools::Compress
         for( int i=0; i<n; ++i )
             VCol[i] = sigma*VTRow[i*VTLDim];
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -65,6 +71,9 @@ void psp::hmatrix_tools::Compress
   DenseMatrix< std::complex<Real> >& D, 
   LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Compress (DenseMatrix,LowRankMatrix)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int m = D.Height();
@@ -116,6 +125,9 @@ void psp::hmatrix_tools::Compress
                 VCol[i] = sigma*VHRow[i*VHLDim];
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // A :~= A
@@ -125,19 +137,24 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
 ( int maxRank, LowRankMatrix<Real,Conjugated>& A )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Compress (LowRankMatrix)");
+#endif
     const int m = A.Height();
     const int n = A.Width();
     const int r = A.Rank();
     const int roundedRank = std::min( r, maxRank );
 #ifndef RELEASE
     if( r > std::min(m,n) )
-    {
-        throw std::logic_error
-        ("Rank entering Compress was larger than the minimum dimension");
-    }
+        throw std::logic_error("Rank larger than minimum dimension");
 #endif
     if( roundedRank == r )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     // Grab enough workspace for our entire rounded addition
     const int leftPanelSize = m*r;
@@ -251,6 +268,9 @@ void psp::hmatrix_tools::Compress
     ( 'L', 'N', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
       A.V.Buffer(), A.V.LDim(), &buffer[0], blockSize );
 #endif // PIVOTED_QR
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // A :~= A
@@ -261,6 +281,9 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Compress
 ( int maxRank, LowRankMatrix<std::complex<Real>,Conjugated>& A )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Compress (LowRankMatrix)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int m = A.Height();
@@ -269,12 +292,15 @@ void psp::hmatrix_tools::Compress
     const int roundedRank = std::min( r, maxRank );
 #ifndef RELEASE
     if( r > std::min(m,n) )
-    {        throw std::logic_error
-        ("Rank entering Compress was larger than the minimum dimension");
-    }
+        throw std::logic_error("Rank larger than minimum dimension");
 #endif
     if( roundedRank == r )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     // Grab enough workspace for our entire rounded addition
     const int leftPanelSize = m*r;
@@ -406,6 +432,9 @@ void psp::hmatrix_tools::Compress
     ( 'L', 'N', n, roundedRank, r, &buffer[2*blockSize], n, &tauV[0],
       A.V.Buffer(), A.V.LDim(), &buffer[0], blockSize );
 #endif // PIVOTED_QR
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template void psp::hmatrix_tools::Compress

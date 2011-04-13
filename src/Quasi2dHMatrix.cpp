@@ -70,6 +70,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildNaturalToHierarchicalMap
 ( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::BuildNaturalToHierarchicalMap");
+#endif
     map.resize( xSize*ySize*zSize );
 
     // Fill the mapping from the 'natural' x-y-z ordering
@@ -79,6 +82,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildNaturalToHierarchicalMap
 #ifndef RELEASE
     if( index != xSize*ySize*zSize )
         throw std::logic_error("Map recursion is incorrect.");
+    PopCallStack();
 #endif
 }
 
@@ -111,7 +115,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
   _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0)
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Quasi2dHMatrix");
+#endif
     ImportLowRankMatrix( F );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
@@ -126,7 +136,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
   _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0)
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Quasi2dHMatrix");
+#endif
     ImportSparseMatrix( S );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Create a potentially non-square non-top-level H-matrix
@@ -149,7 +165,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
   _xSource(xSource), _xTarget(xTarget),
   _ySource(ySource), _yTarget(yTarget)
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Quasi2dHMatrix");
+#endif
     ImportLowRankMatrix( F );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
@@ -171,7 +193,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
   _xSource(xSource), _xTarget(xTarget),
   _ySource(ySource), _yTarget(yTarget)
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Quasi2dHMatrix");
+#endif
     ImportSparseMatrix( S );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -191,6 +219,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MapVector (y := H x + y)");
+#endif
     hmatrix_tools::Scale( beta, y );
     switch( _shell.type )
     {
@@ -230,6 +261,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
         hmatrix_tools::MatrixVector( alpha, *_shell.data.D, x, (Scalar)1, y );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -237,8 +271,14 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MapVector (y := H x)");
+#endif
     y.Resize( this->_height );
     MapVector( alpha, x, 0, y );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -246,6 +286,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::TransposeMapVector (y := H^T x + y)");
+#endif
     hmatrix_tools::Scale( beta, y );
     switch( _shell.type )
     {
@@ -287,6 +330,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
         ( alpha, *_shell.data.D, x, (Scalar)1, y );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -294,8 +340,14 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::TransposeMapVector (y := H^T x)");
+#endif
     y.Resize( this->_width );
     TransposeMapVector( alpha, x, 0, y );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -303,6 +355,10 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack
+    ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y)");
+#endif
     hmatrix_tools::Scale( beta, y );
     switch( _shell.type )
     {
@@ -351,6 +407,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
         ( alpha, *_shell.data.D, x, (Scalar)1, y );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Having a non-const x allows us to conjugate x in place for the 
@@ -360,6 +419,10 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack
+    ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y, non-const)");
+#endif
     hmatrix_tools::Scale( beta, y );
     switch( _shell.type )
     {
@@ -406,6 +469,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
         ( alpha, *_shell.data.D, x, (Scalar)1, y );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -413,8 +479,14 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x)");
+#endif
     y.Resize( this->_width );
     HermitianTransposeMapVector( alpha, x, 0, y );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // This version allows for temporary in-place conjugation of x
@@ -423,8 +495,15 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack
+    ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x, non-const)");
+#endif
     y.Resize( this->_width );
     HermitianTransposeMapVector( alpha, x, 0, y );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -433,6 +512,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B, 
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MapMatrix (D := H D + D)");
+#endif
     hmatrix_tools::Scale( beta, C );
     switch( _shell.type )
     {
@@ -445,14 +527,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         for( int t=0; t<4; ++t )
         {
             DenseMatrix<Scalar> CSub;
-            CSub.View( C, targetOffset, targetSizes[t], 0, C.Width() );
+            CSub.View( C, targetOffset, 0, targetSizes[t], C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<4; ++s )
             {
                 DenseMatrix<Scalar> BSub;
                 BSub.LockedView
-                ( B, sourceOffset, sourceSizes[s], 0, B.Width() );
+                ( B, sourceOffset, 0, sourceSizes[s], B.Width() );
 
                 const Quasi2dHMatrix& ASub = _shell.data.node->Child(t,s);
                 ASub.MapMatrix( alpha, BSub, (Scalar)1, CSub );
@@ -473,6 +555,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         hmatrix_tools::MatrixMatrix( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -481,9 +566,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MapMatrix (D := H D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( this->_height, B.Width() );
     MapMatrix( alpha, B, 0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -492,6 +583,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::TransposeMapMatrix (D := H^T D + D)");
+#endif
     hmatrix_tools::Scale( beta, C );
     switch( _shell.type )
     {
@@ -504,14 +598,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
         for( int t=0; t<4; ++t )
         {
             DenseMatrix<Scalar> CSub;
-            CSub.View( C, targetOffset, sourceSizes[t], 0, C.Width() );
+            CSub.View( C, targetOffset, 0, sourceSizes[t], C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<4; ++s )
             {
                 DenseMatrix<Scalar> BSub;
                 BSub.LockedView
-                ( B, sourceOffset, targetSizes[s], 0, B.Width() );
+                ( B, sourceOffset, 0, targetSizes[s], B.Width() );
 
                 const Quasi2dHMatrix& ASub = _shell.data.node->Child(s,t);
                 ASub.TransposeMapMatrix( alpha, BSub, (Scalar)1, CSub );
@@ -534,6 +628,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
         ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -542,9 +639,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::TransposeMapMatrix (D := H^T D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( this->_width, B.Width() );
     TransposeMapMatrix( alpha, B, 0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -553,6 +656,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack
+    ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D)");
+#endif
     hmatrix_tools::Scale( beta, C );
     switch( _shell.type )
     {
@@ -565,14 +672,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         for( int t=0; t<4; ++t )
         {
             DenseMatrix<Scalar> CSub;
-            CSub.View( C, targetOffset, sourceSizes[t], 0, C.Width() );
+            CSub.View( C, targetOffset, 0, sourceSizes[t], C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<4; ++s )
             {
                 DenseMatrix<Scalar> BSub;
                 BSub.LockedView
-                ( B, sourceOffset, targetSizes[s], 0, B.Width() );
+                ( B, sourceOffset, 0, targetSizes[s], B.Width() );
 
                 const Quasi2dHMatrix& ASub = _shell.data.node->Child(s,t);
                 ASub.HermitianTransposeMapMatrix
@@ -602,6 +709,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // This version allows for temporary in-place conjugation of B
@@ -611,6 +721,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 ( Scalar alpha, DenseMatrix<Scalar>& B,
   Scalar beta,  DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack
+    ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D, non-const)");
+#endif
     hmatrix_tools::Scale( beta, C );
     switch( _shell.type )
     {
@@ -623,14 +737,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         for( int t=0; t<4; ++t )
         {
             DenseMatrix<Scalar> CSub;
-            CSub.View( C, targetOffset, sourceSizes[t], 0, C.Width() );
+            CSub.View( C, targetOffset, 0, sourceSizes[t], C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<4; ++s )
             {
                 DenseMatrix<Scalar> BSub;
                 BSub.LockedView
-                ( B, sourceOffset, targetSizes[s], 0, B.Width() );
+                ( B, sourceOffset, 0, targetSizes[s], B.Width() );
 
                 const Quasi2dHMatrix& ASub = _shell.data.node->Child(s,t);
                 ASub.HermitianTransposeMapMatrix
@@ -658,6 +772,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -666,9 +783,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( this->_width, B.Width() );
     HermitianTransposeMapMatrix( alpha, B, 0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // This version allows for temporary in-place conjugation of B
@@ -678,9 +801,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 ( Scalar alpha, DenseMatrix<Scalar>& B,
                 DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack
+    ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D, non-const)");
+#endif
     C.SetType( GENERAL );
     C.Resize( this->_width, B.Width() );
     HermitianTransposeMapMatrix( alpha, B, 0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 /*\
@@ -693,6 +823,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
 ( const Quasi2dHMatrix<Scalar,Conjugated>& B )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::CopyFrom");
+#endif
     this->_height = B.Height();
     this->_width = B.Width();
     this->_numLevels = B.NumLevels();
@@ -751,6 +884,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
         hmatrix_tools::Copy( *B._shell.data.D, *_shell.data.D );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // A := alpha A
@@ -758,6 +894,9 @@ template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Scale");
+#endif
     switch( _shell.type )
     {
     case NODE:
@@ -781,6 +920,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
         hmatrix_tools::Scale( alpha, *_shell.data.D );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // A := I
@@ -788,6 +930,9 @@ template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::SetToIdentity()
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::SetToIdentity");
+#endif
     switch( _shell.type )
     {
     case NODE:
@@ -837,6 +982,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SetToIdentity()
         break;
     }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // A := alpha B + A
@@ -845,6 +993,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWith
 ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::UpdateWith");
+#endif
     switch( _shell.type )
     {
     case NODE:
@@ -873,6 +1024,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWith
         ( alpha, *B._shell.data.D, (Scalar)1, *_shell.data.D );
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // C := alpha A B
@@ -883,6 +1037,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
                       Quasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MapMatrix H := H H");
     if( this->Width() != B.Height() )
         throw std::logic_error("Attempted nonconformal matrix-matrix multiply");
     if( this->NumLevels() != B.NumLevels() )
@@ -1029,8 +1184,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             throw std::logic_error("Invalid combination of H-matrices.");
 #endif
         C._shell.type = DENSE;
-        C._shell.data.D = 
-            new DenseMatrix<Scalar>( this->_height, this->_width );
+        C._shell.data.D = new DenseMatrix<Scalar>;
 
         if( this->IsDense() && B.IsDense() )
         {
@@ -1053,6 +1207,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             ( alpha, *_shell.data.F, *B._shell.data.F, *C._shell.data.D );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // C := alpha A B + beta C
@@ -1063,6 +1220,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
   Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MapMatrix (H := H H + H)");
     if( this->Width() != B.Height() || 
         this->Height() != C.Height() || B.Width() != C.Width() )
         throw std::logic_error("Attempted nonconformal matrix-matrix multiply");
@@ -1092,7 +1250,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else if( this->IsLowRank() && B.IsHierarchical() )
         {
-            // W := alpha A.F B.F
+            // W := alpha A.F B
             LowRankMatrix<Scalar,Conjugated> W;
             hmatrix_tools::Copy( _shell.data.F->U, W.U );
             const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
@@ -1105,7 +1263,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else if( this->IsLowRank() && B.IsDense() )
         {
-            // W := alpha A.F B.F
+            // W := alpha A.F B.D
             LowRankMatrix<Scalar,Conjugated> W;
             hmatrix_tools::Copy( _shell.data.F->U, W.U );
             const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
@@ -1118,7 +1276,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else if( this->IsHierarchical() && B.IsLowRank() )
         {
-            // W := alpha A.F B.F
+            // W := alpha A B.F
             LowRankMatrix<Scalar,Conjugated> W;
             this->MapMatrix( alpha, B._shell.data.F->U, W.U );
             hmatrix_tools::Copy( B._shell.data.F->V, W.V );
@@ -1129,7 +1287,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else if( this->IsHierarchical() && B.IsHierarchical() )
         {
-            // W := alpha H H
+            // W := alpha A B
             LowRankMatrix<Scalar,Conjugated> W;
             const int oversampling = 4; // lift this definition
             hmatrix_tools::MatrixMatrix
@@ -1141,7 +1299,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else if( this->IsDense() && B.IsLowRank() )
         {
-            // W := alpha A.F B.F
+            // W := alpha A.D B.F
             LowRankMatrix<Scalar,Conjugated> W;
             hmatrix_tools::MatrixMatrix
             ( alpha, *_shell.data.D, B._shell.data.F->U, W.U );
@@ -1230,6 +1388,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             ( alpha, *_shell.data.F, *B._shell.data.F, beta, *C._shell.data.D );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // A := inv(A)
@@ -1238,6 +1399,7 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
 {
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Invert");
     if( this->Height() != this->Width() )
         throw std::logic_error("Cannot invert non-square matrices");
     if( this->IsLowRank() )
@@ -1333,6 +1495,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
     case LOW_RANK:
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 //----------------------------------------------------------------------------//
@@ -1355,6 +1520,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
 ( const LowRankMatrix<Scalar,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::ImportLowRankMatrix");
+#endif
     // View our portions of F
     DenseMatrix<Scalar> FUSub, FVSub;
     FUSub.LockedView( F.U, this->_targetOffset, 0, this->_height, F.Rank() );
@@ -1451,6 +1619,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
              FVSub.LockedBuffer(), FVSub.LDim(),
           0, _shell.data.D->Buffer(), _shell.data.D->LDim() );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1458,6 +1629,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 ( const SparseMatrix<Scalar>& S )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::ImportSparseMatrix");
+#endif
     if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
     {
         _shell.type = LOW_RANK;
@@ -1556,6 +1730,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
           this->_targetOffset, this->_targetOffset+this->_height,
           this->_sourceOffset, this->_sourceOffset+this->_width );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // y += alpha A x
@@ -1564,6 +1741,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
 ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::UpdateVectorWithNodeSymmetric");
+#endif
     // Loop over the 10 children in the lower triangle, summing in each row
     {
         int targetOffset = 0;
@@ -1614,6 +1794,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
             targetOffset += sizes[s];
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // C += alpha A B
@@ -1622,6 +1805,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
 ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::UpdateMatrixWithNodeSymmetric");
+#endif
     // Loop over the 10 children in the lower triangle, summing in each row
     {
         int targetOffset = 0;
@@ -1629,13 +1815,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
         for( int t=0; t<4; ++t )
         {
             DenseMatrix<Scalar> CSub;
-            CSub.View( C, targetOffset, sizes[t], 0, C.Width() );
+            CSub.View( C, targetOffset, 0, sizes[t], C.Width() );
 
             int sourceOffset = 0;
             for( int s=0; s<=t; ++s )
             {
                 DenseMatrix<Scalar> BSub;
-                BSub.LockedView( B, sourceOffset, sizes[s], 0, B.Width() );
+                BSub.LockedView( B, sourceOffset, 0, sizes[s], B.Width() );
 
                 const Quasi2dHMatrix& ASub = 
                     _shell.data.nodeSymmetric->Child(t,s);
@@ -1655,13 +1841,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
         for( int s=0; s<4; ++s )
         {
             DenseMatrix<Scalar> CSub;
-            CSub.View( C, targetOffset, sizes[s], 0, C.Width() );
+            CSub.View( C, targetOffset, 0, sizes[s], C.Width() );
 
             int sourceOffset = targetOffset + sizes[s];
             for( int t=s+1; t<4; ++t )
             {
                 DenseMatrix<Scalar> BSub;
-                BSub.LockedView( B, sourceOffset, sizes[t], 0, B.Width() );
+                BSub.LockedView( B, sourceOffset, 0, sizes[t], B.Width() );
 
                 const Quasi2dHMatrix& ASub =  
                     _shell.data.nodeSymmetric->Child(t,s);
@@ -1672,6 +1858,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
             targetOffset += sizes[s];
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template class psp::Quasi2dHMatrix<float,false>;

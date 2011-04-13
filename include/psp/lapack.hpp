@@ -340,6 +340,9 @@ inline void QR
   float* tau, 
   float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::QR");
+#endif
     int info;
     LAPACK(sgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -349,6 +352,7 @@ inline void QR
         s << "QR factorization, sgeqrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -358,6 +362,9 @@ inline void QR
   double* tau, 
   double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::QR");
+#endif
     int info;
     LAPACK(dgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -367,6 +374,7 @@ inline void QR
         s << "QR factorization, dgeqrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -376,6 +384,9 @@ inline void QR
   std::complex<float>* tau, 
   std::complex<float>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::QR");
+#endif
     int info;
     LAPACK(cgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -385,6 +396,7 @@ inline void QR
         s << "QR factorization, cgeqrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -394,6 +406,9 @@ inline void QR
   std::complex<double>* tau, 
   std::complex<double>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::QR");
+#endif
     int info;
     LAPACK(zgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -403,6 +418,7 @@ inline void QR
         s << "QR factorization, zgeqrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -428,6 +444,9 @@ inline void PivotedQR
   float* tau, 
   float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PivotedQR");
+#endif
     int info;
     LAPACK(sgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -437,6 +456,7 @@ inline void PivotedQR
         s << "QR factorization, sgeqp3, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -447,6 +467,9 @@ inline void PivotedQR
   double* tau, 
   double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PivotedQR");
+#endif
     int info;
     LAPACK(dgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -456,6 +479,7 @@ inline void PivotedQR
         s << "QR factorization, dgeqp3, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -467,6 +491,9 @@ inline void PivotedQR
   std::complex<float>* work, int lwork,
   float* rwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PivotedQR");
+#endif
     int info;
     LAPACK(cgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, rwork, &info );
 #ifndef RELEASE
@@ -476,6 +503,7 @@ inline void PivotedQR
         s << "QR factorization, cgeqp3, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -487,6 +515,9 @@ inline void PivotedQR
   std::complex<double>* work, int lwork,
   double* rwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PivotedQR");
+#endif
     int info;
     LAPACK(zgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, rwork, &info );
 #ifndef RELEASE
@@ -496,6 +527,7 @@ inline void PivotedQR
         s << "QR factorization, zgeqp3, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -505,6 +537,9 @@ inline void PivotedQR
 
 inline int ApplyQWorkSize( char side, int m, int n )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::ApplyQWorkSize");
+#endif
     if( side == 'L' )
         return n*BLOCKSIZE;
     else if( side == 'R' )
@@ -512,6 +547,7 @@ inline int ApplyQWorkSize( char side, int m, int n )
 #ifndef RELEASE
     else
         throw std::logic_error("Invalid side for ApplyQ worksize query.");
+    PopCallStack();
 #endif
 }
 
@@ -522,6 +558,9 @@ inline void ApplyQ
         float* C, int ldc,
         float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::ApplyQ");
+#endif
     // Convert the more general complex option to the real case
     if( trans == 'C' || trans == 'c' )
         trans = 'T';
@@ -536,6 +575,7 @@ inline void ApplyQ
         s << "Q application, sormqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -546,6 +586,9 @@ inline void ApplyQ
         double* C, int ldc,
         double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::ApplyQ");
+#endif
     // Convert the more general complex option to the real case
     if( trans == 'C' || trans == 'c' )
         trans = 'T';
@@ -560,6 +603,7 @@ inline void ApplyQ
         s << "Q application, dormqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -570,6 +614,9 @@ inline void ApplyQ
         std::complex<float>* C, int ldc,
         std::complex<float>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::ApplyQ");
+#endif
     int info;
     LAPACK(cunmqr)
     ( &side, &trans, &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, &info );
@@ -580,6 +627,7 @@ inline void ApplyQ
         s << "Q application, cunmqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -590,6 +638,9 @@ inline void ApplyQ
         std::complex<double>* C, int ldc,
         std::complex<double>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::ApplyQ");
+#endif
     int info;
     LAPACK(zunmqr)
     ( &side, &trans, &m, &n, &k, A, &lda, tau, C, &ldc, work, &lwork, &info );
@@ -600,6 +651,7 @@ inline void ApplyQ
         s << "Q application, zunmqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -619,6 +671,9 @@ inline void FormQ
   const float* tau, 
         float* work, int lwork ) 
 {
+#ifndef RELEASE
+    PushCallStack("lapack::FormQ");
+#endif
     int info;
     LAPACK(sorgqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -628,6 +683,7 @@ inline void FormQ
         s << "Q application, sorgqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -637,6 +693,9 @@ inline void FormQ
   const double* tau,
         double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::FormQ");
+#endif
     int info;
     LAPACK(dorgqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -646,6 +705,7 @@ inline void FormQ
         s << "Q application, dorgqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -655,6 +715,9 @@ inline void FormQ
   const std::complex<float>* tau,
         std::complex<float>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::FormQ");
+#endif
     int info;
     LAPACK(cungqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -664,6 +727,7 @@ inline void FormQ
         s << "Q application, cungqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -673,6 +737,9 @@ inline void FormQ
   const std::complex<double>* tau,
         std::complex<double>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::FormQ");
+#endif
     int info;
     LAPACK(zungqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
 #ifndef RELEASE
@@ -682,6 +749,7 @@ inline void FormQ
         s << "Q application, zungqr, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -708,6 +776,9 @@ inline void SVD
   float* VH, int ldvh,
   float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::SVD");
+#endif
     int info;
     LAPACK(sgesvd)
     ( &jobu, &jobvh, &m, &n, A, &lda, s, U, &ldu, VH, &ldvh, work, &lwork,
@@ -719,6 +790,7 @@ inline void SVD
         s << "SVD, sgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -730,6 +802,9 @@ inline void SVD
   double* VH, int ldvh,
   double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::SVD");
+#endif
     int info;
     LAPACK(dgesvd)
     ( &jobu, &jobvh, &m, &n, A, &lda, s, U, &ldu, VH, &ldvh, work, &lwork,
@@ -741,6 +816,7 @@ inline void SVD
         s << "SVD, dgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -753,6 +829,9 @@ inline void SVD
   std::complex<float>* work, int lwork, 
   float* rwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::SVD");
+#endif
     int info;
     LAPACK(cgesvd)
     ( &jobu, &jobvh, &m, &n, A, &lda, s, U, &ldu, VH, &ldvh, work, &lwork,
@@ -764,6 +843,7 @@ inline void SVD
         s << "SVD, cgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -776,6 +856,9 @@ inline void SVD
   std::complex<double>* work, int lwork, 
   double* rwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::SVD");
+#endif
     int info;
     LAPACK(zgesvd)
     ( &jobu, &jobvh, &m, &n, A, &lda, s, U, &ldu, VH, &ldvh, work, &lwork,
@@ -787,6 +870,7 @@ inline void SVD
         s << "SVD, zgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -802,6 +886,9 @@ inline void PseudoInverse
   float* VH, int ldvh,
   float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PseudoInverse");
+#endif
     lapack::SVD( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork );
 
     // Get the safe minimum for our singular value thresholding
@@ -871,6 +958,9 @@ inline void PseudoInverse
     blas::Gemm
     ( 'N', 'N', m, n, k, 1, U, ldu, VH, ldvh, 0, A, lda );
 #endif // PACK_DURING_PSEUDO_INVERSE
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 inline void PseudoInverse
@@ -881,6 +971,9 @@ inline void PseudoInverse
   double* VH, int ldvh,
   double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PseudoInverse");
+#endif
     lapack::SVD( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork );
 
     // Get the safe minimum for our singular value thresholding
@@ -950,6 +1043,9 @@ inline void PseudoInverse
     blas::Gemm
     ( 'N', 'N', m, n, k, 1, U, ldu, VH, ldvh, 0, A, lda );
 #endif // PACK_DURING_PSEUDO_INVERSE
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 inline void PseudoInverse
@@ -961,6 +1057,9 @@ inline void PseudoInverse
   std::complex<float>* work, int lwork, 
   float* rwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PseudoInverse");
+#endif
     lapack::SVD
     ( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork, rwork );
 
@@ -1032,6 +1131,9 @@ inline void PseudoInverse
     blas::Gemm
     ( 'N', 'N', m, n, k, 1, U, ldu, VH, ldvh, 0, A, lda );
 #endif // PACK_DURING_PSEUDO_INVERSE
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 inline void PseudoInverse
@@ -1043,6 +1145,9 @@ inline void PseudoInverse
   std::complex<double>* work, int lwork, 
   double* rwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::PseudoInverse");
+#endif
     lapack::SVD
     ( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork, rwork );
 
@@ -1114,6 +1219,9 @@ inline void PseudoInverse
     blas::Gemm
     ( 'N', 'N', m, n, k, 1, U, ldu, VH, ldvh, 0, A, lda );
 #endif // PACK_DURING_PSEUDO_INVERSE
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 //----------------------------------------------------------------------------//
@@ -1123,6 +1231,9 @@ inline void PseudoInverse
 inline void LU
 ( int m, int n, float* A, int lda, int* ipiv )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LU");
+#endif
     int info;
     LAPACK(sgetrf)( &m, &n, A, &lda, ipiv, &info );
 #ifndef RELEASE
@@ -1132,12 +1243,16 @@ inline void LU
         s << "LU, sgetrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
 inline void LU
 ( int m, int n, double* A, int lda, int* ipiv )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LU");
+#endif
     int info;
     LAPACK(dgetrf)( &m, &n, A, &lda, ipiv, &info );
 #ifndef RELEASE
@@ -1147,12 +1262,16 @@ inline void LU
         s << "LU, dgetrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
 inline void LU
 ( int m, int n, std::complex<float>* A, int lda, int* ipiv )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LU");
+#endif
     int info;
     LAPACK(cgetrf)( &m, &n, A, &lda, ipiv, &info );
 #ifndef RELEASE
@@ -1162,12 +1281,16 @@ inline void LU
         s << "LU, cgetrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
 inline void LU
 ( int m, int n, std::complex<double>* A, int lda, int* ipiv )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LU");
+#endif
     int info;
     LAPACK(zgetrf)( &m, &n, A, &lda, ipiv, &info );
 #ifndef RELEASE
@@ -1177,6 +1300,7 @@ inline void LU
         s << "LU, zgetrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1194,6 +1318,9 @@ inline void InvertLU
 ( int n, float* A, int lda, int* ipiv, 
   float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLU");
+#endif
     int info;
     LAPACK(sgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1203,6 +1330,7 @@ inline void InvertLU
         s << "InvertLU, sgetri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1210,6 +1338,9 @@ inline void InvertLU
 ( int n, double* A, int lda, int* ipiv, 
   double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLU");
+#endif
     int info;
     LAPACK(dgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1219,6 +1350,7 @@ inline void InvertLU
         s << "InvertLU, dgetri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1226,6 +1358,9 @@ inline void InvertLU
 ( int n, std::complex<float>* A, int lda, int* ipiv, 
   std::complex<float>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLU");
+#endif
     int info;
     LAPACK(cgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1235,6 +1370,7 @@ inline void InvertLU
         s << "InvertLU, cgetri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1242,6 +1378,9 @@ inline void InvertLU
 ( int n, std::complex<double>* A, int lda, int* ipiv, 
   std::complex<double>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLU");
+#endif
     int info;
     LAPACK(zgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1251,6 +1390,7 @@ inline void InvertLU
         s << "InvertLU, zgetri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1268,6 +1408,9 @@ inline void LDLT
 ( char uplo, int n, float* A, int lda, int* ipiv, 
   float* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LDLT");
+#endif
     int info;
     LAPACK(ssytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1277,6 +1420,7 @@ inline void LDLT
         s << "LDL^T, ssytrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1284,6 +1428,9 @@ inline void LDLT
 ( char uplo, int n, double* A, int lda, int* ipiv, 
   double* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LDLT");
+#endif
     int info;
     LAPACK(dsytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1293,6 +1440,7 @@ inline void LDLT
         s << "LDL^T, dsytrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1300,6 +1448,9 @@ inline void LDLT
 ( char uplo, int n, std::complex<float>* A, int lda, int* ipiv, 
   std::complex<float>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LDLT");
+#endif
     int info;
     LAPACK(csytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1309,6 +1460,7 @@ inline void LDLT
         s << "LDL^T, csytrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1316,6 +1468,9 @@ inline void LDLT
 ( char uplo, int n, std::complex<double>* A, int lda, int* ipiv, 
   std::complex<double>* work, int lwork )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::LDLT");
+#endif
     int info;
     LAPACK(zsytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
 #ifndef RELEASE
@@ -1325,6 +1480,7 @@ inline void LDLT
         s << "LDL^T, zsytrf, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1341,6 +1497,9 @@ inline void InvertLDLT
 ( char uplo, int n, float* A, int lda, int* ipiv, 
   float* work )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLDLT");
+#endif
     int info;
     LAPACK(ssytri)( &uplo, &n, A, &lda, ipiv, work, &info );
 #ifndef RELEASE
@@ -1350,6 +1509,7 @@ inline void InvertLDLT
         s << "InvertLDL^T, ssytri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1357,6 +1517,9 @@ inline void InvertLDLT
 ( char uplo, int n, double* A, int lda, int* ipiv, 
   double* work )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLDLT");
+#endif
     int info;
     LAPACK(dsytri)( &uplo, &n, A, &lda, ipiv, work, &info );
 #ifndef RELEASE
@@ -1366,6 +1529,7 @@ inline void InvertLDLT
         s << "InvertLDL^T, dsytri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1373,6 +1537,9 @@ inline void InvertLDLT
 ( char uplo, int n, std::complex<float>* A, int lda, int* ipiv, 
   std::complex<float>* work )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLDLT");
+#endif
     int info;
     LAPACK(csytri)( &uplo, &n, A, &lda, ipiv, work, &info );
 #ifndef RELEASE
@@ -1382,6 +1549,7 @@ inline void InvertLDLT
         s << "InvertLDL^T, csytri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 
@@ -1389,6 +1557,9 @@ inline void InvertLDLT
 ( char uplo, int n, std::complex<double>* A, int lda, int* ipiv, 
   std::complex<double>* work )
 {
+#ifndef RELEASE
+    PushCallStack("lapack::InvertLDLT");
+#endif
     int info;
     LAPACK(zsytri)( &uplo, &n, A, &lda, ipiv, work, &info );
 #ifndef RELEASE
@@ -1398,6 +1569,7 @@ inline void InvertLDLT
         s << "InvertLDL^T, zsytri, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
+    PopCallStack();
 #endif
 }
 

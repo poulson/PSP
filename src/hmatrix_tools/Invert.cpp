@@ -25,6 +25,7 @@ void psp::hmatrix_tools::Invert
 ( DenseMatrix<Scalar>& D )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::Invert");
     if( D.Height() != D.Width() )
         throw std::logic_error("Tried to invert a non-square dense matrix.");
 #endif
@@ -44,6 +45,9 @@ void psp::hmatrix_tools::Invert
         lapack::LU( n, n, D.Buffer(), D.LDim(), &ipiv[0] );
         lapack::InvertLU( n, D.Buffer(), D.LDim(), &ipiv[0], &work[0], lwork );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template void psp::hmatrix_tools::Invert

@@ -27,6 +27,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixTransposeVector (y := D^T x + y)");
+#endif
     if( A.Symmetric() )
     {
         blas::Symv
@@ -43,6 +46,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                  x.LockedBuffer(), 1, 
           beta,  y.Buffer(),       1 );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense y := alpha A^T x
@@ -52,6 +58,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixTransposeVector (y := D^T x)");
+#endif
     y.Resize( x.Height() );
     if( A.Symmetric() )
     {
@@ -69,6 +78,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                  x.LockedBuffer(), 1, 
           0,     y.Buffer(),       1 );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank y := alpha A^T x + beta y
@@ -78,6 +90,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixTransposeVector (y := F^T x + y)");
+#endif
     const int r = A.Rank();
 
     // Form t := alpha (A.U)^T x
@@ -108,6 +123,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 t.LockedBuffer(),   1, 
           beta, y.Buffer(),         1 );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank y := alpha A^T x
@@ -117,6 +135,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixTransposeVector (y := F^T x)");
+#endif
     const int r = A.Rank();
 
     // Form t := alpha (A.U)^T x
@@ -147,6 +168,9 @@ void psp::hmatrix_tools::MatrixTransposeVector
              t.LockedBuffer(),   1, 
           0, y.Buffer(),         1 );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template void psp::hmatrix_tools::MatrixTransposeVector

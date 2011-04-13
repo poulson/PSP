@@ -27,13 +27,15 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixUpdate (D := D + D)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to update with nonconforming matrices.");
     // TODO: Allow for A to be symmetric when B is general
     if( A.Symmetric() && B.General() )
         throw std::logic_error("A-symmetric/B-general not yet implemented.");
     if( A.General() && B.Symmetric() )
-        throw std::logic_error("Cannot update a symmetric matrix with a general one");
+        throw std::logic_error
+        ("Cannot update a symmetric matrix with a general one");
 #endif
     const int m = A.Height();
     const int n = A.Width();
@@ -57,6 +59,9 @@ void psp::hmatrix_tools::MatrixUpdate
                 BCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank B := alpha A + beta B
@@ -66,6 +71,7 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        LowRankMatrix<Scalar,Conjugated>& B )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixUpdate (F := F + F)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to update with nonconforming matrices.");
 #endif
@@ -94,6 +100,9 @@ void psp::hmatrix_tools::MatrixUpdate
         std::memcpy
         ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense updated with low-rank, B := alpha A + beta B
@@ -103,6 +112,7 @@ void psp::hmatrix_tools::MatrixUpdate
   Scalar beta,        DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixUpdate (D := F + D)");
     if( A.Height() != B.Height() || A.Width() != B.Width()  )
         throw std::logic_error("Tried to update with nonconforming matrices.");
     if( B.Symmetric() )
@@ -113,6 +123,9 @@ void psp::hmatrix_tools::MatrixUpdate
     ( 'N', option, A.Height(), A.Width(), A.Rank(), 
       alpha, A.U.LockedBuffer(), A.U.LDim(), A.V.LockedBuffer(), A.V.LDim(), 
       beta, B.Buffer(), B.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense update B := alpha A + beta B

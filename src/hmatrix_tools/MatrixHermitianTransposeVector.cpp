@@ -27,6 +27,10 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeVector (y := D^H x + y)");
+#endif
     if( A.Symmetric() )
     {
         Vector<Scalar> xConj;
@@ -47,6 +51,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                  x.LockedBuffer(), 1, 
           beta,  y.Buffer(),       1 );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense y := alpha A^H x
@@ -56,6 +63,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeVector (y := D^H x)");
+#endif
     y.Resize( x.Height() );
     if( A.Symmetric() )
     {
@@ -76,6 +86,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                  x.LockedBuffer(), 1, 
           0,     y.Buffer(),       1 );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank y := alpha A^H x + beta y
@@ -85,6 +98,10 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeVector (y := F x + y)");
+#endif
     const int m = A.Height();
     const int n = A.Width();
     const int r = A.Rank();
@@ -117,6 +134,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
           Conj(beta), y.Buffer(),         1 );
         Conjugate( y );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank y := alpha A^H x
@@ -126,6 +146,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeVector (y := F x)");
+#endif
     const int m = A.Height();
     const int n = A.Width();
     const int r = A.Rank();
@@ -158,6 +181,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
           0, y.Buffer(),         1 );
         Conjugate( y );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template void psp::hmatrix_tools::MatrixHermitianTransposeVector

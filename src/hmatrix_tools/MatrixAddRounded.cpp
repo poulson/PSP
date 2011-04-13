@@ -46,11 +46,9 @@ void psp::hmatrix_tools::MatrixAddRounded
                     LowRankMatrix<Real,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAddRounded (F := F + F)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
-    {
-        throw std::logic_error
-        ("Incompatible matrix dimensions in MatrixAddRounded");
-    }
+        throw std::logic_error("Incompatible matrix dimensions");
 #endif
     const int m = A.Height();
     const int n = A.Width();
@@ -61,15 +59,9 @@ void psp::hmatrix_tools::MatrixAddRounded
     const int roundedRank = std::min( std::min(r,minDim), maxRank );
 #ifndef RELEASE
     if( Ar > minDim )
-    {
-        throw std::logic_error
-        ("rank(A) entering MatrixAddRounded larger than minimum dimension");
-    }
+        throw std::logic_error("rank(A) greater than minimum dimension");
     if( Br > minDim )
-    {
-        throw std::logic_error
-        ("rank(B) entering MatrixAddRounded larger than minimum dimension");
-    }
+        throw std::logic_error("rank(B) greater than minimum dimension");
 #endif
 
     C.U.SetType( GENERAL ); C.U.Resize( m, roundedRank );
@@ -108,6 +100,9 @@ void psp::hmatrix_tools::MatrixAddRounded
             ( C.V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Real) );
         }
 
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
     }
 
@@ -265,6 +260,9 @@ void psp::hmatrix_tools::MatrixAddRounded
     ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], n, &tauV[0], 
       C.V.Buffer(), C.V.LDim(), &buffer[offset], blockSize );
 #endif // PIVOTED_QR
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -277,11 +275,9 @@ void psp::hmatrix_tools::MatrixAddRounded
         LowRankMatrix<std::complex<Real>,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAddRounded (F := F + F)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
-    {
-        throw std::logic_error
-        ("Incompatible matrix dimensions in MatrixAddRounded");
-    }
+        throw std::logic_error("Incompatible matrix dimensions");
 #endif
     typedef std::complex<Real> Scalar;
 
@@ -294,15 +290,9 @@ void psp::hmatrix_tools::MatrixAddRounded
     const int roundedRank = std::min( r, maxRank );
 #ifndef RELEASE
     if( Ar > minDim )
-    {
-        throw std::logic_error
-        ("rank(A) entering MatrixAddRounded larger than minimum dimension");
-    }
+        throw std::logic_error("rank(A) greater than minimum dimension");
     if( Br > minDim )
-    {
-        throw std::logic_error
-        ("rank(B) entering MatrixAddRounded larger than minimum dimension");
-    }
+        throw std::logic_error("rank(B) greater than minimum dimension");
 #endif
 
     C.U.SetType( GENERAL ); C.U.Resize( m, roundedRank );
@@ -341,6 +331,9 @@ void psp::hmatrix_tools::MatrixAddRounded
             ( C.V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Scalar) );
         }
 
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
     }
 
@@ -514,6 +507,9 @@ void psp::hmatrix_tools::MatrixAddRounded
     ( 'L', 'N', n, roundedRank, r, &buffer[leftPanelSize], n, &tauV[0], 
       C.V.Buffer(), C.V.LDim(), &buffer[offset], blockSize );
 #endif // PIVOTED_QR
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template void psp::hmatrix_tools::MatrixAddRounded

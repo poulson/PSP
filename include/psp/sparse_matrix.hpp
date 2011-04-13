@@ -46,6 +46,9 @@ template<typename Scalar>
 inline void
 psp::SparseMatrix<Scalar>::Print( const std::string& tag ) const
 {
+#ifndef RELEASE
+    PushCallStack("SparseMatrix::Print");
+#endif
     if( symmetric )
         std::cout << tag << "(symmetric)\n";
     else
@@ -63,6 +66,9 @@ psp::SparseMatrix<Scalar>::Print( const std::string& tag ) const
         }
     }
     std::cout << std::endl;
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 #endif // PSP_SPARSE_MATRIX_HPP

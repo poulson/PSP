@@ -115,12 +115,16 @@ inline void
 psp::Vector<Scalar>::Resize( int height )
 {
 #ifndef RELEASE
+    PushCallStack("Vector::Resize");
     if( _viewing || _lockedView )
         throw std::logic_error("Cannot resize a Vector that is a view.");
 #endif
     _height = height;
     _memory.resize( height );
     _buffer = &_memory[0];
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
@@ -128,12 +132,14 @@ inline void
 psp::Vector<Scalar>::Set( int i, Scalar value )
 {
 #ifndef RELEASE
+    PushCallStack("Vector::Set");
     if( _lockedView )
         throw std::logic_error("Cannot modify locked views");
     if( i < 0 )
         throw std::logic_error("Negative buffer offsets are nonsensical");
     if( i >= _height )
         throw std::logic_error("Vector::Set is out of bounds");
+    PopCallStack();
 #endif
     _buffer[i] = value;
 }
@@ -143,10 +149,12 @@ inline Scalar
 psp::Vector<Scalar>::Get( int i ) const
 {
 #ifndef RELEASE
+    PushCallStack("Vector::Get");
     if( i < 0 )
         throw std::logic_error("Negative buffer offsets are nonsensical");
     if( i >= _height )
         throw std::logic_error("Vector::Get is out of bounds");
+    PopCallStack();
 #endif
     if( _lockedView )
         return _lockedBuffer[i];
@@ -158,6 +166,9 @@ template<typename Scalar>
 inline void
 psp::Vector<Scalar>::Print( const std::string& tag ) const
 {
+#ifndef RELEASE
+    PushCallStack("Vector::Print");
+#endif
     std::cout << tag << "\n";
     if( _lockedView )
     {
@@ -170,6 +181,9 @@ psp::Vector<Scalar>::Print( const std::string& tag ) const
             std::cout << WrapScalar(_buffer[i]) << "\n";
     }
     std::cout << std::endl;
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
@@ -177,12 +191,14 @@ inline Scalar*
 psp::Vector<Scalar>::Buffer( int i )
 {
 #ifndef RELEASE
+    PushCallStack("Vector::Buffer");
     if( _lockedView )
         throw std::logic_error("Cannot get modifiable buffer from locked view");
     if( i < 0 )
         throw std::logic_error("Negative buffer offset is nonsensical");
     if( i > _height )
         throw std::logic_error("Out of bounds of buffer");
+    PopCallStack();
 #endif
     return &_buffer[i];
 }
@@ -192,10 +208,12 @@ inline const Scalar*
 psp::Vector<Scalar>::LockedBuffer( int i ) const
 {
 #ifndef RELEASE
+    PushCallStack("Vector::LockedBuffer");
     if( i < 0 )
         throw std::logic_error("Negative buffer offset is nonsensical");
     if( i > _height )
         throw std::logic_error("Out of bounds of buffer");
+    PopCallStack();
 #endif
     if( _lockedView )
         return &_lockedBuffer[i];
@@ -207,10 +225,16 @@ template<typename Scalar>
 inline void
 psp::Vector<Scalar>::View( Vector<Scalar>& x )
 {
+#ifndef RELEASE
+    PushCallStack("Vector::View");
+#endif
     _viewing = true;
     _lockedView = false;
     _buffer = x.Buffer();
     _height = x.Height();
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
@@ -218,6 +242,7 @@ inline void
 psp::Vector<Scalar>::View( Vector<Scalar>& x, int i, int height )
 {
 #ifndef RELEASE
+    PushCallStack("Vector::View");
     if( x.Height() < i+height )
         throw std::logic_error("Vector view goes out of bounds");
     if( i < 0 )
@@ -227,16 +252,25 @@ psp::Vector<Scalar>::View( Vector<Scalar>& x, int i, int height )
     _lockedView = false;
     _buffer = x.Buffer( i );
     _height = height;
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
 inline void
 psp::Vector<Scalar>::LockedView( const Vector<Scalar>& x )
 {
+#ifndef RELEASE
+    PushCallStack("Vector::LockedView");
+#endif
     _viewing = true;
     _lockedView = true;
     _lockedBuffer = x.Buffer();
     _height = x.Height();
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
@@ -244,6 +278,7 @@ inline void
 psp::Vector<Scalar>::LockedView( const Vector<Scalar>& x, int i, int height )
 {
 #ifndef RELEASE
+    PushCallStack("Vector::LockedView");
     if( x.Height() < i+height )
         throw std::logic_error("Vector view goes out of bounds");
     if( i < 0 )
@@ -253,6 +288,9 @@ psp::Vector<Scalar>::LockedView( const Vector<Scalar>& x, int i, int height )
     _lockedView = true;
     _lockedBuffer = x.LockedBuffer( i );
     _height = height;
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 #endif // PSP_VECTOR_HPP

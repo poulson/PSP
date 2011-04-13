@@ -27,9 +27,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (D := D^H D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense C := alpha A^H B + beta C
@@ -40,6 +46,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeMatrix (D := D^H D + D)");
     if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( B.Symmetric() )
@@ -96,6 +104,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
           alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(),
           beta, C.Buffer(), C.LDim() );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // TODO: version of above routine that allows for temporary in-place conj of B
@@ -107,9 +118,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const LowRankMatrix<Scalar,Conjugated>& B, 
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (D := D^H F)");
+#endif
     C.SetType( GENERAL );
     C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a dense matrix times a low-rank matrix
@@ -120,6 +137,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeMatrix (D := D^H F + D)");
     if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( C.Symmetric() )
@@ -174,6 +193,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                  B.V.LockedBuffer(), B.V.LDim(), 
           beta,  C.Buffer(),         C.LDim() );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a low-rank matrix times a dense matrix
@@ -183,9 +205,15 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (D := F^H D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a low-rank matrix times a dense matrix
@@ -196,6 +224,8 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeMatrix (D := F^H D + D)");
     if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
     if( C.Symmetric() )
@@ -302,6 +332,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
               beta,  C.Buffer(),            C.LDim() );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from the product of two low-rank matrices
@@ -311,8 +344,14 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (D := F^H F)");
+#endif
     C.SetType( GENERAL ); C.Resize( A.Width(), B.Width() );
     MatrixHermitianTransposeMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Update a dense matrix from the product of two low-rank matrices
@@ -322,6 +361,10 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeMatrix (D := F^H F + D)");
+#endif
     if( Conjugated )
     {
         DenseMatrix<Scalar> W( A.Rank(), B.Rank() );
@@ -358,6 +401,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
           alpha, X.LockedBuffer(), X.LDim(), B.V.LockedBuffer(), B.V.LDim(),
           beta,  C.Buffer(), C.LDim() );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank C := alpha A^H B
@@ -368,6 +414,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := F^H F)");
     if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
@@ -486,6 +533,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
             Copy( B.V, C.V );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a low-rank matrix from a dense matrix times a low-rank matrix
@@ -496,6 +546,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := D^H F)");
     if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
@@ -537,6 +588,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
           0,     C.U.Buffer(),       C.U.LDim() );
         Copy( B.V, C.V );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a low-rank matrix from a low-rank matrix times a dense matrix
@@ -547,6 +601,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := F^H D)");
     if( A.Height() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
@@ -626,6 +681,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
               0,     C.V.Buffer(),          C.V.LDim() );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -635,7 +693,13 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   const DenseMatrix<Real>& B,
         LowRankMatrix<Real,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := D^H D)");
+#endif
     MatrixTransposeMatrix( maxRank, alpha, A, B, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -645,6 +709,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   const DenseMatrix< std::complex<Real> >& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := D^H D)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int m = A.Width();
@@ -698,6 +765,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
                 VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -708,7 +778,14 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   Real beta,
   LowRankMatrix<Real,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeMatrix (F := D^H D + F)");
+#endif
     MatrixTransposeMatrix( maxRank, alpha, A, B, beta, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -719,6 +796,10 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   std::complex<Real> beta,
         LowRankMatrix< std::complex<Real>,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::MatrixHermitianTransposeMatrix (F := D^H D + F)");
+#endif
     typedef std::complex<Real> Scalar;
 
     // D := alpha A^H B + beta C
@@ -728,6 +809,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 
     // Force D into a low-rank matrix of rank 'maxRank'
     Compress( maxRank, D, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense C := alpha A^H B

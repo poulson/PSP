@@ -27,9 +27,15 @@ void psp::hmatrix_tools::MatrixMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := D D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense C := alpha A B + beta C
@@ -40,8 +46,11 @@ void psp::hmatrix_tools::MatrixMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := D D + D)");
     if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Height() != A.Height() || C.Width() != B.Width() )
+        throw std::logic_error("C does not conform with AB");
     if( A.Symmetric() && B.Symmetric() )
         throw std::logic_error("Product of symmetric matrices not supported.");
     if( C.Symmetric() )
@@ -68,6 +77,9 @@ void psp::hmatrix_tools::MatrixMatrix
           alpha, A.LockedBuffer(), A.LDim(), B.LockedBuffer(), B.LDim(),
           beta, C.Buffer(), C.LDim() );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a dense matrix times a low-rank matrix
@@ -77,9 +89,15 @@ void psp::hmatrix_tools::MatrixMatrix
                 const LowRankMatrix<Scalar,Conjugated>& B, 
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := D F)");
+#endif
     C.SetType( GENERAL );
     C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a dense matrix times a low-rank matrix
@@ -90,8 +108,11 @@ void psp::hmatrix_tools::MatrixMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := D F + D)");
     if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Height() != A.Height() || C.Width() != B.Width() )
+        throw std::logic_error("C does not conform with AB");
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
 #endif
@@ -120,6 +141,9 @@ void psp::hmatrix_tools::MatrixMatrix
       alpha, W.LockedBuffer(),   W.LDim(), 
              B.V.LockedBuffer(), B.V.LDim(), 
       beta,  C.Buffer(),         C.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a low-rank matrix times a dense matrix
@@ -129,9 +153,15 @@ void psp::hmatrix_tools::MatrixMatrix
                 const DenseMatrix<Scalar>& B, 
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := F D)");
+#endif
     C.SetType( GENERAL );
     C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from a low-rank matrix times a dense matrix
@@ -142,8 +172,11 @@ void psp::hmatrix_tools::MatrixMatrix
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := F D + D)");
     if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
+    if( C.Height() != A.Height() || C.Width() != B.Width() )
+        throw std::logic_error("C does not conform with AB");
     if( C.Symmetric() )
         throw std::logic_error("Update will probably not be symmetric.");
 #endif
@@ -234,6 +267,9 @@ void psp::hmatrix_tools::MatrixMatrix
               beta,  C.Buffer(),         C.LDim() );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a dense matrix from the product of two low-rank matrices.
@@ -243,8 +279,14 @@ void psp::hmatrix_tools::MatrixMatrix
                 const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := F F)");
+#endif
     C.SetType( GENERAL ); C.Resize( A.Height(), B.Width() );
     MatrixMatrix( alpha, A, B, (Scalar)0, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Update a dense matrix from the product of two low-rank matrices.
@@ -254,6 +296,13 @@ void psp::hmatrix_tools::MatrixMatrix
                 const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (D := F F + D)");
+    if( A.Width() != B.Height() )
+        throw std::logic_error("A and B do not conform in MatrixMatrix");
+    if( C.Height() != A.Height() || C.Width() != B.Width() )
+        throw std::logic_error("C does not conform with AB");
+#endif
     const char option = ( Conjugated ? 'C' : 'T' );
     DenseMatrix<Scalar> W( A.Rank(), B.Rank() );
     blas::Gemm
@@ -269,6 +318,9 @@ void psp::hmatrix_tools::MatrixMatrix
     ( 'N', option, C.Height(), C.Width(), B.Rank(),
       alpha, X.LockedBuffer(), X.LDim(), B.V.LockedBuffer(), B.V.LDim(),
       beta,  C.Buffer(), C.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank C := alpha A B
@@ -279,11 +331,12 @@ void psp::hmatrix_tools::MatrixMatrix
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := F F)");
     if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
     const int m = A.Height();
-    const int n = A.Width();
+    const int n = B.Width();
     const int Ar = A.Rank();
     const int Br = B.Rank();
 
@@ -329,7 +382,7 @@ void psp::hmatrix_tools::MatrixMatrix
             blas::Gemm
             ( 'T', 'N', Br, Ar, B.Height(),
               1, B.U.LockedBuffer(), B.U.LDim(),
-                 A.V.LockedBuffer(), A.U.LDim(),
+                 A.V.LockedBuffer(), A.V.LDim(),
               0, W.Buffer(),         W.LDim() );
             blas::Gemm
             ( 'N', 'N', n, Ar, Br,
@@ -387,6 +440,9 @@ void psp::hmatrix_tools::MatrixMatrix
             Copy( B.V, C.V );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a low-rank matrix from a dense matrix times a low-rank matrix
@@ -397,6 +453,7 @@ void psp::hmatrix_tools::MatrixMatrix
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := D F)");
     if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
@@ -427,6 +484,9 @@ void psp::hmatrix_tools::MatrixMatrix
 
     // Form C.V := B.V
     Copy( B.V, C.V );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Form a low-rank matrix from a low-rank matrix times a dense matrix
@@ -437,6 +497,7 @@ void psp::hmatrix_tools::MatrixMatrix
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := F D)");
     if( A.Width() != B.Height() )
         throw std::logic_error("Cannot multiply nonconformal matrices.");
 #endif
@@ -517,6 +578,9 @@ void psp::hmatrix_tools::MatrixMatrix
               0,     C.V.Buffer(),       C.V.LDim() );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -526,6 +590,9 @@ void psp::hmatrix_tools::MatrixMatrix
   const DenseMatrix<Real>& B,
         LowRankMatrix<Real,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := D D)");
+#endif
     const int m = A.Height();
     const int n = B.Width();
     const int minDim = std::min( m, n );
@@ -560,6 +627,9 @@ void psp::hmatrix_tools::MatrixMatrix
         for( int i=0; i<n; ++i )
             VCol[i] = sigma*VTRow[i*VTLDim];
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -569,6 +639,9 @@ void psp::hmatrix_tools::MatrixMatrix
   const DenseMatrix< std::complex<Real> >& B,
         LowRankMatrix< std::complex<Real>,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := D D)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int m = A.Height();
@@ -622,6 +695,9 @@ void psp::hmatrix_tools::MatrixMatrix
                 VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -632,6 +708,13 @@ void psp::hmatrix_tools::MatrixMatrix
   Real beta,
   LowRankMatrix<Real,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := D D + F)");
+    if( A.Width() != B.Height() )
+        throw std::logic_error("A and B not conformal in MatrixMatrix");
+    if( C.Height() != A.Height() || C.Width() != A.Width() )
+        throw std::logic_error("C not conformal with AB");
+#endif
     // D := alpha A B + beta C
     DenseMatrix<Real> D;
     MatrixMatrix( alpha, A, B, D );
@@ -639,6 +722,9 @@ void psp::hmatrix_tools::MatrixMatrix
 
     // Truncate D down to a low-rank matrix of rank 'maxRank'
     Compress( maxRank, D, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -649,6 +735,13 @@ void psp::hmatrix_tools::MatrixMatrix
   std::complex<Real> beta,
         LowRankMatrix< std::complex<Real>,Conjugated>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := D D + F)");
+    if( A.Width() != B.Height() )
+        throw std::logic_error("A and B not conformal in MatrixMatrix");
+    if( C.Height() != A.Height() || C.Width() != A.Width() )
+        throw std::logic_error("C not conformal with AB");
+#endif
     typedef std::complex<Real> Scalar;
 
     // D := alpha A B + beta C
@@ -658,6 +751,9 @@ void psp::hmatrix_tools::MatrixMatrix
 
     // Truncate D down to a low-rank matrix of rank 'maxRank'
     Compress( maxRank, D, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense C := alpha A B

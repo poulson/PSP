@@ -771,38 +771,65 @@ template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const psp::Vector<Scalar>& x, psp::Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Copy (Vector,Vector)");
+#endif
     y.Resize( x.Height() );
     std::memcpy( y.Buffer(), x.LockedBuffer(), x.Height()*sizeof(Scalar) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const std::vector<Scalar>& x, std::vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Copy (vector,vector)");
+#endif
     y.resize( x.size() );
     std::memcpy( &y[0], &x[0], x.size()*sizeof(Scalar) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const psp::Vector<Scalar>& x, std::vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Copy (Vector,vector)");
+#endif
     y.resize( x.Height() );
     std::memcpy( &y[0], x.LockedBuffer(), x.Height()*sizeof(Scalar) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const std::vector<Scalar>& x, psp::Vector<Scalar>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Copy (vector,Vector)");
+#endif
     y.Resize( x.size() );
     std::memcpy( y.Buffer(), &x[0], x.size()*sizeof(Scalar) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const psp::DenseMatrix<Scalar>& A, psp::DenseMatrix<Scalar>& B )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Copy (DenseMatrix,DenseMatrix)");
+#endif
     const int m = A.Height();
     const int n = A.Width();
     B.SetType( A.Type() ); B.Resize( m, n );
@@ -822,6 +849,9 @@ void psp::hmatrix_tools::Copy
             ( B.Buffer(0,j), A.LockedBuffer(0,j), m*sizeof(Scalar) );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -829,8 +859,14 @@ void psp::hmatrix_tools::Copy
 ( const psp::LowRankMatrix<Scalar,Conjugated>& A, 
         psp::LowRankMatrix<Scalar,Conjugated>& B )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Copy (LowRankMatrix,LowRankMatrix)");
+#endif
     Copy( A.U, B.U );
     Copy( A.V, B.V );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 /*\
@@ -846,10 +882,16 @@ template<typename Real>
 void psp::hmatrix_tools::Conjugate
 ( psp::Vector< std::complex<Real> >& x )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (Vector)");
+#endif
     const int n = x.Height();
     std::complex<Real>* xBuffer = x.Buffer();
     for( int i=0; i<n; ++i ) 
         xBuffer[i] = Conj( xBuffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -857,8 +899,14 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector<Real>& x,
         psp::Vector<Real>& y )
 { 
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (Vector,Vector)");
+#endif
     y.Resize( x.Height() );
     std::memcpy( y.Buffer(), x.LockedBuffer(), x.Height()*sizeof(Real) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -866,12 +914,18 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector< std::complex<Real> >& x, 
         psp::Vector< std::complex<Real> >& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (Vector,Vector)");
+#endif
     const int n = x.Height();
     y.Resize( n );
     const std::complex<Real>* RESTRICT xBuffer = x.LockedBuffer();
     std::complex<Real>* RESTRICT yBuffer = y.Buffer();
     for( int i=0; i<n; ++i )
         yBuffer[i] = Conj( xBuffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -883,10 +937,16 @@ template<typename Real>
 void psp::hmatrix_tools::Conjugate
 ( std::vector< std::complex<Real> >& x )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (vector)");
+#endif
     const int n = x.size();
     std::complex<Real>* xBuffer = &x[0];
     for( int i=0; i<n; ++i )
         xBuffer[i] = Conj( xBuffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -894,8 +954,14 @@ void psp::hmatrix_tools::Conjugate
 ( const std::vector<Real>& x,
         std::vector<Real>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (vector,vector)");
+#endif
     y.resize( x.size() );
     std::memcpy( &y[0], &x[0], x.size()*sizeof(Real) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -903,12 +969,18 @@ void psp::hmatrix_tools::Conjugate
 ( const std::vector< std::complex<Real> >& x,
         std::vector< std::complex<Real> >& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (vector,vector)");
+#endif
     const int n = x.size();
     y.resize( n );
     const std::complex<Real>* RESTRICT xBuffer = &x[0];
     std::complex<Real>* RESTRICT yBuffer = &y[0];
     for( int i=0; i<n; ++i )
         yBuffer[i] = Conj( xBuffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -916,8 +988,14 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector<Real>& x,
         std::vector<Real>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (Vector,vector)");
+#endif
     y.resize( x.Height() );
     std::memcpy( &y[0], x.Buffer(), x.Height()*sizeof(Real) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -925,12 +1003,18 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::Vector< std::complex<Real> >& x,
         std::vector< std::complex<Real> >& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (Vector,vector)");
+#endif
     const int n = x.Height();
     y.resize( n );
     const std::complex<Real>* RESTRICT xBuffer = x.LockedBuffer();
     std::complex<Real>* RESTRICT yBuffer = &y[0];
     for( int i=0; i<n; ++i )
         yBuffer[i] = Conj( xBuffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -938,8 +1022,14 @@ void psp::hmatrix_tools::Conjugate
 ( const std::vector<Real>& x,
         psp::Vector<Real>& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (vector,Vector)");
+#endif
     y.Resize( x.size() );
     std::memcpy( y.Buffer(), &x[0], x.size()*sizeof(Real) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -947,12 +1037,18 @@ void psp::hmatrix_tools::Conjugate
 ( const std::vector< std::complex<Real> >& x,
         psp::Vector< std::complex<Real> >& y )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (vector,Vector)");
+#endif
     const int n = x.size();
     y.Resize( n );
     const std::complex<Real>* xBuffer = &x[0];
     std::complex<Real>* yBuffer = y.Buffer();
     for( int i=0; i<n; ++i )
         yBuffer[i] = Conj( xBuffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -964,6 +1060,9 @@ template<typename Real>
 void psp::hmatrix_tools::Conjugate
 ( psp::DenseMatrix< std::complex<Real> >& D )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (DenseMatrix)");
+#endif
     const int m = D.Height();
     const int n = D.Width();
     for( int j=0; j<n; ++j )
@@ -972,6 +1071,9 @@ void psp::hmatrix_tools::Conjugate
         for( int i=0; i<m; ++i )
             DCol[i] = Conj( DCol[i] );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -979,6 +1081,9 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::DenseMatrix<Real>& D1, 
         psp::DenseMatrix<Real>& D2 )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (DenseMatrix,DenseMatrix)");
+#endif
     const int m = D1.Height();
     const int n = D1.Width();
     D2.SetType( D1.Type() ); 
@@ -999,6 +1104,9 @@ void psp::hmatrix_tools::Conjugate
             ( D2.Buffer(0,j), D1.LockedBuffer(0,j), m*sizeof(Real) );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -1006,6 +1114,9 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::DenseMatrix< std::complex<Real> >& D1,
         psp::DenseMatrix< std::complex<Real> >& D2 )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (DenseMatrix,DenseMatrix)");
+#endif
     const int m = D1.Height();
     const int n = D1.Width();
     D2.SetType( D1.Type() );
@@ -1030,6 +1141,9 @@ void psp::hmatrix_tools::Conjugate
                 D2Col[i] = Conj( D1Col[i] );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -1041,8 +1155,14 @@ template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::Conjugate
 ( psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (LowRankMatrix)");
+#endif
     Conjugate( F.U );
     Conjugate( F.V );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -1050,6 +1170,9 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::LowRankMatrix<Real,Conjugated>& F1,
         psp::LowRankMatrix<Real,Conjugated>& F2 )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (LowRankMatrix,LowRankMatrix)");
+#endif
     const int m = F1.Height();
     const int n = F1.Width();
     const int r = F1.Rank();
@@ -1057,6 +1180,9 @@ void psp::hmatrix_tools::Conjugate
     F2.V.SetType( GENERAL ); F2.V.Resize( n, r );
     Copy( F1.U, F2.U );
     Copy( F1.V, F2.V );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real,bool Conjugated>
@@ -1064,6 +1190,9 @@ void psp::hmatrix_tools::Conjugate
 ( const psp::LowRankMatrix<std::complex<Real>,Conjugated>& F1,
         psp::LowRankMatrix<std::complex<Real>,Conjugated>& F2 )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Conjugate (LowRankMatrix,LowRankMatrix)");
+#endif
     const int m = F1.Height();
     const int n = F1.Width();
     const int r = F1.Rank();
@@ -1071,6 +1200,9 @@ void psp::hmatrix_tools::Conjugate
     F2.V.SetType( GENERAL ); F2.V.Resize( n, r );
     Conjugate( F1.U, F2.U );
     Conjugate( F1.V, F2.V );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 /*\
@@ -1081,21 +1213,35 @@ template<typename Scalar>
 void psp::hmatrix_tools::Scale
 ( Scalar alpha, psp::Vector<Scalar>& x )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Scale (Vector)");
+#endif
     if( alpha == (Scalar)0 )
         std::memset( x.Buffer(), 0, x.Height()*sizeof(Scalar) );
     else
         blas::Scal( x.Height(), alpha, x.Buffer(), 1 );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar>
 void psp::hmatrix_tools::Scale
 ( Scalar alpha, psp::DenseMatrix<Scalar>& D )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Scale (DenseMatrix)");
+#endif
     const int m = D.Height();
     const int n = D.Width();
 
     if( alpha == (Scalar)1 )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     if( D.Symmetric() )
     {
@@ -1123,12 +1269,18 @@ void psp::hmatrix_tools::Scale
                 blas::Scal( m, alpha, D.Buffer(0,j), 1 );
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
 void psp::hmatrix_tools::Scale
 ( Scalar alpha, psp::LowRankMatrix<Scalar,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Scale (LowRankMatrix)");
+#endif
     if( alpha == (Scalar)0 )
     {
         F.U.Resize( F.Height(), 0 );
@@ -1138,6 +1290,9 @@ void psp::hmatrix_tools::Scale
     {
         Scale( alpha, F.U );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 /*\
@@ -1153,6 +1308,9 @@ void psp::hmatrix_tools::MatrixMatrix
   const psp::AbstractHMatrix<Real>& B,
         psp::LowRankMatrix<Real,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := A A)");
+#endif
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
@@ -1229,6 +1387,9 @@ void psp::hmatrix_tools::MatrixMatrix
     ( 'N', 'T', Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // F := alpha H H,
@@ -1240,6 +1401,9 @@ void psp::hmatrix_tools::MatrixMatrix
   const psp::AbstractHMatrix< std::complex<Real> >& B,
         psp::LowRankMatrix< std::complex<Real>,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixMatrix (F := A A)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int maxRankA = std::min( A.Height(), A.Width() );
@@ -1321,6 +1485,9 @@ void psp::hmatrix_tools::MatrixMatrix
     ( 'N', 'C', Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // F := alpha H^T H,
@@ -1332,6 +1499,9 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
   const psp::AbstractHMatrix<Real>& B,
         psp::LowRankMatrix<Real,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixTransposeMatrix (F := A^T A)");
+#endif
     const int maxRankA = std::min( A.Height(), A.Width() );
     const int maxRankB = std::min( B.Height(), B.Width() );
     const int maxRankAB = std::min( maxRankA, maxRankB );
@@ -1408,6 +1578,9 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
     ( 'N', 'T', Y.Height(), r, Y.Width(),
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(),
       0, F.U.Buffer(), F.U.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // F := alpha H^T H,
@@ -1419,6 +1592,9 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
   const psp::AbstractHMatrix< std::complex<Real> >& B,
         psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixTransposeMatrix (F := A^T A)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int maxRankA = std::min( A.Height(), A.Width() );
@@ -1506,6 +1682,9 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
     ( 'N', 'C', Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // F := alpha H^H H,
@@ -1517,7 +1696,13 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   const psp::AbstractHMatrix<Real>& B,
         psp::LowRankMatrix<Real,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := A^H A)");
+#endif
     MatrixTransposeMatrix( maxRank, oversampling, alpha, A, B, F );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // F := alpha H^H H
@@ -1529,6 +1714,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
   const psp::AbstractHMatrix< std::complex<Real> >& B,
         psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := A^H A)");
+#endif
     typedef std::complex<Real> Scalar;
 
     const int maxRankA = std::min( A.Height(), A.Width() );
@@ -1611,6 +1799,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     ( 'N', 'C', Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 /*\
@@ -1668,6 +1859,9 @@ void
 psp::hmatrix_tools::GaussianRandomVector
 ( psp::Vector<Real>& x )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::GaussianRandomVector");
+#endif
     // Use BoxMuller for every pair of entries
     const int n = x.size();
     const int numPairs = (n+1)/2;
@@ -1683,6 +1877,9 @@ psp::hmatrix_tools::GaussianRandomVector
         GaussianRandomVariable( buffer[n-1] );
     else
         BoxMuller( buffer[n-2], buffer[n-1] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -1690,10 +1887,16 @@ void
 psp::hmatrix_tools::GaussianRandomVector
 ( psp::Vector< std::complex<Real> >& x )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::GaussianRandomVector");
+#endif
     const int n = x.size();
     std::complex<Real>* buffer = x.Buffer();
     for( int i=0; i<n; ++i )
         GaussianRandomVariable( buffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -1701,6 +1904,9 @@ void
 psp::hmatrix_tools::GaussianRandomVectors
 ( psp::DenseMatrix<Real>& A )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::GaussianRandomVectors");
+#endif
     // Use BoxMuller for every pair of entries in each column
     A.SetType( GENERAL );
     const int m = A.Height();
@@ -1721,6 +1927,9 @@ psp::hmatrix_tools::GaussianRandomVectors
         else
             BoxMuller( ACol[n-2], ACol[n-1] );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Real>
@@ -1728,6 +1937,9 @@ void
 psp::hmatrix_tools::GaussianRandomVectors
 ( psp::DenseMatrix< std::complex<Real> >& A )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::GaussianRandomVectors");
+#endif
     A.SetType( GENERAL );
     const int m = A.Height();
     const int n = A.Width();
@@ -1737,6 +1949,9 @@ psp::hmatrix_tools::GaussianRandomVectors
         for( int i=0; i<m; ++i )
             GaussianRandomVariable( ACol[i] );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 #endif // PSP_HMATRIX_TOOLS_HPP

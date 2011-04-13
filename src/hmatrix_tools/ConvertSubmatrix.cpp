@@ -25,6 +25,9 @@ void psp::hmatrix_tools::ConvertSubmatrix
 ( DenseMatrix<Scalar>& D, const SparseMatrix<Scalar>& S, 
   int iStart, int iEnd, int jStart, int jEnd )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::ConvertSubmatrix (DenseMatrix,SparseMatrix)");
+#endif
     // Initialize the dense matrix to all zeros
     if( S.symmetric && iStart == jStart )
         D.SetType( SYMMETRIC );
@@ -61,6 +64,9 @@ void psp::hmatrix_tools::ConvertSubmatrix
                 break;
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -68,6 +74,10 @@ void psp::hmatrix_tools::ConvertSubmatrix
 ( LowRankMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
   int iStart, int iEnd, int jStart, int jEnd )
 {
+#ifndef RELEASE
+    PushCallStack
+    ("hmatrix_tools::ConvertSubmatrix (LowRankMatrix,SparseMatrix)");
+#endif
     // Figure out the matrix sizes
     const int m = iEnd - iStart;
     const int n = jEnd - jStart;
@@ -126,6 +136,11 @@ void psp::hmatrix_tools::ConvertSubmatrix
                 break;
         }
     }
+#ifndef RELEASE
+    if( F.Rank() > std::min(S.height,S.width) )
+        std::logic_error("Rank is larger than minimum dimension");
+    PopCallStack();
+#endif
 }
 
 template void psp::hmatrix_tools::ConvertSubmatrix

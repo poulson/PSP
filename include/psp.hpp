@@ -81,6 +81,11 @@ ScalarWrapper<Scalar>
 WrapScalar( Scalar alpha )
 { return ScalarWrapper<Scalar>( alpha ); }
 
+// These should typically only be used when not in RELEASE mode
+void PushCallStack( const std::string& s );
+void PopCallStack();
+void DumpCallStack();
+
 } // namespace psp
 
 #include "psp/blas.hpp"

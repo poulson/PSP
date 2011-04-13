@@ -28,6 +28,7 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAdd (D := D + D)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to add nonconforming matrices.");
     // TODO: Allow for A and B to have different types
@@ -62,6 +63,9 @@ void psp::hmatrix_tools::MatrixAdd
                 CCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Low-rank C := alpha A + beta B
@@ -72,6 +76,7 @@ void psp::hmatrix_tools::MatrixAdd
                       LowRankMatrix<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAdd (F := F + F)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
@@ -112,6 +117,9 @@ void psp::hmatrix_tools::MatrixAdd
         std::memcpy
         ( C.V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Scalar) );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense from sum of low-rank and dense:  C := alpha A + beta B
@@ -122,6 +130,7 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAdd (D := F + D)");
     if( A.Height() != B.Height() || A.Width() != B.Width()  )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
@@ -182,6 +191,9 @@ void psp::hmatrix_tools::MatrixAdd
                  A.V.LockedBuffer(), A.V.LDim(),
           1,     C.Buffer(),         C.LDim() );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense from sum of dense and low-rank:  C := alpha A + beta B
@@ -192,7 +204,13 @@ void psp::hmatrix_tools::MatrixAdd
   Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C )
 {
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAdd (D := D + F)");
+#endif
     MatrixAdd( beta, B, alpha, A, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense as sum of two low-rank matrices
@@ -203,6 +221,7 @@ void psp::hmatrix_tools::MatrixAdd
                       DenseMatrix<Scalar>& C )
 {
 #ifndef RELEASE
+    PushCallStack("hmatrix_tools::MatrixAdd (D := F + F)");
     if( A.Height() != B.Height() || A.Width() != B.Width() )
         throw std::logic_error("Tried to add nonconforming matrices.");
 #endif
@@ -226,6 +245,9 @@ void psp::hmatrix_tools::MatrixAdd
       beta, B.U.LockedBuffer(), B.U.LDim(), 
             B.V.LockedBuffer(), B.V.LDim(),
       1,    C.Buffer(),         C.LDim() );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // Dense C := alpha A + beta B
