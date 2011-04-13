@@ -1226,14 +1226,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
                 const Node& nodeA = *this->_shell.data.node;
                 const Node& nodeB = *B._shell.data.node;
                 Node& nodeC = *C._shell.data.node;
-#ifndef RELEASE
-                if( nodeA.children.size() != 16 )
-                    throw std::logic_error("nodeA not properly initialized");
-                if( nodeB.children.size() != 16 )
-                    throw std::logic_error("nodeB not properly initialized");
-                if( nodeC.children.size() != 16 )
-                    throw std::logic_error("nodeC not properly initialized");
-#endif
+
                 for( int t=0; t<4; ++t )
                 {
                     for( int s=0; s<4; ++s )
@@ -1411,15 +1404,45 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 #endif
         if( this->IsLowRank() && B.IsLowRank() )
         {
-            // HERE        
+            // Form W := alpha A B 
+            LowRankMatrix<Scalar,Conjugated> W;
+            hmatrix_tools::MatrixMatrix
+            ( alpha, *_shell.data.F, *B._shell.data.F, W );
+
+            // C :~= W + beta C
+            C.Scale( beta );
+            C.UpdateWithLowRankMatrix( (Scalar)1, W );
         }
         else if( this->IsLowRank() && B.IsHierarchical() )
         {
+            // Form W := alpha A B
+            LowRankMatrix<Scalar,Conjugated> W;
+            hmatrix_tools::Copy( _shell.data.F->U, W.U );
+            if( Conjugated )
+            {
+                B.HermitianTransposeMapMatrix
+                ( Conj(alpha), _shell.data.F->V, W.V );
+            }
+            else
+            {
+                B.TransposeMapMatrix
+                ( alpha, _shell.data.F->V, W.V );
+            }
 
+            // C :~= W + beta C
+            C.Scale( beta );
+            C.UpdateWithLowRankMatrix( (Scalar)1, W );
         }
         else if( this->IsHierarchical() && B.IsLowRank() )
         {
+            // Form W := alpha A B    
+            LowRankMatrix<Scalar,Conjugated> W;
+            this->MapMatrix( alpha, B._shell.data.F->U, W.U );
+            hmatrix_tools::Copy( B._shell.data.F->V, W.V );
 
+            // Form C :~= W + beta C
+            C.Scale( beta );
+            C.UpdateWithLowRankMatrix( (Scalar)1, W );
         }
         else
         {
@@ -1438,16 +1461,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             else /* !this->Symmetric() && !B.Symmetric() */
             {
                 const Node& nodeA = *this->_shell.data.node;
-            const Node& nodeB = *B._shell.data.node;
+                const Node& nodeB = *B._shell.data.node;
                 Node& nodeC = *C._shell.data.node;
-#ifndef RELEASE
-                if( nodeA.children.size() != 16 )
-                    throw std::logic_error("nodeA not properly initialized");
-                if( nodeB.children.size() != 16 )
-                    throw std::logic_error("nodeB not properly initialized");
-                if( nodeC.children.size() != 16 )
-                    throw std::logic_error("nodeC not properly initialized");
-#endif
+
                 for( int t=0; t<4; ++t )
                 {
                     for( int s=0; s<4; ++s )
@@ -1526,12 +1542,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
 
         Node& nodeA = *_shell.data.node;
         Node& nodeB = *B._shell.data.node;
-#ifndef RELEASE
-        if( nodeA.children.size() != 16 )
-            throw std::logic_error("nodeA not properly initialized");
-        if( nodeB.children.size() != 16 )
-            throw std::logic_error("nodeB not properly initialized");
-#endif
+
         for( int l=0; l<4; ++l )
         {
             // A_ll := inv(B_ll)
