@@ -122,7 +122,7 @@ main( int argc, char* argv[] )
         std::cout << "Constructing H-matrix...";
         std::cout.flush();
         psp::Quasi2dHMatrix<double,false> 
-            H( S, numLevels, r, false, xSize, ySize, zSize );
+            H( S, numLevels, r, true, xSize, ySize, zSize );
         std::cout << "done" << std::endl;
 
         psp::Vector<double> x;
@@ -137,17 +137,26 @@ main( int argc, char* argv[] )
             psp::Vector<double> y;
             H.MapVector( 2.0, x, y );
             y.Print( "y := 2 H x ~= 2 S x" );
+
+            H.Print( "H" );
         }
 
         std::cout << "Inverting the H-matrix...";
         std::cout.flush();
+        psp::Quasi2dHMatrix<double,false> HCopy;
+        if( print )
+            HCopy.CopyFrom( H );
         H.Invert();
         std::cout << "done" << std::endl;
         if( print )
         {
-            psp::Vector<double> y; 
-            H.MapVector( 2.0, x, y );
-            y.Print( "y := 2 inv(H) x ~= 2 inv(S) x" );
+            psp::Vector<double> y, z; 
+            H.MapVector( 1.0, x, y );
+            HCopy.MapVector( 1.0, y, z );
+            y.Print( "y := inv(H) x ~= inv(S) x" );
+            z.Print( "z := H inv(H) x ~= x" );
+            
+            H.Print( "inv(H)" );
         }
     }
     catch( std::exception& e )

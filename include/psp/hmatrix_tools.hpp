@@ -1362,7 +1362,7 @@ void psp::hmatrix_tools::MatrixMatrix
         std::vector<Real> s( std::min(m,n) );
         X.Resize( std::min(m,n), n );
         lapack::SVD
-        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 0, 
+        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 1, 
           X.Buffer(), X.LDim(), &work[0], lwork );
 
         // Truncate the SVD in-place
@@ -1461,7 +1461,7 @@ void psp::hmatrix_tools::MatrixMatrix
         std::vector<Real> s( std::min(m,n) );
         X.Resize( std::min(m,n), n );
         lapack::SVD
-        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 0,
+        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 1,
           X.Buffer(), X.LDim(), &work[0], lwork, &rwork[0] );
 
         // Truncate the SVD in-place
@@ -1553,7 +1553,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
         std::vector<Real> s( std::min(m,n) );
         X.Resize( std::min(m,n), n );
         lapack::SVD
-        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 0,
+        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 1,
           X.Buffer(), X.LDim(), &work[0], lwork );
 
         // Truncate the SVD in-place
@@ -1657,7 +1657,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
         std::vector<Real> s( std::min(m,n) );
         X.Resize( std::min(m,n), n );
         lapack::SVD
-        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 0,
+        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 1,
           X.Buffer(), X.LDim(), &work[0], lwork, &rwork[0] );
 
         // Truncate the SVD in-place
@@ -1774,7 +1774,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         std::vector<Real> s( std::min(m,n) );
         X.Resize( std::min(m,n), n );
         lapack::SVD
-        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 0,
+        ( 'O', 'S', m, n, F.V.Buffer(), F.V.LDim(), &s[0], 0, 1,
           X.Buffer(), X.LDim(), &work[0], lwork, &rwork[0] );
 
         // Truncate the SVD in-place

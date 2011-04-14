@@ -208,7 +208,7 @@ void psp::hmatrix_tools::Compress
     // Get the SVD of R1 R2^T, overwriting R1 R2^T with U
     std::vector<Real> s( r );
     lapack::SVD
-    ( 'O', 'A', r, r, &buffer[0], r, &s[0], 0, 1, 
+    ( 'O', 'S', r, r, &buffer[0], r, &s[0], 0, 1, 
       &buffer[blockSize], r, &buffer[2*blockSize], lworkSVD );
 
     //------------------------------------------------------------------------//
@@ -351,7 +351,7 @@ void psp::hmatrix_tools::Compress
     // Get the SVD of R1 R2^[T,H], overwriting it with U
     std::vector<Real> realBuffer( 6*r );
     lapack::SVD
-    ( 'O', 'A', r, r, &buffer[0], r, &realBuffer[0], 0, 1, 
+    ( 'O', 'S', r, r, &buffer[0], r, &realBuffer[0], 0, 1, 
       &buffer[blockSize], r, &buffer[2*blockSize], lworkSVD, &realBuffer[r] );
 
     //------------------------------------------------------------------------//

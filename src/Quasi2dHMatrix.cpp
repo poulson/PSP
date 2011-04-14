@@ -208,6 +208,21 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::~Quasi2dHMatrix()
 
 template<typename Scalar,bool Conjugated>
 void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
+( const std::string& tag ) const
+{
+    DenseMatrix<Scalar> I( this->Width(), this->Width() );
+    std::memset( I.Buffer(), 0, I.LDim()*I.Width() );
+    for( int j=0; j<this->Width(); ++j )
+        I.Set(j,j,(Scalar)1);
+
+    DenseMatrix<Scalar> HFull;
+    this->MapMatrix( (Scalar)1, I, HFull );
+    HFull.Print( tag );
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
 ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) const
 {
@@ -573,7 +588,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     PushCallStack("Quasi2dHMatrix::MapMatrix (D := H D)");
 #endif
     C.SetType( GENERAL );
-    C.Resize( this->_height, B.Width() );
+    C.Resize( this->Height(), B.Width() );
     MapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();

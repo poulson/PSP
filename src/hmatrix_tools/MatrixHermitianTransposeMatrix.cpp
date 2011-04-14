@@ -730,7 +730,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     std::vector<Real> rwork( 5*minDim );
     lapack::SVD
     ( 'O', 'S', m, n, C.U.Buffer(), C.U.LDim(),
-      s.Buffer(), 0, 0, VH.Buffer(), VH.LDim(),
+      s.Buffer(), 0, 1, VH.Buffer(), VH.LDim(),
       &work[0], lwork, &rwork[0] );
 
     // Truncate the SVD in-place

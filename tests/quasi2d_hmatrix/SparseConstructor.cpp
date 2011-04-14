@@ -91,10 +91,6 @@ main( int argc, char* argv[] )
         y.Print( "y := 2 H^T x ~= 2 S^T x" );
         H.HermitianTransposeMapVector( 2.0, x, y );
         y.Print( "y := 2 H^H x ~= 2 S^H x" );
-        
-        H.Invert();
-        H.MapVector( 1.0, x, y );
-        y.Print( "y ~= inv(H) x" );
     }
     catch( std::exception& e )
     {
@@ -165,10 +161,6 @@ main( int argc, char* argv[] )
         y.Print( "y := (4+5i)H^T x ~= (4+5i)S^T x" );
         H.HermitianTransposeMapVector( std::complex<double>(4.0,5.0), x, y );
         y.Print( "y := (4+5i)H^H x ~= (4+5i)S^H x" );
-
-        H.Invert();
-        H.MapVector( std::complex<double>(1.0,0.0), x, y );
-        y.Print( "y ~= inv(H) x" );
     }
     catch( std::exception& e )
     {

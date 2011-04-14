@@ -259,7 +259,7 @@ void psp::hmatrix_tools::MatrixMatrix
             ( 'T', 'N', A.Rank(), B.Width(), A.Width(),
               1, A.V.LockedBuffer(), A.V.LDim(), 
                  B.LockedBuffer(),   B.LDim(), 
-              0, W.Buffer(),         A.Rank() );
+              0, W.Buffer(),         W.LDim() );
             blas::Gemm
             ( 'N', 'N', A.Height(), B.Width(), A.Rank(),
               alpha, A.U.LockedBuffer(), A.U.LDim(), 
@@ -608,7 +608,7 @@ void psp::hmatrix_tools::MatrixMatrix
     std::vector<Real> work( lwork );
     lapack::SVD
     ( 'O', 'S', m, n, C.U.Buffer(), C.U.LDim(), 
-      s.Buffer(), 0, 0, VT.Buffer(), VT.LDim(),
+      s.Buffer(), 0, 1, VT.Buffer(), VT.LDim(),
       &work[0], lwork );
 
     // Truncate the SVD in-place
@@ -660,7 +660,7 @@ void psp::hmatrix_tools::MatrixMatrix
     std::vector<Real> rwork( 5*minDim );
     lapack::SVD
     ( 'O', 'S', m, n, C.U.Buffer(), C.U.LDim(), 
-      s.Buffer(), 0, 0, VH.Buffer(), VH.LDim(),
+      s.Buffer(), 0, 1, VH.Buffer(), VH.LDim(),
       &work[0], lwork, &rwork[0] );
 
     // Truncate the SVD in-place

@@ -100,127 +100,79 @@ void psp::hmatrix_tools::MatrixAddRounded
         return;
     }
 
-    // Grab enough workspace for our entire rounded addition
-    const int leftPanelSize = m*r;
-    const int rightPanelSize = n*r;
-    const int blockSize = r*r;
-    const int lworkSVD = lapack::SVDWorkSize( r, r );
-    std::vector<Real> buffer
-    ( leftPanelSize+rightPanelSize+
-      std::max(std::max(leftPanelSize,rightPanelSize),2*blockSize+lworkSVD) );
 
-    // Put [(alpha A.U), (beta B.U)] into the first 'leftPanelSize' entries of
-    // our buffer and [A.V, B.V] into the next 'rightPanelSize' entries
-    // Copy in (alpha A.U)
+    // Form U := [(alpha A.U), (beta B.U)]
+    DenseMatrix<Real> U( m, r );
     for( int j=0; j<Ar; ++j )
     {
-        Real* RESTRICT packedAUCol = &buffer[j*m];
+        Real* RESTRICT packedAUCol = U.Buffer(0,j);
         const Real* RESTRICT AUCol = A.U.LockedBuffer(0,j);
         for( int i=0; i<m; ++i )
             packedAUCol[i] = alpha*AUCol[i];
     }
-    // Copy in (beta B.U)
     for( int j=0; j<Br; ++j )
     {
-        Real* RESTRICT packedBUCol = &buffer[(j+Ar)*m];
+        Real* RESTRICT packedBUCol = U.Buffer(0,j+Ar);
         const Real* RESTRICT BUCol = B.U.LockedBuffer(0,j);
         for( int i=0; i<m; ++i )
             packedBUCol[i] = beta*BUCol[i];
     }
-    // Copy in A.V
-    for( int j=0; j<Ar; ++j )
-    {
-        std::memcpy
-        ( &buffer[leftPanelSize+j*n], A.V.LockedBuffer(0,j), 
-          n*sizeof(Real) );
-    }
-    // Copy in B.V
-    for( int j=0; j<Br; ++j )
-    {
-        std::memcpy
-        ( &buffer[leftPanelSize+(j+Ar)*n], B.V.LockedBuffer(0,j), 
-          n*sizeof(Real) );
-    }
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize): [(alpha A.U), (beta B.U)]                          //
-    //  [leftPanelSize,leftPanelSize+rightPanelSize): [A.V, B.V]              //
-    //------------------------------------------------------------------------//
-    const int offset = leftPanelSize + rightPanelSize;
+    // Form V := [A.V B.V]
+    DenseMatrix<Real> V( n, r );
+    for( int j=0; j<Ar; ++j )
+        std::memcpy( V.Buffer(0,j), A.V.LockedBuffer(0,j), n*sizeof(Real) );
+    for( int j=0; j<Br; ++j )
+        std::memcpy( V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Real) );
 
 #if defined(PIVOTED_QR)
     // TODO 
     throw std::logic_error("Pivoted QR is not yet supported for this routine.");
 #else
-    // Perform an unpivoted QR decomposition on [(alpha A.U), (beta B.U)]
+    // Perform an unpivoted QR decomposition on U
     const int minDimU = std::min(m,r);
     std::vector<Real> tauU( minDimU );
-    lapack::QR( m, r, &buffer[0], m, &tauU[0], &buffer[offset], leftPanelSize );
+    std::vector<Real> workU( m*r );
+    lapack::QR( m, r, U.Buffer(), U.LDim(), &tauU[0], &workU[0], m*r );
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):      qr([(alpha A.U), (beta B.U)])                 //
-    //  [leftPanelSize,offset): [A.V, B.V]                                    //
-    //------------------------------------------------------------------------//
-
-    // Perform an unpivoted QR decomposition on [A.V, B.V]
+    // Perform an unpivoted QR decomposition on V
     const int minDimV = std::min(n,r);
     std::vector<Real> tauV( minDimV );
-    lapack::QR
-    ( n, r, &buffer[leftPanelSize], n, &tauV[0], 
-      &buffer[offset], rightPanelSize );
-
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):      qr([(alpha A.U), (beta B.U)])                 //
-    //  [leftPanelSize,offset): qr([A.V, B.V])                                //
-    //------------------------------------------------------------------------//
+    std::vector<Real> workV( n*r );
+    lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], n*r );
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
+    workU.resize( r*r );
+    std::memset( &workU[0], 0, r*r*sizeof(Real) );
+    for( int j=0; j<r; ++j )
     {
-        Real* RESTRICT W = &buffer[offset];
-        const Real* RESTRICT R1 = &buffer[0];
-        std::memset( W, 0, blockSize*sizeof(Real) );
-        for( int j=0; j<minDimU; ++j )
-            for( int i=0; i<=j; ++i )
-                W[i+j*r] = R1[i+j*m];
+        std::memcpy
+        ( &workU[j*r], U.LockedBuffer(0,j), std::min(m,j+1)*sizeof(Real) );
     }
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):         qr([(alpha A.U), (beta B.U)])              //
-    //  [leftPanelSize,offset):    qr([A.V, B.V])                             //
-    //  [offset,offset+blockSize): R1                                         //
-    //------------------------------------------------------------------------//
+    // Copy R2 (the right factor's R from QR) into a zeroed buffer
+    workV.resize( r*r );
+    std::memset( &workV[0], 0, r*r*sizeof(Real) );
+    for( int j=0; j<r; ++j )
+    {
+        std::memcpy
+        ( &workV[j*r], V.LockedBuffer(0,j), std::min(n,j+1)*sizeof(Real) );
+    }
 
-    // Update W := R1 R2^T. We are unfortunately performing 2x as many
-    // flops as are required.
-    blas::Trmm
-    ( 'R', 'U', 'T', 'N', minDimU, minDimV, 
-      1, &buffer[leftPanelSize], n, &buffer[offset], r );
+    // Form W := R1 R2^T.
+    DenseMatrix<Real> W( minDimU, minDimV );
+    blas::Gemm
+    ( 'N', 'T', minDimU, minDimV, r,
+      (Real)1, &workU[0], r, &workV[0], r, (Real)0, W.Buffer(), W.LDim() );
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):         qr([(alpha A.U), (beta B.U)])              //
-    //  [leftPanelSize,offset):    qr([A.V, B.V])                             //
-    //  [offset,offset+blockSize): R1 R2^T                                    //
-    //------------------------------------------------------------------------//
-
-    // Get the SVD of R1 R2^T, overwriting R1 R2^T with U
+    // Get the SVD of R1 R2^T, overwriting R1 R2^T with UNew
     std::vector<Real> s( std::min(minDimU,minDimV) );
+    DenseMatrix<Real> VT( std::min(minDimU,minDimV), minDimV );
+    const int lworkSVD = lapack::SVDWorkSize( minDimU, minDimV );
+    std::vector<Real> workSVD( lworkSVD );
     lapack::SVD
-    ( 'O', 'A', minDimU, minDimV, &buffer[offset], r, 
-      &s[0], 0, 1, &buffer[offset+blockSize], r, 
-      &buffer[offset+2*blockSize], lworkSVD );
-
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):                     qr([(alpha A.U),(beta B.U)])   //
-    //  [leftPanelSize,offset):                qr([A.V, B.V])                 //
-    //  [offset,offset+blockSize):             U of R1 R2^T                   //
-    //  [offset+blockSize,offset+2*blockSize): V^H of R1 R2^T                 //
-    //------------------------------------------------------------------------//
+    ( 'O', 'S', minDimU, minDimV, W.Buffer(), W.LDim(),
+      &s[0], 0, 1, VT.Buffer(), VT.LDim(), &workSVD[0], lworkSVD );
 
     // Form the rounded C.U by first filling it with 
     //  | S*U_Left |, and then hitting it from the left with Q1
@@ -229,16 +181,16 @@ void psp::hmatrix_tools::MatrixAddRounded
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = s[j];
-        const Real* RESTRICT UCol = &buffer[offset+j*r];
+        const Real* RESTRICT UCol = W.LockedBuffer(0,j);
         Real* RESTRICT UColScaled = C.U.Buffer(0,j);
         for( int i=0; i<minDimU; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
-    // Apply Q1 and use the unneeded U space for our work buffer
+    // Apply Q1
+    workU.resize( m*roundedRank );
     lapack::ApplyQ
-    ( 'L', 'N', m, roundedRank, minDimU, 
-      &buffer[0], m, &tauU[0], C.U.Buffer(), C.U.LDim(), 
-      &buffer[offset], blockSize );
+    ( 'L', 'N', m, roundedRank, minDimU, U.LockedBuffer(), U.LDim(), &tauU[0],
+      C.U.Buffer(), C.U.LDim(), &workU[0], m*roundedRank );
 
     // Form the rounded C.V by first filling it with 
     //  | (VT_Top)^T |, and then hitting it from the left with Q2
@@ -246,15 +198,17 @@ void psp::hmatrix_tools::MatrixAddRounded
     Scale( (Real)0, C.V );
     for( int j=0; j<roundedRank; ++j )
     {
-        const Real* RESTRICT VTRow = &buffer[offset+blockSize+j];
+        const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
+        const int VTLDim = VT.LDim();
         Real* RESTRICT VCol = C.V.Buffer(0,j);
         for( int i=0; i<minDimV; ++i )
-            VCol[i] = VTRow[i*r];
+            VCol[i] = VTRow[i*VTLDim];
     }
-    // Apply Q2 and use the unneeded U space for our work buffer
+    // Apply Q2
+    workV.resize( n*roundedRank );
     lapack::ApplyQ
-    ( 'L', 'N', n, roundedRank, minDimV, &buffer[leftPanelSize], n, &tauV[0], 
-      C.V.Buffer(), C.V.LDim(), &buffer[offset], blockSize );
+    ( 'L', 'N', n, roundedRank, minDimV, V.LockedBuffer(), V.LDim(), &tauV[0], 
+      C.V.Buffer(), C.V.LDim(), &workV[0], n*roundedRank );
 #endif // PIVOTED_QR
 #ifndef RELEASE
     PopCallStack();
@@ -283,7 +237,7 @@ void psp::hmatrix_tools::MatrixAddRounded
     const int Ar = A.Rank();
     const int Br = B.Rank();
     const int r = Ar + Br;
-    const int roundedRank = std::min( r, maxRank );
+    const int roundedRank = std::min( r, std::min(maxRank,minDim) );
 
     C.U.SetType( GENERAL ); C.U.Resize( m, roundedRank );
     C.V.SetType( GENERAL ); C.V.Resize( n, roundedRank );
@@ -327,131 +281,87 @@ void psp::hmatrix_tools::MatrixAddRounded
         return;
     }
 
-    // Grab enough workspace for our entire rounded addition
-    const int leftPanelSize = m*r;
-    const int rightPanelSize = n*r;
-    const int blockSize = r*r;
-    const int lworkSVD = lapack::SVDWorkSize( r, r );;
-    std::vector<Scalar> buffer
-    ( leftPanelSize+rightPanelSize+
-      std::max(std::max(leftPanelSize,rightPanelSize),2*blockSize+lworkSVD) );
-
-    // Put [(alpha A.U), (beta B.U)] into the first 'leftPanelSize' entries of
-    // our buffer and [A.V, B.V] into the next 'rightPanelSize' entries
-    // Copy in (alpha A.U)
+    // Form U := [(alpha A.U) (beta B.U)]
+    DenseMatrix<Scalar> U( m, r );
     for( int j=0; j<Ar; ++j )
     {
-        Scalar* RESTRICT packedAUCol = &buffer[j*m];
+        Scalar* RESTRICT packedAUCol = U.Buffer(0,j);
         const Scalar* RESTRICT AUCol = A.U.LockedBuffer(0,j);
         for( int i=0; i<m; ++i )
             packedAUCol[i] = alpha*AUCol[i];
     }
-    // Copy in (beta B.U)
     for( int j=0; j<Br; ++j )
     {
-        Scalar* RESTRICT packedBUCol = &buffer[(j+Ar)*m];
+        Scalar* RESTRICT packedBUCol = U.Buffer(0,j+Ar);
         const Scalar* RESTRICT BUCol = B.U.LockedBuffer(0,j);
         for( int i=0; i<m; ++i )
             packedBUCol[i] = beta*BUCol[i];
     }
-    // Copy in A.V
+
+    // Form V := [A.V B.V]
+    DenseMatrix<Scalar> V( n, r );
     for( int j=0; j<Ar; ++j )
     {
         std::memcpy
-        ( &buffer[leftPanelSize+j*n], A.V.LockedBuffer(0,j), 
-          n*sizeof(Scalar) );
+        ( V.Buffer(0,j), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
     }
-    // Copy in B.V
     for( int j=0; j<Br; ++j )
     {
         std::memcpy
-        ( &buffer[leftPanelSize+(j+Ar)*n], B.V.LockedBuffer(0,j),
-          n*sizeof(Scalar) );
+        ( V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Scalar) );
     }
-
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize): [(alpha A.U), (beta B.U)]                          //
-    //  [leftPanelSize,leftPanelSize+rightPanelSize): [A.V, B.V]              //
-    //------------------------------------------------------------------------//
-    const int offset = leftPanelSize + rightPanelSize;
 
 #if defined(PIVOTED_QR)
     // TODO 
     throw std::logic_error("Pivoted QR is not yet supported for this routine.");
 #else
-    // Perform an unpivoted QR decomposition on [(alpha A.U), (beta B.U)]
+    // Perform an unpivoted QR decomposition on U
     const int minDimU = std::min(m,r);
     std::vector<Scalar> tauU( minDimU );
-    lapack::QR( m, r, &buffer[0], m, &tauU[0], &buffer[offset], leftPanelSize );
+    std::vector<Scalar> workU( m*r );
+    lapack::QR( m, r, U.Buffer(), U.LDim(), &tauU[0], &workU[0], m*r );
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):      qr([(alpha A.U), (beta B.U)])                 //
-    //  [leftPanelSize,offset): [A.V, B.V]                                    //
-    //------------------------------------------------------------------------//
-
-    // Perform an unpivoted QR decomposition on [A.V, B.V]
+    // Perform an unpivoted QR decomposition on V
     const int minDimV = std::min(n,r);
     std::vector<Scalar> tauV( minDimV );
-    lapack::QR
-    ( n, r, &buffer[leftPanelSize], n, &tauV[0], 
-      &buffer[offset], rightPanelSize );
-
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):      qr([(alpha A.U), (beta B.U)])                 //
-    //  [leftPanelSize,offset): qr([A.V, B.V])                                //
-    //------------------------------------------------------------------------//
+    std::vector<Scalar> workV( n*r );
+    lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], n*r );
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
+    workU.resize( r*r );
+    std::memset( &workU[0], 0, r*r*sizeof(Scalar) );
+    for( int j=0; j<r; ++j )
     {
-        Scalar* RESTRICT W = &buffer[offset];
-        const Scalar* RESTRICT R1 = &buffer[0];
-        std::memset( W, 0, blockSize*sizeof(Scalar) );
-        for( int j=0; j<minDimU; ++j )
-            for( int i=0; i<=j; ++i )
-                W[i+j*r] = R1[i+j*m];
+        std::memcpy
+        ( &workU[j*r], U.LockedBuffer(0,j), std::min(m,j+1)*sizeof(Scalar) );
     }
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):         qr([(alpha A.U), (beta B.U)])              //
-    //  [leftPanelSize,offset):    qr([A.V, B.V])                             //
-    //  [offset,offset+blockSize): R1                                         //
-    //------------------------------------------------------------------------//
+    // Copy R2 (the right factor's R from QR) into a zeroed buffer
+    workV.resize( r*r );
+    std::memset( &workV[0], 0, r*r*sizeof(Scalar) );
+    for( int j=0; j<r; ++j )
+    {
+        std::memcpy
+        ( &workV[j*r], V.LockedBuffer(0,j), std::min(n,j+1)*sizeof(Scalar) );
+    }
 
-    // Update W := R1 R2^[T,H]. We are unfortunately performing 2x as many
-    // flops as are required.
-    const char option = ( Conjugated ? 'C' : 'N' );
-    blas::Trmm
-    ( 'R', 'U', option, 'N', minDimU, minDimV, 
-      1, &buffer[leftPanelSize], n, &buffer[offset], r );
+    // Form W := R1 R2^[T,H]
+    const char option = ( Conjugated ? 'C' : 'T' );
+    DenseMatrix<Scalar> W( minDimU, minDimV );
+    blas::Gemm
+    ( 'N', option, minDimU, minDimV, r,
+      (Scalar)1, &workU[0], r, &workV[0], r, (Scalar)0, W.Buffer(), W.LDim() );
 
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):         qr([(alpha A.U), (beta B.U)])              //
-    //  [leftPanelSize,offset):    qr([A.V, B.V])                             //
-    //  [offset,offset+blockSize): R1 R2^[T,H]                                //
-    //------------------------------------------------------------------------//
-
-    // Get the SVD of R1 R2^[T,H], overwriting R1 R2^[T,H] with U
-    std::vector<Real> realBuffer( 6*r );
+    // Get the SVD of R1 R2^[T,H], overwriting R1 R2^[T,H] with UNew
+    std::vector<Real> s( std::min(minDimU,minDimV) );
+    DenseMatrix<Scalar> VH( std::min(minDimU,minDimV), minDimV );
+    const int lworkSVD = lapack::SVDWorkSize( minDimU, minDimV ); 
+    std::vector<Scalar> workSVD( lworkSVD );
+    std::vector<Real> realWorkSVD( 5*r );
     lapack::SVD
-    ( 'O', 'A', minDimU, minDimV, &buffer[offset], r, 
-      &realBuffer[0], 0, 1, &buffer[offset+blockSize], r, 
-      &buffer[offset+2*blockSize], lworkSVD, &realBuffer[r] );
-
-    //------------------------------------------------------------------------//
-    // buffer contains:                                                       //
-    //  [0,leftPanelSize):                     qr([(alpha A.U),(beta B.U)])   //
-    //  [leftPanelSize,offset):                qr([A.V, B.V])                 //
-    //  [offset,offset+blockSize):             U of R1 R2^[T,H]               //
-    //  [offset+blockSize,offset+2*blockSize): V^H of R1 R2^[T,H]             //
-    //                                                                        //
-    // realBuffer contains:                                                   //
-    //   [0,r): singular values of R1 R2^[T,H]                                //
-    //------------------------------------------------------------------------//
+    ( 'O', 'S', minDimU, minDimV, W.Buffer(), W.LDim(),
+      &s[0], 0, 1, VH.Buffer(), VH.LDim(), &workSVD[0], lworkSVD,
+      &realWorkSVD[0] );
 
     // Form the rounded C.U by first filling it with 
     //  | S*U_Left |, and then hitting it from the left with Q1
@@ -459,16 +369,17 @@ void psp::hmatrix_tools::MatrixAddRounded
     Scale( (Scalar)0, C.U );
     for( int j=0; j<roundedRank; ++j )
     {
-        const Real sigma = realBuffer[j];
-        const Scalar* RESTRICT UCol = &buffer[offset+j*r];
+        const Real sigma = s[j];
+        const Scalar* RESTRICT UCol = W.Buffer(0,j);
         Scalar* RESTRICT UColScaled = C.U.Buffer(0,j);
         for( int i=0; i<minDimU; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
-    // Apply Q1 and use the unneeded U space for our work buffer
+    // Apply Q1
+    workU.resize( m*roundedRank );
     lapack::ApplyQ
-    ( 'L', 'N', m, roundedRank, minDimU, &buffer[0], m, &tauU[0], 
-      C.U.Buffer(), C.U.LDim(), &buffer[offset], blockSize );
+    ( 'L', 'N', m, roundedRank, minDimU, U.LockedBuffer(), U.LDim(), &tauU[0],
+      C.U.Buffer(), C.U.LDim(), &workU[0], m*roundedRank );
 
     // Form the rounded C.V by first filling it with 
     //  | (VH_Top)^[T,H] |, and then hitting it from the left with Q2
@@ -478,26 +389,29 @@ void psp::hmatrix_tools::MatrixAddRounded
     {
         for( int j=0; j<roundedRank; ++j )
         {
-            const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
             Scalar* RESTRICT VCol = C.V.Buffer(0,j);
             for( int i=0; i<minDimV; ++i )
-                VCol[i] = Conj( VHRow[i*r] );
+                VCol[i] = Conj( VHRow[i*VHLDim] );
         }
     }
     else
     {
         for( int j=0; j<roundedRank; ++j )
         {
-            const Scalar* RESTRICT VHRow = &buffer[offset+blockSize+j];
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
             Scalar* RESTRICT VColConj = C.V.Buffer(0,j);
             for( int i=0; i<minDimV; ++i )
-                VColConj[i] = VHRow[i*r];
+                VColConj[i] = VHRow[i*VHLDim];
         }
     }
-    // Apply Q2 and use the unneeded U space for our work buffer
+    // Apply Q2
+    workV.resize( n*roundedRank );
     lapack::ApplyQ
-    ( 'L', 'N', n, roundedRank, minDimV, &buffer[leftPanelSize], n, &tauV[0], 
-      C.V.Buffer(), C.V.LDim(), &buffer[offset], blockSize );
+    ( 'L', 'N', n, roundedRank, minDimV, V.LockedBuffer(), V.LDim(), &tauV[0],
+      C.V.Buffer(), C.V.LDim(), &workV[0], n*roundedRank );
 #endif // PIVOTED_QR
 #ifndef RELEASE
     PopCallStack();

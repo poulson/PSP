@@ -52,15 +52,13 @@ void psp::hmatrix_tools::ConvertSubmatrix
         for( int k=0; k<nextRowOffset-thisRowOffset; ++k )
         {
             const int thisColIndex = thisSetOfColIndices[k];
-            if( thisColIndex < jStart )
+            if( thisColIndex < jStart || thisColIndex >= jStart+width )
                 continue;
-            else if( thisColIndex < jStart+width )
+            else
             {
                 const int jOffset = thisColIndex - jStart;
                 DBuffer[iOffset+jOffset*ldim] = S.nonzeros[thisRowOffset+k];
             }
-            else
-                break;
         }
     }
 #ifndef RELEASE
@@ -88,12 +86,10 @@ void psp::hmatrix_tools::ConvertSubmatrix
         for( int k=0; k<nextRowOffset-thisRowOffset; ++k )
         {
             const int thisColIndex = thisSetOfColIndices[k];
-            if( thisColIndex < jStart )
+            if( thisColIndex < jStart || thisColIndex >= jStart+width)
                 continue;
-            else if( thisColIndex < jStart+width )
-                ++rankCounter;
             else
-                break;
+                ++rankCounter;
         }
     }
 
@@ -116,9 +112,9 @@ void psp::hmatrix_tools::ConvertSubmatrix
         for( int k=0; k<nextRowOffset-thisRowOffset; ++k )
         {
             const int thisColIndex = thisSetOfColIndices[k];
-            if( thisColIndex < jStart )
+            if( thisColIndex < jStart || thisColIndex >= jStart+width )
                 continue;
-            else if( thisColIndex < jStart+width )
+            else
             {
                 const int jOffset = thisColIndex - jStart;
                 const Scalar value = S.nonzeros[thisRowOffset+k];
@@ -129,8 +125,6 @@ void psp::hmatrix_tools::ConvertSubmatrix
                     F.V.Set(jOffset,rankCounter,value);
                 ++rankCounter;
             }
-            else
-                break;
         }
     }
 #ifndef RELEASE
