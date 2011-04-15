@@ -119,45 +119,84 @@ main( int argc, char* argv[] )
         if( print )
             S.Print( "S" );
 
+        // Convert to H-matrix form
         std::cout << "Constructing H-matrix...";
         std::cout.flush();
         psp::Quasi2dHMatrix<double,false> 
             H( S, numLevels, r, true, xSize, ySize, zSize );
         std::cout << "done" << std::endl;
-
-        psp::Vector<double> x;
         if( print )
-        {
-            x.Resize( m );
-            double* xBuffer = x.Buffer();
-            for( int i=0; i<m; ++i )
-                xBuffer[i] = 1.0;
-            x.Print( "x" );
-
-            psp::Vector<double> y;
-            H.MapVector( 2.0, x, y );
-            y.Print( "y := 2 H x ~= 2 S x" );
-
             H.Print( "H" );
-        }
 
+        // Test against a vector of all 1's
+        psp::Vector<double> x;
+        x.Resize( m );
+        double* xBuffer = x.Buffer();
+        for( int i=0; i<m; ++i )
+            xBuffer[i] = 1.0;
+        if( print )
+            x.Print( "x" );
+        std::cout << "Multiplying H-matrix by a vector...";
+        std::cout.flush();
+        psp::Vector<double> y;
+        H.MapVector( 1.0, x, y );
+        std::cout << "done" << std::endl;
+        if( print )
+            y.Print( "y := H x ~= S x" );
+
+        // Make a copy for inversion
+        std::cout << "Making a copy of the H-matrix for inversion...";
+        std::cout.flush();
+        psp::Quasi2dHMatrix<double,false> invH;
+        invH.CopyFrom( H );
+        std::cout << "done" << std::endl;
+
+        // Invert the copy
         std::cout << "Inverting the H-matrix...";
         std::cout.flush();
-        psp::Quasi2dHMatrix<double,false> HCopy;
+        invH.Invert();
+        std::cout << "done" << std::endl;
         if( print )
-            HCopy.CopyFrom( H );
-        H.Invert();
+            invH.Print( "inv(H)" );
+
+        // Test for discrepancies in x and inv(H) H x
+        std::cout << "Multiplying the inverse by a vector...";
+        std::cout.flush();
+        psp::Vector<double> z;
+        invH.MapVector( 1.0, y, z );
         std::cout << "done" << std::endl;
         if( print )
         {
-            psp::Vector<double> y, z; 
-            H.MapVector( 1.0, x, y );
-            HCopy.MapVector( 1.0, y, z );
-            y.Print( "y := inv(H) x ~= inv(S) x" );
-            z.Print( "z := H inv(H) x ~= x" );
-            
-            H.Print( "inv(H)" );
+            y.Print( "y := H x ~= S x" );
+            z.Print( "z := inv(H) H x ~= x" );
         }
+        const double xNormL1 = m;
+        const double xNormL2 = sqrt( m );
+        const double xNormLInf = 1.0;
+        double errorNormL1, errorNormL2, errorNormLInf;
+        {
+            errorNormL1 = 0;
+            errorNormLInf = 0;
+
+            double* zBuffer = z.Buffer();
+            double errorNormL2Squared = 0;
+            for( int i=0; i<m; ++i )
+            {
+                const double deviation = std::abs( zBuffer[i] - 1.0 );
+                errorNormL1 += deviation;
+                errorNormL2Squared += deviation*deviation;
+                errorNormLInf = std::max( errorNormLInf, deviation );
+            }
+            errorNormL2 = std::sqrt( errorNormL2Squared );
+        }
+        std::cout << "||e||_1 =  " << errorNormL1 << "\n"
+                  << "||e||_2 =  " << errorNormL2 << "\n"
+                  << "||e||_oo = " << errorNormLInf << "\n"
+                  << "\n"
+                  << "||e||_1  / ||x||_1  = " << errorNormL1/xNormL1 << "\n"
+                  << "||e||_2  / ||x||_2  = " << errorNormL2/xNormL2 << "\n"
+                  << "||e||_oo / ||x||_oo = " << errorNormLInf/xNormLInf << "\n"
+                  << std::endl;
     }
     catch( std::exception& e )
     {
