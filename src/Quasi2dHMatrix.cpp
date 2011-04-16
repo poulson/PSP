@@ -168,7 +168,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::Quasi2dHMatrix");
 #endif
-    ImportLowRankMatrix( F, targetOffset, sourceOffset );
+    ImportLowRankMatrix( F );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1657,16 +1657,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Admissible
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
-( const LowRankMatrix<Scalar,Conjugated>& F, int iOffset, int jOffset )
+( const LowRankMatrix<Scalar,Conjugated>& F )
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::ImportLowRankMatrix");
 #endif
-    // View our portions of F
-    DenseMatrix<Scalar> FUSub, FVSub;
-    FUSub.LockedView( F.U, iOffset, 0, this->_height, F.Rank() );
-    FVSub.LockedView( F.V, jOffset, 0, this->_width,  F.Rank() );
-
     // Delete the old type
     switch( _shell.type )
     {
@@ -1680,8 +1675,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
     {
         _shell.type = LOW_RANK;
         _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
-        hmatrix_tools::Copy( FUSub, _shell.data.F->U );
-        hmatrix_tools::Copy( FVSub, _shell.data.F->V );
+        hmatrix_tools::Copy( F.U, _shell.data.F->U );
+        hmatrix_tools::Copy( F.V, _shell.data.F->V );
     }
     else if( this->_numLevels > 1 )
     {
@@ -1698,14 +1693,25 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
 
             int child = 0;
             int targetOffset = this->_targetOffset;
+            LowRankMatrix<Scalar,Conjugated> FSub;
             for( int t=0; t<4; ++t )
             {
+                FSub.U.LockedView
+                ( F.U, 
+                  targetOffset-this->_targetOffset, 0, 
+                  sizes[t], F.Rank() );
+
                 int sourceOffset = this->_targetOffset;
                 for( int s=0; s<=t; ++s )
                 {
+                    FSub.V.LockedView
+                    ( F.V, 
+                      sourceOffset-this->_sourceOffset, 0, 
+                      sizes[s], F.Rank() );
+
                     node.children[child++] = 
                       new Quasi2dHMatrix
-                      ( F, 
+                      ( FSub, 
                         this->_numLevels-1, this->_maxRank, 
                         this->_stronglyAdmissible,
                         xSizes[s&1], xSizes[t&1],
@@ -1736,14 +1742,25 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
             const int* targetSizes  = node.targetSizes;
 
             int targetOffset = this->_targetOffset;
+            LowRankMatrix<Scalar,Conjugated> FSub;
             for( int t=0; t<4; ++t )
             {
+                FSub.U.LockedView
+                ( F.U, 
+                  targetOffset-this->_targetOffset, 0, 
+                  targetSizes[t], F.Rank() );
+
                 int sourceOffset = this->_sourceOffset;
                 for( int s=0; s<4; ++s )
                 {
+                    FSub.V.LockedView
+                    ( F.V, 
+                      sourceOffset-this->_sourceOffset, 0, 
+                      sourceSizes[s], F.Rank() );
+
                     node.children[s+4*t] = 
                       new Quasi2dHMatrix
-                      ( F,
+                      ( FSub,
                         this->_numLevels-1, this->_maxRank,
                         this->_stronglyAdmissible,
                         xSourceSizes[s&1], xTargetSizes[t&1],
@@ -1765,8 +1782,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
         ( 'N', option, this->_height, this->_width, F.Rank(),
-          1, FUSub.LockedBuffer(), FUSub.LDim(),
-             FVSub.LockedBuffer(), FVSub.LDim(),
+          1, F.U.LockedBuffer(), F.U.LDim(),
+             F.V.LockedBuffer(), F.V.LDim(),
           0, _shell.data.D->Buffer(), _shell.data.D->LDim() );
     }
 #ifndef RELEASE
@@ -1778,20 +1795,15 @@ template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
 ( Scalar alpha, 
-  const LowRankMatrix<Scalar,Conjugated>& F, int iOffset, int jOffset )
+  const LowRankMatrix<Scalar,Conjugated>& F )
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::UpdateWithLowRankMatrix");
 #endif
-    // View our portions of F
-    LowRankMatrix<Scalar,Conjugated> FSub;
-    FSub.U.LockedView( F.U, iOffset, 0, this->_height, F.Rank() );
-    FSub.V.LockedView( F.V, jOffset, 0, this->_width,  F.Rank() );
-
     if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
     {
         hmatrix_tools::MatrixUpdateRounded
-        ( this->MaxRank(), alpha, FSub, (Scalar)1, *_shell.data.F );
+        ( this->MaxRank(), alpha, F, (Scalar)1, *_shell.data.F );
     }
     else if( this->_numLevels > 1 )
     {
@@ -1801,13 +1813,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
             const int* sizes = node.sizes;
 
             int targetOffset = 0;
+            LowRankMatrix<Scalar,Conjugated> FSub;
             for( int t=0; t<4; ++t )
             {
+                FSub.U.LockedView
+                ( F.U, targetOffset, 0, sizes[t], F.Rank() );
+
                 int sourceOffset = 0;
                 for( int s=0; s<=t; ++s )
                 {
-                    node.Child(t,s).UpdateWithLowRankMatrix
-                    ( alpha, FSub, targetOffset, sourceOffset );
+                    FSub.V.LockedView
+                    ( F.V, sourceOffset, 0, sizes[s],  F.Rank() );
+
+                    node.Child(t,s).UpdateWithLowRankMatrix( alpha, FSub );
 
                     sourceOffset += sizes[s];
                 }
@@ -1821,13 +1839,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
             const int* targetSizes  = node.targetSizes;
 
             int targetOffset = 0;
+            LowRankMatrix<Scalar,Conjugated> FSub;
             for( int t=0; t<4; ++t )
             {
+                FSub.U.LockedView
+                ( F.U, targetOffset, 0, targetSizes[t], F.Rank() );
+
                 int sourceOffset = 0;
                 for( int s=0; s<4; ++s )
                 {
-                    node.Child(t,s).UpdateWithLowRankMatrix
-                    ( alpha, FSub, targetOffset, sourceOffset );
+                    FSub.V.LockedView
+                    ( F.V, sourceOffset, 0, sourceSizes[s],  F.Rank() );
+
+                    node.Child(t,s).UpdateWithLowRankMatrix( alpha, FSub );
 
                     sourceOffset += sourceSizes[s];
                 }
@@ -1840,15 +1864,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
         ( 'N', option, this->_height, this->_width, F.Rank(),
-          alpha, FSub.U.LockedBuffer(), FSub.U.LDim(),
-                 FSub.V.LockedBuffer(), FSub.V.LDim(),
+          alpha, F.U.LockedBuffer(), F.U.LDim(),
+                 F.V.LockedBuffer(), F.V.LDim(),
           1, _shell.data.D->Buffer(), _shell.data.D->LDim() );
     }
 #ifndef RELEASE
     PopCallStack();
 #endif
 }
-
 
 template<typename Scalar,bool Conjugated>
 void

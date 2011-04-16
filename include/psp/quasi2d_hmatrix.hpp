@@ -378,13 +378,13 @@ private:
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
     void ImportLowRankMatrix
-    ( const LowRankMatrix<Scalar,Conjugated>& F, int iOffset=0, int jOffset=0 );
+    ( const LowRankMatrix<Scalar,Conjugated>& F );
     void ImportSparseMatrix
     ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
 
     void UpdateWithLowRankMatrix
     ( Scalar alpha,
-      const LowRankMatrix<Scalar,Conjugated>& F, int iOffset=0, int jOffset=0 );
+      const LowRankMatrix<Scalar,Conjugated>& F );
 
     // y += alpha A x
     void UpdateVectorWithNodeSymmetric
