@@ -342,6 +342,8 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(sgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -364,6 +366,8 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -386,6 +390,8 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(cgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -408,6 +414,8 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -446,6 +454,8 @@ inline void PivotedQR
 {
 #ifndef RELEASE
     PushCallStack("lapack::PivotedQR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(sgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, &info );
@@ -469,6 +479,8 @@ inline void PivotedQR
 {
 #ifndef RELEASE
     PushCallStack("lapack::PivotedQR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, &info );
@@ -493,6 +505,8 @@ inline void PivotedQR
 {
 #ifndef RELEASE
     PushCallStack("lapack::PivotedQR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(cgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, rwork, &info );
@@ -517,6 +531,8 @@ inline void PivotedQR
 {
 #ifndef RELEASE
     PushCallStack("lapack::PivotedQR");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zgeqp3)( &m, &n, A, &lda, jpvt, tau, work, &lwork, rwork, &info );
@@ -560,6 +576,10 @@ inline void ApplyQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::ApplyQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldc == 0 )
+        throw std::logic_error("ldc was 0");
 #endif
     // Convert the more general complex option to the real case
     if( trans == 'C' || trans == 'c' )
@@ -588,6 +608,10 @@ inline void ApplyQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::ApplyQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldc == 0 )
+        throw std::logic_error("ldc was 0");
 #endif
     // Convert the more general complex option to the real case
     if( trans == 'C' || trans == 'c' )
@@ -616,6 +640,10 @@ inline void ApplyQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::ApplyQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldc == 0 )
+        throw std::logic_error("ldc was 0");
 #endif
     int info;
     LAPACK(cunmqr)
@@ -640,6 +668,10 @@ inline void ApplyQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::ApplyQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldc == 0 )
+        throw std::logic_error("ldc was 0");
 #endif
     int info;
     LAPACK(zunmqr)
@@ -673,6 +705,8 @@ inline void FormQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::FormQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(sorgqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
@@ -695,6 +729,8 @@ inline void FormQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::FormQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dorgqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
@@ -717,6 +753,8 @@ inline void FormQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::FormQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(cungqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
@@ -739,6 +777,8 @@ inline void FormQ
 {
 #ifndef RELEASE
     PushCallStack("lapack::FormQ");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zungqr)( &m, &n, &k, A, &lda, tau, work, &lwork, &info );
@@ -778,6 +818,12 @@ inline void SVD
 {
 #ifndef RELEASE
     PushCallStack("lapack::SVD");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     int info;
     LAPACK(sgesvd)
@@ -804,6 +850,12 @@ inline void SVD
 {
 #ifndef RELEASE
     PushCallStack("lapack::SVD");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     int info;
     LAPACK(dgesvd)
@@ -831,6 +883,12 @@ inline void SVD
 {
 #ifndef RELEASE
     PushCallStack("lapack::SVD");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     int info;
     LAPACK(cgesvd)
@@ -858,6 +916,12 @@ inline void SVD
 {
 #ifndef RELEASE
     PushCallStack("lapack::SVD");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     int info;
     LAPACK(zgesvd)
@@ -888,6 +952,12 @@ inline void PseudoInverse
 {
 #ifndef RELEASE
     PushCallStack("lapack::PseudoInverse");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     lapack::SVD( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork );
 
@@ -973,6 +1043,12 @@ inline void PseudoInverse
 {
 #ifndef RELEASE
     PushCallStack("lapack::PseudoInverse");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     lapack::SVD( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork );
 
@@ -1059,6 +1135,12 @@ inline void PseudoInverse
 {
 #ifndef RELEASE
     PushCallStack("lapack::PseudoInverse");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     lapack::SVD
     ( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork, rwork );
@@ -1147,6 +1229,12 @@ inline void PseudoInverse
 {
 #ifndef RELEASE
     PushCallStack("lapack::PseudoInverse");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
+    if( ldu == 0 )
+        throw std::logic_error("ldu was 0");
+    if( ldvh == 0 )
+        throw std::logic_error("ldvh was 0");
 #endif
     lapack::SVD
     ( 'S', 'S', m, n, A, lda, s, U, ldu, VH, ldvh, work, lwork, rwork );
@@ -1233,6 +1321,8 @@ inline void LU
 {
 #ifndef RELEASE
     PushCallStack("lapack::LU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(sgetrf)( &m, &n, A, &lda, ipiv, &info );
@@ -1252,6 +1342,8 @@ inline void LU
 {
 #ifndef RELEASE
     PushCallStack("lapack::LU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dgetrf)( &m, &n, A, &lda, ipiv, &info );
@@ -1271,6 +1363,8 @@ inline void LU
 {
 #ifndef RELEASE
     PushCallStack("lapack::LU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(cgetrf)( &m, &n, A, &lda, ipiv, &info );
@@ -1290,6 +1384,8 @@ inline void LU
 {
 #ifndef RELEASE
     PushCallStack("lapack::LU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zgetrf)( &m, &n, A, &lda, ipiv, &info );
@@ -1320,6 +1416,8 @@ inline void InvertLU
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(sgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1340,6 +1438,8 @@ inline void InvertLU
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1360,6 +1460,8 @@ inline void InvertLU
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(cgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1380,6 +1482,8 @@ inline void InvertLU
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLU");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zgetri)( &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1410,6 +1514,8 @@ inline void LDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::LDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(ssytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1430,6 +1536,8 @@ inline void LDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::LDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dsytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1450,6 +1558,8 @@ inline void LDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::LDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(csytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1470,6 +1580,8 @@ inline void LDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::LDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zsytrf)( &uplo, &n, A, &lda, ipiv, work, &lwork, &info );
@@ -1499,6 +1611,8 @@ inline void InvertLDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(ssytri)( &uplo, &n, A, &lda, ipiv, work, &info );
@@ -1519,6 +1633,8 @@ inline void InvertLDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(dsytri)( &uplo, &n, A, &lda, ipiv, work, &info );
@@ -1539,6 +1655,8 @@ inline void InvertLDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(csytri)( &uplo, &n, A, &lda, ipiv, work, &info );
@@ -1559,6 +1677,8 @@ inline void InvertLDLT
 {
 #ifndef RELEASE
     PushCallStack("lapack::InvertLDLT");
+    if( lda == 0 )
+        throw std::logic_error("lda was 0");
 #endif
     int info;
     LAPACK(zsytri)( &uplo, &n, A, &lda, ipiv, work, &info );

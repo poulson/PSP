@@ -1481,6 +1481,7 @@ void psp::hmatrix_tools::MatrixMatrix
     }
 
     // F.U := Q (VH)^H = Q V
+    F.U.Resize( Y.Height(), r );
     blas::Gemm
     ( 'N', 'C', Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
