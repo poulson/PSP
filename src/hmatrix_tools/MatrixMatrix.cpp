@@ -712,7 +712,7 @@ void psp::hmatrix_tools::MatrixMatrix
     PushCallStack("hmatrix_tools::MatrixMatrix (F := D D + F)");
     if( A.Width() != B.Height() )
         throw std::logic_error("A and B not conformal in MatrixMatrix");
-    if( C.Height() != A.Height() || C.Width() != A.Width() )
+    if( C.Height() != A.Height() || C.Width() != B.Width() )
         throw std::logic_error("C not conformal with AB");
 #endif
     // D := alpha A B + beta C
@@ -739,7 +739,7 @@ void psp::hmatrix_tools::MatrixMatrix
     PushCallStack("hmatrix_tools::MatrixMatrix (F := D D + F)");
     if( A.Width() != B.Height() )
         throw std::logic_error("A and B not conformal in MatrixMatrix");
-    if( C.Height() != A.Height() || C.Width() != A.Width() )
+    if( C.Height() != A.Height() || C.Width() != B.Width() )
         throw std::logic_error("C not conformal with AB");
 #endif
     typedef std::complex<Real> Scalar;

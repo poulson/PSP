@@ -228,6 +228,7 @@ main( int argc, char* argv[] )
         std::cout << "Constructing H-matrix...";
         std::cout.flush();
         Quasi2d H( S, numLevels, r, true, xSize, ySize, zSize );
+        //Quasi2d H( S, numLevels, r, false, xSize, ySize, zSize );
         std::cout << "done" << std::endl;
         if( print )
             H.Print( "H" );

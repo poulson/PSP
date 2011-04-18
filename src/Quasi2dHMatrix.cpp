@@ -1089,13 +1089,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     C._symmetric = false;
     C._stronglyAdmissible = this->StronglyAdmissible();
     C._xSizeSource = B.XSizeSource();
-    C._xSizeTarget = this->XSizeTarget();
     C._ySizeSource = B.YSizeSource();
+    C._xSizeTarget = this->XSizeTarget();
     C._ySizeTarget = this->YSizeTarget();
     C._zSize = this->ZSize();
     C._xSource = B.XSource();
-    C._xTarget = this->XTarget();
     C._ySource = B.YSource();
+    C._xTarget = this->XTarget();
     C._yTarget = this->YTarget();
 
     // Delete the old type
@@ -1119,21 +1119,33 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else if( this->IsLowRank() && B.IsHierarchical() )
         {
-            // C.F.U := A.F.U
             hmatrix_tools::Copy( _shell.data.F->U, C._shell.data.F->U );
-            // C.F.V := scale B^H A.F.V
-            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
-            B.HermitianTransposeMapMatrix
-            ( scale, _shell.data.F->V, C._shell.data.F->V );
+            if( Conjugated )
+            {
+                B.HermitianTransposeMapMatrix
+                ( Conj(alpha), _shell.data.F->V, C._shell.data.F->V );
+            }
+            else
+            {
+                B.TransposeMapMatrix
+                ( alpha, _shell.data.F->V, C._shell.data.F->V );
+            }
         }
         else if( this->IsLowRank() && B.IsDense() )
         {
-            // C.F.U := A.F.U
             hmatrix_tools::Copy( _shell.data.F->U, C._shell.data.F->U );
-            // C.F.V := scale B^H A.F.V
-            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
-            hmatrix_tools::MatrixHermitianTransposeMatrix
-            ( scale, *B._shell.data.D, _shell.data.F->V, C._shell.data.F->V );
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixHermitianTransposeMatrix
+                ( Conj(alpha), *B._shell.data.D, _shell.data.F->V, 
+                  C._shell.data.F->V );
+            }
+            else
+            {
+                hmatrix_tools::MatrixTransposeMatrix
+                ( alpha, *B._shell.data.D, _shell.data.F->V,
+                  C._shell.data.F->V );
+            }
         }
         else if( this->IsHierarchical() && B.IsLowRank() )
         {
@@ -1341,9 +1353,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // W := alpha A.F B
             LowRankMatrix<Scalar,Conjugated> W;
             hmatrix_tools::Copy( _shell.data.F->U, W.U );
-            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
-            B.HermitianTransposeMapMatrix
-            ( scale, _shell.data.F->V, W.V );
+            if( Conjugated )
+            {
+                B.HermitianTransposeMapMatrix
+                ( Conj(alpha), _shell.data.F->V, W.V );
+            }
+            else
+            {
+                B.TransposeMapMatrix
+                ( alpha, _shell.data.F->V, W.V );
+            }
 
             // C.F :~= W + beta C.F
             hmatrix_tools::MatrixUpdateRounded
@@ -1354,9 +1373,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // W := alpha A.F B.D
             LowRankMatrix<Scalar,Conjugated> W;
             hmatrix_tools::Copy( _shell.data.F->U, W.U );
-            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
-            hmatrix_tools::MatrixHermitianTransposeMatrix
-            ( scale, *B._shell.data.D, _shell.data.F->V, W.V );
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixHermitianTransposeMatrix
+                ( Conj(alpha), *B._shell.data.D, _shell.data.F->V, W.V );
+            }
+            else
+            {
+                hmatrix_tools::MatrixTransposeMatrix
+                ( alpha, *B._shell.data.D, _shell.data.F->V, W.V );
+            }
 
             // C.F :~= W + beta C.F
             hmatrix_tools::MatrixUpdateRounded
@@ -1717,8 +1743,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
                         xSizes[s&1], xSizes[t&1],
                         ySizes[s/2], ySizes[t/2],
                         _zSize,
-                        _xSource+(s&1), _xTarget+(t&1),
-                        _ySource+(s/2), _yTarget+(t/2),
+                        2*_xSource+(s&1), 2*_xTarget+(t&1),
+                        2*_ySource+(s/2), 2*_yTarget+(t/2),
                         sourceOffset, targetOffset );
                     sourceOffset += sizes[s];
                 }
@@ -1766,8 +1792,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
                         xSourceSizes[s&1], xTargetSizes[t&1],
                         ySourceSizes[s/2], yTargetSizes[t/2],
                         _zSize,
-                        _xSource+(s&1), _xTarget+(t&1),
-                        _ySource+(s/2), _yTarget+(t/2),
+                        2*_xSource+(s&1), 2*_xTarget+(t&1),
+                        2*_ySource+(s/2), 2*_yTarget+(t/2),
                         sourceOffset, targetOffset );
                     sourceOffset += sourceSizes[s];
                 }
@@ -1932,8 +1958,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
                         xSizes[s&1], xSizes[t&1],
                         ySizes[s/2], ySizes[t/2],
                         _zSize,
-                        _xSource+(s&1), _xTarget+(t&1),
-                        _ySource+(s/2), _yTarget+(t/2),
+                        2*_xSource+(s&1), 2*_xTarget+(t&1),
+                        2*_ySource+(s/2), 2*_yTarget+(t/2),
                         sourceOffset, targetOffset );
                     sourceOffset += sizes[s];
                 }
@@ -1970,8 +1996,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
                         xSourceSizes[s&1], xTargetSizes[t&1],
                         ySourceSizes[s/2], yTargetSizes[t/2],
                         _zSize,
-                        _xSource+(s&1), _xTarget+(t&1),
-                        _ySource+(s/2), _yTarget+(t/2),
+                        2*_xSource+(s&1), 2*_xTarget+(t&1),
+                        2*_ySource+(s/2), 2*_yTarget+(t/2),
                         sourceOffset, targetOffset );
                     sourceOffset += sourceSizes[s];
                 }
