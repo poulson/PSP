@@ -331,7 +331,7 @@ namespace lapack {
 inline int QRWorkSize( int n )
 {
     // Minimum workspace for using blocksize BLOCKSIZE.
-    return n*BLOCKSIZE;
+    return std::max(1,n*BLOCKSIZE);
 }
 
 inline void QR
@@ -557,9 +557,9 @@ inline int ApplyQWorkSize( char side, int m, int n )
     PushCallStack("lapack::ApplyQWorkSize");
 #endif
     if( side == 'L' )
-        return n*BLOCKSIZE;
+        return std::max(1,n*BLOCKSIZE);
     else if( side == 'R' )
-        return m*BLOCKSIZE;
+        return std::max(1,m*BLOCKSIZE);
 #ifndef RELEASE
     else
         throw std::logic_error("Invalid side for ApplyQ worksize query.");
@@ -694,7 +694,7 @@ inline void ApplyQ
 inline int FormQWorkSize( int n )
 {
     // Minimum workspace for using blocksize BLOCKSIZE.
-    return n*BLOCKSIZE;
+    return std::max(1,n*BLOCKSIZE);
 }
 
 inline void FormQ
@@ -1407,7 +1407,7 @@ inline void LU
 inline int InvertLUWorkSize( int n )
 {
     // Minimum space for running with blocksize BLOCKSIZE.
-    return n*BLOCKSIZE;
+    return std::max(1,n*BLOCKSIZE);
 }
 
 inline void InvertLU

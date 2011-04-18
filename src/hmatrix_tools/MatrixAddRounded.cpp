@@ -138,8 +138,8 @@ void psp::hmatrix_tools::MatrixAddRounded
     // Perform an unpivoted QR decomposition on V
     const int minDimV = std::min(n,r);
     std::vector<Real> tauV( minDimV );
-    std::vector<Real> workV( n*r );
-    lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], n*r );
+    std::vector<Real> workV( std::max(1,n*r) );
+    lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], workV.size() );
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
     workU.resize( r*r );
@@ -187,10 +187,10 @@ void psp::hmatrix_tools::MatrixAddRounded
             UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1
-    workU.resize( m*roundedRank );
+    workU.resize( std::max(1,m*roundedRank) );
     lapack::ApplyQ
     ( 'L', 'N', m, roundedRank, minDimU, U.LockedBuffer(), U.LDim(), &tauU[0],
-      C.U.Buffer(), C.U.LDim(), &workU[0], m*roundedRank );
+      C.U.Buffer(), C.U.LDim(), &workU[0], workU.size() );
 
     // Form the rounded C.V by first filling it with 
     //  | (VT_Top)^T |, and then hitting it from the left with Q2
@@ -205,10 +205,10 @@ void psp::hmatrix_tools::MatrixAddRounded
             VCol[i] = VTRow[i*VTLDim];
     }
     // Apply Q2
-    workV.resize( n*roundedRank );
+    workV.resize( std::max(1,n*roundedRank) );
     lapack::ApplyQ
     ( 'L', 'N', n, roundedRank, minDimV, V.LockedBuffer(), V.LDim(), &tauV[0], 
-      C.V.Buffer(), C.V.LDim(), &workV[0], n*roundedRank );
+      C.V.Buffer(), C.V.LDim(), &workV[0], workV.size() );
 #endif // PIVOTED_QR
 #ifndef RELEASE
     PopCallStack();
@@ -318,14 +318,14 @@ void psp::hmatrix_tools::MatrixAddRounded
     // Perform an unpivoted QR decomposition on U
     const int minDimU = std::min(m,r);
     std::vector<Scalar> tauU( minDimU );
-    std::vector<Scalar> workU( m*r );
-    lapack::QR( m, r, U.Buffer(), U.LDim(), &tauU[0], &workU[0], m*r );
+    std::vector<Scalar> workU( std::max(1,m*r) );
+    lapack::QR( m, r, U.Buffer(), U.LDim(), &tauU[0], &workU[0], workU.size() );
 
     // Perform an unpivoted QR decomposition on V
     const int minDimV = std::min(n,r);
     std::vector<Scalar> tauV( minDimV );
-    std::vector<Scalar> workV( n*r );
-    lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], n*r );
+    std::vector<Scalar> workV( std::max(1,n*r) );
+    lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], workV.size() );
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
     workU.resize( r*r );
@@ -376,10 +376,10 @@ void psp::hmatrix_tools::MatrixAddRounded
             UColScaled[i] = sigma*UCol[i];
     }
     // Apply Q1
-    workU.resize( m*roundedRank );
+    workU.resize( std::max(1,m*roundedRank) );
     lapack::ApplyQ
     ( 'L', 'N', m, roundedRank, minDimU, U.LockedBuffer(), U.LDim(), &tauU[0],
-      C.U.Buffer(), C.U.LDim(), &workU[0], m*roundedRank );
+      C.U.Buffer(), C.U.LDim(), &workU[0], workU.size() );
 
     // Form the rounded C.V by first filling it with 
     //  | (VH_Top)^[T,H] |, and then hitting it from the left with Q2
@@ -408,10 +408,10 @@ void psp::hmatrix_tools::MatrixAddRounded
         }
     }
     // Apply Q2
-    workV.resize( n*roundedRank );
+    workV.resize( std::max(1,n*roundedRank) );
     lapack::ApplyQ
     ( 'L', 'N', n, roundedRank, minDimV, V.LockedBuffer(), V.LDim(), &tauV[0],
-      C.V.Buffer(), C.V.LDim(), &workV[0], n*roundedRank );
+      C.V.Buffer(), C.V.LDim(), &workV[0], workV.size() );
 #endif // PIVOTED_QR
 #ifndef RELEASE
     PopCallStack();
