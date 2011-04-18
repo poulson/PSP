@@ -20,8 +20,12 @@
 */
 #include "psp.hpp"
 
-namespace {
-void BuildMapOnQuadrant
+//----------------------------------------------------------------------------//
+// Static routines                                                            //
+//----------------------------------------------------------------------------//
+template<typename Scalar,bool Conjugated>
+void 
+psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildMapOnQuadrant
 ( int* map, int& index, int level, int numLevels,
   int xSize, int ySize, int zSize, int thisXSize, int thisYSize )
 {
@@ -63,7 +67,6 @@ void BuildMapOnQuadrant
           xSize, ySize, zSize, rightWidth, topHeight );
     }
 }
-} // anonymous namespace
 
 template<typename Scalar,bool Conjugated>
 void
@@ -87,7 +90,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildNaturalToHierarchicalMap
 }
 
 //----------------------------------------------------------------------------//
-// Public routines                                                            //
+// Public non-static routines                                                 //
 //----------------------------------------------------------------------------//
 
 // Create an empty H-matrix
@@ -219,6 +222,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
     DenseMatrix<Scalar> HFull;
     this->MapMatrix( (Scalar)1, I, HFull );
     HFull.Print( tag );
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::PrintStructure
+( const std::string& tag ) const
+{
+    std::cout << tag << std::endl;
+    PrintStructureRecursion();
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1666,7 +1678,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
 }
 
 //----------------------------------------------------------------------------//
-// Private routines                                                           //
+// Private non-static routines                                                //
 //----------------------------------------------------------------------------//
 
 template<typename Scalar,bool Conjugated>
@@ -2143,6 +2155,49 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
 #ifndef RELEASE
     PopCallStack();
 #endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::PrintStructureRecursion() const
+{
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        std::cout << "H " 
+                  << this->TargetOffset() << " " << this->SourceOffset() << " "
+                  << this->TargetSize() << " " << this->SourceSize() 
+                  << std::endl;
+        const Node& node = *_shell.data.node;
+        for( unsigned child=0; child<node.children.size(); ++child )
+            node.children[child]->PrintStructureRecursion();
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        std::cout << "H " 
+                  << this->TargetOffset() << " " << this->SourceOffset() << " "
+                  << this->TargetSize() << " " << this->SourceSize() 
+                  << std::endl;
+        const NodeSymmetric& node = *_shell.data.nodeSymmetric;
+        for( unsigned child=0; child<node.children.size(); ++child )
+            node.children[child]->PrintStructureRecursion();
+        break;
+    }
+    case LOW_RANK:
+        std::cout << "F " 
+                  << this->TargetOffset() << " " << this->SourceOffset() << " "
+                  << this->TargetSize() << " " << this->SourceSize() 
+                  << std::endl;
+        break;
+    case DENSE:
+        std::cout << "D " 
+                  << this->TargetOffset() << " " << this->SourceOffset() << " "
+                  << this->TargetSize() << " " << this->SourceSize() 
+                  << std::endl;
+        break;
+    }
 }
 
 template class psp::Quasi2dHMatrix<float,false>;

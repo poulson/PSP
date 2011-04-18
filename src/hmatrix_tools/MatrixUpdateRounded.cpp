@@ -98,13 +98,13 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // Perform an unpivoted QR decomposition on U
     const int minDimU = std::min(m,r);
     std::vector<Real> tauU( minDimU );
-    std::vector<Real> workU( std::max(1,m*r) );
+    std::vector<Real> workU( std::max(1,std::max(1,m)*r) );
     lapack::QR( m, r, U.Buffer(), U.LDim(), &tauU[0], &workU[0], workU.size() );
 
     // Perform an unpivoted QR decomposition on V
     const int minDimV = std::min(n,r);
     std::vector<Real> tauV( minDimV );
-    std::vector<Real> workV( std::max(1,n*r) );
+    std::vector<Real> workV( std::max(1,std::max(1,n)*r) );
     lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], workV.size() );
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer
@@ -271,13 +271,13 @@ void psp::hmatrix_tools::MatrixUpdateRounded
     // Perform an unpivoted QR decomposition on U
     const int minDimU = std::min(m,r);
     std::vector<Scalar> tauU( minDimU );
-    std::vector<Scalar> workU( std::max(1,m*r) );
+    std::vector<Scalar> workU( std::max(1,std::max(1,m)*r) );
     lapack::QR( m, r, U.Buffer(), U.LDim(), &tauU[0], &workU[0], workU.size() );
 
     // Perform an unpivoted QR decomposition on V
     const int minDimV = std::min(n,r);
     std::vector<Scalar> tauV( minDimV );
-    std::vector<Scalar> workV( std::max(1,n*r) );
+    std::vector<Scalar> workV( std::max(1,std::max(1,n)*r) );
     lapack::QR( n, r, V.Buffer(), V.LDim(), &tauV[0], &workV[0], workV.size() );
 
     // Copy R1 (the left factor's R from QR) into a zeroed buffer

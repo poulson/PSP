@@ -153,8 +153,8 @@ void psp::hmatrix_tools::Compress
     }
 
     // Grab enough workspace for our entire rounded addition
-    const int leftPanelSize = std::max(1,m*r);
-    const int rightPanelSize = std::max(1,n*r);
+    const int leftPanelSize = std::max(1,std::max(1,m)*r);
+    const int rightPanelSize = std::max(1,std::max(1,n)*r);
     const int blockSize = std::max(1,r*r);
     const int lworkSVD = lapack::SVDWorkSize( r, r );
     std::vector<Real> buffer
@@ -295,8 +295,8 @@ void psp::hmatrix_tools::Compress
     }
 
     // Grab enough workspace for our entire rounded addition
-    const int leftPanelSize = std::max(1,m*r);
-    const int rightPanelSize = std::max(1,n*r);
+    const int leftPanelSize = std::max(1,std::max(1,m)*r);
+    const int rightPanelSize = std::max(1,std::max(1,n)*r);
     const int blockSize = std::max(1,r*r);
     const int lworkSVD = lapack::SVDWorkSize( r, r );
     std::vector<Scalar> buffer

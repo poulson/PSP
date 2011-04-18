@@ -107,7 +107,6 @@ FormRow
     colIndices.resize( 0 );
 
     // Set up the diagonal entry
-    int entry = 0;
     colIndices.push_back( rowIdx );
     row.push_back( centerTerm );
 
@@ -231,7 +230,10 @@ main( int argc, char* argv[] )
         //Quasi2d H( S, numLevels, r, false, xSize, ySize, zSize );
         std::cout << "done" << std::endl;
         if( print )
+        {
             H.Print( "H" );
+            H.PrintStructure( "H Structure" );
+        }
 
         // Test against a vector of all 1's
         psp::Vector<Scalar> x;

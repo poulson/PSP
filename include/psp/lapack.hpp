@@ -342,8 +342,10 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
-    if( lda == 0 )
-        throw std::logic_error("lda was 0");
+    if( lda < std::max(1,m) )
+        throw std::logic_error("lda was too small");
+    if( lwork < std::max(1,n) )
+        throw std::logic_error("lwork too small");
 #endif
     int info;
     LAPACK(sgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -366,8 +368,10 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
-    if( lda == 0 )
-        throw std::logic_error("lda was 0");
+    if( lda < std::max(1,m) )
+        throw std::logic_error("lda was too small");
+    if( lwork < std::max(1,n) )
+        throw std::logic_error("lwork too small");
 #endif
     int info;
     LAPACK(dgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -390,8 +394,10 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
-    if( lda == 0 )
-        throw std::logic_error("lda was 0");
+    if( lda < std::max(1,m) )
+        throw std::logic_error("lda was too small");
+    if( lwork < std::max(1,n) )
+        throw std::logic_error("lwork too small");
 #endif
     int info;
     LAPACK(cgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );
@@ -414,8 +420,10 @@ inline void QR
 {
 #ifndef RELEASE
     PushCallStack("lapack::QR");
-    if( lda == 0 )
-        throw std::logic_error("lda was 0");
+    if( lda < std::max(1,m) )
+        throw std::logic_error("lda was too small");
+    if( lwork < std::max(1,n) )
+        throw std::logic_error("lwork too small");
 #endif
     int info;
     LAPACK(zgeqrf)( &m, &n, A, &lda, tau, work, &lwork, &info );

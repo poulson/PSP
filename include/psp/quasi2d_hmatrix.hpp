@@ -241,6 +241,8 @@ public:
     int YSizeSource() const { return _ySizeSource; }
     int YSizeTarget() const { return _ySizeTarget; }
     int ZSize() const { return _zSize; }
+    int SourceSize() const { return _xSizeSource*_ySizeSource*_zSize; }
+    int TargetSize() const { return _xSizeTarget*_ySizeTarget*_zSize; }
     int XSource() const { return _xSource; }
     int YSource() const { return _ySource; }
     int XTarget() const { return _xTarget; }
@@ -256,6 +258,9 @@ public:
 
     // Multiply the H-matrix by identity and print the result
     void Print( const std::string& tag ) const;
+
+    // Print out a representation of the H-matrix structure
+    void PrintStructure( const std::string& tag ) const;
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //
@@ -394,6 +399,12 @@ private:
     void UpdateMatrixWithNodeSymmetric
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
+
+    void PrintStructureRecursion() const;
+    
+    static void BuildMapOnQuadrant
+    ( int* map, int& index, int level, int numLevels,
+      int xSize, int ySize, int zSize, int thisXSize, int thisYSize );
 };
 
 } // namespace psp
