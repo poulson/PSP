@@ -1277,7 +1277,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
                         // Initialize the [t,s] box of C with the first product
                         nodeA.Child(t,0).MapMatrix
                         ( alpha, nodeB.Child(0,s), nodeC.Child(t,s) );
-        
+
                         // Add the other three products onto it
                         for( int u=1; u<4; ++u )
                         {
@@ -1670,7 +1670,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
         hmatrix_tools::Invert( *_shell.data.D );
         break;
     case LOW_RANK:
+    {
+        throw std::logic_error("Mistake in inversion code.");
         break;
+    }
     }
 #ifndef RELEASE
     PopCallStack();

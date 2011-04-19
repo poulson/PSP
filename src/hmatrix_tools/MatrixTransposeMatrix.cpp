@@ -687,20 +687,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
     C.V.SetType( GENERAL ); C.V.Resize( n, r );
     if( Conjugated )
     {
-        // Put (Sigma V^H)^H = V Sigma into C.V
-        for( int j=0; j<r; ++j )
-        {
-            const Real sigma = s.Get(j);
-            Scalar* RESTRICT VCol = C.V.Buffer(0,j);
-            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
-            for( int i=0; i<n; ++i )
-                VCol[i] = sigma*VHRow[i*VHLDim];
-        }
-    }
-    else
-    {
-        // Put (Sigma V^H)^T = conj(V) Sigma into C.V
+        // Put (Sigma V^H)^H = (V^H)^H Sigma into C.V
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
@@ -709,6 +696,19 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
             const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
+        }
+    }
+    else
+    {
+        // Put (Sigma V^H)^T = (V^H)^T Sigma into C.V
+        for( int j=0; j<r; ++j )
+        {
+            const Real sigma = s.Get(j);
+            Scalar* RESTRICT VCol = C.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
+            const int VHLDim = VH.LDim();
+            for( int i=0; i<n; ++i )
+                VCol[i] = sigma*VHRow[i*VHLDim];
         }
     }
 #ifndef RELEASE
