@@ -226,11 +226,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::PrintStructure
-( const std::string& tag ) const
+psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructure
+( const std::string& filename ) const
 {
-    std::cout << tag << std::endl;
-    PrintStructureRecursion();
+    std::ofstream file( filename.c_str() );
+    WriteStructureRecursion( file );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -2532,43 +2532,44 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::PrintStructureRecursion() const
+psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
+( std::ofstream& file ) const
 {
     switch( _shell.type )
     {
     case NODE:
     {
-        std::cout << "H " 
-                  << this->TargetOffset() << " " << this->SourceOffset() << " "
-                  << this->TargetSize() << " " << this->SourceSize() 
-                  << std::endl;
+        file << "1 " 
+             << this->TargetOffset() << " " << this->SourceOffset() << " "
+             << this->TargetSize() << " " << this->SourceSize() 
+             << std::endl;
         const Node& node = *_shell.data.node;
         for( unsigned child=0; child<node.children.size(); ++child )
-            node.children[child]->PrintStructureRecursion();
+            node.children[child]->WriteStructureRecursion( file );
         break;
     }
     case NODE_SYMMETRIC:
     {
-        std::cout << "H " 
-                  << this->TargetOffset() << " " << this->SourceOffset() << " "
-                  << this->TargetSize() << " " << this->SourceSize() 
-                  << std::endl;
+        file << "1 " 
+             << this->TargetOffset() << " " << this->SourceOffset() << " "
+             << this->TargetSize() << " " << this->SourceSize() 
+             << std::endl;
         const NodeSymmetric& node = *_shell.data.nodeSymmetric;
         for( unsigned child=0; child<node.children.size(); ++child )
-            node.children[child]->PrintStructureRecursion();
+            node.children[child]->WriteStructureRecursion( file );
         break;
     }
     case LOW_RANK:
-        std::cout << "F " 
-                  << this->TargetOffset() << " " << this->SourceOffset() << " "
-                  << this->TargetSize() << " " << this->SourceSize() 
-                  << std::endl;
+        file << "5 " 
+             << this->TargetOffset() << " " << this->SourceOffset() << " "
+             << this->TargetSize() << " " << this->SourceSize() 
+             << std::endl;
         break;
     case DENSE:
-        std::cout << "D " 
-                  << this->TargetOffset() << " " << this->SourceOffset() << " "
-                  << this->TargetSize() << " " << this->SourceSize() 
-                  << std::endl;
+        file << "20 " 
+             << this->TargetOffset() << " " << this->SourceOffset() << " "
+             << this->TargetSize() << " " << this->SourceSize() 
+             << std::endl;
         break;
     }
 }

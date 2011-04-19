@@ -22,8 +22,8 @@
 
 void Usage()
 {
-    std::cout << "Invert <xSize> <ySize> <zSize> <numLevels> <r> <print?>" 
-              << std::endl;
+    std::cout << "Invert <xSize> <ySize> <zSize> <numLevels> <r> <print?> "
+                 "<print structure?>" << std::endl;
 }
 
 const double omega = 10.0;
@@ -193,7 +193,7 @@ CheckDistanceFromOnes( const psp::Vector< std::complex<Real> >& z )
 int
 main( int argc, char* argv[] )
 {
-    if( argc < 7 )
+    if( argc < 8 )
     {
         Usage();
         return 0;
@@ -204,6 +204,7 @@ main( int argc, char* argv[] )
     const int numLevels = atoi( argv[4] );
     const int r = atoi( argv[5] );
     const bool print = atoi( argv[6] );
+    const bool printStructure = atoi( argv[7] );
 
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
@@ -267,10 +268,9 @@ main( int argc, char* argv[] )
         //Quasi2d H( S, numLevels, r, false, xSize, ySize, zSize );
         std::cout << "done" << std::endl;
         if( print )
-        {
             H.Print( "H" );
-            H.PrintStructure( "H Structure" );
-        }
+        if( printStructure )
+            H.WriteStructure( "structure.dat" );
 
         // Test against a vector of all 1's
         psp::Vector<Scalar> x;

@@ -24,6 +24,7 @@
 #include "mpi.h"
 #include <complex>
 #include <iostream>
+#include <fstream>
 
 #include "psp/config.h"
 

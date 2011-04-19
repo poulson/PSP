@@ -256,8 +256,9 @@ public:
     { return _shell.type == NODE || _shell.type == NODE_SYMMETRIC; }
     bool IsLowRank() const { return _shell.type == LOW_RANK; }
 
-    // Print out a representation of the H-matrix structure
-    void PrintStructure( const std::string& tag ) const;
+    // Write a representation of the H-matrix structure to file. It can be
+    // visualized with util/PlotHStructure.m
+    void WriteStructure( const std::string& filename ) const;
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //
@@ -421,7 +422,7 @@ private:
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
 
-    void PrintStructureRecursion() const;
+    void WriteStructureRecursion( std::ofstream& file ) const;
     
     static void BuildMapOnQuadrant
     ( int* map, int& index, int level, int numLevels,
