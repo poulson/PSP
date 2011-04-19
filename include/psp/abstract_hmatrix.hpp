@@ -63,6 +63,9 @@ public:
     bool Symmetric() const { return _symmetric; }
     bool StronglyAdmissible() const { return _stronglyAdmissible; }
 
+    // Display the equivalent dense matrix
+    virtual void Print( const std::string& tag ) const = 0;
+
     // y := alpha A x + beta y
     virtual void MapVector
     ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) 

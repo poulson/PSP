@@ -1346,7 +1346,8 @@ void psp::hmatrix_tools::MatrixMatrix
         
         // Form the Q from the QR decomposition
         lapack::FormQ
-        ( m, n, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        ( m, minDim, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        Y.Resize( m, minDim );
     }
 
     // Compute (Q^T (alpha A B))^T = alpha B^T A^T Q into F.V
@@ -1445,14 +1446,26 @@ void psp::hmatrix_tools::MatrixMatrix
 
         // Form the Q from the QR decomposition
         lapack::FormQ
-        ( m, n, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        ( m, minDim, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        Y.Resize( m, minDim );
     }
 
-    // Compute (Q^H (alpha AB))^H = conj(alpha) B^H A^H Q into F.V
-    A.HermitianTransposeMapMatrix( Conj(alpha), Y, X );
-    B.HermitianTransposeMapMatrix( 1, X, F.V );
+    if( Conjugated )
+    {
+        // Compute (Q^H (alpha AB))^H = conj(alpha) B^H A^H Q into F.V
+        A.HermitianTransposeMapMatrix( Conj(alpha), Y, X );
+        B.HermitianTransposeMapMatrix( 1, X, F.V );
+    }
+    else
+    {
+        // Compute (Q^H (alpha AB))^T = alpha B^T A^T conj(Q)
+        Conjugate( Y );
+        A.TransposeMapMatrix( alpha, Y, X );
+        B.TransposeMapMatrix( 1, X, F.V );
+        Conjugate( Y );
+    }
         
-    // Compute the economic SVD of F.V = (Q^H (alpha AB))^H = U Sigma V^H,
+    // Compute the economic SVD of F.V, U Sigma V^H,
     // overwriting F.V with U, and X with V^H. Then truncate the SVD to rank 
     // r and form V^H := Sigma V^H.
     {
@@ -1480,10 +1493,11 @@ void psp::hmatrix_tools::MatrixMatrix
         }
     }
 
-    // F.U := Q (VH)^H = Q V
+    // F.U := Q (V^H)^T/H 
+    const char option = ( Conjugated ? 'C' : 'T' );
     F.U.Resize( Y.Height(), r );
     blas::Gemm
-    ( 'N', 'C', Y.Height(), r, Y.Width(), 
+    ( 'N', option, Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
 #ifndef RELEASE
@@ -1538,7 +1552,8 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 
         // Form the Q from the QR decomposition
         lapack::FormQ
-        ( m, n, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        ( m, minDim, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        Y.Resize( m, minDim );
     }
 
     // Compute (Q^T (alpha A^T B))^T = alpha B^T A Q into F.V
@@ -1637,19 +1652,31 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 
         // Form the Q from the QR decomposition
         lapack::FormQ
-        ( m, n, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        ( m, minDim, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        Y.Resize( m, minDim );
     }
 
-    // Compute (Q^H (alpha A^T B))^H = conj(alpha) B^H conj(A) Q
-    //                               = conj(alpha B^T A conj(Q))
-    // into F.V.
-    Conjugate( Y );
-    A.MapMatrix( alpha, Y, X );
-    B.TransposeMapMatrix( 1, X, F.V );
-    Conjugate( F.V );
-    Conjugate( Y );
+    if( Conjugated )
+    {
+        // Compute (Q^H (alpha A^T B))^H = conj(alpha) B^H conj(A) Q
+        //                               = conj(alpha B^T A conj(Q))
+        // into F.V.
+        Conjugate( Y );
+        A.MapMatrix( alpha, Y, X );
+        B.TransposeMapMatrix( 1, X, F.V );
+        Conjugate( F.V );
+        Conjugate( Y );
+    }
+    else
+    {
+        // Compute (Q^H (alpha A^T B))^T = alpha B^T A conj(Q)
+        Conjugate( Y );
+        A.MapMatrix( alpha, Y, X );
+        B.TransposeMapMatrix( 1, X, F.V );
+        Conjugate( Y );
+    }
         
-    // Compute the economic SVD of F.V = (Q^H (alpha A^T B))^H = U Sigma V^H,
+    // Compute the economic SVD of F.V, U Sigma V^H,
     // overwriting F.V with U, and X with V^H. Then truncate the SVD to rank 
     // r and form V^H := Sigma V^H.
     {
@@ -1677,10 +1704,11 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
         }
     }
 
-    // F.U := Q (VH)^H = Q V
+    // F.U := Q (VH)^[T/H] = Q V
+    const char option = ( Conjugated ? 'C' : 'T' );
     F.U.Resize( Y.Height(), r );
     blas::Gemm
-    ( 'N', 'C', Y.Height(), r, Y.Width(), 
+    ( 'N', option, Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
 #ifndef RELEASE
@@ -1759,14 +1787,26 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 
         // Form the Q from the QR decomposition
         lapack::FormQ
-        ( m, n, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        ( m, minDim, minDim, Y.Buffer(), Y.LDim(), &tau[0], &work[0], lwork );
+        Y.Resize( m, minDim );
     }
 
-    // Compute (Q^H (alpha A^H B))^H = conj(alpha) B^H A Q into F.V.
-    A.MapMatrix( Conj(alpha), Y, X );
-    B.HermitianTransposeMapMatrix( 1, X, F.V );
+    if( Conjugated )
+    {
+        // Compute (Q^H (alpha A^H B))^H = conj(alpha) B^H A Q into F.V.
+        A.MapMatrix( Conj(alpha), Y, X );
+        B.HermitianTransposeMapMatrix( 1, X, F.V );
+    }
+    else
+    {
+        // Compute (Q^H (alpha A^H B))^T = alpha B^T conj(A) conj(Q)
+        //                               = conj(conj(alpha) B^H A Q)
+        A.MapMatrix( Conj(alpha), Y, X );
+        B.HermitianTransposeMapMatrix( 1, X, F.V );
+        Conjugate( F.V );
+    }
         
-    // Compute the economic SVD of F.V = (Q^H (alpha A^H B))^H = U Sigma V^H,
+    // Compute the economic SVD of F.V, U Sigma V^H,
     // overwriting F.V with U, and X with V^H. Then truncate the SVD to rank 
     // r and form V^H := Sigma V^H.
     {
@@ -1794,10 +1834,11 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         }
     }
 
-    // F.U := Q (VH)^H = Q V
+    // F.U := Q (VH)^[T/H] = Q V
+    const char option = ( Conjugated ? 'C' : 'T' );
     F.U.Resize( Y.Height(), r );
     blas::Gemm
-    ( 'N', 'C', Y.Height(), r, Y.Width(), 
+    ( 'N', option, Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
 #ifndef RELEASE

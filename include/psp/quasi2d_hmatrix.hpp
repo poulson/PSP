@@ -256,15 +256,15 @@ public:
     { return _shell.type == NODE || _shell.type == NODE_SYMMETRIC; }
     bool IsLowRank() const { return _shell.type == LOW_RANK; }
 
-    // Multiply the H-matrix by identity and print the result
-    void Print( const std::string& tag ) const;
-
     // Print out a representation of the H-matrix structure
     void PrintStructure( const std::string& tag ) const;
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //
     //------------------------------------------------------------------------//
+
+    // Multiply the H-matrix by identity and print the result
+    virtual void Print( const std::string& tag ) const;
 
     // y := alpha H x + beta y
     virtual void MapVector
