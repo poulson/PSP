@@ -153,6 +153,43 @@ FormRow
     }
 }
 
+template<typename Real>
+void 
+CheckDistanceFromOnes( const psp::Vector< std::complex<Real> >& z )
+{
+    typedef std::complex<Real> Scalar;
+
+    const int m = z.Height();
+
+    const double xNormL1 = m;
+    const double xNormL2 = sqrt( m );
+    const double xNormLInf = 1.0;
+    double errorNormL1, errorNormL2, errorNormLInf;
+    {
+        errorNormL1 = 0;
+        errorNormLInf = 0;
+
+        const Scalar* zBuffer = z.LockedBuffer();
+        double errorNormL2Squared = 0;
+        for( int i=0; i<m; ++i )
+        {
+            const double deviation = std::abs( zBuffer[i] - 1.0 );
+            errorNormL1 += deviation;
+            errorNormL2Squared += deviation*deviation;
+            errorNormLInf = std::max( errorNormLInf, deviation );
+        }
+        errorNormL2 = std::sqrt( errorNormL2Squared );
+    }
+    std::cout << "||e||_1 =  " << errorNormL1 << "\n"
+              << "||e||_2 =  " << errorNormL2 << "\n"
+              << "||e||_oo = " << errorNormLInf << "\n"
+              << "\n"
+              << "||e||_1  / ||x||_1  = " << errorNormL1/xNormL1 << "\n"
+              << "||e||_2  / ||x||_2  = " << errorNormL2/xNormL2 << "\n"
+              << "||e||_oo / ||x||_oo = " << errorNormLInf/xNormLInf << "\n"
+              << std::endl;
+}
+
 int
 main( int argc, char* argv[] )
 {
@@ -251,59 +288,68 @@ main( int argc, char* argv[] )
         if( print )
             y.Print( "y := H x ~= S x" );
 
-        // Make a copy for inversion
-        std::cout << "Making a copy of the H-matrix for inversion...";
-        std::cout.flush();
-        Quasi2d invH;
-        invH.CopyFrom( H );
-        std::cout << "done" << std::endl;
-
-        // Perform a direct inversion
-        std::cout << "Directly inverting the H-matrix...";
-        std::cout.flush();
-        invH.DirectInvert();
-        std::cout << "done" << std::endl;
-        if( print )
-            invH.Print( "inv(H)" );
-
-        // Test for discrepancies in x and inv(H) H x
-        std::cout << "Multiplying the inverse by a vector...";
-        std::cout.flush();
-        psp::Vector<Scalar> z;
-        invH.MapVector( 1.0, y, z );
-        std::cout << "done" << std::endl;
-        if( print )
+        // Direct inversion test
         {
-            y.Print( "y := H x ~= S x" );
-            z.Print( "z := inv(H) H x ~= x" );
-        }
-        const double xNormL1 = m;
-        const double xNormL2 = sqrt( m );
-        const double xNormLInf = 1.0;
-        double errorNormL1, errorNormL2, errorNormLInf;
-        {
-            errorNormL1 = 0;
-            errorNormLInf = 0;
+            // Make a copy for inversion
+            std::cout << "Making a copy of the H-matrix for inversion...";
+            std::cout.flush();
+            Quasi2d invH;
+            invH.CopyFrom( H );
+            std::cout << "done" << std::endl;
 
-            Scalar* zBuffer = z.Buffer();
-            double errorNormL2Squared = 0;
-            for( int i=0; i<m; ++i )
+            // Perform a direct inversion
+            std::cout << "Directly inverting the H-matrix...";
+            std::cout.flush();
+            invH.DirectInvert();
+            std::cout << "done" << std::endl;
+            if( print )
+                invH.Print( "inv(H)" );
+
+            // Test for discrepancies in x and inv(H) H x
+            std::cout << "Multiplying the direct inverse by a vector...";
+            std::cout.flush();
+            psp::Vector<Scalar> z;
+            invH.MapVector( 1.0, y, z );
+            std::cout << "done" << std::endl;
+            if( print )
             {
-                const double deviation = std::abs( zBuffer[i] - 1.0 );
-                errorNormL1 += deviation;
-                errorNormL2Squared += deviation*deviation;
-                errorNormLInf = std::max( errorNormLInf, deviation );
+                y.Print( "y := H x ~= S x" );
+                z.Print( "z := inv(H) H x ~= x" );
             }
-            errorNormL2 = std::sqrt( errorNormL2Squared );
+            CheckDistanceFromOnes( z );
         }
-        std::cout << "||e||_1 =  " << errorNormL1 << "\n"
-                  << "||e||_2 =  " << errorNormL2 << "\n"
-                  << "||e||_oo = " << errorNormLInf << "\n"
-                  << "\n"
-                  << "||e||_1  / ||x||_1  = " << errorNormL1/xNormL1 << "\n"
-                  << "||e||_2  / ||x||_2  = " << errorNormL2/xNormL2 << "\n"
-                  << "||e||_oo / ||x||_oo = " << errorNormLInf/xNormLInf << "\n"
-                  << std::endl;
+
+        // Schulz iteration tests
+        for( int maxIts=10; maxIts<60; maxIts+=10 )
+        {
+            // Make a copy
+            std::cout << "Making a copy for Schulz inversion...";
+            std::cout.flush();
+            Quasi2d invH;
+            invH.CopyFrom( H );
+            std::cout << "done" << std::endl;
+
+            // Perform the iterative inversion
+            std::cout << "Schulz inverting the H-matrix...";
+            std::cout.flush();
+            invH.SchulzInvert( maxIts );
+            std::cout << "done" << std::endl;
+            if( print )
+                invH.Print( "inv(H)" );
+
+            // Test for discrepancies in x and inv(H) H x
+            std::cout << "Multiplying the direct inverse by a vector...";
+            std::cout.flush();
+            psp::Vector<Scalar> z;
+            invH.MapVector( 1.0, y, z );
+            std::cout << "done" << std::endl;
+            if( print )
+            {
+                y.Print( "y := H x ~= S x" );
+                z.Print( "z := inv(H) H x ~= x" );
+            }
+            CheckDistanceFromOnes( z );
+        }
     }
     catch( std::exception& e )
     {

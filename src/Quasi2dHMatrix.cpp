@@ -880,7 +880,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
     _ySource = B.YSource();
     _yTarget = B.YTarget();
 
-    // Delete the old type and switch
+    // Delete the old type 
     switch( _shell.type )
     {
     case NODE:           delete _shell.data.node;          break;
@@ -928,6 +928,281 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
         _shell.data.D = new DenseMatrix<Scalar>;
         hmatrix_tools::Copy( *B._shell.data.D, *_shell.data.D );
         break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+// A := Conj(A)
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Conjugate()
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Conjugate");
+#endif
+    switch( _shell.type )
+    {
+    case NODE:
+        for( int i=0; i<16; ++i )
+            _shell.data.node->children[i]->Conjugate();
+        break;
+    case NODE_SYMMETRIC:
+        for( int i=0; i<10; ++i )
+            _shell.data.nodeSymmetric->children[i]->Conjugate();
+        break;
+    case LOW_RANK:
+        hmatrix_tools::Conjugate( _shell.data.F->U );
+        hmatrix_tools::Conjugate( _shell.data.F->V );
+        break;
+    case DENSE:
+        hmatrix_tools::Conjugate( *_shell.data.D );
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+// A := Conj(B)
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::ConjugateFrom
+( const Quasi2dHMatrix<Scalar,Conjugated>& B )
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::ConjugateFrom");
+#endif
+    this->_height = B.Height();
+    this->_width = B.Width();
+    this->_numLevels = B.NumLevels();
+    this->_maxRank = B.MaxRank();
+    this->_sourceOffset = B.SourceOffset();
+    this->_targetOffset = B.TargetOffset();
+    this->_symmetric = B.Symmetric();
+    this->_stronglyAdmissible = B.StronglyAdmissible();
+    _xSizeSource = B.XSizeSource();
+    _xSizeTarget = B.XSizeTarget();
+    _ySizeSource = B.YSizeSource();
+    _ySizeTarget = B.YSizeTarget();
+    _zSize = B.ZSize();
+    _xSource = B.XSource();
+    _xTarget = B.XTarget();
+    _ySource = B.YSource();
+    _yTarget = B.YTarget();
+
+    // Delete the old type 
+    switch( _shell.type )
+    {
+    case NODE:           delete _shell.data.node;          break;
+    case NODE_SYMMETRIC: delete _shell.data.nodeSymmetric; break;
+    case LOW_RANK:       delete _shell.data.F;             break;
+    case DENSE:          delete _shell.data.D;             break;
+    }
+    _shell.type = B._shell.type;
+
+    switch( _shell.type )
+    {
+    case NODE:
+        for( int i=0; i<16; ++i )
+        {
+            _shell.data.node->children[i]->ConjugateFrom
+            ( *B._shell.data.node->children[i] );
+        }
+        break;
+    case NODE_SYMMETRIC:
+        for( int i=0; i<10; ++i )
+        {
+            _shell.data.nodeSymmetric->children[i]->ConjugateFrom
+            ( *B._shell.data.nodeSymmetric->children[i] );
+        }
+        break;
+    case LOW_RANK:
+        hmatrix_tools::Conjugate( B._shell.data.F->U, _shell.data.F->U );
+        hmatrix_tools::Conjugate( B._shell.data.F->V, _shell.data.F->V );
+        break;
+    case DENSE:
+        hmatrix_tools::Conjugate( *B._shell.data.D, *_shell.data.D );
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+// A := B^T
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeFrom
+( const Quasi2dHMatrix<Scalar,Conjugated>& B )
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::TransposeFrom");
+#endif
+    this->_height = B.Width();
+    this->_width = B.Height();
+    this->_numLevels = B.NumLevels();
+    this->_maxRank = B.MaxRank();
+    this->_sourceOffset = B.TargetOffset();
+    this->_targetOffset = B.SourceOffset();
+    this->_symmetric = B.Symmetric();
+    this->_stronglyAdmissible = B.StronglyAdmissible();
+    _xSizeSource = B.XSizeTarget();
+    _xSizeTarget = B.XSizeSource();
+    _ySizeSource = B.YSizeTarget();
+    _ySizeTarget = B.YSizeSource();
+    _zSize = B.ZSize();
+    _xSource = B.XTarget();
+    _xTarget = B.XSource();
+    _ySource = B.YTarget();
+    _yTarget = B.YSource();
+
+    // Delete the old type
+    switch( _shell.type )
+    {
+    case NODE:           delete _shell.data.node;          break;
+    case NODE_SYMMETRIC: delete _shell.data.nodeSymmetric; break;
+    case LOW_RANK:       delete _shell.data.F;             break;
+    case DENSE:          delete _shell.data.D;             break;
+    }
+    _shell.type = B._shell.type;
+
+    switch( B._shell.type )
+    {
+    case NODE:
+    {
+        _shell.data.node = 
+            new Node
+            ( _xSizeSource, _xSizeTarget,
+              _ySizeSource, _ySizeTarget, _zSize );
+        Node& nodeA = *_shell.data.node;
+        const Node& nodeB = *B._shell.data.node;
+        for( int t=0; t<4; ++t )
+        {
+            for( int s=0; s<4; ++s )
+            {
+                nodeA.children[s+4*t] = 
+                    new Quasi2dHMatrix<Scalar,Conjugated>;
+                nodeA.Child(t,s).TransposeFrom( nodeB.Child(s,t) );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        _shell.data.nodeSymmetric = 
+            new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
+        const NodeSymmetric& nodeB = *B._shell.data.nodeSymmetric;
+        for( int i=0; i<10; ++i )
+        {
+            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i]->CopyFrom( *nodeB.children[i] );
+        }
+        break;
+    }
+    case LOW_RANK:
+    {
+        _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        hmatrix_tools::Transpose( *B._shell.data.F, *_shell.data.F );
+        break;
+    }
+    case DENSE:
+    {
+        _shell.data.D = new DenseMatrix<Scalar>;
+        hmatrix_tools::Transpose( *B._shell.data.D, *_shell.data.D );
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+// A := B^H
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
+( const Quasi2dHMatrix<Scalar,Conjugated>& B )
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::HermitianTransposeFrom");
+#endif
+    this->_height = B.Width();
+    this->_width = B.Height();
+    this->_numLevels = B.NumLevels();
+    this->_maxRank = B.MaxRank();
+    this->_sourceOffset = B.TargetOffset();
+    this->_targetOffset = B.SourceOffset();
+    this->_symmetric = B.Symmetric();
+    this->_stronglyAdmissible = B.StronglyAdmissible();
+    _xSizeSource = B.XSizeTarget();
+    _xSizeTarget = B.XSizeSource();
+    _ySizeSource = B.YSizeTarget();
+    _ySizeTarget = B.YSizeSource();
+    _zSize = B.ZSize();
+    _xSource = B.XTarget();
+    _xTarget = B.XSource();
+    _ySource = B.YTarget();
+    _yTarget = B.YSource();
+
+    // Delete the old type
+    switch( _shell.type )
+    {
+    case NODE:           delete _shell.data.node;          break;
+    case NODE_SYMMETRIC: delete _shell.data.nodeSymmetric; break;
+    case LOW_RANK:       delete _shell.data.F;             break;
+    case DENSE:          delete _shell.data.D;             break;
+    }
+    _shell.type = B._shell.type;
+
+    switch( B._shell.type )
+    {
+    case NODE:
+    {
+        _shell.data.node = 
+            new Node
+            ( _xSizeSource, _xSizeTarget,
+              _ySizeSource, _ySizeTarget, _zSize );
+        Node& nodeA = *_shell.data.node;
+        const Node& nodeB = *B._shell.data.node;
+        for( int t=0; t<4; ++t )
+        {
+            for( int s=0; s<4; ++s )
+            {
+                nodeA.children[s+4*t] = 
+                    new Quasi2dHMatrix<Scalar,Conjugated>;
+                nodeA.Child(t,s).HermitianTransposeFrom( nodeB.Child(s,t) );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        _shell.data.nodeSymmetric = 
+            new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
+        const NodeSymmetric& nodeB = *B._shell.data.nodeSymmetric;
+        for( int i=0; i<10; ++i )
+        {
+            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i]->ConjugateFrom( *nodeB.children[i] );
+        }
+        break;
+    }
+    case LOW_RANK:
+    {
+        _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        hmatrix_tools::HermitianTranspose( *B._shell.data.F, *_shell.data.F );
+        break;
+    }
+    case DENSE:
+    {
+        _shell.data.D = new DenseMatrix<Scalar>;
+        hmatrix_tools::HermitianTranspose( *B._shell.data.D, *_shell.data.D );
+        break;
+    }
     }
 #ifndef RELEASE
     PopCallStack();
@@ -1031,6 +1306,53 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SetToIdentity()
     PopCallStack();
 #endif
 }
+
+// A := A + alpha I
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::AddConstantToDiagonal
+( Scalar alpha )
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::AddConstantToDiagonal");
+#endif
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        Node& nodeA = *_shell.data.node;
+        for( int i=0; i<4; ++i )
+            nodeA.Child(i,i).AddConstantToDiagonal( alpha );
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        NodeSymmetric& nodeA = *_shell.data.nodeSymmetric;
+        for( int i=0; i<4; ++i )
+            nodeA.Child(i,i).AddConstantToDiagonal( alpha );
+        break;
+    }
+    case LOW_RANK:
+#ifndef RELEASE
+        throw std::logic_error("Mistake in logic");
+#endif
+        break;
+    case DENSE:
+    {
+        Scalar* DBuffer = _shell.data.D->Buffer();
+        const int m = _shell.data.D->Height();
+        const int n = _shell.data.D->Width();
+        const int DLDim = _shell.data.D->LDim();
+        for( int j=0; j<std::min(m,n); ++j )
+            DBuffer[j+j*DLDim] += alpha;
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 
 // A := alpha B + A
 template<typename Scalar,bool Conjugated>
@@ -1663,7 +1985,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
     }
     case NODE_SYMMETRIC:
     {
+#ifndef RELEASE
         throw std::logic_error("Symmetric inversion not yet supported.");
+#endif
         break;
     }
     case DENSE:
@@ -1671,7 +1995,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
         break;
     case LOW_RANK:
     {
+#ifndef RELEASE
         throw std::logic_error("Mistake in inversion code.");
+#endif
         break;
     }
     }
@@ -1683,7 +2009,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
 // A := inv(A) using Schulz iterations, X_k+1 := (2I - X_k A) X_k
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert()
+psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert( int maxIts )
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::SchulzInvert");
@@ -1692,9 +2018,33 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert()
     if( this->IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
 #endif
-    // Pick alpha
-    // Loop until convergence (test by checking X_k A y ~= y?)
-    throw std::logic_error("Schulz iversion not yet written");
+    // Need to find alpha s.t. 0 < alpha < 2/||A||_2^2, but we do not have
+    // a cheap way of estimating ||A||_2, so instead pick alpha very small.
+    //
+    // TODO: Allow alpha as a parameter
+    std::cout << "TODO: Implement a 2-norm estimator for choosing alpha" 
+              << std::endl;
+    Scalar alpha = ((Scalar)1)/((Scalar)1.e7);
+
+    // Initialize X_0 := alpha A^H
+    Quasi2dHMatrix<Scalar,Conjugated> X;
+    X.HermitianTransposeFrom( *this );
+    X.Scale( alpha );
+
+    for( int k=0; k<maxIts; ++k )
+    {
+        // Form Z := 2I - X_k A
+        Quasi2dHMatrix<Scalar,Conjugated> Z;        
+        X.MapMatrix( (Scalar)-1, *this, Z );
+        Z.AddConstantToDiagonal( (Scalar)2 );
+
+        // Form X_k+1 := Z X_k = (2I - X_k A) X_k
+        Quasi2dHMatrix<Scalar,Conjugated> XCopy;
+        XCopy.CopyFrom( X );
+        Z.MapMatrix( (Scalar)1, XCopy, X );
+    }
+
+    this->CopyFrom( X );
 #ifndef RELEASE
     PopCallStack();
 #endif

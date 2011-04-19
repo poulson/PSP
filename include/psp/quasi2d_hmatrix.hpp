@@ -348,12 +348,27 @@ public:
 
     // A := B
     void CopyFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
+    
+    // A := conj(A)
+    void Conjugate();
+
+    // A := conj(B)
+    void ConjugateFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
+
+    // A := B^T
+    void TransposeFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
+
+    // A := B^H
+    void HermitianTransposeFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
 
     // A := alpha A
     void Scale( Scalar alpha );
 
     // A := I
     void SetToIdentity();
+
+    // A := A + alpha I
+    void AddConstantToDiagonal( Scalar alpha );
 
     // A :~= alpha B + A
     void UpdateWith( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B );
@@ -371,9 +386,11 @@ public:
     // A :~= inv(A) using recursive Schur complements
     void DirectInvert();
 
-    // A :~= inv(A) using Schulz iteration, X_k+1 = X_k (2I - A X_k) = (2I - X_k A) X_k,
-    // where X_k -> inv(A) if X_0 = alpha A^T (or is it A^H ?!?), with 0 < alpha < 2/||A||_2^2.
-    void SchulzInvert();
+    // A :~= inv(A) using Schulz iteration, 
+    //     X_k+1 = X_k (2I - A X_k) = (2I - X_k A) X_k,
+    // where X_k -> inv(A) if X_0 = alpha A^H,
+    // with 0 < alpha < 2/||A||_2^2.
+    void SchulzInvert( int maxIts );
 
 private:
     // Data specific to our quasi-2d H-matrix

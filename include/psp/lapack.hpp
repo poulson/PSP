@@ -26,6 +26,7 @@
 #include <cstring>
 #include <sstream>
 #include <stdexcept>
+#include <vector>
 
 #if defined(LAPACK_POST)
 #define LAPACK(name) name ## _
@@ -832,6 +833,9 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
+    std::vector<float> ACopy( m*n );
+    for( int j=0; j<n; ++j )
+        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(float) );
 #endif
     int info;
     LAPACK(sgesvd)
@@ -841,7 +845,14 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, sgesvd, failed with info=" << info;
+        s << "SVD, sgesvd, failed with info=" << info << "\n";
+        s << "Input matrix:\n";
+        for( int i=0; i<m; ++i )
+        {
+            for( int j=0; j<n; ++j )
+                s << ACopy[i+j*m] << " ";
+            s << "\n";
+        }
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
@@ -864,6 +875,9 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
+    std::vector<double> ACopy( m*n );
+    for( int j=0; j<n; ++j )
+        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(double) );
 #endif
     int info;
     LAPACK(dgesvd)
@@ -873,7 +887,14 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, dgesvd, failed with info=" << info;
+        s << "SVD, dgesvd, failed with info=" << info << "\n";
+        s << "Input matrix:\n";
+        for( int i=0; i<m; ++i )
+        {
+            for( int j=0; j<n; ++j )
+                s << ACopy[i+j*m] << " ";
+            s << "\n";
+        }
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
@@ -897,6 +918,9 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
+    std::vector< std::complex<float> > ACopy( m*n );
+    for( int j=0; j<n; ++j )
+        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(std::complex<float>) );
 #endif
     int info;
     LAPACK(cgesvd)
@@ -906,7 +930,14 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, cgesvd, failed with info=" << info;
+        s << "SVD, dgesvd, failed with info=" << info << "\n";
+        s << "Input matrix:\n";
+        for( int i=0; i<m; ++i )
+        {
+            for( int j=0; j<n; ++j )
+                s << ACopy[i+j*m] << " ";
+            s << "\n";
+        }
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
@@ -930,6 +961,9 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
+    std::vector< std::complex<double> > ACopy( m*n );
+    for( int j=0; j<n; ++j )
+        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(std::complex<double>) );
 #endif
     int info;
     LAPACK(zgesvd)
@@ -939,7 +973,14 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, zgesvd, failed with info=" << info;
+        s << "SVD, dgesvd, failed with info=" << info << "\n";
+        s << "Input matrix:\n";
+        for( int i=0; i<m; ++i )
+        {
+            for( int j=0; j<n; ++j )
+                s << ACopy[i+j*m] << " ";
+            s << "\n";
+        }
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();

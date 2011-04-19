@@ -738,6 +738,32 @@ void Conjugate
         LowRankMatrix<std::complex<Real>,Conjugated>& F2 );
 
 /*\
+|*| Transpose a matrix: B := A^T
+\*/
+template<typename Scalar>
+void Transpose
+( const DenseMatrix<Scalar>& A, 
+        DenseMatrix<Scalar>& B );
+
+template<typename Scalar,bool Conjugated>
+void Transpose
+( const LowRankMatrix<Scalar,Conjugated>& A, 
+        LowRankMatrix<Scalar,Conjugated>& B );
+
+/*\
+|*| Hermitian-transpose a matrix: B := A^H
+\*/
+template<typename Scalar>
+void HermitianTranspose
+( const DenseMatrix<Scalar>& A, 
+        DenseMatrix<Scalar>& B );
+
+template<typename Scalar,bool Conjugated>
+void HermitianTranspose
+( const LowRankMatrix<Scalar,Conjugated>& A,
+        LowRankMatrix<Scalar,Conjugated>& B );
+
+/*\
 |*| For generating Gaussian random variables/vectors
 \*/
 template<typename Real>
@@ -1200,6 +1226,118 @@ void psp::hmatrix_tools::Conjugate
     F2.V.SetType( GENERAL ); F2.V.Resize( n, r );
     Conjugate( F1.U, F2.U );
     Conjugate( F1.V, F2.V );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+/*\
+|*| Transpose a matrix, B := A^T
+\*/
+
+template<typename Scalar>
+void psp::hmatrix_tools::Transpose
+( const DenseMatrix<Scalar>& A, DenseMatrix<Scalar>& B )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Transpose (DenseMatrix)");
+#endif
+    if( B.Symmetric() )
+    {
+        hmatrix_tools::Copy( A, B );
+    }
+    else
+    {
+        B.Resize( A.Width(), A.Height() );
+        const int m = A.Height();
+        const int n = A.Width();
+        const int ALDim = A.LDim();
+        const int BLDim = B.LDim();
+        const Scalar* RESTRICT ABuffer = A.LockedBuffer();
+        Scalar* RESTRICT BBuffer = B.Buffer();
+        for( int j=0; j<n; ++j )
+            for( int i=0; i<m; ++i )
+                BBuffer[j+i*BLDim] = ABuffer[i+j*ALDim];
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::Transpose
+( const LowRankMatrix<Scalar,Conjugated>& A, 
+        LowRankMatrix<Scalar,Conjugated>& B )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::Transpose (LowRankMatrix)");
+#endif
+    if( Conjugated )
+    {
+        hmatrix_tools::Conjugate( A.V, B.U );
+        hmatrix_tools::Conjugate( A.U, B.V );
+    }
+    else
+    {
+        hmatrix_tools::Copy( A.V, B.U );
+        hmatrix_tools::Copy( A.U, B.V );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+/*\
+|*| Hermitian-transpose a matrix, B := A^H
+\*/
+
+template<typename Scalar>
+void psp::hmatrix_tools::HermitianTranspose
+( const DenseMatrix<Scalar>& A, DenseMatrix<Scalar>& B )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::HermitianTranspose (DenseMatrix)");
+#endif
+    if( B.Symmetric() )
+    {
+        hmatrix_tools::Conjugate( A, B );
+    }
+    else
+    {
+        B.Resize( A.Width(), A.Height() );
+        const int m = A.Height();
+        const int n = A.Width();
+        const int ALDim = A.LDim();
+        const int BLDim = B.LDim();
+        const Scalar* RESTRICT ABuffer = A.LockedBuffer();
+        Scalar* RESTRICT BBuffer = B.Buffer();
+        for( int j=0; j<n; ++j )
+            for( int i=0; i<m; ++i )
+                BBuffer[j+i*BLDim] = Conj(ABuffer[i+j*ALDim]);
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void psp::hmatrix_tools::HermitianTranspose
+( const LowRankMatrix<Scalar,Conjugated>& A, 
+        LowRankMatrix<Scalar,Conjugated>& B )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::HermitianTranspose (LowRankMatrix)");
+#endif
+    if( Conjugated )
+    {
+        hmatrix_tools::Copy( A.V, B.U );
+        hmatrix_tools::Copy( A.U, B.V );
+    }
+    else
+    {
+        hmatrix_tools::Conjugate( A.V, B.U );
+        hmatrix_tools::Conjugate( A.U, B.V );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
