@@ -368,8 +368,12 @@ public:
     ( Scalar alpha, const Quasi2dHMatrix<Scalar,Conjugated>& B, 
       Scalar beta,        Quasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
-    // A :~= inv(A)
-    void Invert();
+    // A :~= inv(A) using recursive Schur complements
+    void DirectInvert();
+
+    // A :~= inv(A) using Schulz iteration, X_k+1 = X_k (2I - A X_k) = (2I - X_k A) X_k,
+    // where X_k -> inv(A) if X_0 = alpha A^T (or is it A^H ?!?), with 0 < alpha < 2/||A||_2^2.
+    void SchulzInvert();
 
 private:
     // Data specific to our quasi-2d H-matrix

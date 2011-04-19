@@ -1569,13 +1569,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 #endif
 }
 
-// A := inv(A)
+// A := inv(A) using recursive Schur complements
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
+psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
 {
 #ifndef RELEASE
-    PushCallStack("Quasi2dHMatrix::Invert");
+    PushCallStack("Quasi2dHMatrix::DirectInvert");
     if( this->Height() != this->Width() )
         throw std::logic_error("Cannot invert non-square matrices");
     if( this->IsLowRank() )
@@ -1600,7 +1600,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
         {
             // A_ll := inv(B_ll)
             nodeA.Child(l,l).CopyFrom( nodeB.Child(l,l) );
-            nodeA.Child(l,l).Invert();
+            nodeA.Child(l,l).DirectInvert();
 
             // NOTE: Can be skipped for upper-triangular matrices
             for( int j=0; j<l; ++j )
@@ -1675,6 +1675,26 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Invert()
         break;
     }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+// A := inv(A) using Schulz iterations, X_k+1 := (2I - X_k A) X_k
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert()
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::SchulzInvert");
+    if( this->Height() != this->Width() )
+        throw std::logic_error("Cannot invert non-square matrices");
+    if( this->IsLowRank() )
+        throw std::logic_error("Cannot invert low-rank matrices");
+#endif
+    // Pick alpha
+    // Loop until convergence (test by checking X_k A y ~= y?)
+    throw std::logic_error("Schulz iversion not yet written");
 #ifndef RELEASE
     PopCallStack();
 #endif

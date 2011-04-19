@@ -258,10 +258,10 @@ main( int argc, char* argv[] )
         invH.CopyFrom( H );
         std::cout << "done" << std::endl;
 
-        // Invert the copy
-        std::cout << "Inverting the H-matrix...";
+        // Perform a direct inversion
+        std::cout << "Directly inverting the H-matrix...";
         std::cout.flush();
-        invH.Invert();
+        invH.DirectInvert();
         std::cout << "done" << std::endl;
         if( print )
             invH.Print( "inv(H)" );
