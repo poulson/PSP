@@ -22,8 +22,9 @@
 
 void Usage()
 {
-    std::cout << "Invert <xSize> <ySize> <zSize> <numLevels> <r> <print?> "
-                 "<print structure?>" << std::endl;
+    std::cout << "Invert <xSize> <ySize> <zSize> <numLevels> "
+                 "<strongly admissible?> <r> <print?> <print structure?>" 
+              << std::endl;
 }
 
 const double omega = 10.0;
@@ -193,18 +194,22 @@ CheckDistanceFromOnes( const psp::Vector< std::complex<Real> >& z )
 int
 main( int argc, char* argv[] )
 {
-    if( argc < 8 )
+    MPI_Init( &argc, &argv );
+
+    if( argc < 9 )
     {
         Usage();
+        MPI_Finalize();
         return 0;
     }
     const int xSize = atoi( argv[1] );
     const int ySize = atoi( argv[2] );
     const int zSize = atoi( argv[3] );
     const int numLevels = atoi( argv[4] );
-    const int r = atoi( argv[5] );
-    const bool print = atoi( argv[6] );
-    const bool printStructure = atoi( argv[7] );
+    const bool stronglyAdmissible = atoi( argv[5] );
+    const int r = atoi( argv[6] );
+    const bool print = atoi( argv[7] );
+    const bool printStructure = atoi( argv[8] );
 
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
@@ -236,6 +241,7 @@ main( int argc, char* argv[] )
 
         std::cout << "Filling sparse matrix...";
         std::cout.flush();
+        double fillStartTime = MPI_Wtime();
         std::vector<Scalar> row;
         std::vector<int> colIndices;
         for( int i=0; i<m; ++i )
@@ -257,16 +263,20 @@ main( int argc, char* argv[] )
             }
         }
         S.rowOffsets.push_back( S.nonzeros.size() );
-        std::cout << "done." << std::endl;
+        double fillStopTime = MPI_Wtime();
+        std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
+                  << std::endl;
         if( print )
             S.Print( "S" );
 
         // Convert to H-matrix form
         std::cout << "Constructing H-matrix...";
         std::cout.flush();
-        Quasi2d H( S, numLevels, r, true, xSize, ySize, zSize );
-        //Quasi2d H( S, numLevels, r, false, xSize, ySize, zSize );
-        std::cout << "done" << std::endl;
+        double constructStartTime = MPI_Wtime();
+        Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
+        double constructStopTime = MPI_Wtime();
+        std::cout << "done: " << constructStopTime-constructStartTime 
+                  << " seconds." << std::endl;
         if( print )
             H.Print( "H" );
         if( printStructure )
@@ -283,8 +293,11 @@ main( int argc, char* argv[] )
         std::cout << "Multiplying H-matrix by a vector...";
         std::cout.flush();
         psp::Vector<Scalar> y;
+        double matVecStartTime = MPI_Wtime();
         H.MapVector( 1.0, x, y );
-        std::cout << "done" << std::endl;
+        double matVecStopTime = MPI_Wtime();
+        std::cout << "done: " << matVecStopTime-matVecStartTime << " seconds." 
+                  << std::endl;
         if( print )
             y.Print( "y := H x ~= S x" );
 
@@ -293,24 +306,33 @@ main( int argc, char* argv[] )
             // Make a copy for inversion
             std::cout << "Making a copy of the H-matrix for inversion...";
             std::cout.flush();
+            double copyStartTime = MPI_Wtime();
             Quasi2d invH;
             invH.CopyFrom( H );
-            std::cout << "done" << std::endl;
+            double copyStopTime = MPI_Wtime();
+            std::cout << "done: " << copyStopTime-copyStartTime << " seconds." 
+                      << std::endl;
 
             // Perform a direct inversion
             std::cout << "Directly inverting the H-matrix...";
             std::cout.flush();
+            double invertStartTime = MPI_Wtime();
             invH.DirectInvert();
-            std::cout << "done" << std::endl;
+            double invertStopTime = MPI_Wtime();
+            std::cout << "done: " << invertStopTime-invertStartTime 
+                      << " seconds." << std::endl;
             if( print )
                 invH.Print( "inv(H)" );
 
             // Test for discrepancies in x and inv(H) H x
             std::cout << "Multiplying the direct inverse by a vector...";
             std::cout.flush();
+            matVecStartTime = MPI_Wtime();
             psp::Vector<Scalar> z;
             invH.MapVector( 1.0, y, z );
-            std::cout << "done" << std::endl;
+            matVecStopTime = MPI_Wtime();
+            std::cout << "done: " << matVecStopTime-matVecStartTime 
+                      << " seconds." << std::endl;
             if( print )
             {
                 y.Print( "y := H x ~= S x" );
@@ -325,24 +347,33 @@ main( int argc, char* argv[] )
             // Make a copy
             std::cout << "Making a copy for Schulz inversion...";
             std::cout.flush();
+            double copyStartTime = MPI_Wtime();
             Quasi2d invH;
             invH.CopyFrom( H );
-            std::cout << "done" << std::endl;
+            double copyStopTime = MPI_Wtime();
+            std::cout << "done: " << copyStopTime-copyStartTime 
+                      << " seconds." << std::endl;
 
             // Perform the iterative inversion
             std::cout << "Schulz inverting the H-matrix...";
             std::cout.flush();
+            double invertStartTime = MPI_Wtime();
             invH.SchulzInvert( maxIts );
-            std::cout << "done" << std::endl;
+            double invertStopTime = MPI_Wtime();
+            std::cout << "done: " << invertStopTime-invertStartTime 
+                      << " seconds." << std::endl;
             if( print )
                 invH.Print( "inv(H)" );
 
             // Test for discrepancies in x and inv(H) H x
             std::cout << "Multiplying the direct inverse by a vector...";
             std::cout.flush();
+            matVecStartTime = MPI_Wtime();
             psp::Vector<Scalar> z;
             invH.MapVector( 1.0, y, z );
-            std::cout << "done" << std::endl;
+            matVecStopTime = MPI_Wtime();
+            std::cout << "done: " << matVecStopTime-matVecStartTime 
+                      << " seconds." << std::endl;
             if( print )
             {
                 y.Print( "y := H x ~= S x" );
@@ -359,5 +390,6 @@ main( int argc, char* argv[] )
 #endif
     }
     
+    MPI_Finalize();
     return 0;
 }
