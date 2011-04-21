@@ -32,6 +32,8 @@
 #define BLAS(name) name
 #endif
 
+// TODO: Separate implementation from interface.
+
 // Declarations for an external BLAS library
 extern "C" {
 

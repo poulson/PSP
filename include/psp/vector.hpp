@@ -43,8 +43,9 @@ class Vector
 public:
     Vector();
     Vector( int height );
-    Vector( Scalar* buffer, int height );
-    Vector( const Scalar* lockedBuffer, int height );
+    Vector( int height, Scalar* buffer );
+    Vector( int height, const Scalar* lockedBuffer );
+    Vector( const Vector<Scalar>& x );
     ~Vector();
 
     int Height() const;
@@ -86,17 +87,26 @@ psp::Vector<Scalar>::Vector( int height )
 
 template<typename Scalar>
 inline
-psp::Vector<Scalar>::Vector( Scalar* buffer, int height )
+psp::Vector<Scalar>::Vector( int height, Scalar* buffer )
 : _height(height), _viewing(true), _lockedView(false),
   _memory(), _buffer(buffer), _lockedBuffer(0)
 { }
 
 template<typename Scalar>
 inline
-psp::Vector<Scalar>::Vector( const Scalar* lockedBuffer, int height )
+psp::Vector<Scalar>::Vector( int height, const Scalar* lockedBuffer )
 : _height(height), _viewing(true), _lockedView(true),
   _memory(), _buffer(0), _lockedBuffer(lockedBuffer)
 { }
+
+template<typename Scalar>
+inline
+psp::Vector<Scalar>::Vector( const Vector<Scalar>& x )
+: _height(x.Height()), _viewing(false), _lockedView(false),
+  _memory(x.Height()), _buffer(&_memory[0]), _lockedBuffer(0)
+{
+    std::memcpy( _buffer, x.LockedBuffer(), x.Height()*sizeof(Scalar) );
+}
 
 template<typename Scalar>
 inline
