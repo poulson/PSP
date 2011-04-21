@@ -55,6 +55,10 @@ public:
     ~DistVector();
 
     int Height() const;
+    int LocalOffset() const;
+    int LocalHeight() const;
+    MPI_Comm Comm() const;
+
     void Resize( int height, int localOffset, int localHeight );
 
     void Set( int i, Scalar value );
@@ -66,13 +70,15 @@ public:
     void Print( const std::string& tag ) const;
 
     Scalar* LocalBuffer( int iLocal=0 );
-    const Scalar* LocalBuffer( int iLocal=0 ) const;
+    const Scalar* LockedLocalBuffer( int iLocal=0 ) const;
 
     void View( DistVector<Scalar>& x );
-    void View( DistVector<Scalar>& x, int i, int height );
+    // TODO
+    //void View( DistVector<Scalar>& x, int i, int height );
 
     void LockedView( const DistVector<Scalar>& x );
-    void LockedView( const DistVector<Scalar>& x, int i, int height );
+    // TODO
+    //void LockedView( const DistVector<Scalar>& x, int i, int height );
 };
 
 } // namespace psp
@@ -91,7 +97,7 @@ psp::DistVector<Scalar>::CheckLocalHeights()
 {
     int localHeight = _localVector.Height();
     int sumOfLocalHeights;
-    mpi::AllSum( &localHeight, &sumOfLocalHeights, 1, _comm );
+    mpi::AllReduce( &localHeight, &sumOfLocalHeights, 1, MPI_SUM, _comm );
     if( sumOfLocalHeights != _height )
         throw std::logic_error("Incompatible local heights");
 }
@@ -205,6 +211,16 @@ psp::DistVector<Scalar>::Height() const
 { return _height; }
 
 template<typename Scalar>
+inline int
+psp::DistVector<Scalar>::LocalOffset() const
+{ return _localOffset; }
+
+template<typename Scalar>
+inline int
+psp::DistVector<Scalar>::LocalHeight() const
+{ return _localVector.Height(); }
+
+template<typename Scalar>
 inline void
 psp::DistVector<Scalar>::Resize
 ( int height, int localOffset, int localHeight )
@@ -263,21 +279,159 @@ psp::DistVector<Scalar>::Get( int i ) const
 #endif
 }
 
-// HERE
+template<typename Scalar>
+inline void
+psp::DistVector<Scalar>::SetLocal( int iLocal, Scalar value )
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::SetLocal");
+#endif
+    _localVector.Set( iLocal, value );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar>
+inline Scalar
+psp::DistVector<Scalar>::GetLocal( int iLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::GetLocal");
+#endif
+    const Scalar value = _localVector.Get( iLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return value;
+}
+
+template<typename Scalar>
+inline void
+psp::DistVector<Scalar>::Print( const std::string& tag ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::Print");
+#endif
+    const int p = mpi::CommSize( _comm );
+    if( _rank == 0 )
+        std::cout << tag << "\n";
+    for( int k=0; k<p; ++k )
+    {
+        if( _rank == k )
+        {
+            for( int iLocal=0; iLocal<_localVector.Height(); ++iLocal )
+                std::cout << _localVector.Get(iLocal) << "\n";
+            std::cout.flush();
+        }
+        mpi::Barrier( _comm );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar>
+inline Scalar*
+psp::DistVector<Scalar>::LocalBuffer( int iLocal )
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::LocalBuffer");
+#endif
+    Scalar* buffer = _localVector.Buffer( iLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return buffer;
+}
+
+template<typename Scalar>
+inline const Scalar*
+psp::DistVector<Scalar>::LockedLocalBuffer( int iLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::LockedLocalBuffer");
+#endif
+    const Scalar* buffer = _localVector.LockedBuffer( iLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return buffer;
+}
+
+template<typename Scalar>
+inline void
+psp::DistVector<Scalar>::View( DistVector<Scalar>& x )
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::View");
+#endif
+    _height = x.Height();
+    _localOffset = x.LocalOffset();
+    _localVector.View( x._localVector );
+    _comm = x.Comm();
+    _rank = mpi::CommRank( _comm );
+
+    FillOffsets();    
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 /*
-    void SetLocal( int iLocal, Scalar value );
-    Scalar GetLocal( int iLocal ) const;
+template<typename Scalar>
+inline void
+psp::DistVector<Scalar>::View( DistVector<Scalar>& x, int i, int height )
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::View");
+#endif
+    _height = height;
+    // TODO
 
-    void Print( const std::string& tag ) const;
+    FillOffsets();    
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+*/
 
-    Scalar* LocalBuffer( int iLocal=0 );
-    const Scalar* LocalBuffer( int iLocal=0 ) const;
+template<typename Scalar>
+inline void
+psp::DistVector<Scalar>::LockedView( const DistVector<Scalar>& x )
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::LockedView");
+#endif
+    _height = x.Height();
+    _localOffset = x.LocalOffset();
+    _localVector.LockedView( x._localVector );
+    _comm = x.Comm();
+    _rank = mpi::CommRank( _comm );
 
-    void View( DistVector<Scalar>& x );
-    void View( DistVector<Scalar>& x, int i, int height );
+    FillOffsets();    
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
-    void LockedView( const DistVector<Scalar>& x );
-    void LockedView( const DistVector<Scalar>& x, int i, int height );
- */
+/*
+template<typename Scalar>
+inline void
+psp::DistVector<Scalar>::LockedView
+( const DistVector<Scalar>& x, int i, int height )
+{
+#ifndef RELEASE
+    PushCallStack("DistVector::LockedView");
+#endif
+    _height = height;
+    // TODO
+
+    FillOffsets();    
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+*/
 
 #endif // PSP_DIST_VECTOR_HPP
