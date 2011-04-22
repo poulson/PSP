@@ -213,7 +213,7 @@ template<typename Scalar,bool Conjugated>
 int
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSize() const
 {
-    int packedSize = 0;
+    std::size_t packedSize = 0;
 
     // Make space for the abstract H-matrix information
     packedSize += 6*sizeof(int) + 2*sizeof(bool);
@@ -233,7 +233,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 ( std::vector<byte>& packedHMatrix ) const
 {
     // Create the storage and extract the buffer
-    const unsigned packedSize = PackedSize();
+    const std::size_t packedSize = PackedSize();
     packedHMatrix.resize( packedSize );
     byte* head = &packedHMatrix[0];
 
@@ -2490,7 +2490,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
-( int& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const
+( std::size_t& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const
 {
     const Shell& shell = H._shell;
     const ShellType type = shell.type;

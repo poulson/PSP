@@ -323,7 +323,8 @@ private:
     ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
 
     void CountShellSize
-    ( int& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
+    ( std::size_t& packedSize, 
+      const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
     void PackShell
     ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
     void UnpackShell
