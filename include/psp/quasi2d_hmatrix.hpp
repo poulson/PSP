@@ -29,8 +29,6 @@ namespace psp {
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
-// Put the public section first since the private section depends upon 
-// this class's public data structures.
 public:    
     struct Node
     {
@@ -45,62 +43,11 @@ public:
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
-          int zSize )
-        : children(16)
-        {
-            xSourceSizes[0] = xSizeSource/2;
-            xSourceSizes[1] = xSizeSource - xSourceSizes[0];
-            ySourceSizes[0] = ySizeSource/2;
-            ySourceSizes[1] = ySizeSource - ySourceSizes[0];
-            
-            sourceSizes[0] = xSourceSizes[0]*ySourceSizes[0]*zSize;
-            sourceSizes[1] = xSourceSizes[1]*ySourceSizes[0]*zSize;
-            sourceSizes[2] = xSourceSizes[0]*ySourceSizes[1]*zSize;
-            sourceSizes[3] = xSourceSizes[1]*ySourceSizes[1]*zSize;
+          int zSize );
+        ~Node();
 
-            xTargetSizes[0] = xSizeTarget/2;
-            xTargetSizes[1] = xSizeTarget - xTargetSizes[0];
-            yTargetSizes[0] = ySizeTarget/2;
-            yTargetSizes[1] = ySizeTarget - yTargetSizes[0];
-
-            targetSizes[0] = xTargetSizes[0]*yTargetSizes[0]*zSize;
-            targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
-            targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*zSize;
-            targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
-        }
-
-        ~Node()
-        {
-            for( unsigned i=0; i<children.size(); ++i )
-                delete children[i];
-            children.clear();
-        }
-
-        Quasi2dHMatrix& Child( int i, int j )
-        { 
-#ifndef RELEASE
-            if( i < 0 || j < 0 )
-                throw std::logic_error("Child indices must be non-negative");
-            if( i > 3 || j > 3 )
-                throw std::logic_error("Child indices out of bounds");
-            if( children.size() != 16 )
-                throw std::logic_error("children array not yet set up");
-#endif
-            return *children[j+4*i]; 
-        }
-
-        const Quasi2dHMatrix& Child( int i, int j ) const
-        { 
-#ifndef RELEASE
-            if( i < 0 || j < 0 )
-                throw std::logic_error("Child indices must be non-negative");
-            if( i > 3 || j > 3 )
-                throw std::logic_error("Child indices out of bounds");
-            if( children.size() != 16 )
-                throw std::logic_error("children array not yet set up");
-#endif
-            return *children[j+4*i]; 
-        }
+        Quasi2dHMatrix& Child( int i, int j );
+        const Quasi2dHMatrix& Child( int i, int j ) const;
     };
 
     struct NodeSymmetric
@@ -110,85 +57,11 @@ public:
         int ySizes[2];
         int sizes[4];
 
-        NodeSymmetric( int xSize, int ySize, int zSize )
-        : children(10)
-        {
-            xSizes[0] = xSize/2;
-            xSizes[1] = xSize - xSizes[0];
-            ySizes[0] = ySize/2;
-            ySizes[1] = ySize - ySizes[0];
+        NodeSymmetric( int xSize, int ySize, int zSize );
+        ~NodeSymmetric();
 
-            sizes[0] = xSizes[0]*ySizes[0]*zSize;
-            sizes[1] = xSizes[1]*ySizes[0]*zSize;
-            sizes[2] = xSizes[0]*ySizes[1]*zSize;
-            sizes[3] = xSizes[1]*ySizes[1]*zSize;
-        }
-
-        ~NodeSymmetric()
-        {
-            for( unsigned i=0; i<children.size(); ++i )
-                delete children[i];
-            children.clear();
-        }
-
-        Quasi2dHMatrix& Child( int i, int j )
-        { 
-#ifndef RELEASE
-            if( i < 0 || j < 0 )
-                throw std::logic_error("Child indices must be non-negative");
-            if( i > 3 || j > 3 )
-                throw std::logic_error("Child indices out of bounds");
-            if( j > i )
-                throw std::logic_error("Child index outside of lower triangle");
-            if( children.size() != 10 )
-                throw std::logic_error("children array not yet set up");
-#endif
-            return *children[(i*(i+1))/2 + j]; 
-        }
-
-        const Quasi2dHMatrix& Child( int i, int j ) const
-        {
-#ifndef RELEASE
-            if( i < 0 || j < 0 )
-                throw std::logic_error("Child indices must be non-negative");
-            if( i > 3 || j > 3 )
-                throw std::logic_error("Child indices out of bounds");
-            if( j > i )
-                throw std::logic_error("Child index outside of lower triangle");
-            if( children.size() != 10 )
-                throw std::logic_error("children array not yet set up");
-#endif
-            return *children[(i*(i+1))/2 + j];
-        }
-    };
-
-    enum ShellType { NODE, NODE_SYMMETRIC, DENSE, LOW_RANK };
-
-    struct Shell
-    {
-        ShellType type;
-        union Data
-        {
-            Node* node;
-            NodeSymmetric* nodeSymmetric;
-            DenseMatrix<Scalar>* D;
-            LowRankMatrix<Scalar,Conjugated>* F;
-
-            Data() { std::memset( this, 0, sizeof(Data) ); }
-        } data;
-
-        Shell() : type(NODE), data() { }
-
-        ~Shell()
-        {
-            switch( type )
-            {
-            case NODE:           delete data.node; break;
-            case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
-            case LOW_RANK:       delete data.F; break;
-            case DENSE:          delete data.D; break;
-            }
-        }
+        Quasi2dHMatrix& Child( int i, int j );
+        const Quasi2dHMatrix& Child( int i, int j ) const;
     };
 
     static void BuildNaturalToHierarchicalMap
@@ -234,7 +107,16 @@ public:
       int ySource, int yTarget,
       int sourceOffset, int targetOffset );
 
+    // Reconstruct an H-matrix from its packed form
+    Quasi2dHMatrix( const std::vector<byte>& packedHMatrix );
+
     ~Quasi2dHMatrix();
+
+    // Routines useful for packing and unpacking the Quasi2dHMatrix to/from
+    // a contiguous buffer.
+    int PackedSize() const;
+    void Pack( std::vector<byte>& packedHMatrix ) const;
+    void Unpack( const std::vector<byte>& packedHMatrix );
 
     int XSizeSource() const { return _xSizeSource; }
     int XSizeTarget() const { return _xSizeTarget; }
@@ -247,9 +129,6 @@ public:
     int YSource() const { return _ySource; }
     int XTarget() const { return _xTarget; }
     int YTarget() const { return _yTarget; }
-
-          Shell& GetShell() { return _shell; }
-    const Shell& GetShell() const { return _shell; }
 
     bool IsDense() const { return _shell.type == DENSE; }
     bool IsHierarchical() const
@@ -394,6 +273,35 @@ public:
     void SchulzInvert( int maxIts );
 
 private:
+    enum ShellType { NODE, NODE_SYMMETRIC, LOW_RANK, DENSE };
+
+    struct Shell
+    {
+        ShellType type;
+        union Data
+        {
+            Node* node;
+            NodeSymmetric* nodeSymmetric;
+            DenseMatrix<Scalar>* D;
+            LowRankMatrix<Scalar,Conjugated>* F;
+
+            Data() { std::memset( this, 0, sizeof(Data) ); }
+        } data;
+
+        Shell() : type(NODE), data() { }
+
+        ~Shell()
+        {
+            switch( type )
+            {
+            case NODE:           delete data.node; break;
+            case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
+            case LOW_RANK:       delete data.F; break;
+            case DENSE:          delete data.D; break;
+            }
+        }
+    };
+
     // Data specific to our quasi-2d H-matrix
     int _xSizeSource, _xSizeTarget;
     int _ySizeSource, _ySizeTarget;
@@ -406,12 +314,20 @@ private:
 
     void ImportLowRankMatrix
     ( const LowRankMatrix<Scalar,Conjugated>& F );
-    void ImportSparseMatrix
-    ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
-
+    
     void UpdateWithLowRankMatrix
     ( Scalar alpha,
       const LowRankMatrix<Scalar,Conjugated>& F );
+
+    void ImportSparseMatrix
+    ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
+
+    void CountShellSize
+    ( int& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
+    void PackShell
+    ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
+    void UnpackShell
+    ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     // y += alpha A x
     void UpdateVectorWithNodeSymmetric
@@ -428,6 +344,142 @@ private:
     ( int* map, int& index, int level, int numLevels,
       int xSize, int ySize, int zSize, int thisXSize, int thisYSize );
 };
+
+} // namespace psp
+
+//----------------------------------------------------------------------------//
+// Inlined implementations                                                    //
+//----------------------------------------------------------------------------//
+
+namespace psp {
+
+template<typename Scalar,bool Conjugated>
+inline
+Quasi2dHMatrix<Scalar,Conjugated>::Node::Node
+( int xSizeSource, int xSizeTarget,
+  int ySizeSource, int ySizeTarget,
+  int zSize )
+: children(16)
+{
+    xSourceSizes[0] = xSizeSource/2;
+    xSourceSizes[1] = xSizeSource - xSourceSizes[0];
+    ySourceSizes[0] = ySizeSource/2;
+    ySourceSizes[1] = ySizeSource - ySourceSizes[0];
+            
+    sourceSizes[0] = xSourceSizes[0]*ySourceSizes[0]*zSize;
+    sourceSizes[1] = xSourceSizes[1]*ySourceSizes[0]*zSize;
+    sourceSizes[2] = xSourceSizes[0]*ySourceSizes[1]*zSize;
+    sourceSizes[3] = xSourceSizes[1]*ySourceSizes[1]*zSize;
+
+    xTargetSizes[0] = xSizeTarget/2;
+    xTargetSizes[1] = xSizeTarget - xTargetSizes[0];
+    yTargetSizes[0] = ySizeTarget/2;
+    yTargetSizes[1] = ySizeTarget - yTargetSizes[0];
+
+    targetSizes[0] = xTargetSizes[0]*yTargetSizes[0]*zSize;
+    targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
+    targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*zSize;
+    targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+Quasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
+{
+    for( unsigned i=0; i<children.size(); ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline Quasi2dHMatrix<Scalar,Conjugated>& 
+Quasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j )
+{ 
+#ifndef RELEASE
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Child indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Child indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+#endif
+    return *children[j+4*i]; 
+}
+
+template<typename Scalar,bool Conjugated>
+inline const Quasi2dHMatrix<Scalar,Conjugated>& 
+Quasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
+{ 
+#ifndef RELEASE
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Child indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Child indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+#endif
+    return *children[j+4*i]; 
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
+( int xSize, int ySize, int zSize )
+: children(10)
+{
+    xSizes[0] = xSize/2;
+    xSizes[1] = xSize - xSizes[0];
+    ySizes[0] = ySize/2;
+    ySizes[1] = ySize - ySizes[0];
+
+    sizes[0] = xSizes[0]*ySizes[0]*zSize;
+    sizes[1] = xSizes[1]*ySizes[0]*zSize;
+    sizes[2] = xSizes[0]*ySizes[1]*zSize;
+    sizes[3] = xSizes[1]*ySizes[1]*zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
+{
+    for( unsigned i=0; i<children.size(); ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline Quasi2dHMatrix<Scalar,Conjugated>& 
+Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
+{ 
+#ifndef RELEASE
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Child indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Child indices out of bounds");
+    if( j > i )
+        throw std::logic_error("Child index outside of lower triangle");
+    if( children.size() != 10 )
+        throw std::logic_error("children array not yet set up");
+#endif
+    return *children[(i*(i+1))/2 + j]; 
+}
+
+template<typename Scalar,bool Conjugated>
+inline const Quasi2dHMatrix<Scalar,Conjugated>& 
+Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j ) const
+{
+#ifndef RELEASE
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Child indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Child indices out of bounds");
+    if( j > i )
+        throw std::logic_error("Child index outside of lower triangle");
+    if( children.size() != 10 )
+        throw std::logic_error("children array not yet set up");
+#endif
+    return *children[(i*(i+1))/2 + j];
+}
 
 } // namespace psp
 

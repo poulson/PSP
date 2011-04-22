@@ -30,6 +30,8 @@
 
 namespace psp {
 
+typedef unsigned char byte;
+
 template<typename Real>
 inline Real
 Conj( Real alpha )

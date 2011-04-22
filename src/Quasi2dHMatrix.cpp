@@ -210,6 +210,91 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::~Quasi2dHMatrix()
 { }
 
 template<typename Scalar,bool Conjugated>
+int
+psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSize() const
+{
+    int packedSize = 0;
+
+    // Make space for the abstract H-matrix information
+    packedSize += 6*sizeof(int) + 2*sizeof(bool);
+
+    // Quasi2dHMatrix-specific information
+    packedSize += 9*sizeof(int);
+
+    // Recurse on this shell to finish computing the packed size
+    CountShellSize( packedSize, *this );
+
+    return packedSize;
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
+( std::vector<byte>& packedHMatrix ) const
+{
+    // Create the storage and extract the buffer
+    const unsigned packedSize = PackedSize();
+    packedHMatrix.resize( packedSize );
+    byte* head = &packedHMatrix[0];
+
+    // Write out the abstract H-matrix information
+    *((int*)head)  = this->_height;             head += sizeof(int);
+    *((int*)head)  = this->_width;              head += sizeof(int);
+    *((int*)head)  = this->_numLevels;          head += sizeof(int);
+    *((int*)head)  = this->_maxRank;            head += sizeof(int);
+    *((int*)head)  = this->_sourceOffset;       head += sizeof(int);
+    *((int*)head)  = this->_targetOffset;       head += sizeof(int);
+    *((bool*)head) = this->_symmetric;          head += sizeof(bool);
+    *((bool*)head) = this->_stronglyAdmissible; head += sizeof(bool);
+
+    // Write out the Quasi2dHMatrix-specific information
+    *((int*)head) = _xSizeSource; head += sizeof(int);
+    *((int*)head) = _xSizeTarget; head += sizeof(int);
+    *((int*)head) = _ySizeSource; head += sizeof(int);
+    *((int*)head) = _ySizeTarget; head += sizeof(int);
+    *((int*)head) = _zSize;       head += sizeof(int);
+    *((int*)head) = _xSource;     head += sizeof(int);
+    *((int*)head) = _xTarget;     head += sizeof(int);
+    *((int*)head) = _ySource;     head += sizeof(int);
+    *((int*)head) = _yTarget;     head += sizeof(int);
+
+    // Fill this shell
+    PackShell( head, *this );
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
+( const std::vector<byte>& packedHMatrix )
+{
+    const byte* head = &packedHMatrix[0];
+
+    // Set the abstract H-matrix data
+    this->_height             = *((int*)head);  head += sizeof(int);
+    this->_width              = *((int*)head);  head += sizeof(int);
+    this->_numLevels          = *((int*)head);  head += sizeof(int);
+    this->_maxRank            = *((int*)head);  head += sizeof(int);
+    this->_sourceOffset       = *((int*)head);  head += sizeof(int);
+    this->_targetOffset       = *((int*)head);  head += sizeof(int);
+    this->_symmetric          = *((bool*)head); head += sizeof(bool);
+    this->_stronglyAdmissible = *((bool*)head); head += sizeof(bool);
+
+    // Set the Quasi2dHMatrix-specific information
+    _xSizeSource = *((int*)head); head += sizeof(int);
+    _xSizeTarget = *((int*)head); head += sizeof(int);
+    _ySizeSource = *((int*)head); head += sizeof(int);
+    _ySizeTarget = *((int*)head); head += sizeof(int);
+    _zSize       = *((int*)head); head += sizeof(int);
+    _xSource     = *((int*)head); head += sizeof(int);
+    _xTarget     = *((int*)head); head += sizeof(int);
+    _ySource     = *((int*)head); head += sizeof(int);
+    _yTarget     = *((int*)head); head += sizeof(int);
+
+    // Unpack the shell
+    UnpackShell( head, *this );
+}
+
+template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
 ( const std::string& tag ) const
@@ -2400,6 +2485,225 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 #ifndef RELEASE
     PopCallStack();
 #endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
+( int& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const
+{
+    const Shell& shell = H._shell;
+    const ShellType type = shell.type;
+
+    packedSize += sizeof(ShellType);
+    switch( type )
+    {
+    case NODE:
+        for( int i=0; i<16; ++i )
+            CountShellSize( packedSize, *shell.data.node->children[i] );
+        break;
+    case NODE_SYMMETRIC:
+        for( int i=0; i<10; ++i )
+        {
+            CountShellSize
+            ( packedSize, *shell.data.nodeSymmetric->children[i] );
+        }
+        break;
+    case LOW_RANK:
+    {
+        const DenseMatrix<Scalar>& U = shell.data.F->U;
+        const DenseMatrix<Scalar>& V = shell.data.F->V;
+        const int m = U.Height();
+        const int n = V.Height();
+        const int r = U.Width();
+
+        // Make space for the dimensions
+        packedSize += 3*sizeof(int);
+
+        // Make space for U and V
+        packedSize += (m+n)*r*sizeof(Scalar);
+
+        break;
+    }
+    case DENSE:
+    {
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        const int m = D.Height();
+        const int n = D.Width();
+
+        // Make space for the dimensions
+        packedSize += 2*sizeof(int);
+
+        // Make space for the matrix data
+        packedSize += m*n*sizeof(Scalar);
+
+        break;
+    }
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::PackShell
+( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const
+{
+    const Shell& shell = H._shell;
+    const ShellType type = shell.type;
+
+    *((ShellType*)head) = type; head += sizeof(ShellType);
+    switch( type )
+    {
+    case NODE:
+        for( int i=0; i<16; ++i )
+            PackShell( head, *shell.data.node->children[i] );
+        break;
+    case NODE_SYMMETRIC:
+        for( int i=0; i<10; ++i )
+            PackShell( head, *shell.data.nodeSymmetric->children[i] );
+        break;
+    case LOW_RANK:
+    {
+        const DenseMatrix<Scalar>& U = shell.data.F->U;
+        const DenseMatrix<Scalar>& V = shell.data.F->V;
+        const int m = U.Height();
+        const int n = V.Height();
+        const int r = U.Width();
+
+        // Write out the dimensions
+        *((int*)head) = m; head += sizeof(int);
+        *((int*)head) = n; head += sizeof(int);
+        *((int*)head) = r; head += sizeof(int);
+
+        // Write out U
+        for( int j=0; j<r; ++j )
+        {
+            std::memcpy( head, U.LockedBuffer(0,j), m*sizeof(Scalar) );
+            head += m*sizeof(Scalar);
+        }
+
+        // Write out V
+        for( int j=0; j<r; ++j )
+        {
+            std::memcpy( head, V.LockedBuffer(0,j), n*sizeof(Scalar) );
+            head += n*sizeof(Scalar);
+        }
+
+        break;
+    }
+    case DENSE:
+    {
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        const int m = D.Height();
+        const int n = D.Width();
+
+        // Write out the dimensions
+        *((int*)head) = m; head += sizeof(int);
+        *((int*)head) = n; head += sizeof(int);
+
+        // Write out the matrix data
+        for( int j=0; j<n; ++j )
+        {
+            std::memcpy( head, D.LockedBuffer(0,j), m*sizeof(Scalar) );
+            head += m*sizeof(Scalar);
+        }
+
+        break;
+    }
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
+( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H )
+{
+    Shell& shell = H._shell;
+
+    // If data has been allocated, delete it
+    switch( shell.type )
+    {
+    case NODE:           delete shell.data.node; break;
+    case NODE_SYMMETRIC: delete shell.data.nodeSymmetric; break;
+    case LOW_RANK:       delete shell.data.F; break;
+    case DENSE:          delete shell.data.D; break;
+    }
+
+    shell.type = *((ShellType*)head); head += sizeof(ShellType);
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        shell.data.node = 
+            new Node
+            ( H._xSizeSource, H._xSizeTarget, 
+              H._ySizeSource, H._ySizeTarget, H._zSize );
+        Node& node = *shell.data.node;
+        for( int i=0; i<16; ++i )
+        {
+            node.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            UnpackShell( head, *node.children[i] );
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        shell.data.nodeSymmetric = 
+            new NodeSymmetric( H._xSizeSource, H._ySizeSource, H._zSize );
+        NodeSymmetric& node = *shell.data.nodeSymmetric;
+        for( int i=0; i<10; ++i )
+        {
+            node.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            UnpackShell( head, *node.children[i] );
+        }
+        break;
+    }
+    case LOW_RANK:
+    {
+        shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        DenseMatrix<Scalar>& U = shell.data.F->U;
+        DenseMatrix<Scalar>& V = shell.data.F->V;
+
+        // Read in the matrix dimensions
+        const int m = *((int*)head); head += sizeof(int);
+        const int n = *((int*)head); head += sizeof(int);
+        const int r = *((int*)head); head += sizeof(int);
+        U.Resize( m, r );
+        V.Resize( n, r );
+
+        // Read in U
+        for( int j=0; j<r; ++j )
+        {
+            std::memcpy( U.Buffer(0,j), head, m*sizeof(Scalar) );
+            head += m*sizeof(Scalar);
+        }
+
+        // Read in V
+        for( int j=0; j<r; ++j )
+        {
+            std::memcpy( V.Buffer(0,j), head, n*sizeof(Scalar) );
+            head += n*sizeof(Scalar);
+        }
+
+        break;
+    }
+    case DENSE:
+        shell.data.D = new DenseMatrix<Scalar>;
+        DenseMatrix<Scalar>& D = *shell.data.D;
+
+        // Read in the matrix dimensions
+        const int m = *((int*)head); head += sizeof(int);
+        const int n = *((int*)head); head += sizeof(int);
+        D.Resize( m, n );
+
+        // Read in the matrix
+        for( int j=0; j<n; ++j )
+        {
+            std::memcpy( D.Buffer(0,j), head, m*sizeof(Scalar) );
+            head += m*sizeof(Scalar);
+        }
+
+        break;
+    }
 }
 
 // y += alpha A x
