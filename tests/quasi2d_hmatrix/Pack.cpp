@@ -22,7 +22,7 @@
 
 void Usage()
 {
-    std::cout << "Invert <xSize> <ySize> <zSize> <numLevels> "
+    std::cout << "Pack <xSize> <ySize> <zSize> <numLevels> "
                  "<strongly admissible?> <r> <print?>" << std::endl;
 }
 

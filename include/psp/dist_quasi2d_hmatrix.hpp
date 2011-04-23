@@ -29,21 +29,37 @@ template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
 private:
+    /*
     enum ShellType 
     { NODE, NODE_SYMMETRIC, BLACK_BOX, 
       LEFT_HALF_OF_LOW_RANK, RIGHT_HALF_OF_LOW_RANK, 
       LEFT_TEAM_DENSE, RIGHT_TEAM_DENSE };
+    */
     // NOTE: We may need to expand the list of dense shell types for triangular
     //       matrices in order to get better load balancing.
 
+    /*
     void PreCompute
     ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
     void Communicate
     ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
     void PostCompute
     ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
+    */
+
+    static void CountScatteredShellSizes
+    ( std::vector<std::size_t>& scatteredSizes,
+      int rank, int p, int sourceRankOffset, int targetRankOffset,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void CountSizeOfSourceSideOfLeaf
+    ( std::size_t& size, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void CountSizeOfTargetSideOfLeaf
+    ( std::size_t& size, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
 public:
+    /*
     struct PackedSharedLowRanks
     {
         int numShared;
@@ -80,6 +96,7 @@ public:
         int* offsets;
         Scalar* buffer;
     };
+    */
 
     // We should build the distributed H-matrix from the pieces rather than
     // from an entire serial H-matrix.
@@ -87,14 +104,20 @@ public:
     // The packed dense matrices imply the existence of the transposed 
     // pairing that requires no data at construction but does require
     // communication in the middle phase of a matvec.
+    /*
     DistQuasi2dHMatrix
     ( int numLevels, bool stronglyAdmissible, int xSize, int ySize, int zSize,
       const Quasi2dHMatrix<Scalar,Conjugated>& myLeaf,
       const PackedSharedLowRanks& packedSharedLowRanks,
       const PackedSharedDenses& packedSharedDenses );
+    */
+
+    static void ScatteredSizes
+    ( std::vector<std::size_t>& scatteredSizes,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
 
     void MapVector
-    ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
+    ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y ) const;
 };
 
 } // namespace psp

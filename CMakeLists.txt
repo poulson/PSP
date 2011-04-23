@@ -37,38 +37,38 @@ endif(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
 
 # We need PETSc's GMRES, so go ahead and use its dependencies, which we must 
 # link anyways.
-if(NOT PETSC_DIR)    
-  message(
-    FATAL_ERROR
-    "PETSC_DIR must be set to the location of the top-level PETSc folder."
-  )
-endif(NOT PETSC_DIR)
-if(NOT PETSC_ARCH_SUBDIR)
-  message(
-    FATAL_ERROR
-    "PETSC_ARCH_SUBDIR must be set to the architecture-specific PETSc subdirectory."
-  )
-endif(NOT PETSC_ARCH_SUBDIR)
-set(PETSC_INCLUDE_DIR "${PETSC_DIR}/include")
-set(PETSC_ARCH_INCLUDE_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/include")
-set(PETSC_LIB_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/lib")
-find_library(PETSC_LIB NAMES petsc HINTS ${PETSC_LIB_DIR})
-if(NOT PETSC_LIB)
-  message(
-    FATAL_ERROR
-    "Could not find PETSc using PETSC_DIR and PETSC_ARCH_SUBDIR. Please make sure it was built."
-  )
-endif(NOT PETSC_LIB)
+#if(NOT PETSC_DIR)    
+#  message(
+#    FATAL_ERROR
+#    "PETSC_DIR must be set to the location of the top-level PETSc folder."
+#  )
+#endif(NOT PETSC_DIR)
+#if(NOT PETSC_ARCH_SUBDIR)
+#  message(
+#    FATAL_ERROR
+#    "PETSC_ARCH_SUBDIR must be set to the architecture-specific PETSc subdirectory."
+#  )
+#endif(NOT PETSC_ARCH_SUBDIR)
+#set(PETSC_INCLUDE_DIR "${PETSC_DIR}/include")
+#set(PETSC_ARCH_INCLUDE_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/include")
+#set(PETSC_LIB_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/lib")
+#find_library(PETSC_LIB NAMES petsc HINTS ${PETSC_LIB_DIR})
+#if(NOT PETSC_LIB)
+#  message(
+#    FATAL_ERROR
+#    "Could not find PETSc using PETSC_DIR and PETSC_ARCH_SUBDIR. Please make sure it was built."
+#  )
+#endif(NOT PETSC_LIB)
 
 # X11 library
-find_library(X11_LIB NAMES X11)
-if(NOT X11_LIB)
-  if(BUILT_PETSC_WITH_X11)
-    message(FATAL_ERROR "Could not find X11 lib.")
-  else(BUILT_PETSC_WITH_X11)
-    set(X11_LIB "")
-  endif(BUILT_PETSC_WITH_X11)
-endif(NOT X11_LIB)
+#find_library(X11_LIB NAMES X11)
+#if(NOT X11_LIB)
+#  if(BUILT_PETSC_WITH_X11)
+#    message(FATAL_ERROR "Could not find X11 lib.")
+#  else(BUILT_PETSC_WITH_X11)
+#    set(X11_LIB "")
+#  endif(BUILT_PETSC_WITH_X11)
+#endif(NOT X11_LIB)
 
 # Dynamic library
 find_library(DL_LIB NAMES dl)
@@ -289,8 +289,8 @@ endforeach(HEADER)
 include_directories("${PROJECT_BINARY_DIR}/include")
 
 # Make sure that the PETSc includes can be found
-include_directories("${PETSC_INCLUDE_DIR}")
-include_directories("${PETSC_ARCH_INCLUDE_DIR}")
+#include_directories("${PETSC_INCLUDE_DIR}")
+#include_directories("${PETSC_ARCH_INCLUDE_DIR}")
 
 # Build the PSP source
 add_library(psp STATIC ${PSP_SRC})

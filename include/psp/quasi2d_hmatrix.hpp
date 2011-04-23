@@ -26,10 +26,15 @@
 
 namespace psp {
 
+// Forward declare the distributed version so that we may friend it
+template<typename Scalar,bool Conjugated> class DistQuasi2dHMatrix;
+
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
 public:    
+    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
+
     struct Node
     {
         std::vector<Quasi2dHMatrix*> children;
@@ -114,7 +119,7 @@ public:
 
     // Routines useful for packing and unpacking the Quasi2dHMatrix to/from
     // a contiguous buffer.
-    int PackedSize() const;
+    std::size_t PackedSize() const;
     void Pack( std::vector<byte>& packedHMatrix ) const;
     void Unpack( const std::vector<byte>& packedHMatrix );
 
@@ -322,11 +327,11 @@ private:
     void ImportSparseMatrix
     ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
 
-    void CountShellSize
+    static void CountShellSize
     ( std::size_t& packedSize, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
-    void PackShell
-    ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const;
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    static void PackShell
+    ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H );
     void UnpackShell
     ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H );
 
