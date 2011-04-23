@@ -206,6 +206,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
 }
 
 template<typename Scalar,bool Conjugated>
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
+( const std::vector<byte>& packedHMatrix )
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Quasi2dHMatrix");
+#endif
+    Unpack( packedHMatrix );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMatrix<Scalar,Conjugated>::~Quasi2dHMatrix()
 { }
 
@@ -213,17 +226,17 @@ template<typename Scalar,bool Conjugated>
 int
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSize() const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::PackedSize");
+#endif
     std::size_t packedSize = 0;
-
-    // Make space for the abstract H-matrix information
-    packedSize += 6*sizeof(int) + 2*sizeof(bool);
-
-    // Quasi2dHMatrix-specific information
-    packedSize += 9*sizeof(int);
 
     // Recurse on this shell to finish computing the packed size
     CountShellSize( packedSize, *this );
 
+#ifndef RELEASE
+    PopCallStack();
+#endif
     return packedSize;
 }
 
@@ -232,34 +245,20 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 ( std::vector<byte>& packedHMatrix ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Pack");
+#endif
     // Create the storage and extract the buffer
     const std::size_t packedSize = PackedSize();
     packedHMatrix.resize( packedSize );
     byte* head = &packedHMatrix[0];
 
-    // Write out the abstract H-matrix information
-    *((int*)head)  = this->_height;             head += sizeof(int);
-    *((int*)head)  = this->_width;              head += sizeof(int);
-    *((int*)head)  = this->_numLevels;          head += sizeof(int);
-    *((int*)head)  = this->_maxRank;            head += sizeof(int);
-    *((int*)head)  = this->_sourceOffset;       head += sizeof(int);
-    *((int*)head)  = this->_targetOffset;       head += sizeof(int);
-    *((bool*)head) = this->_symmetric;          head += sizeof(bool);
-    *((bool*)head) = this->_stronglyAdmissible; head += sizeof(bool);
-
-    // Write out the Quasi2dHMatrix-specific information
-    *((int*)head) = _xSizeSource; head += sizeof(int);
-    *((int*)head) = _xSizeTarget; head += sizeof(int);
-    *((int*)head) = _ySizeSource; head += sizeof(int);
-    *((int*)head) = _ySizeTarget; head += sizeof(int);
-    *((int*)head) = _zSize;       head += sizeof(int);
-    *((int*)head) = _xSource;     head += sizeof(int);
-    *((int*)head) = _xTarget;     head += sizeof(int);
-    *((int*)head) = _ySource;     head += sizeof(int);
-    *((int*)head) = _yTarget;     head += sizeof(int);
-
-    // Fill this shell
+    // Start the recursive packing
     PackShell( head, *this );
+
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -267,31 +266,17 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
 ( const std::vector<byte>& packedHMatrix )
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Unpack");
+#endif
     const byte* head = &packedHMatrix[0];
 
-    // Set the abstract H-matrix data
-    this->_height             = *((int*)head);  head += sizeof(int);
-    this->_width              = *((int*)head);  head += sizeof(int);
-    this->_numLevels          = *((int*)head);  head += sizeof(int);
-    this->_maxRank            = *((int*)head);  head += sizeof(int);
-    this->_sourceOffset       = *((int*)head);  head += sizeof(int);
-    this->_targetOffset       = *((int*)head);  head += sizeof(int);
-    this->_symmetric          = *((bool*)head); head += sizeof(bool);
-    this->_stronglyAdmissible = *((bool*)head); head += sizeof(bool);
-
-    // Set the Quasi2dHMatrix-specific information
-    _xSizeSource = *((int*)head); head += sizeof(int);
-    _xSizeTarget = *((int*)head); head += sizeof(int);
-    _ySizeSource = *((int*)head); head += sizeof(int);
-    _ySizeTarget = *((int*)head); head += sizeof(int);
-    _zSize       = *((int*)head); head += sizeof(int);
-    _xSource     = *((int*)head); head += sizeof(int);
-    _xTarget     = *((int*)head); head += sizeof(int);
-    _ySource     = *((int*)head); head += sizeof(int);
-    _yTarget     = *((int*)head); head += sizeof(int);
-
-    // Unpack the shell
+    // Start the recursive unpacking
     UnpackShell( head, *this );
+
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -299,6 +284,9 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
 ( const std::string& tag ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Print");
+#endif
     DenseMatrix<Scalar> I( this->Width(), this->Width() );
     std::memset( I.Buffer(), 0, I.LDim()*I.Width() );
     for( int j=0; j<this->Width(); ++j )
@@ -307,6 +295,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
     DenseMatrix<Scalar> HFull;
     this->MapMatrix( (Scalar)1, I, HFull );
     HFull.Print( tag );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -314,8 +305,14 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructure
 ( const std::string& filename ) const
 {
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::WriteStructure");
+#endif
     std::ofstream file( filename.c_str() );
     WriteStructureRecursion( file );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename Scalar,bool Conjugated>
@@ -2492,11 +2489,15 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
 ( std::size_t& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const
 {
-    const Shell& shell = H._shell;
-    const ShellType type = shell.type;
+    // Make space for the abstract H-matrix information
+    packedSize += 6*sizeof(int) + 2*sizeof(bool);
 
+    // Quasi2dHMatrix-specific information
+    packedSize += 9*sizeof(int);
+
+    const Shell& shell = H._shell;
     packedSize += sizeof(ShellType);
-    switch( type )
+    switch( shell.type )
     {
     case NODE:
         for( int i=0; i<16; ++i )
@@ -2547,11 +2548,30 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackShell
 ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H ) const
 {
-    const Shell& shell = H._shell;
-    const ShellType type = shell.type;
+    // Write out the abstract H-matrix information
+    *((int*)head)  = H._height;             head += sizeof(int);
+    *((int*)head)  = H._width;              head += sizeof(int);
+    *((int*)head)  = H._numLevels;          head += sizeof(int);
+    *((int*)head)  = H._maxRank;            head += sizeof(int);
+    *((int*)head)  = H._sourceOffset;       head += sizeof(int);
+    *((int*)head)  = H._targetOffset;       head += sizeof(int);
+    *((bool*)head) = H._symmetric;          head += sizeof(bool);
+    *((bool*)head) = H._stronglyAdmissible; head += sizeof(bool);
 
-    *((ShellType*)head) = type; head += sizeof(ShellType);
-    switch( type )
+    // Write out the Quasi2dHMatrix-specific information
+    *((int*)head) = H._xSizeSource; head += sizeof(int);
+    *((int*)head) = H._xSizeTarget; head += sizeof(int);
+    *((int*)head) = H._ySizeSource; head += sizeof(int);
+    *((int*)head) = H._ySizeTarget; head += sizeof(int);
+    *((int*)head) = H._zSize;       head += sizeof(int);
+    *((int*)head) = H._xSource;     head += sizeof(int);
+    *((int*)head) = H._xTarget;     head += sizeof(int);
+    *((int*)head) = H._ySource;     head += sizeof(int);
+    *((int*)head) = H._yTarget;     head += sizeof(int);
+
+    const Shell& shell = H._shell;
+    *((ShellType*)head) = shell.type; head += sizeof(ShellType);
+    switch( shell.type )
     {
     case NODE:
         for( int i=0; i<16; ++i )
@@ -2617,9 +2637,29 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
 ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
-    Shell& shell = H._shell;
+    // Set the abstract H-matrix data
+    H._height             = *((int*)head);  head += sizeof(int);
+    H._width              = *((int*)head);  head += sizeof(int);
+    H._numLevels          = *((int*)head);  head += sizeof(int);
+    H._maxRank            = *((int*)head);  head += sizeof(int);
+    H._sourceOffset       = *((int*)head);  head += sizeof(int);
+    H._targetOffset       = *((int*)head);  head += sizeof(int);
+    H._symmetric          = *((bool*)head); head += sizeof(bool);
+    H._stronglyAdmissible = *((bool*)head); head += sizeof(bool);
+
+    // Set the Quasi2dHMatrix-specific information
+    H._xSizeSource = *((int*)head); head += sizeof(int);
+    H._xSizeTarget = *((int*)head); head += sizeof(int);
+    H._ySizeSource = *((int*)head); head += sizeof(int);
+    H._ySizeTarget = *((int*)head); head += sizeof(int);
+    H._zSize       = *((int*)head); head += sizeof(int);
+    H._xSource     = *((int*)head); head += sizeof(int);
+    H._xTarget     = *((int*)head); head += sizeof(int);
+    H._ySource     = *((int*)head); head += sizeof(int);
+    H._yTarget     = *((int*)head); head += sizeof(int);
 
     // If data has been allocated, delete it
+    Shell& shell = H._shell;
     switch( shell.type )
     {
     case NODE:           delete shell.data.node; break;
