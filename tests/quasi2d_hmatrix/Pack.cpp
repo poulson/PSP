@@ -200,7 +200,6 @@ main( int argc, char* argv[] )
                   << "Packed size: " << sizeInMB << " MB." << std::endl;
 
         // Unpack the H-matrix
-
         std::cout << "Unpacking H-matrix...";
         std::cout.flush();
         double unpackStartTime = MPI_Wtime();
