@@ -69,17 +69,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::CountScatteredShellSizes
             throw std::logic_error("Mistake in logic");
 #endif
         if( sourceRankOffset == targetRankOffset )
-        {
             scatteredSizes[rank] += H.PackedSize();
-        }
         else if( rank == sourceRankOffset )
-        {
             CountSizeOfSourceSideOfLeaf( scatteredSizes[rank], H );
-        }
         else
-        {
             CountSizeOfTargetSideOfLeaf( scatteredSizes[rank], H );
-        }
     }
     else if( p == 2 )
     {

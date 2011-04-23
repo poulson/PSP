@@ -22,6 +22,9 @@
 #define PSP_DIST_QUASI2D_HMATRIX_HPP 1
 
 #include "psp/quasi2d_hmatrix.hpp"
+#include "psp/shared_quasi2d_hmatrix.hpp"
+#include "psp/shared_low_rank_matrix.hpp"
+#include "psp/shared_dense_matrix.hpp"
 
 namespace psp {
 
@@ -59,44 +62,6 @@ private:
     ( std::size_t& size, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
 public:
-    /*
-    struct PackedSharedLowRanks
-    {
-        int numShared;
-
-        // Dimensions of full low-rank matrices
-        int* heights;
-        int* widths;
-        int* ranks;
-
-        // Which side we own for each half and who the partners are
-        bool* sides;
-        int* pairedRanks;
-
-        // The buffer that all of the entries are packed into. The j'th half
-        // of a low-rank matrix is stored at &buffer[offsets[j]].
-        int* offsets;
-        Scalar* buffer;
-    };
-
-    struct PackedSharedDenses
-    {
-        int numShared;
-
-        // Dimensions of shared dense matrices
-        int* heights;
-        int* widths;
-
-        // Whether or not we own the data and who the partners are
-        bool* mine;
-        int* pairedRanks;
-
-        // The buffer where all of the entries are packed. The j'th dense
-        // matrix (if we own it) can be accessed at &buffer[offsets[j]].
-        int* offsets;
-        Scalar* buffer;
-    };
-    */
 
     // We should build the distributed H-matrix from the pieces rather than
     // from an entire serial H-matrix.
