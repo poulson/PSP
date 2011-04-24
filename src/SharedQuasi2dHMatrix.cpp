@@ -260,9 +260,9 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const int r = U.Width();
 
         // Write out the source information
-        *((int*)sourceHead) = m;          sourceHead += sizeof(int);
-        *((int*)sourceHead) = n;          sourceHead += sizeof(int);
-        *((int*)sourceHead) = r;          sourceHead += sizeof(int);
+        *((int*)sourceHead) = m; sourceHead += sizeof(int);
+        *((int*)sourceHead) = n; sourceHead += sizeof(int);
+        *((int*)sourceHead) = r; sourceHead += sizeof(int);
         for( int j=0; j<r; ++j )
         {
             std::memcpy( sourceHead, V.LockedBuffer(0,j), n*sizeof(Scalar) );
@@ -270,9 +270,9 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
 
         // Write out the target information
-        *((int*)targetHead) = m;          targetHead += sizeof(int);
-        *((int*)targetHead) = n;          targetHead += sizeof(int);
-        *((int*)targetHead) = r;          targetHead += sizeof(int);
+        *((int*)targetHead) = m; targetHead += sizeof(int);
+        *((int*)targetHead) = n; targetHead += sizeof(int);
+        *((int*)targetHead) = r; targetHead += sizeof(int);
         for( int j=0; j<r; ++j )
         {
             std::memcpy( targetHead, U.LockedBuffer(0,j), m*sizeof(Scalar) );
@@ -319,8 +319,8 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
 
         // Write out the target information
-        *((int*)targetHead) = m;          targetHead += sizeof(int);
-        *((int*)targetHead) = n;          targetHead += sizeof(int);
+        *((int*)targetHead) = m; targetHead += sizeof(int);
+        *((int*)targetHead) = n; targetHead += sizeof(int);
 
         break;
     }
@@ -401,7 +401,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     H._xTarget            = *((int*)head);  head += sizeof(int);
     H._ySource            = *((int*)head);  head += sizeof(int);
     H._yTarget            = *((int*)head);  head += sizeof(int);
-    H._ownSourceSide     = *((bool*)head); head += sizeof(bool);
+    H._ownSourceSide     = *((bool*)head);  head += sizeof(bool);
     H._partner            = *((int*)head);  head += sizeof(int);
 
     // Delete the old shell information if it exists
@@ -452,11 +452,11 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         const int m = *((int*)head); head += sizeof(int);
         const int n = *((int*)head); head += sizeof(int);
         const int r = *((int*)head); head += sizeof(int);
-        SF.height         = m;
-        SF.width          = n;
-        SF.rank           = r;
+        SF.height        = m;
+        SF.width         = n;
+        SF.rank          = r;
         SF.ownSourceSide = H._ownSourceSide;
-        SF.partner        = H._partner;
+        SF.partner       = H._partner;
 
         SF.D.SetType( GENERAL );
         if( SF.ownSourceSide )
