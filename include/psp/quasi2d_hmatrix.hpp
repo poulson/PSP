@@ -26,18 +26,19 @@
 
 namespace psp {
 
-// Forward declare the distributed version so that we may friend it
+// Forward declare friend classes
+template<typename Scalar,bool Conjugated> class SharedQuasi2dHMatrix;
 template<typename Scalar,bool Conjugated> class DistQuasi2dHMatrix;
 
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
 private:
-    static void CountShellSize
+    static void PackedSizeRecursion
     ( std::size_t& packedSize, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    static void PackShell
+    static void PackRecursion
     ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void BuildMapOnQuadrant
@@ -133,7 +134,7 @@ private:
     void ImportSparseMatrix
     ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
 
-    void UnpackShell
+    void UnpackRecursion
     ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     // y += alpha A x
@@ -148,6 +149,7 @@ private:
     void WriteStructureRecursion( std::ofstream& file ) const;
     
 public:    
+    friend class SharedQuasi2dHMatrix<Scalar,Conjugated>;
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
     static void BuildNaturalToHierarchicalMap
@@ -410,12 +412,14 @@ inline Quasi2dHMatrix<Scalar,Conjugated>&
 Quasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j )
 { 
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Node::Child");
     if( i < 0 || j < 0 )
-        throw std::logic_error("Child indices must be non-negative");
+        throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
-        throw std::logic_error("Child indices out of bounds");
+        throw std::logic_error("Indices out of bounds");
     if( children.size() != 16 )
         throw std::logic_error("children array not yet set up");
+    PopCallStack();
 #endif
     return *children[j+4*i]; 
 }
@@ -425,12 +429,14 @@ inline const Quasi2dHMatrix<Scalar,Conjugated>&
 Quasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
 { 
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Node::Child");
     if( i < 0 || j < 0 )
-        throw std::logic_error("Child indices must be non-negative");
+        throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
-        throw std::logic_error("Child indices out of bounds");
+        throw std::logic_error("Indices out of bounds");
     if( children.size() != 16 )
         throw std::logic_error("children array not yet set up");
+    PopCallStack();
 #endif
     return *children[j+4*i]; 
 }
@@ -466,14 +472,16 @@ inline Quasi2dHMatrix<Scalar,Conjugated>&
 Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
 { 
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::NodeSymmetric::Child");
     if( i < 0 || j < 0 )
-        throw std::logic_error("Child indices must be non-negative");
+        throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
-        throw std::logic_error("Child indices out of bounds");
+        throw std::logic_error("Indices out of bounds");
     if( j > i )
-        throw std::logic_error("Child index outside of lower triangle");
+        throw std::logic_error("Index outside of lower triangle");
     if( children.size() != 10 )
         throw std::logic_error("children array not yet set up");
+    PopCallStack();
 #endif
     return *children[(i*(i+1))/2 + j]; 
 }
@@ -483,14 +491,16 @@ inline const Quasi2dHMatrix<Scalar,Conjugated>&
 Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j ) const
 {
 #ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::NodeSymmetric::Child");
     if( i < 0 || j < 0 )
-        throw std::logic_error("Child indices must be non-negative");
+        throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
-        throw std::logic_error("Child indices out of bounds");
+        throw std::logic_error("Indices out of bounds");
     if( j > i )
-        throw std::logic_error("Child index outside of lower triangle");
+        throw std::logic_error("Index outside of lower triangle");
     if( children.size() != 10 )
         throw std::logic_error("children array not yet set up");
+    PopCallStack();
 #endif
     return *children[(i*(i+1))/2 + j];
 }

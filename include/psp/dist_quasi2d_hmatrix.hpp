@@ -34,9 +34,9 @@ template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
 private:
-    static void CountScatteredShellSizes
+    static void PackedSizesRecursion
     ( std::vector<std::size_t>& scatteredSizes,
-      int rank, int p, int sourceRankOffset, int targetRankOffset,
+      int rank, int sourceRankOffset, int targetRankOffset, int teamSize,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     struct Node
@@ -121,7 +121,7 @@ private:
 
 public:
 
-    static void ScatteredSizes
+    static void PackedSizes
     ( std::vector<std::size_t>& scatteredSizes,
       const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
 

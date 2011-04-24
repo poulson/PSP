@@ -35,8 +35,7 @@ struct SharedDenseMatrix
     int height, width;
     int partner;
 
-    // Only one process will have a copy of D
-    int ownMatrix;
+    bool ownSourceSide;
     DenseMatrix<Scalar> D;
 
     // Temporary storage for the product D x

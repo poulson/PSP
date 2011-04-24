@@ -36,11 +36,12 @@ struct SharedLowRankMatrix
     int height, width, rank;
     int partner;
 
-    bool ownRightSide;
+    bool ownSourceSide;
     DenseMatrix<Scalar> D;
 
     // Storage for V^[T/H] x. This should be computed by the process owning
-    // the right side and then communicated to the process owning the left side.
+    // the source side and then communicated to the process owning the target 
+    // side.
     mutable Vector<Scalar> y;
 };
 

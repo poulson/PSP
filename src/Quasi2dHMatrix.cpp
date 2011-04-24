@@ -95,7 +95,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildNaturalToHierarchicalMap
 //----------------------------------------------------------------------------//
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
+psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
 ( std::size_t& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     // Make space for the abstract H-matrix information
@@ -110,12 +110,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
     {
     case NODE:
         for( int i=0; i<16; ++i )
-            CountShellSize( packedSize, *shell.data.node->children[i] );
+            PackedSizeRecursion( packedSize, *shell.data.node->children[i] );
         break;
     case NODE_SYMMETRIC:
         for( int i=0; i<10; ++i )
         {
-            CountShellSize
+            PackedSizeRecursion
             ( packedSize, *shell.data.nodeSymmetric->children[i] );
         }
         break;
@@ -140,12 +140,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
         const DenseMatrix<Scalar>& D = *shell.data.D;
         const int m = D.Height();
         const int n = D.Width();
+        const MatrixType type = D.Type();
 
         // Make space for the dimensions
         packedSize += 2*sizeof(int);
 
-        // Make space for the matrix data
-        packedSize += m*n*sizeof(Scalar);
+        // Make space for the matrix type and data
+        packedSize += sizeof(MatrixType);
+        if( type == GENERAL )
+            packedSize += m*n*sizeof(Scalar);
+        else
+            packedSize += ((m*m+m)/2)*sizeof(Scalar);
 
         break;
     }
@@ -154,7 +159,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CountShellSize
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::PackShell
+psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     // Write out the abstract H-matrix information
@@ -184,11 +189,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackShell
     {
     case NODE:
         for( int i=0; i<16; ++i )
-            PackShell( head, *shell.data.node->children[i] );
+            PackRecursion( head, *shell.data.node->children[i] );
         break;
     case NODE_SYMMETRIC:
         for( int i=0; i<10; ++i )
-            PackShell( head, *shell.data.nodeSymmetric->children[i] );
+            PackRecursion( head, *shell.data.nodeSymmetric->children[i] );
         break;
     case LOW_RANK:
     {
@@ -224,16 +229,29 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackShell
         const DenseMatrix<Scalar>& D = *shell.data.D;
         const int m = D.Height();
         const int n = D.Width();
+        const MatrixType type = D.Type();
 
         // Write out the dimensions
         *((int*)head) = m; head += sizeof(int);
         *((int*)head) = n; head += sizeof(int);
 
-        // Write out the matrix data
-        for( int j=0; j<n; ++j )
+        // Write out the matrix type and data
+        *((MatrixType*)head) = type; head += sizeof(MatrixType);
+        if( type == GENERAL )
         {
-            std::memcpy( head, D.LockedBuffer(0,j), m*sizeof(Scalar) );
-            head += m*sizeof(Scalar);
+            for( int j=0; j<n; ++j )
+            {
+                std::memcpy( head, D.LockedBuffer(0,j), m*sizeof(Scalar) );
+                head += m*sizeof(Scalar);
+            }
+        }
+        else
+        {
+            for( int j=0; j<n; ++j )
+            {
+                std::memcpy( head, D.LockedBuffer(j,j), (m-j)*sizeof(Scalar) );
+                head += (m-j)*sizeof(Scalar);
+            }
         }
 
         break;
@@ -382,10 +400,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSize() const
     PushCallStack("Quasi2dHMatrix::PackedSize");
 #endif
     std::size_t packedSize = 0;
-
-    // Recurse on this shell to finish computing the packed size
-    CountShellSize( packedSize, *this );
-
+    PackedSizeRecursion( packedSize, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -405,9 +420,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
     packedHMatrix.resize( packedSize );
     byte* head = &packedHMatrix[0];
 
-    // Start the recursive packing
-    PackShell( head, *this );
-
+    PackRecursion( head, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -422,10 +435,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
     PushCallStack("Quasi2dHMatrix::Unpack");
 #endif
     const byte* head = &packedHMatrix[0];
-
-    // Start the recursive unpacking
-    UnpackShell( head, *this );
-
+    UnpackRecursion( head, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2541,13 +2551,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
         _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
         hmatrix_tools::ConvertSubmatrix
         ( *_shell.data.F, S, iOffset, jOffset, this->_height, this->_width );
-#ifndef RELEASE
-        std::cout << "Converted sparse " 
-                  << this->_height << " x " << this->_width 
-                  << " matrix with offsets (" << iOffset << ","
-                  << jOffset << ") to rank "
-                  << _shell.data.F->Rank() << std::endl;
-#endif
     }
     else if( this->NumLevels() > 1 )
     {
@@ -2640,7 +2643,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
+psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     // Set the abstract H-matrix data
@@ -2674,6 +2677,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
     case DENSE:          delete shell.data.D; break;
     }
 
+    // Create this layer of the H-matrix from the packed information
     shell.type = *((ShellType*)head); head += sizeof(ShellType);
     switch( shell.type )
     {
@@ -2687,7 +2691,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
         for( int i=0; i<16; ++i )
         {
             node.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
-            UnpackShell( head, *node.children[i] );
+            UnpackRecursion( head, *node.children[i] );
         }
         break;
     }
@@ -2699,7 +2703,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
         for( int i=0; i<10; ++i )
         {
             node.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
-            UnpackShell( head, *node.children[i] );
+            UnpackRecursion( head, *node.children[i] );
         }
         break;
     }
@@ -2713,8 +2717,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
         const int m = *((int*)head); head += sizeof(int);
         const int n = *((int*)head); head += sizeof(int);
         const int r = *((int*)head); head += sizeof(int);
-        U.Resize( m, r );
-        V.Resize( n, r );
+        U.SetType( GENERAL ); U.Resize( m, r );
+        V.SetType( GENERAL ); V.Resize( n, r );
 
         // Read in U
         for( int j=0; j<r; ++j )
@@ -2739,13 +2743,28 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackShell
         // Read in the matrix dimensions
         const int m = *((int*)head); head += sizeof(int);
         const int n = *((int*)head); head += sizeof(int);
+        const MatrixType type = *((MatrixType*)head); 
+        head += sizeof(MatrixType);
+
+        D.SetType( type ); 
         D.Resize( m, n );
 
         // Read in the matrix
-        for( int j=0; j<n; ++j )
+        if( type == GENERAL )
         {
-            std::memcpy( D.Buffer(0,j), head, m*sizeof(Scalar) );
-            head += m*sizeof(Scalar);
+            for( int j=0; j<n; ++j )
+            {
+                std::memcpy( D.Buffer(0,j), head, m*sizeof(Scalar) );
+                head += m*sizeof(Scalar);
+            }
+        }
+        else
+        {
+            for( int j=0; j<n; ++j )
+            {
+                std::memcpy( D.Buffer(j,j), head, (m-j)*sizeof(Scalar) );
+                head += (m-j)*sizeof(Scalar);
+            }
         }
 
         break;

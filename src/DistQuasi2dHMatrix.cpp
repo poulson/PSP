@@ -26,26 +26,27 @@
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ScatteredSizes
-( std::vector<std::size_t>& scatteredSizes, 
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
+( std::vector<std::size_t>& packedSizes, 
   const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm )
 {
 #ifndef RELEASE
-    PushCallStack("Quasi2dHMatrix::ScatteredSizes");
+    PushCallStack("DistQuasi2dHMatrix::PackedSizes");
 #endif
     const int rank = mpi::CommRank( comm );
-    const int p = mpi::CommSize( comm );
+    const unsigned p = mpi::CommSize( comm );
     if( !(p && !(p & (p-1))) )
         throw std::logic_error("Must use a power of two number of processes");
+    if( p > (1u<<(2*(H._numLevels-1))) )
+        throw std::logic_error("More than 4^(numLevels-1) processes.");
 
-    scatteredSizes.resize( p );
-    std::memset( &scatteredSizes[0], 0, p*sizeof(std::size_t) );
+    packedSizes.resize( p );
+    std::memset( &packedSizes[0], 0, p*sizeof(std::size_t) );
 
     // Recurse on this shell to compute the packed sizes
     int sourceRankOffset=0, targetRankOffset=0;
-    CountScatteredShellSizes
-    ( scatteredSizes, rank, p, sourceRankOffset, targetRankOffset, H );
-
+    PackedSizesRecursion
+    ( packedSizes, rank, sourceRankOffset, targetRankOffset, p, H );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -57,74 +58,67 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ScatteredSizes
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::CountScatteredShellSizes
-( std::vector<std::size_t>& scatteredSizes,
-  int rank, int p, int sourceRankOffset, int targetRankOffset,
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
+( std::vector<std::size_t>& packedSizes, int rank,
+  int sourceRankOffset, int targetRankOffset, int teamSize,
   const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
+    typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
 
-    if( p == 1 )
+    if( teamSize == 1 )
     {
 #ifndef RELEASE
         if( rank != sourceRankOffset && rank != targetRankOffset )
             throw std::logic_error("Mistake in logic");
 #endif
         if( sourceRankOffset == targetRankOffset )
-            scatteredSizes[rank] += H.PackedSize();
+            packedSizes[rank] += H.PackedSize();
         else if( rank == sourceRankOffset )
-            CountSizeOfSourceSideOfLeaf( scatteredSizes[rank], H );
+            packedSizes[rank] += SharedQuasi2d::PackedSourceSize( H );
         else
-            CountSizeOfTargetSideOfLeaf( scatteredSizes[rank], H );
+            packedSizes[rank] += SharedQuasi2d::PackedTargetSize( H );
     }
-    else if( p == 2 )
+    else // teamSize >= 2
     {
         // Every process stores the basic H-matrix information
         const std::size_t headerSize = 
             15*sizeof(int) + 2*sizeof(bool) + 
             sizeof(typename Quasi2d::ShellType);
-        for( int j=0; j<p; ++j )
-            scatteredSizes[j] += headerSize;
+        for( int j=0; j<teamSize; ++j )
+            packedSizes[j] += headerSize;
 
         const typename Quasi2d::Shell& shell = H._shell;
         switch( shell.type )
         {
         case Quasi2d::NODE:
-            // HERE: Branch based on your rank
-            break;
-        case Quasi2d::NODE_SYMMETRIC:
-#ifndef RELEASE
-            throw std::logic_error("Nonsymmetric case not yet supported");
-#endif
-            break;
-        case Quasi2d::LOW_RANK:
-            break;
-        case Quasi2d::DENSE:
+        {
+            const int newTeamSize = teamSize/2;
+            for( int t=0; t<4; ++t )
+            {
+                for( int s=0; s<4; ++s )
+                {
+                    PackedSizesRecursion
+                    ( packedSizes, rank,
+                      sourceRankOffset+newTeamSize*(s/2),
+                      targetRankOffset+newTeamSize*(t/2), newTeamSize,
+                      shell.data.node->Child(t,s) );
+                }
+            }
             break;
         }
-    }
-    else // p >= 4
-    {
-        // Every process stores the basic H-matrix information
-        const std::size_t headerSize = 
-            15*sizeof(int) + 2*sizeof(bool) + 
-            sizeof(typename Quasi2d::ShellType);
-        for( int j=0; j<p; ++j )
-            scatteredSizes[j] += headerSize;
-
-        const typename Quasi2d::Shell& shell = H._shell;
-        switch( shell.type )
-        {
-        case Quasi2d::NODE:
-            break;
         case Quasi2d::NODE_SYMMETRIC:
 #ifndef RELEASE
             PushCallStack("Nonsymmetric case not yet supported");
 #endif
             break;
         case Quasi2d::LOW_RANK:
+            // TODO: Count size of DistLowRankMatrix
             break;
         case Quasi2d::DENSE:
+#ifndef RELEASE
+            throw std::logic_error("Too many processes");
+#endif
             break;
         }
     }
