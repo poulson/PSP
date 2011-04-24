@@ -18,25 +18,28 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_SHARED_LOW_RANK_MATRIX_HPP
-#define PSP_SHARED_LOW_RANK_MATRIX_HPP 1
+#ifndef PSP_DIST_LOW_RANK_MATRIX_HPP
+#define PSP_DIST_LOW_RANK_MATRIX_HPP 1
 
 #include "psp/dense_matrix.hpp"
 
 namespace psp {
 
 // For parallelizing the application of U V* (where V* = V^T or V^H) when 
-// two processes are involved. One process owns U and the other owns V. Then
-// the process owning V can form y := V* x, which is only r entries, then 
-// communicate this result to the process owning U so that it may form 
-// z := U y = U (V* x).
+// there are two teams involved. The 'left' team divides U into contiguous
+// sets of rows and the 'right' team divides V into contiguous sets of rows.
+// U V* can be applied to a vector x by forming V* x, which is only r entries,
+// communicating the small set of entries to the 'left' team, and then having
+// each member of the left team locally update their portion of z := U V* x.
 template<typename Scalar,bool Conjugated>
-struct SharedLowRankMatrix
+struct DistLowRankMatrix
 {
     int height, width, rank;
-    int partner;
 
-    bool ownRightSide;
+    MPI_Comm myTeam;
+    MPI_Comm otherTeam;
+
+    bool onRightTeam;
     DenseMatrix<Scalar> D;
 
     // Storage for V^[T/H] x. This should be computed by the process owning
@@ -46,4 +49,4 @@ struct SharedLowRankMatrix
 
 } // namespace psp
 
-#endif // PSP_SHARED_LOW_RANK_MATRIX_HPP
+#endif // PSP_DIST_LOW_RANK_MATRIX_HPP

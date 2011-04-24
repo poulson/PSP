@@ -23,6 +23,7 @@
 //----------------------------------------------------------------------------//
 // Public static routines                                                     //
 //----------------------------------------------------------------------------//
+
 template<typename Scalar,bool Conjugated>
 void 
 psp::Quasi2dHMatrix<Scalar,Conjugated>::BuildMapOnQuadrant

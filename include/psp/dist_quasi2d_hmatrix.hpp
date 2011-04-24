@@ -28,62 +28,133 @@
 
 namespace psp {
 
+// We will enforce the requirement that is a power of 2 numbers or processes, 
+// but not more than 4^{numLevels-1}.
 template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
 private:
-    /*
-    enum ShellType 
-    { NODE, NODE_SYMMETRIC, BLACK_BOX, 
-      LEFT_HALF_OF_LOW_RANK, RIGHT_HALF_OF_LOW_RANK, 
-      LEFT_TEAM_DENSE, RIGHT_TEAM_DENSE };
-    */
-    // NOTE: We may need to expand the list of dense shell types for triangular
-    //       matrices in order to get better load balancing.
-
-    /*
-    void PreCompute
-    ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
-    void Communicate
-    ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
-    void PostCompute
-    ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y );
-    */
-
     static void CountScatteredShellSizes
     ( std::vector<std::size_t>& scatteredSizes,
       int rank, int p, int sourceRankOffset, int targetRankOffset,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    static void CountSizeOfSourceSideOfLeaf
-    ( std::size_t& size, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    struct Node
+    {
+        std::vector<DistQuasi2dHMatrix*> children;
+        int xSourceSizes[2];
+        int ySourceSizes[2];
+        int sourceSizes[2];
+        int xTargetSizes[2];
+        int yTargetSizes[2];
+        int targetSizes[2];
 
-    static void CountSizeOfTargetSideOfLeaf
-    ( std::size_t& size, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+        Node
+        ( int xSizeSource, int xSizeTarget,
+          int ySizeSource, int ySizeTarget,
+          int zSize );
+        ~Node();
+
+        DistQuasi2dHMatrix& Child( int i, int j );
+        const DistQuasi2dHMatrix& Child( int i, int j ) const;
+    };
+
+    struct NodeSymmetric
+    {
+        std::vector<DistQuasi2dHMatrix*> children;
+        int xSizes[2];
+        int ySizes[2];
+        int sizes[4];
+
+        NodeSymmetric( int xSize, int ySize, int zSize );
+        ~NodeSymmetric();
+
+        DistQuasi2dHMatrix& Child( int i, int j );
+        const DistQuasi2dHMatrix& Child( int i, int j ) const;
+    };
+
+    enum ShellType 
+    { 
+        NODE, 
+        NODE_SYMMETRIC, 
+        DIST_LOW_RANK, 
+        SHARED_LOW_RANK, 
+        SHARED_QUASI2D, 
+        QUASI2D 
+    };
+    // NOTE: We may need to expand the list of dense shell types for triangular
+    //       matrices in order to get better load balancing.
+
+    struct Shell
+    {
+        ShellType type;
+        union Data
+        {
+            Node* node;
+            NodeSymmetric* nodeSymmetric;
+            DistLowRankMatrix<Scalar,Conjugated>* DF;
+            SharedLowRankMatrix<Scalar,Conjugated>* SF;
+            SharedQuasi2dHMatrix<Scalar,Conjugated>* SH;
+            Quasi2dHMatrix<Scalar,Conjugated>* H;
+
+            Data() { std::memset( this, 0, sizeof(Data) ); }
+        } data;
+
+        Shell() : type(NODE), data() { }
+
+        ~Shell()
+        {
+            switch( type )
+            {
+            case NODE:            delete data.node; break;
+            case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
+            case DIST_LOW_RANK:   delete data.DF; break;
+            case SHARED_LOW_RANK: delete data.SF; break;
+            case SHARED_QUASI2D:  delete data.SH; break;
+            case QUASI2D:         delete data.H; break;
+            }
+        }
+    };
+
+    int _localHeight, _localWidth;
+    // TODO: Finish filling in member variables
 
 public:
-
-    // We should build the distributed H-matrix from the pieces rather than
-    // from an entire serial H-matrix.
-    //
-    // The packed dense matrices imply the existence of the transposed 
-    // pairing that requires no data at construction but does require
-    // communication in the middle phase of a matvec.
-    /*
-    DistQuasi2dHMatrix
-    ( int numLevels, bool stronglyAdmissible, int xSize, int ySize, int zSize,
-      const Quasi2dHMatrix<Scalar,Conjugated>& myLeaf,
-      const PackedSharedLowRanks& packedSharedLowRanks,
-      const PackedSharedDenses& packedSharedDenses );
-    */
 
     static void ScatteredSizes
     ( std::vector<std::size_t>& scatteredSizes,
       const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
 
+    int LocalHeight() const;
+    int LocalWidth() const;
+
+    /*
     void MapVector
     ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y ) const;
+    */
 };
+
+} // namespace psp
+
+//----------------------------------------------------------------------------//
+// Inlined implementations                                                    //
+//----------------------------------------------------------------------------//
+
+namespace psp {
+
+template<typename Scalar,bool Conjugated>
+inline int
+DistQuasi2dHMatrix<Scalar,Conjugated>::LocalHeight() const
+{ 
+    return _localHeight;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+DistQuasi2dHMatrix<Scalar,Conjugated>::LocalWidth() const
+{
+    return _localWidth;
+}
 
 } // namespace psp
 

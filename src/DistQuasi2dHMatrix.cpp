@@ -23,6 +23,7 @@
 //----------------------------------------------------------------------------//
 // Public static routines                                                     //
 //----------------------------------------------------------------------------//
+
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ScatteredSizes
@@ -53,6 +54,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ScatteredSizes
 //----------------------------------------------------------------------------//
 // Private static routines                                                    //
 //----------------------------------------------------------------------------//
+
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::CountScatteredShellSizes

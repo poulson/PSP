@@ -32,8 +32,17 @@ template<typename Scalar,bool Conjugated> class DistQuasi2dHMatrix;
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
-public:    
-    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
+private:
+    static void CountShellSize
+    ( std::size_t& packedSize, 
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void PackShell
+    ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void BuildMapOnQuadrant
+    ( int* map, int& index, int level, int numLevels,
+      int xSize, int ySize, int zSize, int thisXSize, int thisYSize );
 
     struct Node
     {
@@ -68,6 +77,78 @@ public:
         Quasi2dHMatrix& Child( int i, int j );
         const Quasi2dHMatrix& Child( int i, int j ) const;
     };
+
+    enum ShellType 
+    { 
+        NODE, 
+        NODE_SYMMETRIC, 
+        LOW_RANK, 
+        DENSE 
+    };
+
+    struct Shell
+    {
+        ShellType type;
+        union Data
+        {
+            Node* node;
+            NodeSymmetric* nodeSymmetric;
+            LowRankMatrix<Scalar,Conjugated>* F;
+            DenseMatrix<Scalar>* D;
+
+            Data() { std::memset( this, 0, sizeof(Data) ); }
+        } data;
+
+        Shell() : type(NODE), data() { }
+
+        ~Shell()
+        {
+            switch( type )
+            {
+            case NODE:           delete data.node; break;
+            case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
+            case LOW_RANK:       delete data.F; break;
+            case DENSE:          delete data.D; break;
+            }
+        }
+    };
+
+    // Data specific to our quasi-2d H-matrix
+    int _xSizeSource, _xSizeTarget;
+    int _ySizeSource, _ySizeTarget;
+    int _zSize;
+    int _xSource, _xTarget;
+    int _ySource, _yTarget;
+    Shell _shell;
+
+    bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
+
+    void ImportLowRankMatrix
+    ( const LowRankMatrix<Scalar,Conjugated>& F );
+    
+    void UpdateWithLowRankMatrix
+    ( Scalar alpha,
+      const LowRankMatrix<Scalar,Conjugated>& F );
+
+    void ImportSparseMatrix
+    ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
+
+    void UnpackShell
+    ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    // y += alpha A x
+    void UpdateVectorWithNodeSymmetric
+    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
+
+    // C += alpha A B
+    void UpdateMatrixWithNodeSymmetric
+    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
+    const;
+
+    void WriteStructureRecursion( std::ofstream& file ) const;
+    
+public:    
+    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
     static void BuildNaturalToHierarchicalMap
     ( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels );
@@ -276,79 +357,6 @@ public:
     // where X_k -> inv(A) if X_0 = alpha A^H,
     // with 0 < alpha < 2/||A||_2^2.
     void SchulzInvert( int maxIts );
-
-private:
-    enum ShellType { NODE, NODE_SYMMETRIC, LOW_RANK, DENSE };
-
-    struct Shell
-    {
-        ShellType type;
-        union Data
-        {
-            Node* node;
-            NodeSymmetric* nodeSymmetric;
-            DenseMatrix<Scalar>* D;
-            LowRankMatrix<Scalar,Conjugated>* F;
-
-            Data() { std::memset( this, 0, sizeof(Data) ); }
-        } data;
-
-        Shell() : type(NODE), data() { }
-
-        ~Shell()
-        {
-            switch( type )
-            {
-            case NODE:           delete data.node; break;
-            case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
-            case LOW_RANK:       delete data.F; break;
-            case DENSE:          delete data.D; break;
-            }
-        }
-    };
-
-    // Data specific to our quasi-2d H-matrix
-    int _xSizeSource, _xSizeTarget;
-    int _ySizeSource, _ySizeTarget;
-    int _zSize;
-    int _xSource, _xTarget;
-    int _ySource, _yTarget;
-    Shell _shell;
-
-    bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
-
-    void ImportLowRankMatrix
-    ( const LowRankMatrix<Scalar,Conjugated>& F );
-    
-    void UpdateWithLowRankMatrix
-    ( Scalar alpha,
-      const LowRankMatrix<Scalar,Conjugated>& F );
-
-    void ImportSparseMatrix
-    ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
-
-    static void CountShellSize
-    ( std::size_t& packedSize, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
-    static void PackShell
-    ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H );
-    void UnpackShell
-    ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    // y += alpha A x
-    void UpdateVectorWithNodeSymmetric
-    ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
-
-    // C += alpha A B
-    void UpdateMatrixWithNodeSymmetric
-    ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
-    const;
-
-    void WriteStructureRecursion( std::ofstream& file ) const;
-    
-    static void BuildMapOnQuadrant
-    ( int* map, int& index, int level, int numLevels,
-      int xSize, int ySize, int zSize, int thisXSize, int thisYSize );
 };
 
 } // namespace psp

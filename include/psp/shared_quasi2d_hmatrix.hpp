@@ -31,11 +31,81 @@ template<typename Scalar,bool Conjugated>
 class SharedQuasi2dHMatrix
 {
 private:
+    struct Node
+    {
+        std::vector<SharedQuasi2dHMatrix*> children;
+        int xSourceSizes[2];
+        int ySourceSizes[2];
+        int sourceSizes[4];
+        int xTargetSizes[2];
+        int yTargetSizes[2];
+        int targetSizes[4];
+
+        Node
+        ( int xSizeSource, int xSizeTarget,
+          int ySizeSource, int ySizeTarget,
+          int zSize );
+        ~Node();
+
+        SharedQuasi2dHMatrix& Child( int i, int j );
+        const SharedQuasi2dHMatrix& Child( int i, int j ) const;
+    };
+
+    struct NodeSymmetric
+    {
+        std::vector<SharedQuasi2dHMatrix*> children;
+        int xSizes[2];
+        int ySizes[2];
+        int sizes[4];
+
+        NodeSymmetric( int xSize, int ySize, int zSize );
+        ~NodeSymmetric();
+
+        SharedQuasi2dHMatrix& Child( int i, int j );
+        const SharedQuasi2dHMatrix& Child( int i, int j ) const;
+    };
+
     enum ShellType 
-    { NODE, NODE_SYMMETRIC, SHARED_LOW_RANK, SHARED_DENSE, DENSE };
+    { 
+        NODE, 
+        NODE_SYMMETRIC, 
+        SHARED_LOW_RANK, 
+        SHARED_DENSE, 
+        DENSE 
+    };
+
+    struct Shell
+    {
+        ShellType type;
+        union Data
+        {
+            Node* node;
+            NodeSymmetric* nodeSymmetric;
+            SharedLowRankMatrix<Scalar,Conjugated>* SF;
+            SharedDenseMatrix<Scalar>* SD;
+            DenseMatrix<Scalar>* D;
+
+            Data() { std::memset( this, 0, sizeof(Data) ); }
+        } data;
+
+        Shell() : type(NODE), data() { }
+
+        ~Shell()
+        {
+            switch( type )
+            {
+            case NODE:            delete data.node; break;
+            case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
+            case SHARED_LOW_RANK: delete data.SF; break;
+            case SHARED_DENSE:    delete data.SD; break;
+            case DENSE:           delete data.D; break;
+            }
+        }
+    };
+
+    // TODO: Fill in member variables
 
 public:
-
     // TODO
 };
 
