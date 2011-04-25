@@ -91,9 +91,11 @@ private:
         NODE, 
         NODE_SYMMETRIC, 
         DIST_LOW_RANK, 
-        SHARED_LOW_RANK, 
         SHARED_QUASI2D, 
-        QUASI2D 
+        SHARED_LOW_RANK, 
+        SHARED_DENSE,
+        QUASI2D,
+        DENSE
     };
 
     struct Shell
@@ -104,9 +106,11 @@ private:
             Node* node;
             NodeSymmetric* nodeSymmetric;
             DistLowRankMatrix<Scalar,Conjugated>* DF;
-            SharedLowRankMatrix<Scalar,Conjugated>* SF;
             SharedQuasi2dHMatrix<Scalar,Conjugated>* SH;
+            SharedLowRankMatrix<Scalar,Conjugated>* SF;
+            SharedDenseMatrix<Scalar>* SD;
             Quasi2dHMatrix<Scalar,Conjugated>* H;
+            DenseMatrix<Scalar>* D;
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
         Shell();

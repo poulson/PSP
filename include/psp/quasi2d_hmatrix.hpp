@@ -106,6 +106,7 @@ private:
     int _ySource, _yTarget;
     Shell _shell;
 
+    bool Admissible() const;
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
     void ImportLowRankMatrix

@@ -1704,7 +1704,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     case DENSE:          delete C._shell.data.D;             break;
     }
 
-    if( C.Admissible( C._xSource, C._xTarget, C._ySource, C._yTarget ) )
+    if( C.Admissible() )
     {
         C._shell.type = LOW_RANK;
         C._shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
@@ -1932,7 +1932,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     if( C.Symmetric() )
         throw std::logic_error("Symmetric updates not yet supported.");
 #endif
-    if( C.Admissible( C._xSource, C._xTarget, C._ySource, C._yTarget ) )
+    if( C.Admissible() )
     {
         if( this->IsLowRank() && B.IsLowRank() )
         {
@@ -2316,6 +2316,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert( int maxIts )
 //----------------------------------------------------------------------------//
 // Private non-static routines                                                //
 //----------------------------------------------------------------------------//
+
+template<typename Scalar,bool Conjugated>
+bool
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Admissible() const
+{
+    return Admissible( _xSource, _xTarget, _ySource, _yTarget );
+}
 
 template<typename Scalar,bool Conjugated>
 bool

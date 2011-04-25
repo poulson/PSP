@@ -162,35 +162,32 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     for( int i=0; i<teamSize; ++i )
         packedSizes[targetRankOffset+i] += headerSize;
 
-    if( teamSize == 1 )
+    const typename Quasi2d::Shell& shell = H._shell;
+    const int m = H._height;
+    const int n = H._width;
+    switch( shell.type )
     {
-        if( sourceRankOffset == targetRankOffset )
+    case NODE:
+    {
+        if( teamSize == 1 )
         {
-            packedSizes[sourceRankOffset] += H.PackedSize();
+            if( sourceRankOffset == targetRankOffset )
+            {
+                // Store the entire H-matrix on one process
+                packedSizes[sourceRankOffset] += H.PackedSize();
+            }
+            else
+            {
+                // Store a shared H-matrix
+                std::size_t sourceSize, targetSize;
+                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
+                packedSizes[sourceRankOffset] += sourceSize;
+                packedSizes[targetRankOffset] += targetSize;
+            }
         }
         else
         {
-            // HERE
-            // if( admissible )
-            // {
-            // ...
-            // }
-            // else
-            // {
-            std::size_t sourceSize, targetSize;
-            SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
-            packedSizes[sourceRankOffset] += sourceSize;
-            packedSizes[targetRankOffset] += targetSize;
-            // }
-        }
-    }
-    else // teamSize >= 2
-    {
-        const typename Quasi2d::Shell& shell = H._shell;
-        switch( shell.type )
-        {
-        case Quasi2d::NODE:
-        {
+            // Recurse
             const int newTeamSize = teamSize/2;
             for( int t=0; t<4; ++t )
             {
@@ -203,30 +200,56 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                       shell.data.node->Child(t,s) );
                 }
             }
-            break;
         }
-        case Quasi2d::NODE_SYMMETRIC:
-#ifndef RELEASE
-            throw std::logic_error("Nonsymmetric case not yet supported");
-#endif
-            break;
-        case Quasi2d::LOW_RANK:
+    }
+    case NODE_SYMMETRIC:
+    {
+        if( teamSize == 1 )
+        {
+            if( sourceRankOffset == targetRankOffset )
+            {
+                // Store the entire H-matrix on one process
+                packedSizes[sourceRankOffset] += H.PackedSize();
+            }
+            else
+            {
+                // Store a shared H-matrix
+                std::size_t sourceSize, targetSize;
+                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
+                packedSizes[sourceRankOffset] += sourceSize;
+                packedSizes[targetRankOffset] += targetSize;
+            }
+        }
+        else
         {
 #ifndef RELEASE
-            if( sourceRankOffset == targetRankOffset )
-                throw std::logic_error("Offsets were equal off the diagonal");
+            throw std::logic_error("Symmetric case not yet supported");
 #endif
-            const DenseMatrix<Scalar>& U = shell.data.F->U;
-            const DenseMatrix<Scalar>& V = shell.data.F->V;
-            const int m = U.Height();
-            const int n = V.Height();
+        }
+    }
+    case LOW_RANK:
+    {
+        if( teamSize == 1 )
+        {
+            // Store a shared low-rank matrix                
+            const DenseMatrix<Scalar>& shell.data.F->U;
+            const DenseMatrix<Scalar>& shell.data.F->V;
             const int r = U.Width();
 
-            // Make room for:
-            //   1) rank (int)
-            //   2) my team's root (int)
-            //   3) my team's size (int)
-            //   4) other team's root (int)
+            // The source and target processes store the matrix rank and their
+            // factor's entries.
+            packedSizes[sourceRankOffset] += sizeof(int) + n*r*sizeof(Scalar);
+            packedSizes[targetRankOffset] += sizeof(int) + m*r*sizeof(Scalar);
+        }
+        else
+        {
+            // Store a distributed low-rank matrix
+            const DenseMatrix<Scalar>& U = shell.data.F->U;
+            const DenseMatrix<Scalar>& V = shell.data.F->V;
+            const int r = U.Width();
+
+            // Make room for: 
+            //   rank, my team's root, my team's size, other team's root
             const std::size_t headerSize = 4*sizeof(int);
 
             // Write out the source information
@@ -244,15 +267,35 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                 packedSizes[targetRank] += 
                     headerSize + localHeights[targetRank]*r*sizeof(Scalar);
             } 
-
-            break;
         }
-        case Quasi2d::DENSE:
+        break;
+    }
+    case DENSE:
+    {
+        const DenseMatrix<Scalar>& *shell.data.D;
+
+        if( teamSize == 1 )
+        {
+            // We can just store the dense matrix at the source rank since, 
+            // if there are two processes the source stores it, and if there
+            // is one process the source and target ranks are the same.
+            const DenseMatrix<Scalar>& *shell.data.D;
+            const MatrixType type = D.Type();
+
+            packedSizes[sourceRankOffset] += sizeof(MatrixType);
+            if( type == GENERAL )
+                packedSizes[sourceRankOffset] += m*n*sizeof(Scalar);
+            else
+                packedSizes[sourceRankOffset] += ((m*m+m)/2)*sizeof(Scalar);
+        }
+        else
+        {
 #ifndef RELEASE
             throw std::logic_error("Too many processes");
 #endif
-            break;
         }
+        break;
+    }
     }
 }
 
@@ -319,6 +362,27 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         *((int*)*h) = H._yTarget;             *h += sizeof(int);
     }
 
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        break;
+    }
+    case LOW_RANK:
+    {
+        break;
+    }
+    case DENSE:
+    {
+
+        break;
+    }
+    }
+    /*
     if( teamSize == 1 )
     {
         if( sourceRankOffset == targetRankOffset )
@@ -415,6 +479,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             break;
         }
     }
+    */
 }
 
 template<typename Scalar,bool Conjugated>
