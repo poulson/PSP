@@ -54,13 +54,11 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[4];
-
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
           int zSize );
         ~Node();
-
         Quasi2dHMatrix& Child( int i, int j );
         const Quasi2dHMatrix& Child( int i, int j ) const;
     };
@@ -71,10 +69,8 @@ private:
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
-
         NodeSymmetric( int xSize, int ySize, int zSize );
         ~NodeSymmetric();
-
         Quasi2dHMatrix& Child( int i, int j );
         const Quasi2dHMatrix& Child( int i, int j ) const;
     };
@@ -96,22 +92,10 @@ private:
             NodeSymmetric* nodeSymmetric;
             LowRankMatrix<Scalar,Conjugated>* F;
             DenseMatrix<Scalar>* D;
-
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
-
-        Shell() : type(NODE), data() { }
-
-        ~Shell()
-        {
-            switch( type )
-            {
-            case NODE:           delete data.node; break;
-            case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
-            case LOW_RANK:       delete data.F; break;
-            case DENSE:          delete data.D; break;
-            }
-        }
+        Shell();
+        ~Shell();
     };
 
     // Data specific to our quasi-2d H-matrix
@@ -503,6 +487,25 @@ Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j ) const
     PopCallStack();
 #endif
     return *children[(i*(i+1))/2 + j];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+Quasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
+: type(NODE), data() 
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline
+Quasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
+{
+    switch( type )
+    {
+    case NODE:           delete data.node; break;
+    case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
+    case LOW_RANK:       delete data.F; break;
+    case DENSE:          delete data.D; break;
+    }
 }
 
 } // namespace psp

@@ -35,9 +35,19 @@ class DistQuasi2dHMatrix
 {
 private:
     static void PackedSizesRecursion
-    ( std::vector<std::size_t>& scatteredSizes,
+    ( std::vector<std::size_t>& packedSizes,
+      const std::vector<int>& localHeights,
+      const std::vector<int>& localWidths,
       int rank, int sourceRankOffset, int targetRankOffset, int teamSize,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void ComputeLocalDimensionRecursion
+    ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
+
+    static void ComputeLocalSizesRecursion
+    ( int* localHeights, int* localWidths, int teamSize,
+      int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
+      int zSize );
 
     struct Node
     {
@@ -48,13 +58,11 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[2];
-
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
           int zSize );
         ~Node();
-
         DistQuasi2dHMatrix& Child( int i, int j );
         const DistQuasi2dHMatrix& Child( int i, int j ) const;
     };
@@ -65,10 +73,8 @@ private:
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
-
         NodeSymmetric( int xSize, int ySize, int zSize );
         ~NodeSymmetric();
-
         DistQuasi2dHMatrix& Child( int i, int j );
         const DistQuasi2dHMatrix& Child( int i, int j ) const;
     };
@@ -82,8 +88,6 @@ private:
         SHARED_QUASI2D, 
         QUASI2D 
     };
-    // NOTE: We may need to expand the list of dense shell types for triangular
-    //       matrices in order to get better load balancing.
 
     struct Shell
     {
@@ -96,38 +100,49 @@ private:
             SharedLowRankMatrix<Scalar,Conjugated>* SF;
             SharedQuasi2dHMatrix<Scalar,Conjugated>* SH;
             Quasi2dHMatrix<Scalar,Conjugated>* H;
-
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
-
-        Shell() : type(NODE), data() { }
-
-        ~Shell()
-        {
-            switch( type )
-            {
-            case NODE:            delete data.node; break;
-            case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
-            case DIST_LOW_RANK:   delete data.DF; break;
-            case SHARED_LOW_RANK: delete data.SF; break;
-            case SHARED_QUASI2D:  delete data.SH; break;
-            case QUASI2D:         delete data.H; break;
-            }
-        }
+        Shell();
+        ~Shell();
     };
 
+    int _height, _width;
+    int _numLevels;
+    int _maxRank;
+    int _sourceOffset, _targetOffset;
+    bool _symmetric; // TODO: Replace with MatrixType
+    bool _stronglyAdmissible;
+
+    int _xSizeSource, _xSizeTarget;
+    int _ySizeSource, _ySizeTarget;
+    int _zSize;
+    int _xSource, _xTarget;
+    int _ySource, _yTarget;
+    Shell _shell;
+
+    MPI_Comm _comm;
     int _localHeight, _localWidth;
-    // TODO: Finish filling in member variables
 
 public:
-
     static void PackedSizes
-    ( std::vector<std::size_t>& scatteredSizes,
+    ( std::vector<std::size_t>& packedSizes,
       const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
+
+    static int ComputeLocalHeight
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static int ComputeLocalWidth
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void ComputeLocalSizes
+    ( std::vector<int>& localHeights, std::vector<int>& localWidths,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     int LocalHeight() const;
     int LocalWidth() const;
 
+    // TODO: Figure out whether to act on PETSc's Vec or our own distributed
+    //       vector class.
     /*
     void MapVector
     ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y ) const;
@@ -142,18 +157,165 @@ public:
 
 namespace psp {
 
+// NOTE: The following implementations are practically identical to those of 
+//       Quasi2dHMatrix. However, it is probably not worth coupling the two in
+//       order to prevent code duplication.
 template<typename Scalar,bool Conjugated>
-inline int
-DistQuasi2dHMatrix<Scalar,Conjugated>::LocalHeight() const
-{ 
-    return _localHeight;
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
+( int xSizeSource, int xSizeTarget,
+  int ySizeSource, int ySizeTarget,
+  int zSize )
+: children(16)
+{
+    xSourceSizes[0] = xSizeSource/2;
+    xSourceSizes[1] = xSizeSource - xSourceSizes[0];
+    ySourceSizes[0] = ySizeSource/2;
+    ySourceSizes[1] = ySizeSource - ySourceSizes[0];
+
+    sourceSizes[0] = xSourceSizes[0]*ySourceSizes[0]*zSize;
+    sourceSizes[1] = xSourceSizes[1]*ySourceSizes[0]*zSize;
+    sourceSizes[2] = xSourceSizes[0]*ySourceSizes[1]*zSize;
+    sourceSizes[3] = xSourceSizes[1]*ySourceSizes[1]*zSize;
+
+    xTargetSizes[0] = xSizeTarget/2;
+    xTargetSizes[1] = xSizeTarget - xTargetSizes[0];
+    yTargetSizes[0] = ySizeTarget/2;
+    yTargetSizes[1] = ySizeTarget - yTargetSizes[0];
+
+    targetSizes[0] = xTargetSizes[0]*yTargetSizes[0]*zSize;
+    targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
+    targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*zSize;
+    targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
 }
 
 template<typename Scalar,bool Conjugated>
-inline int
-DistQuasi2dHMatrix<Scalar,Conjugated>::LocalWidth() const
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
 {
-    return _localWidth;
+    for( unsigned i=0; i<children.size(); ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline DistQuasi2dHMatrix<Scalar,Conjugated>&
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::Node::Child");
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[j+4*i];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const DistQuasi2dHMatrix<Scalar,Conjugated>&
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::Node::Child");
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[j+4*i];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
+( int xSize, int ySize, int zSize )
+: children(10)
+{
+    xSizes[0] = xSize/2;
+    xSizes[1] = xSize - xSizes[0];
+    ySizes[0] = ySize/2;
+    ySizes[1] = ySize - ySizes[0];
+
+    sizes[0] = xSizes[0]*ySizes[0]*zSize;
+    sizes[1] = xSizes[1]*ySizes[0]*zSize;
+    sizes[2] = xSizes[0]*ySizes[1]*zSize;
+    sizes[3] = xSizes[1]*ySizes[1]*zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
+{
+    for( unsigned i=0; i<children.size(); ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline DistQuasi2dHMatrix<Scalar,Conjugated>&
+DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::NodeSymmetric::Child");
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( j > i )
+        throw std::logic_error("Index outside of lower triangle");
+    if( children.size() != 10 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[(i*(i+1))/2 + j];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const DistQuasi2dHMatrix<Scalar,Conjugated>&
+DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::NodeSymmetric::Child");
+    if( i < 0 || j < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( i > 3 || j > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( j > i )
+        throw std::logic_error("Index outside of lower triangle");
+    if( children.size() != 10 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[(i*(i+1))/2 + j];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
+: type(NODE), data() 
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
+{
+    switch( type )
+    {
+    case NODE:            delete data.node; break;
+    case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
+    case DIST_LOW_RANK:   delete data.DF; break;
+    case SHARED_LOW_RANK: delete data.SF; break;
+    case SHARED_QUASI2D:  delete data.SH; break;
+    case QUASI2D:         delete data.H; break;
+    }
 }
 
 } // namespace psp

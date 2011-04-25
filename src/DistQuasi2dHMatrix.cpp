@@ -40,13 +40,80 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
     if( p > (1u<<(2*(H._numLevels-1))) )
         throw std::logic_error("More than 4^(numLevels-1) processes.");
 
+    // Initialize for the recursion
     packedSizes.resize( p );
     std::memset( &packedSizes[0], 0, p*sizeof(std::size_t) );
+    std::vector<int> localHeights( p );
+    std::vector<int> localWidths( p );
+    ComputeLocalSizes( localHeights, localWidths, H );
 
     // Recurse on this shell to compute the packed sizes
     int sourceRankOffset=0, targetRankOffset=0;
     PackedSizesRecursion
-    ( packedSizes, rank, sourceRankOffset, targetRankOffset, p, H );
+    ( packedSizes, localHeights, localWidths, rank, 
+      sourceRankOffset, targetRankOffset, p, H );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalHeight
+( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::ComputeLocalHeight");
+    if( !(p && !(p & (p-1))) )
+        throw std::logic_error("Must use a power of two number of processes");
+#endif
+    int localHeight;
+    ComputeLocalDimensionRecursion
+    ( localHeight, p, rank, H._xSizeTarget, H._ySizeTarget, H._zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return localHeight;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalWidth
+( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::ComputeLocalWidth");
+    if( !(p && !(p & (p-1))) )
+        throw std::logic_error("Must use a power of two number of processes");
+#endif
+    int localWidth;
+    ComputeLocalDimensionRecursion
+    ( localWidth, p, rank, H._xSizeSource, H._ySizeSource, H._zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return localWidth;
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalSizes
+( std::vector<int>& localHeights, std::vector<int>& localWidths,
+  const Quasi2dHMatrix<Scalar,Conjugated>& H )
+{
+#ifndef RELEASE    
+    PushCallStack("DistQuasi2dHMatrix::ComputeLocalSizes");
+    const int p = localHeights.size();
+    const int q = localWidths.size();
+    if( p != q )
+        throw std::logic_error("Vectors are of different lengths");
+    if( !(p && !(p & (p-1))) )
+        throw std::logic_error("Must use a power of two number of processes");
+#endif
+    ComputeLocalSizesRecursion
+    ( &localHeights[0], &localWidths[0], localHeights.size(), 
+      H._xSizeSource, H._xSizeTarget, H._ySizeSource, H._ySizeTarget, 
+      H._zSize );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -59,12 +126,23 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
-( std::vector<std::size_t>& packedSizes, int rank,
-  int sourceRankOffset, int targetRankOffset, int teamSize,
+( std::vector<std::size_t>& packedSizes, 
+  const std::vector<int>& localHeights,
+  const std::vector<int>& localWidths,
+  int rank, int sourceRankOffset, int targetRankOffset, int teamSize,
   const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
     typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
+
+    // TODO: Count the header information
+    /*
+    const std::size_t headerSize = 
+        15*sizeof(int) + 2*sizeof(bool) + 
+        sizeof(typename Quasi2d::ShellType);
+    for( int j=0; j<teamSize; ++j )
+        packedSizes[j] += headerSize;
+    */
 
     if( teamSize == 1 )
     {
@@ -81,13 +159,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     }
     else // teamSize >= 2
     {
-        // Every process stores the basic H-matrix information
-        const std::size_t headerSize = 
-            15*sizeof(int) + 2*sizeof(bool) + 
-            sizeof(typename Quasi2d::ShellType);
-        for( int j=0; j<teamSize; ++j )
-            packedSizes[j] += headerSize;
-
         const typename Quasi2d::Shell& shell = H._shell;
         switch( shell.type )
         {
@@ -99,7 +170,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                 for( int s=0; s<4; ++s )
                 {
                     PackedSizesRecursion
-                    ( packedSizes, rank,
+                    ( packedSizes, localHeights, localWidths, rank,
                       sourceRankOffset+newTeamSize*(s/2),
                       targetRankOffset+newTeamSize*(t/2), newTeamSize,
                       shell.data.node->Child(t,s) );
@@ -122,6 +193,98 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             break;
         }
     }
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalDimensionRecursion
+( int& localDim, int p, int rank, int xSize, int ySize, int zSize )
+{
+    if( p != 1 )
+    {
+        if( rank > p/2 )
+        {
+            ComputeLocalDimensionRecursion
+            ( localDim, p/2, rank-p/2, 
+              xSize-(xSize/2), ySize-(ySize/2), zSize );
+        }
+        else
+        {
+            ComputeLocalDimensionRecursion
+            ( localDim, p/2, rank, xSize/2, ySize/2, zSize );
+        }
+    }
+    else
+    {
+        localDim = xSize*ySize*zSize;
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalSizesRecursion
+( int* localHeights, int* localWidths, int teamSize, 
+  int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget, 
+  int zSize ) 
+{
+    if( teamSize != 1 )
+    {
+        ComputeLocalSizesRecursion
+        ( localHeights, localWidths, teamSize/2,
+          xSizeSource/2, xSizeTarget/2, ySizeSource/2, ySizeTarget/2, zSize );
+        ComputeLocalSizesRecursion
+        ( &localHeights[teamSize/2], &localWidths[teamSize/2], teamSize/2,
+          xSizeSource-(xSizeSource/2), xSizeTarget-(xSizeTarget/2),
+          ySizeSource-(ySizeSource/2), ySizeTarget-(ySizeTarget/2),
+          zSize );
+    }
+    else
+    {
+        localHeights[0] = xSizeTarget*ySizeTarget*zSize;
+        localWidths[0] = xSizeSource*ySizeSource*zSize;
+    }
+}
+
+//----------------------------------------------------------------------------//
+// Public non-static routines                                                 //
+//----------------------------------------------------------------------------//
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LocalHeight() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::LocalHeight");
+#endif
+    int p = mpi::CommSize( _comm );
+    int rank = mpi::CommRank( _comm );
+
+    int localHeight;
+    ComputeLocalDimensionRecursion
+    ( localHeight, p, rank, _xSizeTarget, _ySizeTarget, _zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return localHeight;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LocalWidth() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::LocalWidth");
+#endif
+    int p = mpi::CommSize( _comm );
+    int rank = mpi::CommRank( _comm );
+
+    int localWidth;
+    ComputeLocalDimensionRecursion
+    ( localWidth, p, rank, _xSizeSource, _ySizeSource, _zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return localWidth;
 }
 
 template class psp::DistQuasi2dHMatrix<float,false>;

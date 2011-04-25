@@ -39,7 +39,7 @@ struct DistLowRankMatrix
     MPI_Comm myTeam;
     MPI_Comm otherTeam;
 
-    bool onSourceTeam;
+    bool inSourceTeam;
     DenseMatrix<Scalar> D;
 
     // Storage for V^[T/H] x. This should be computed by the process owning

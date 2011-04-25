@@ -49,13 +49,11 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[4];
-
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
           int zSize );
         ~Node();
-
         SharedQuasi2dHMatrix& Child( int i, int j );
         const SharedQuasi2dHMatrix& Child( int i, int j ) const;
     };
@@ -66,10 +64,8 @@ private:
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
-
         NodeSymmetric( int xSize, int ySize, int zSize );
         ~NodeSymmetric();
-
         SharedQuasi2dHMatrix& Child( int i, int j );
         const SharedQuasi2dHMatrix& Child( int i, int j ) const;
     };
@@ -91,29 +87,17 @@ private:
             NodeSymmetric* nodeSymmetric;
             SharedLowRankMatrix<Scalar,Conjugated>* SF;
             SharedDenseMatrix<Scalar>* SD;
-
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
-
-        Shell() : type(NODE), data() { }
-
-        ~Shell()
-        {
-            switch( type )
-            {
-            case NODE:            delete data.node; break;
-            case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
-            case SHARED_LOW_RANK: delete data.SF; break;
-            case SHARED_DENSE:    delete data.SD; break;
-            }
-        }
+        Shell();
+        ~Shell();
     };
 
     int _height, _width;
     int _numLevels;
     int _maxRank;
     int _sourceOffset, _targetOffset;
-    bool _symmetric;
+    bool _symmetric; // TODO: Replace with MatrixType
     bool _stronglyAdmissible;
 
     int _xSizeSource, _xSizeTarget;
@@ -305,6 +289,25 @@ const
     PopCallStack();
 #endif
     return *children[(i*(i+1))/2 + j];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SharedQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
+: type(NODE), data() 
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline
+SharedQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
+{
+    switch( type )
+    {
+    case NODE:            delete data.node; break;
+    case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
+    case SHARED_LOW_RANK: delete data.SF; break;
+    case SHARED_DENSE:    delete data.SD; break;
+    }
 }
 
 } // namespace psp
