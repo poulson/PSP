@@ -35,11 +35,10 @@ template<typename Scalar,bool Conjugated>
 struct DistLowRankMatrix
 {
     int height, width, rank;
-
-    MPI_Comm myTeam;
-    MPI_Comm otherTeam;
-
     bool inSourceTeam;
+    MPI_Comm myTeam;
+    int rootOfOtherTeam;
+
     DenseMatrix<Scalar> D;
 
     // Storage for V^[T/H] x. This should be computed by the process owning

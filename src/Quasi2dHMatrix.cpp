@@ -127,8 +127,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
         const int n = V.Height();
         const int r = U.Width();
 
-        // Make space for the dimensions
-        packedSize += 3*sizeof(int);
+        // The height and width are already known, we just need the rank
+        packedSize += sizeof(int);
 
         // Make space for U and V
         packedSize += (m+n)*r*sizeof(Scalar);
@@ -141,9 +141,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
         const int m = D.Height();
         const int n = D.Width();
         const MatrixType type = D.Type();
-
-        // Make space for the dimensions
-        packedSize += 2*sizeof(int);
 
         // Make space for the matrix type and data
         packedSize += sizeof(MatrixType);
@@ -203,9 +200,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const int n = V.Height();
         const int r = U.Width();
 
-        // Write out the dimensions
-        *((int*)head) = m; head += sizeof(int);
-        *((int*)head) = n; head += sizeof(int);
+        // Write out the rank
         *((int*)head) = r; head += sizeof(int);
 
         // Write out U
@@ -230,10 +225,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const int m = D.Height();
         const int n = D.Width();
         const MatrixType type = D.Type();
-
-        // Write out the dimensions
-        *((int*)head) = m; head += sizeof(int);
-        *((int*)head) = n; head += sizeof(int);
 
         // Write out the matrix type and data
         *((MatrixType*)head) = type; head += sizeof(MatrixType);
@@ -410,6 +401,20 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSize() const
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
+( byte* packedHMatrix ) const
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Pack");
+#endif
+    PackRecursion( packedHMatrix, *this );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 ( std::vector<byte>& packedHMatrix ) const
 {
 #ifndef RELEASE
@@ -421,6 +426,20 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
     byte* head = &packedHMatrix[0];
 
     PackRecursion( head, *this );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
+( const byte* packedHMatrix )
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::Unpack");
+#endif
+    UnpackRecursion( packedHMatrix, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2712,10 +2731,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
         DenseMatrix<Scalar>& U = shell.data.F->U;
         DenseMatrix<Scalar>& V = shell.data.F->V;
+        const int m = H._height;
+        const int n = H._width;
 
-        // Read in the matrix dimensions
-        const int m = *((int*)head); head += sizeof(int);
-        const int n = *((int*)head); head += sizeof(int);
+        // Read in the matrix rank
         const int r = *((int*)head); head += sizeof(int);
         U.SetType( GENERAL ); U.Resize( m, r );
         V.SetType( GENERAL ); V.Resize( n, r );
@@ -2739,13 +2758,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     case DENSE:
         shell.data.D = new DenseMatrix<Scalar>;
         DenseMatrix<Scalar>& D = *shell.data.D;
+        const int m = H._height;
+        const int n = H._width;
 
-        // Read in the matrix dimensions
-        const int m = *((int*)head); head += sizeof(int);
-        const int n = *((int*)head); head += sizeof(int);
         const MatrixType type = *((MatrixType*)head); 
         head += sizeof(MatrixType);
-
         D.SetType( type ); 
         D.Resize( m, n );
 

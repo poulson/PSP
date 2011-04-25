@@ -38,7 +38,14 @@ private:
     ( std::vector<std::size_t>& packedSizes,
       const std::vector<int>& localHeights,
       const std::vector<int>& localWidths,
-      int rank, int sourceRankOffset, int targetRankOffset, int teamSize,
+      int sourceRankOffset, int targetRankOffset, int teamSize,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static void PackRecursion
+    ( std::vector<byte**>& headPointers,
+      const std::vector<int>& localHeights,
+      const std::vector<int>& localWidths,
+      int sourceRankOffset, int targetRankOffset, int teamSize,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void ComputeLocalDimensionRecursion
@@ -121,11 +128,14 @@ private:
     Shell _shell;
 
     MPI_Comm _comm;
-    int _localHeight, _localWidth;
 
 public:
     static void PackedSizes
     ( std::vector<std::size_t>& packedSizes,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
+
+    static void Pack
+    ( std::vector<byte*>& packedPieces, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
 
     static int ComputeLocalHeight

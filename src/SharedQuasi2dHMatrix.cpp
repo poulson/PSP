@@ -132,7 +132,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
         break;
     case Quasi2d::LOW_RANK:
     {
-        const std::size_t headerSize = 3*sizeof(int);
+        const std::size_t headerSize = sizeof(int);
         sourceSize += headerSize;
         targetSize += headerSize;
 
@@ -146,10 +146,6 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     }
     case Quasi2d::DENSE:
     {
-        const std::size_t headerSize = 2*sizeof(int);
-        sourceSize += headerSize;
-        targetSize += headerSize;
-
         const DenseMatrix<Scalar>& D = *shell.data.D;
         const int m = D.Height();
         const int n = D.Width();
@@ -260,8 +256,6 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const int r = U.Width();
 
         // Write out the source information
-        *((int*)sourceHead) = m; sourceHead += sizeof(int);
-        *((int*)sourceHead) = n; sourceHead += sizeof(int);
         *((int*)sourceHead) = r; sourceHead += sizeof(int);
         for( int j=0; j<r; ++j )
         {
@@ -270,8 +264,6 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
 
         // Write out the target information
-        *((int*)targetHead) = m; targetHead += sizeof(int);
-        *((int*)targetHead) = n; targetHead += sizeof(int);
         *((int*)targetHead) = r; targetHead += sizeof(int);
         for( int j=0; j<r; ++j )
         {
@@ -296,8 +288,6 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const MatrixType type = D.Type();
 
         // Write out the source information
-        *((int*)sourceHead) = m;           sourceHead += sizeof(int);
-        *((int*)sourceHead) = n;           sourceHead += sizeof(int);
         *((MatrixType*)sourceHead) = type; sourceHead += sizeof(MatrixType);
         if( type == GENERAL )
         {
@@ -318,9 +308,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
         }
 
-        // Write out the target information
-        *((int*)targetHead) = m; targetHead += sizeof(int);
-        *((int*)targetHead) = n; targetHead += sizeof(int);
+        // There is no target information to write
 
         break;
     }
@@ -449,8 +437,8 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         shell.data.SF = new SharedLowRankMatrix<Scalar,Conjugated>;
         SharedLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
 
-        const int m = *((int*)head); head += sizeof(int);
-        const int n = *((int*)head); head += sizeof(int);
+        const int m = H._height;
+        const int n = H._width;
         const int r = *((int*)head); head += sizeof(int);
         SF.height        = m;
         SF.width         = n;
@@ -485,8 +473,8 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         shell.data.SD = new SharedDenseMatrix<Scalar>;
         SharedDenseMatrix<Scalar>& SD = *shell.data.SD;
 
-        const int m = *((int*)head); head += sizeof(int);
-        const int n = *((int*)head); head += sizeof(int);
+        const int m = H._height;
+        const int n = H._width;
         SD.height       = m;
         SD.width        = n;
         SD.partner      = H._partner;
