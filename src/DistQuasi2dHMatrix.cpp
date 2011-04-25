@@ -167,22 +167,27 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     const int n = H._width;
     switch( shell.type )
     {
-    case NODE:
+    case Quasi2d::NODE:
     {
         if( teamSize == 1 )
         {
             if( sourceRankOffset == targetRankOffset )
             {
                 // Store the entire H-matrix on one process
-                packedSizes[sourceRankOffset] += H.PackedSize();
+                const int rank = sourceRankOffset;
+                packedSizes[rank] += H.PackedSize();
             }
             else
             {
                 // Store a shared H-matrix
+                const int sourceRank = sourceRankOffset;
+                const int targetRank = targetRankOffset;
+
                 std::size_t sourceSize, targetSize;
                 SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
-                packedSizes[sourceRankOffset] += sourceSize;
-                packedSizes[targetRankOffset] += targetSize;
+
+                packedSizes[sourceRank] += sourceSize;
+                packedSizes[targetRank] += targetSize;
             }
         }
         else
@@ -201,23 +206,29 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                 }
             }
         }
+        break;
     }
-    case NODE_SYMMETRIC:
+    case Quasi2d::NODE_SYMMETRIC:
     {
         if( teamSize == 1 )
         {
             if( sourceRankOffset == targetRankOffset )
             {
                 // Store the entire H-matrix on one process
-                packedSizes[sourceRankOffset] += H.PackedSize();
+                const int rank = sourceRankOffset;
+                packedSizes[rank] += H.PackedSize();
             }
             else
             {
                 // Store a shared H-matrix
+                const int sourceRank = sourceRankOffset;
+                const int targetRank = targetRankOffset;
+
                 std::size_t sourceSize, targetSize;
                 SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
-                packedSizes[sourceRankOffset] += sourceSize;
-                packedSizes[targetRankOffset] += targetSize;
+
+                packedSizes[sourceRank] += sourceSize;
+                packedSizes[targetRank] += targetSize;
             }
         }
         else
@@ -226,31 +237,33 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             throw std::logic_error("Symmetric case not yet supported");
 #endif
         }
+        break;
     }
-    case LOW_RANK:
+    case Quasi2d::LOW_RANK:
     {
+        const int r = shell.data.F->Rank();
         if( teamSize == 1 )
         {
             // Store a shared low-rank matrix                
-            const DenseMatrix<Scalar>& shell.data.F->U;
-            const DenseMatrix<Scalar>& shell.data.F->V;
-            const int r = U.Width();
+            const int sourceRank = sourceRankOffset;
+            const int targetRank = targetRankOffset;
 
-            // The source and target processes store the matrix rank and their
-            // factor's entries.
-            packedSizes[sourceRankOffset] += sizeof(int) + n*r*sizeof(Scalar);
-            packedSizes[targetRankOffset] += sizeof(int) + m*r*sizeof(Scalar);
+            // The source and target processes store the matrix rank, 
+            // whether they are on the source side, their partner's (MPI) rank,
+            // and their factor's entries.
+            packedSizes[sourceRank] += 
+                2*sizeof(int) + sizeof(bool) + n*r*sizeof(Scalar);
+            packedSizes[targetRank] += 
+                2*sizeof(int) + sizeof(bool) + m*r*sizeof(Scalar);
         }
         else
         {
             // Store a distributed low-rank matrix
-            const DenseMatrix<Scalar>& U = shell.data.F->U;
-            const DenseMatrix<Scalar>& V = shell.data.F->V;
-            const int r = U.Width();
 
             // Make room for: 
-            //   rank, my team's root, my team's size, other team's root
-            const std::size_t headerSize = 4*sizeof(int);
+            //   matrix rank, whether we're on the source side, 
+            //   my team's root, other team's root, team size
+            const std::size_t headerSize = 4*sizeof(int) + sizeof(bool);
 
             // Write out the source information
             for( int i=0; i<teamSize; ++i )
@@ -270,23 +283,39 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
         }
         break;
     }
-    case DENSE:
+    case Quasi2d::DENSE:
     {
-        const DenseMatrix<Scalar>& *shell.data.D;
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        const MatrixType type = D.Type();
 
         if( teamSize == 1 )
         {
-            // We can just store the dense matrix at the source rank since, 
-            // if there are two processes the source stores it, and if there
-            // is one process the source and target ranks are the same.
-            const DenseMatrix<Scalar>& *shell.data.D;
-            const MatrixType type = D.Type();
-
-            packedSizes[sourceRankOffset] += sizeof(MatrixType);
-            if( type == GENERAL )
-                packedSizes[sourceRankOffset] += m*n*sizeof(Scalar);
+            if( sourceRankOffset == targetRankOffset )
+            {
+                // Store the type and entries
+                const int rank = sourceRankOffset;
+                packedSizes[rank] += sizeof(MatrixType);
+                if( type == GENERAL )
+                    packedSizes[rank] += m*n*sizeof(Scalar);
+                else
+                    packedSizes[rank] += ((m*m+m)/2)*sizeof(Scalar);
+            }
             else
-                packedSizes[sourceRankOffset] += ((m*m+m)/2)*sizeof(Scalar);
+            {
+                // Both teams store whether or not they are on the source side
+                // and who their partner is
+                const int sourceRank = sourceRankOffset;
+                const int targetRank = targetRankOffset;
+                packedSizes[sourceRank] += sizeof(bool) + sizeof(int);
+                packedSizes[targetRank] += sizeof(bool) + sizeof(int);
+
+                // The source side stores the matrix type and entries
+                packedSizes[sourceRank] += sizeof(MatrixType);
+                if( type == GENERAL )
+                    packedSizes[sourceRank] += m*n*sizeof(Scalar);
+                else
+                    packedSizes[sourceRank] += ((m*m+m)/2)*sizeof(Scalar);
+            }
         }
         else
         {
@@ -362,78 +391,55 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         *((int*)*h) = H._yTarget;             *h += sizeof(int);
     }
 
+    const typename Quasi2d::Shell& shell = H._shell;
+    const int m = H._height;
+    const int n = H._width;
     switch( shell.type )
     {
-    case NODE:
+    case Quasi2d::NODE:
     {
-        break;
-    }
-    case NODE_SYMMETRIC:
-    {
-        break;
-    }
-    case LOW_RANK:
-    {
-        break;
-    }
-    case DENSE:
-    {
-
-        break;
-    }
-    }
-    /*
-    if( teamSize == 1 )
-    {
-        if( sourceRankOffset == targetRankOffset )
+        if( teamSize == 1 )
         {
-            byte** h = headPointers[sourceRankOffset];
+            if( sourceRankOffset == targetRankOffset )
+            {
+                // Store the entire H-matrix on one process
+                const int rank = sourceRankOffset;
+                byte** h = headPointers[rank];
+                *((ShellType*)*h) = QUASI2D; *h += sizeof(ShellType);
+                H.Pack( *h ); *h += H.PackedSize();
+            }
+            else
+            {
+                // Store a shared H-matrix 
 
-            *((ShellType*)*h) = QUASI2D;
-            H.Pack( *h );        
-            *h += H.PackedSize();
+                const int sourceRank = sourceRankOffset;
+                const int targetRank = targetRankOffset;
+                byte** hSource = headPointers[sourceRank];
+                byte** hTarget = headPointers[targetRank];
+                *((ShellType*)*hSource) = SHARED_QUASI2D; 
+                *((ShellType*)*hTarget) = SHARED_QUASI2D;
+                *hSource += sizeof(ShellType);
+                *hTarget += sizeof(ShellType);
+
+                SharedQuasi2d::Pack
+                ( *hSource, *hTarget, sourceRank, targetRank, H );
+
+                std::size_t sourceSize, targetSize;
+                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
+                *hSource += sourceSize;
+                *hTarget += targetSize;
+            }
         }
         else
         {
-            // HERE
-            // if( admissible )
-            // {
-            // ...
-            // }
-            // else
-            // {
-            byte** hSource = headPointers[sourceRankOffset];
-            byte** hTarget = headPointers[targetRankOffset];
-
-            *((ShellType*)*hSource) = SHARED_QUASI2D;
-            *((ShellType*)*hTarget) = SHARED_QUASI2D;
-            SharedQuasi2d::Pack
-            ( *hSource, *hTarget, sourceRankOffset, targetRankOffset, H );
-
-            std::size_t sourceSize, targetSize;
-            SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
-            *hSource += sourceSize;
-            *hTarget += targetSize;
-            // }
-        }
-    }
-    else // teamSize >= 2
-    {
-        const typename Quasi2d::Shell& shell = H._shell;
-        switch( shell.type )
-        {
-        case Quasi2d::NODE:
-        {
-            // Write out the shell types for the source and target teams
+            // Recurse
             for( int i=0; i<teamSize; ++i )
             {
                 byte** hSource = headPointers[sourceRankOffset+i];
-                *((ShellType*)*hSource) = NODE; *hSource += sizeof(ShellType);
-
                 byte** hTarget = headPointers[targetRankOffset+i];
+                *((ShellType*)*hSource) = NODE; *hSource += sizeof(ShellType);
                 *((ShellType*)*hTarget) = NODE; *hTarget += sizeof(ShellType);
             }
-
             const int newTeamSize = teamSize/2;
             for( int t=0; t<4; ++t )
             {
@@ -446,40 +452,230 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                       shell.data.node->Child(t,s) );
                 }
             }
-            break;
         }
-        case Quasi2d::NODE_SYMMETRIC:
-#ifndef RELEASE
-            throw std::logic_error("Nonsymmetric case not yet supported");
-#endif
-            break;
-        case Quasi2d::LOW_RANK:
-#ifndef RELEASE
+        break;
+    }
+    case Quasi2d::NODE_SYMMETRIC:
+    {
+        if( teamSize == 1 )
+        {
             if( sourceRankOffset == targetRankOffset )
-                throw std::logic_error("Offsets were equal off the diagonal");
+            {
+                // Store the entire H-matrix on one process
+                const int rank = sourceRankOffset;
+                byte** h = headPointers[rank];
+                *((ShellType*)*h) = QUASI2D; *h += sizeof(ShellType);
+                H.Pack( *h ); *h += H.PackedSize();
+            }
+            else
+            {
+                // Store a shared H-matrix 
+
+                const int sourceRank = sourceRankOffset;
+                const int targetRank = targetRankOffset;
+                byte** hSource = headPointers[sourceRank];
+                byte** hTarget = headPointers[targetRank];
+                *((ShellType*)*hSource) = SHARED_QUASI2D; 
+                *((ShellType*)*hTarget) = SHARED_QUASI2D;
+                *hSource += sizeof(ShellType);
+                *hTarget += sizeof(ShellType);
+
+                SharedQuasi2d::Pack
+                ( *hSource, *hTarget, sourceRank, targetRank, H );
+
+                std::size_t sourceSize, targetSize;
+                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
+                *hSource += sourceSize;
+                *hTarget += targetSize;
+            }
+        }
+        else
+        {
+#ifndef RELEASE
+            throw std::logic_error("Symmetric case not yet supported");
 #endif
-            // Write out the shell types for the source and target teams
+        }
+        break;
+    }
+    case Quasi2d::LOW_RANK:
+    {
+        const DenseMatrix<Scalar>& U = shell.data.F->U;
+        const DenseMatrix<Scalar>& V = shell.data.F->V;
+        const int r = U.Width();
+        if( teamSize == 1 )
+        {
+            // Store a shared low-rank representation
+
+            const int sourceRank = sourceRankOffset;
+            const int targetRank = targetRankOffset;
+            byte** hSource = headPointers[sourceRank];
+            byte** hTarget = headPointers[targetRank];
+            *((ShellType*)*hSource) = SHARED_LOW_RANK;
+            *((ShellType*)*hTarget) = SHARED_LOW_RANK;
+            *hSource += sizeof(ShellType);
+            *hTarget += sizeof(ShellType);
+
+            // Store the source data
+            *((int*)*hSource) = r;          *hSource += sizeof(int);
+            *((bool*)*hSource) = true;      *hSource += sizeof(bool);
+            *((int*)*hSource) = targetRank; *hSource += sizeof(int);
+            for( int j=0; j<r; ++j )
+            {
+                std::memcpy( *hSource, V.LockedBuffer(0,j), n*sizeof(Scalar) );
+                *hSource += n*sizeof(Scalar);
+            }
+
+            // Store the target data
+            *((int*)*hTarget) = r;          *hTarget += sizeof(int);
+            *((bool*)*hTarget) = false;     *hTarget += sizeof(bool);
+            *((int*)*hTarget) = sourceRank; *hTarget += sizeof(int);
+            for( int j=0; j<r; ++j )
+            {
+                std::memcpy( *hTarget, U.LockedBuffer(0,j), m*sizeof(Scalar) );
+                *hTarget += m*sizeof(Scalar);
+            }
+        }
+        else
+        {
+            // Store a distributed low-rank representation
+
             for( int i=0; i<teamSize; ++i )
             {
                 byte** hSource = headPointers[sourceRankOffset+i];
-                *((ShellType*)*hSource) = DIST_LOW_RANK;
-                *hSource += sizeof(ShellType);
-
                 byte** hTarget = headPointers[targetRankOffset+i];
-                *((ShellType*)*hTarget) = DIST_LOW_RANK; 
+                *((ShellType*)*hSource) = DIST_LOW_RANK;
+                *((ShellType*)*hTarget) = DIST_LOW_RANK;
+                *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
             }
 
-            // TODO
-            break;
-        case Quasi2d::DENSE:
-#ifndef RELEASE
-            throw std::logic_error("Too many processes");
-#endif
-            break;
+            // Store the source data
+            int rowOffset = 0;
+            for( int i=0; i<teamSize; ++i )
+            {
+                const int sourceRank = sourceRankOffset + i;
+                byte** hSource = headPointers[sourceRank];
+                const int localWidth = localWidths[sourceRank];
+
+                *((int*)*hSource) = r;                *hSource += sizeof(int);
+                *((bool*)*hSource) = true;            *hSource += sizeof(bool);
+                *((int*)*hSource) = sourceRankOffset; *hSource += sizeof(int);
+                *((int*)*hSource) = targetRankOffset; *hSource += sizeof(int);
+                *((int*)*hSource) = teamSize;         *hSource += sizeof(int);
+
+                for( int j=0; j<r; ++j )
+                {
+                    std::memcpy
+                    ( *hSource, V.LockedBuffer(rowOffset,j), 
+                      localWidth*sizeof(Scalar) );
+                    *hSource += localWidth*sizeof(Scalar);
+                }
+                rowOffset += localWidth;
+            }
+
+            // Store the target data
+            rowOffset = 0;
+            for( int i=0; i<teamSize; ++i )
+            {
+                const int targetRank = targetRankOffset + i;
+                byte** hTarget = headPointers[targetRank];
+                const int localHeight = localHeights[targetRank];
+
+                *((int*)*hTarget) = r;                *hTarget += sizeof(int);
+                *((bool*)*hTarget) = false;           *hTarget += sizeof(bool);
+                *((int*)*hTarget) = targetRankOffset; *hTarget += sizeof(int);
+                *((int*)*hTarget) = sourceRankOffset; *hTarget += sizeof(int);
+                *((int*)*hTarget) = teamSize;         *hTarget += sizeof(int);
+
+                for( int j=0; j<r; ++j )
+                {
+                    std::memcpy
+                    ( *hTarget, U.LockedBuffer(rowOffset,j),
+                      localHeight*sizeof(Scalar) );
+                    *hTarget += localHeight*sizeof(Scalar);
+                }
+                rowOffset += localHeight;
+            }
         }
+        break;
     }
-    */
+    case Quasi2d::DENSE:
+    {
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        const MatrixType type = D.Type();
+        if( teamSize == 1 )
+        {
+            if( sourceRankOffset == targetRankOffset )
+            {
+                // Store a serial dense matrix
+                const int rank = sourceRankOffset;
+                byte** h = headPointers[rank];
+                *((MatrixType*)*h) = type; *h += sizeof(MatrixType);
+                if( type == GENERAL )
+                {
+                    for( int j=0; j<n; ++j )
+                    {
+                        std::memcpy
+                        ( *h, D.LockedBuffer(0,j), m*sizeof(Scalar) );
+                        *h += m*sizeof(Scalar);
+                    }
+                }
+                else
+                {
+                    for( int j=0; j<n; ++j )
+                    {
+                        std::memcpy
+                        ( *h, D.LockedBuffer(j,j), (m-j)*sizeof(Scalar) );
+                        *h += (m-j)*sizeof(Scalar);
+                    }
+                }
+            }
+            else
+            {
+                // Store a shared dense matrix
+
+                const int sourceRank = sourceRankOffset;
+                const int targetRank = targetRankOffset;
+                byte** hSource = headPointers[sourceRank];
+                byte** hTarget = headPointers[targetRank];
+
+                // Store the source data
+                *((bool*)*hSource) = true;       *hSource += sizeof(bool);
+                *((int*)*hSource) = targetRank;  *hSource += sizeof(int);
+                *((MatrixType*)*hSource) = type; *hSource += sizeof(MatrixType);
+                if( type == GENERAL )
+                {
+                    for( int j=0; j<n; ++j )
+                    {
+                        std::memcpy
+                        ( *hSource, D.LockedBuffer(0,j), m*sizeof(Scalar) );
+                        *hSource += m*sizeof(Scalar);
+                    }
+                }
+                else
+                {
+                    for( int j=0; j<n; ++j )
+                    {
+                        std::memcpy
+                        ( *hSource, D.LockedBuffer(j,j), (m-j)*sizeof(Scalar) );
+                        *hSource += (m-j)*sizeof(Scalar);
+                    }
+                }
+
+                // Store the target data
+                *((bool*)*hTarget) = false;     *hTarget += sizeof(bool);
+                *((int*)*hTarget) = sourceRank; *hTarget += sizeof(int);
+            }
+        }
+#ifndef RELEASE
+        else
+        {
+            throw std::logic_error("Too many processes");
+        }
+#endif
+        break;
+    }
+    }
 }
 
 template<typename Scalar,bool Conjugated>

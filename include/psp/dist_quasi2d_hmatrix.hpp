@@ -133,6 +133,10 @@ private:
 
     MPI_Comm _comm;
 
+    void UnpackRecursion
+    ( const byte*& head, 
+      DistQuasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
+
 public:
     static void PackedSizes
     ( std::vector<std::size_t>& packedSizes,
@@ -154,6 +158,9 @@ public:
 
     int LocalHeight() const;
     int LocalWidth() const;
+
+    // Unpack this process's portion of the DistQuasi2dHMatrix
+    void Unpack( const byte* packedDistHMatrix, MPI_Comm comm );
 
     // TODO: Figure out whether to act on PETSc's Vec or our own distributed
     //       vector class.
@@ -320,15 +327,17 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
-{
+{ 
     switch( type )
     {
     case NODE:            delete data.node; break;
     case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
     case DIST_LOW_RANK:   delete data.DF; break;
-    case SHARED_LOW_RANK: delete data.SF; break;
     case SHARED_QUASI2D:  delete data.SH; break;
+    case SHARED_LOW_RANK: delete data.SF; break;
+    case SHARED_DENSE:    delete data.SD; break;
     case QUASI2D:         delete data.H; break;
+    case DENSE:           delete data.D; break;
     }
 }
 
