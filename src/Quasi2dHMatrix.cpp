@@ -406,7 +406,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::Pack");
 #endif
-    PackRecursion( packedHMatrix, *this );
+    byte* head = packedHMatrix;
+    PackRecursion( head, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -439,7 +440,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::Unpack");
 #endif
-    UnpackRecursion( packedHMatrix, *this );
+    const byte* head = packedHMatrix;
+    UnpackRecursion( head, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif

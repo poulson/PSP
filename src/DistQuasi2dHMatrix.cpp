@@ -261,9 +261,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             // Store a distributed low-rank matrix
 
             // Make room for: 
-            //   matrix rank, whether we're on the source side, 
-            //   my team's root, other team's root, team size
-            const std::size_t headerSize = 4*sizeof(int) + sizeof(bool);
+            //   matrix rank, whether we're on the source side, and the
+            //   other team's root.
+            const std::size_t headerSize = 2*sizeof(int) + sizeof(bool);
 
             // Write out the source information
             for( int i=0; i<teamSize; ++i )
@@ -559,9 +559,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 
                 *((int*)*hSource) = r;                *hSource += sizeof(int);
                 *((bool*)*hSource) = true;            *hSource += sizeof(bool);
-                *((int*)*hSource) = sourceRankOffset; *hSource += sizeof(int);
                 *((int*)*hSource) = targetRankOffset; *hSource += sizeof(int);
-                *((int*)*hSource) = teamSize;         *hSource += sizeof(int);
 
                 for( int j=0; j<r; ++j )
                 {
@@ -583,9 +581,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 
                 *((int*)*hTarget) = r;                *hTarget += sizeof(int);
                 *((bool*)*hTarget) = false;           *hTarget += sizeof(bool);
-                *((int*)*hTarget) = targetRankOffset; *hTarget += sizeof(int);
                 *((int*)*hTarget) = sourceRankOffset; *hTarget += sizeof(int);
-                *((int*)*hTarget) = teamSize;         *hTarget += sizeof(int);
 
                 for( int j=0; j<r; ++j )
                 {
@@ -768,6 +764,139 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LocalWidth() const
     PopCallStack();
 #endif
     return localWidth;
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
+( const byte* packedDistHMatrix, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::Unpack");
+#endif
+    const byte* head = packedDistHMatrix;
+    UnpackRecursion( head, *this, comm, comm );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+//----------------------------------------------------------------------------//
+// Private non-static routines                                                //
+//----------------------------------------------------------------------------//
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
+( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H, 
+  MPI_Comm comm, MPI_Comm team )
+{
+    H._comm = comm;
+    H._team = team;
+
+    // Read in the header information
+    H._height             = *((int*)head);  head += sizeof(int);
+    H._width              = *((int*)head);  head += sizeof(int);
+    H._numLevels          = *((int*)head);  head += sizeof(int);
+    H._maxRank            = *((int*)head);  head += sizeof(int);
+    H._sourceOffset       = *((int*)head);  head += sizeof(int);
+    H._targetOffset       = *((int*)head);  head += sizeof(int);
+    H._symmetric          = *((bool*)head); head += sizeof(bool);
+    H._stronglyAdmissible = *((bool*)head); head += sizeof(bool);
+    H._xSizeSource        = *((int*)head);  head += sizeof(int);
+    H._xSizeTarget        = *((int*)head);  head += sizeof(int);
+    H._ySizeSource        = *((int*)head);  head += sizeof(int);
+    H._ySizeTarget        = *((int*)head);  head += sizeof(int);
+    H._zSize              = *((int*)head);  head += sizeof(int);
+    H._xSource            = *((int*)head);  head += sizeof(int);
+    H._xTarget            = *((int*)head);  head += sizeof(int);
+    H._ySource            = *((int*)head);  head += sizeof(int);
+    H._yTarget            = *((int*)head);  head += sizeof(int);
+
+    // Delete the old shell
+    Shell& shell = H._shell;
+    switch( shell.type ) 
+    {
+    case NODE:            delete shell.data.node; break;
+    case NODE_SYMMETRIC:  delete shell.data.nodeSymmetric; break;
+    case DIST_LOW_RANK:   delete shell.data.DF; break;
+    case SHARED_QUASI2D:  delete shell.data.SH; break;
+    case SHARED_LOW_RANK: delete shell.data.SF; break;
+    case SHARED_DENSE:    delete shell.data.SD; break;
+    case QUASI2D:         delete shell.data.H; break;
+    case DENSE:           delete shell.data.D; break;
+    case EMPTY: break;
+    }
+
+    // Read in the information for the new shell
+    shell.type = *((ShellType*)head); head += sizeof(ShellType);
+    switch( shell.type )
+    {
+    case NODE:
+    { 
+        shell.data.node = 
+            new Node
+            ( H._xSizeSource, H._xSizeTarget,
+              H._ySizeSource, H._ySizeTarget, H._zSize, team );
+        Node& node = *shell.data.node;
+
+        // HERE: Need to modify to branch based upon node.inRightTeam
+        if( node.inRightTeam )
+        {
+            // TODO
+        }
+        else
+        {
+            // TODO
+        }
+        /*
+        for( int i=0; i<16; ++i )
+        {
+            node.children[i] = new DistQuasi2dHMatrix<Scalar,Conjugated>;
+            UnpackRecursion( head, *node.children[i], comm, node.childTeam );
+        }
+        */
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case DIST_LOW_RANK:
+    {
+        shell.data.DF = new DistLowRankMatrix<Scalar,Conjugated>;
+        DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+
+        DF.rank              = *((int*)head);  head += sizeof(int);
+        DF.inSourceTeam      = *((bool*)head); head += sizeof(bool);
+        DF.rootOfOtherTeam   = *((int*)head);  head += sizeof(int);
+
+        break;
+    }
+    case SHARED_QUASI2D:
+    {
+        break;
+    }
+    case SHARED_LOW_RANK:
+    {
+        break;
+    }
+    case SHARED_DENSE:
+    {
+        break;
+    }
+    case QUASI2D:
+    {
+        break;
+    }
+    case DENSE:
+    {
+        break;
+    }
+    case EMPTY:
+        break;
+    }
 }
 
 template class psp::DistQuasi2dHMatrix<float,false>;

@@ -298,6 +298,17 @@ inline void Broadcast
 #endif
 }
 
+inline void CommFree( MPI_Comm& comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::CommFree");
+#endif
+    SafeMpi( MPI_Comm_free( &comm ) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 inline int CommRank( MPI_Comm comm )
 {
 #ifndef RELEASE
@@ -322,6 +333,18 @@ inline int CommSize( MPI_Comm comm )
     PopCallStack();
 #endif
     return size;
+}
+
+inline void CommSplit
+( MPI_Comm comm, int color, int key, MPI_Comm& newComm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::CommSplit");
+#endif
+    SafeMpi( MPI_Comm_split( comm, color, key, &newComm ) );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 inline void Gather

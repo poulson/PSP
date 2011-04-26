@@ -65,10 +65,12 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[2];
+        bool inRightTeam;
+        MPI_Comm childTeam;
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
-          int zSize );
+          int zSize, MPI_Comm team );
         ~Node();
         DistQuasi2dHMatrix& Child( int i, int j );
         const DistQuasi2dHMatrix& Child( int i, int j ) const;
@@ -80,7 +82,9 @@ private:
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
-        NodeSymmetric( int xSize, int ySize, int zSize );
+        bool inRightTeam;
+        MPI_Comm childTeam;
+        NodeSymmetric( int xSize, int ySize, int zSize, MPI_Comm team );
         ~NodeSymmetric();
         DistQuasi2dHMatrix& Child( int i, int j );
         const DistQuasi2dHMatrix& Child( int i, int j ) const;
@@ -95,7 +99,8 @@ private:
         SHARED_LOW_RANK, 
         SHARED_DENSE,
         QUASI2D,
-        DENSE
+        DENSE,
+        EMPTY
     };
 
     struct Shell
@@ -132,10 +137,11 @@ private:
     Shell _shell;
 
     MPI_Comm _comm;
+    MPI_Comm _team;
 
     void UnpackRecursion
     ( const byte*& head, 
-      DistQuasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
+      DistQuasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm, MPI_Comm team );
 
 public:
     static void PackedSizes
@@ -186,7 +192,7 @@ inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
 ( int xSizeSource, int xSizeTarget,
   int ySizeSource, int ySizeTarget,
-  int zSize )
+  int zSize, MPI_Comm team )
 : children(16)
 {
     xSourceSizes[0] = xSizeSource/2;
@@ -208,6 +214,20 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
     targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
     targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*zSize;
     targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
+
+    int teamRank = mpi::CommRank( team );
+    int teamSize = mpi::CommSize( team );
+
+    if( teamRank >= teamSize/2 )
+    {
+        mpi::CommSplit( team, true, teamRank-(teamSize/2), childTeam );    
+        inRightTeam = true;
+    }
+    else
+    {
+        mpi::CommSplit( team, false, teamRank, childTeam );
+        inRightTeam = false;
+    }
 }
 
 template<typename Scalar,bool Conjugated>
@@ -217,6 +237,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
     children.clear();
+    mpi::CommFree( childTeam );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -256,7 +277,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
-( int xSize, int ySize, int zSize )
+( int xSize, int ySize, int zSize, MPI_Comm team )
 : children(10)
 {
     xSizes[0] = xSize/2;
@@ -268,6 +289,20 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
     sizes[1] = xSizes[1]*ySizes[0]*zSize;
     sizes[2] = xSizes[0]*ySizes[1]*zSize;
     sizes[3] = xSizes[1]*ySizes[1]*zSize;
+
+    int teamRank = mpi::CommRank( team );
+    int teamSize = mpi::CommSize( team );
+
+    if( teamRank >= teamSize/2 )
+    {
+        mpi::CommSplit( team, true, teamRank-(teamSize/2), childTeam );
+        inRightTeam = true;
+    }
+    else
+    {
+        mpi::CommSplit( team, false, teamRank, childTeam );
+        inRightTeam = false;
+    }
 }
 
 template<typename Scalar,bool Conjugated>
@@ -277,6 +312,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
     children.clear();
+    mpi::CommFree( childTeam );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -338,6 +374,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
     case SHARED_DENSE:    delete data.SD; break;
     case QUASI2D:         delete data.H; break;
     case DENSE:           delete data.D; break;
+    case EMPTY: break;
     }
 }
 
