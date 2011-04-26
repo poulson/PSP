@@ -90,6 +90,7 @@ main( int argc, char* argv[] )
 {
     MPI_Init( &argc, &argv );
     const int rank = psp::mpi::CommRank( MPI_COMM_WORLD );
+    const int p = psp::mpi::CommSize( MPI_COMM_WORLD );
 
     if( argc < 8 )
     {
@@ -113,6 +114,7 @@ main( int argc, char* argv[] )
     {
         std::cout << "-------------------------------------------------------\n"
                   << "Testing complex double Quasi2dHMatrix packing/unpacking\n"
+                  << "into DistQuasi2dHMatrix                                \n"
                   << "-------------------------------------------------------" 
                   << std::endl;
     }
@@ -120,6 +122,7 @@ main( int argc, char* argv[] )
     {
         typedef std::complex<double> Scalar;
         typedef psp::Quasi2dHMatrix<Scalar,false> Quasi2d;
+        typedef psp::DistQuasi2dHMatrix<Scalar,false> DistQuasi2d;
 
         psp::SparseMatrix<Scalar> S;
         S.height = m;
@@ -165,8 +168,6 @@ main( int argc, char* argv[] )
         {
             std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
                       << std::endl;
-            if( print )
-                S.Print("S");
         }
 
         // Convert to H-matrix form
@@ -186,90 +187,35 @@ main( int argc, char* argv[] )
                 H.Print("H");
         }
 
-        // Test against a vector of all 1's
-        psp::Vector<Scalar> x;
-        x.Resize( m );
-        Scalar* xBuffer = x.Buffer();
-        for( int i=0; i<m; ++i )
-            xBuffer[i] = 1.0;
+        // Pack for a DistQuasi2dHMatrix
         if( rank == 0 )
         {
-            std::cout << "Multiplying H-matrix by a vector of all ones...";
-            std::cout.flush();
-        }
-        psp::Vector<Scalar> y;
-        double matVecStartTime = MPI_Wtime();
-        H.MapVector( 1.0, x, y );
-        double matVecStopTime = MPI_Wtime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << matVecStopTime-matVecStartTime 
-                      << " seconds." << std::endl;
-            if( print )
-                y.Print("y := H x ~= S x");
-        }
-
-        // Pack the H-matrix
-        std::vector<psp::byte> packedHMatrix;
-        if( rank == 0 )
-        {
-            std::cout << "Packing H-matrix...";
+            std::cout << "Packing H-matrix for distribution...";
             std::cout.flush();
         }
         double packStartTime = MPI_Wtime();
-        H.Pack( packedHMatrix );
+        std::vector<std::size_t> packedSizes;
+        const std::size_t totalSize = 
+            DistQuasi2d::PackedSizes( packedSizes, H, MPI_COMM_WORLD ); 
+        std::vector<psp::byte> packingBuffer( totalSize );
+        std::vector<psp::byte*> packedPieces( p );
+        std::size_t offset = 0;
+        for( int i=0; i<p; ++i )
+        {
+            packedPieces[i] = &packingBuffer[offset];
+            offset += packedSizes[i];
+        }
+        DistQuasi2d::Pack( packedPieces, H, MPI_COMM_WORLD );
         double packStopTime = MPI_Wtime();
-        double sizeInMB = ((double)packedHMatrix.size())/(1024.*1024.);
         if( rank == 0 )
         {
-            std::cout << "done: " << packStopTime-packStartTime << " seconds.\n"
-                      << "Packed size: " << sizeInMB << " MB." << std::endl;
+            std::cout << "done: " << packStopTime-packStartTime << " seconds."
+                      << std::endl;
         }
 
-        // Unpack the H-matrix
-        if( rank == 0 )
-        {
-            std::cout << "Unpacking H-matrix...";
-            std::cout.flush();
-        }
-        double unpackStartTime = MPI_Wtime();
-        Quasi2d HCopy( packedHMatrix );
-        double unpackStopTime = MPI_Wtime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << unpackStopTime-unpackStartTime 
-                      << " seconds." << std::endl;
-            if( print )
-                HCopy.Print("Unpacked copy of H-matrix");
-        }
+        // AllToAll here?
 
-        // Check that the copied H-matrix has the same action on our vector of 
-        // all 1's
-        psp::Vector<Scalar> z;
-        if( rank == 0 )
-        {
-            std::cout << "Multiplying H-matrix by a vector...";
-            std::cout.flush();
-        }
-        matVecStartTime = MPI_Wtime();
-        HCopy.MapVector( 1.0, x, z );
-        matVecStopTime = MPI_Wtime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << matVecStopTime-matVecStartTime 
-                      << " seconds." << std::endl;
-            if( print )
-                z.Print("z := HCopy x ~= S x");
-            for( int i=0; i<z.Height(); ++i )
-            {
-                if( z.Get(i) != y.Get(i) )
-                {
-                    std::ostringstream s;
-                    s << "Action of copied H-matrix differed at index " << i;
-                    throw std::logic_error( s.str().c_str() );
-                }
-            }
-        }
+        // Unpack here?
     }
     catch( std::exception& e )
     {

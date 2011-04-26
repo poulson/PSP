@@ -25,7 +25,7 @@
 //----------------------------------------------------------------------------//
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
 ( std::vector<std::size_t>& packedSizes, 
   const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm team )
@@ -48,13 +48,17 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
 
     // Recurse on this shell to compute the packed sizes
     PackedSizesRecursion( packedSizes, localHeights, localWidths, 0, 0, p, H );
+    std::size_t totalSize = 0;
+    for( unsigned i=0; i<p; ++i )
+        totalSize += packedSizes[i];
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return totalSize;
 }
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Pack
 ( std::vector<byte*>& packedPieces, 
   const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm )
@@ -71,9 +75,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Pack
     std::vector<int> localWidths( p );
     ComputeLocalSizes( localHeights, localWidths, H );
     PackRecursion( headPointers, localHeights, localWidths, 0, 0, p, H );
+
+    std::size_t totalSize = 0;
+    for( int i=0; i<p; ++i )
+        totalSize += (*headPointers[i]-packedPieces[i]);
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return totalSize;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -183,11 +192,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                 const int sourceRank = sourceRankOffset;
                 const int targetRank = targetRankOffset;
 
-                std::size_t sourceSize, targetSize;
-                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
+                std::pair<std::size_t,std::size_t> sizes = 
+                    SharedQuasi2d::PackedSizes( H );
 
-                packedSizes[sourceRank] += sourceSize;
-                packedSizes[targetRank] += targetSize;
+                packedSizes[sourceRank] += sizes.first;
+                packedSizes[targetRank] += sizes.second;
             }
         }
         else
@@ -224,11 +233,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                 const int sourceRank = sourceRankOffset;
                 const int targetRank = targetRankOffset;
 
-                std::size_t sourceSize, targetSize;
-                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
+                std::pair<std::size_t,std::size_t> sizes = 
+                    SharedQuasi2d::PackedSizes( H );
 
-                packedSizes[sourceRank] += sourceSize;
-                packedSizes[targetRank] += targetSize;
+                packedSizes[sourceRank] += sizes.first;
+                packedSizes[targetRank] += sizes.second;
             }
         }
         else
@@ -420,13 +429,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                 *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
 
-                SharedQuasi2d::Pack
-                ( *hSource, *hTarget, sourceRank, targetRank, H );
+                std::pair<std::size_t,std::size_t> sizes =
+                    SharedQuasi2d::Pack
+                    ( *hSource, *hTarget, sourceRank, targetRank, H );
 
-                std::size_t sourceSize, targetSize;
-                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
-                *hSource += sourceSize;
-                *hTarget += targetSize;
+                *hSource += sizes.first;
+                *hTarget += sizes.second;
             }
         }
         else
@@ -478,13 +486,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                 *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
 
-                SharedQuasi2d::Pack
-                ( *hSource, *hTarget, sourceRank, targetRank, H );
+                std::pair<std::size_t,std::size_t> sizes =
+                    SharedQuasi2d::Pack
+                    ( *hSource, *hTarget, sourceRank, targetRank, H );
 
-                std::size_t sourceSize, targetSize;
-                SharedQuasi2d::PackedSizes( sourceSize, targetSize, H );
-                *hSource += sourceSize;
-                *hTarget += targetSize;
+                *hSource += sizes.first;
+                *hTarget += sizes.second;
             }
         }
         else
@@ -535,7 +542,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         else
         {
             // Store a distributed low-rank representation
-
             for( int i=0; i<teamSize; ++i )
             {
                 byte** hSource = headPointers[sourceRankOffset+i];
@@ -667,9 +673,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
 #ifndef RELEASE
         else
-        {
             throw std::logic_error("Too many processes");
-        }
 #endif
         break;
     }
@@ -696,9 +700,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalDimensionRecursion
         }
     }
     else
-    {
         localDim = xSize*ySize*zSize;
-    }
 }
 
 template<typename Scalar,bool Conjugated>

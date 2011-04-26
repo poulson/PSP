@@ -265,6 +265,7 @@ if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
   set(QUASI2D_TESTS Invert LowRankConstructor Pack)
+  set(DIST_QUASI2D_TESTS Pack)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries
@@ -300,18 +301,27 @@ if(BUILD_TESTS)
   # Build the hmatrix_tools tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmatrix_tools")
   foreach(TEST ${HMATRIX_TOOLS_TESTS})
-    add_executable(${TEST} ${TEST_DIR}/hmatrix_tools/${TEST}.cpp)
-    target_link_libraries(${TEST} psp cmake-dummy-lib)
-    set_target_properties(${TEST} 
+    add_executable(hmatrix-${TEST} ${TEST_DIR}/hmatrix_tools/${TEST}.cpp)
+    target_link_libraries(hmatrix-${TEST} psp cmake-dummy-lib)
+    set_target_properties(hmatrix-${TEST} 
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
   endforeach(TEST)
   # Build the Quasi2dHMatrix tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/quasi2d_hmatrix")
   foreach(TEST ${QUASI2D_TESTS})
-    add_executable(${TEST} ${TEST_DIR}/quasi2d_hmatrix/${TEST}.cpp)
-    target_link_libraries(${TEST} psp cmake-dummy-lib)
-    set_target_properties(${TEST}
+    add_executable(quasi2d-${TEST} ${TEST_DIR}/quasi2d_hmatrix/${TEST}.cpp)
+    target_link_libraries(quasi2d-${TEST} psp cmake-dummy-lib)
+    set_target_properties(quasi2d-${TEST}
+                          PROPERTIES OUTPUT_NAME ${TEST}
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+  endforeach(TEST)
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/dist_quasi2d_hmatrix")
+  foreach(TEST ${DIST_QUASI2D_TESTS})
+    add_executable(dist-quasi2d-${TEST} 
+                   ${TEST_DIR}/dist_quasi2d_hmatrix/${TEST}.cpp)
+    target_link_libraries(dist-quasi2d-${TEST} psp cmake-dummy-lib)
+    set_target_properties(dist-quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
   endforeach(TEST)

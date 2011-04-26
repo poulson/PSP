@@ -25,20 +25,20 @@
 //----------------------------------------------------------------------------//
 
 template<typename Scalar,bool Conjugated>
-void
+std::pair<std::size_t,std::size_t>
 psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
-( std::size_t& sourceSize, std::size_t& targetSize,
-  const Quasi2dHMatrix<Scalar,Conjugated>& H )
+( const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
 #ifndef RELEASE
     PushCallStack("SharedQuasi2dHMatrix::PackedSizes");
 #endif
     // Recurse on this shell to compute the packed sizes
-    sourceSize = targetSize = 0;
+    std::size_t sourceSize=0, targetSize=0;
     PackedSizesRecursion( sourceSize, targetSize, H );
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return std::pair<std::size_t,std::size_t>(sourceSize,targetSize);
 }
 
 template<typename Scalar,bool Conjugated>
@@ -74,7 +74,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedTargetSize
 }
 
 template<typename Scalar,bool Conjugated>
-void
+std::pair<std::size_t,std::size_t>
 psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Pack
 ( byte* packedSourceSide, byte* packedTargetSide,
   int sourceRank, int targetRank,
@@ -86,9 +86,12 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Pack
     byte* sourceHead = packedSourceSide;
     byte* targetHead = packedTargetSide;
     PackRecursion( sourceHead, targetHead, sourceRank, targetRank, H );
+    const std::size_t sourceSize = sourceHead-packedSourceSide;
+    const std::size_t targetSize = targetHead-packedTargetSide;
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return std::pair<std::size_t,std::size_t>(sourceSize,targetSize);
 }
 
 //----------------------------------------------------------------------------//

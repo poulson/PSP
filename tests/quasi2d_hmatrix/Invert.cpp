@@ -195,10 +195,12 @@ int
 main( int argc, char* argv[] )
 {
     MPI_Init( &argc, &argv );
+    const int rank = psp::mpi::CommRank( MPI_COMM_WORLD );
 
     if( argc < 9 )
     {
-        Usage();
+        if( rank == 0 )
+            Usage();
         MPI_Finalize();
         return 0;
     }
@@ -214,10 +216,13 @@ main( int argc, char* argv[] )
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
 
-    std::cout << "--------------------------------------------------\n"
-              << "Testing complex double Quasi2dHMatrix inversion   \n"
-              << "--------------------------------------------------" 
-              << std::endl;
+    if( rank == 0 )
+    {
+        std::cout << "--------------------------------------------------\n"
+                  << "Testing complex double Quasi2dHMatrix inversion   \n"
+                  << "--------------------------------------------------" 
+                  << std::endl;
+    }
     try
     {
         typedef std::complex<double> Scalar;
@@ -239,8 +244,11 @@ main( int argc, char* argv[] )
         for( int i=0; i<m; ++i )
             inverseMap[map[i]] = i;
 
-        std::cout << "Filling sparse matrix...";
-        std::cout.flush();
+        if( rank == 0 )
+        {
+            std::cout << "Filling sparse matrix...";
+            std::cout.flush();
+        }
         double fillStartTime = MPI_Wtime();
         std::vector<Scalar> row;
         std::vector<int> colIndices;
@@ -264,23 +272,32 @@ main( int argc, char* argv[] )
         }
         S.rowOffsets.push_back( S.nonzeros.size() );
         double fillStopTime = MPI_Wtime();
-        std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
-                  << std::endl;
-        if( print )
-            S.Print( "S" );
+        if( rank == 0 )
+        {
+            std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
+                      << std::endl;
+            if( print )
+                S.Print( "S" );
+        }
 
         // Convert to H-matrix form
-        std::cout << "Constructing H-matrix...";
-        std::cout.flush();
+        if( rank == 0 )
+        {
+            std::cout << "Constructing H-matrix...";
+            std::cout.flush();
+        }
         double constructStartTime = MPI_Wtime();
         Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
         double constructStopTime = MPI_Wtime();
-        std::cout << "done: " << constructStopTime-constructStartTime 
-                  << " seconds." << std::endl;
-        if( print )
-            H.Print( "H" );
-        if( printStructure )
-            H.WriteStructure( "structure.dat" );
+        if( rank == 0 )
+        {
+            std::cout << "done: " << constructStopTime-constructStartTime 
+                      << " seconds." << std::endl;
+            if( print )
+                H.Print( "H" );
+            if( printStructure )
+                H.WriteStructure( "structure.dat" );
+        }
 
         // Test against a vector of all 1's
         psp::Vector<Scalar> x;
@@ -288,103 +305,144 @@ main( int argc, char* argv[] )
         Scalar* xBuffer = x.Buffer();
         for( int i=0; i<m; ++i )
             xBuffer[i] = 1.0;
-        if( print )
-            x.Print( "x" );
-        std::cout << "Multiplying H-matrix by a vector...";
-        std::cout.flush();
+        if( rank == 0 )
+        {
+            std::cout << "Multiplying H-matrix by a vector of all ones...";
+            std::cout.flush();
+        }
         psp::Vector<Scalar> y;
         double matVecStartTime = MPI_Wtime();
         H.MapVector( 1.0, x, y );
         double matVecStopTime = MPI_Wtime();
-        std::cout << "done: " << matVecStopTime-matVecStartTime << " seconds." 
-                  << std::endl;
-        if( print )
-            y.Print( "y := H x ~= S x" );
+        if( rank == 0 )
+        {
+            std::cout << "done: " << matVecStopTime-matVecStartTime 
+                      << " seconds." << std::endl;
+            if( print )
+                y.Print( "y := H x ~= S x" );
+        }
 
         // Direct inversion test
         {
             // Make a copy for inversion
-            std::cout << "Making a copy of the H-matrix for inversion...";
-            std::cout.flush();
+            if( rank == 0 )
+            {
+                std::cout << "Making a copy of the H-matrix for inversion...";
+                std::cout.flush();
+            }
             double copyStartTime = MPI_Wtime();
             Quasi2d invH;
             invH.CopyFrom( H );
             double copyStopTime = MPI_Wtime();
-            std::cout << "done: " << copyStopTime-copyStartTime << " seconds." 
-                      << std::endl;
+            if( rank == 0 )
+            {
+                std::cout << "done: " << copyStopTime-copyStartTime 
+                          << " seconds." << std::endl;
+            }
 
             // Perform a direct inversion
-            std::cout << "Directly inverting the H-matrix...";
-            std::cout.flush();
+            if( rank == 0 )
+            {
+                std::cout << "Directly inverting the H-matrix...";
+                std::cout.flush();
+            }
             double invertStartTime = MPI_Wtime();
             invH.DirectInvert();
             double invertStopTime = MPI_Wtime();
-            std::cout << "done: " << invertStopTime-invertStartTime 
-                      << " seconds." << std::endl;
-            if( print )
-                invH.Print( "inv(H)" );
+            if( rank == 0 )
+            {
+                std::cout << "done: " << invertStopTime-invertStartTime 
+                          << " seconds." << std::endl;
+                if( print )
+                    invH.Print( "inv(H)" );
+            }
 
             // Test for discrepancies in x and inv(H) H x
-            std::cout << "Multiplying the direct inverse by a vector...";
-            std::cout.flush();
+            if( rank == 0 )
+            {
+                std::cout << "Multiplying the direct inverse by a vector...";
+                std::cout.flush();
+            }
             matVecStartTime = MPI_Wtime();
             psp::Vector<Scalar> z;
             invH.MapVector( 1.0, y, z );
             matVecStopTime = MPI_Wtime();
-            std::cout << "done: " << matVecStopTime-matVecStartTime 
-                      << " seconds." << std::endl;
-            if( print )
+            if( rank == 0 )
             {
-                y.Print( "y := H x ~= S x" );
-                z.Print( "z := inv(H) H x ~= x" );
+                std::cout << "done: " << matVecStopTime-matVecStartTime 
+                          << " seconds." << std::endl;
+                if( print )
+                {
+                    y.Print( "y := H x ~= S x" );
+                    z.Print( "z := inv(H) H x ~= x" );
+                }
+                CheckDistanceFromOnes( z );
             }
-            CheckDistanceFromOnes( z );
         }
 
         // Schulz iteration tests
         for( int maxIts=10; maxIts<60; maxIts+=10 )
         {
             // Make a copy
-            std::cout << "Making a copy for Schulz inversion...";
-            std::cout.flush();
+            if( rank == 0 )
+            {
+                std::cout << "Making a copy for Schulz inversion...";
+                std::cout.flush();
+            }
             double copyStartTime = MPI_Wtime();
             Quasi2d invH;
             invH.CopyFrom( H );
             double copyStopTime = MPI_Wtime();
-            std::cout << "done: " << copyStopTime-copyStartTime 
-                      << " seconds." << std::endl;
+            if( rank == 0 )
+            {
+                std::cout << "done: " << copyStopTime-copyStartTime 
+                          << " seconds." << std::endl;
+            }
 
             // Perform the iterative inversion
-            std::cout << "Schulz inverting the H-matrix...";
-            std::cout.flush();
+            if( rank == 0 )
+            {
+                std::cout << "Schulz inverting the H-matrix...";
+                std::cout.flush();
+            }
             double invertStartTime = MPI_Wtime();
             invH.SchulzInvert( maxIts );
             double invertStopTime = MPI_Wtime();
-            std::cout << "done: " << invertStopTime-invertStartTime 
-                      << " seconds." << std::endl;
-            if( print )
-                invH.Print( "inv(H)" );
+            if( rank == 0 )
+            {
+                std::cout << "done: " << invertStopTime-invertStartTime 
+                          << " seconds." << std::endl;
+                if( print )
+                    invH.Print( "inv(H)" );
+            }
 
             // Test for discrepancies in x and inv(H) H x
-            std::cout << "Multiplying the direct inverse by a vector...";
-            std::cout.flush();
+            if( rank == 0 )
+            {
+                std::cout << "Multiplying the direct inverse by a vector...";
+                std::cout.flush();
+            }
             matVecStartTime = MPI_Wtime();
             psp::Vector<Scalar> z;
             invH.MapVector( 1.0, y, z );
             matVecStopTime = MPI_Wtime();
-            std::cout << "done: " << matVecStopTime-matVecStartTime 
-                      << " seconds." << std::endl;
-            if( print )
+            if( rank == 0 )
             {
-                y.Print( "y := H x ~= S x" );
-                z.Print( "z := inv(H) H x ~= x" );
+                std::cout << "done: " << matVecStopTime-matVecStartTime 
+                          << " seconds." << std::endl;
+                if( print )
+                {
+                    y.Print( "y := H x ~= S x" );
+                    z.Print( "z := inv(H) H x ~= x" );
+                }
+                CheckDistanceFromOnes( z );
             }
-            CheckDistanceFromOnes( z );
         }
     }
     catch( std::exception& e )
     {
-        std::cerr << "Caught message: " << e.what() << std::endl;
+        std::cerr << "Process " << rank << " caught message: " << e.what() 
+                  << std::endl;
 #ifndef RELEASE
         psp::DumpCallStack();
 #endif

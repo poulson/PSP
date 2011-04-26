@@ -217,6 +217,92 @@ inline void AllReduce
 #endif
 }
 
+inline void AllToAll
+( const int* sendBuf, int sendCount,
+        int* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllToAll");
+#endif
+    SafeMpi( 
+        MPI_Alltoall
+        ( const_cast<int*>(sendBuf), sendCount, MPI_INT,
+                           recvBuf,  recvCount, MPI_INT, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void AllToAll
+( const float* sendBuf, int sendCount,
+        float* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllToAll");
+#endif
+    SafeMpi( 
+        MPI_Alltoall
+        ( const_cast<float*>(sendBuf), sendCount, MPI_FLOAT,
+                             recvBuf,  recvCount, MPI_FLOAT, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void AllToAll
+( const double* sendBuf, int sendCount,
+        double* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllToAll");
+#endif
+    SafeMpi( 
+        MPI_Alltoall
+        ( const_cast<double*>(sendBuf), sendCount, MPI_DOUBLE,
+                              recvBuf,  recvCount, MPI_DOUBLE, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void AllToAll
+( const std::complex<float>* sendBuf, int sendCount,
+        std::complex<float>* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllToAll");
+#endif
+    SafeMpi( 
+        MPI_Alltoall
+        ( const_cast<std::complex<float>*>(sendBuf), sendCount, MPI_COMPLEX,
+          recvBuf, recvCount, MPI_COMPLEX, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void AllToAll
+( const std::complex<double>* sendBuf, int sendCount,
+        std::complex<double>* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllToAll");
+#endif
+    SafeMpi( 
+        MPI_Alltoall
+        ( const_cast<std::complex<double>*>(sendBuf), 
+          sendCount, MPI_DOUBLE_COMPLEX,
+          recvBuf, recvCount, MPI_DOUBLE_COMPLEX, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 inline void Barrier( MPI_Comm comm )
 {
 #ifndef RELEASE

@@ -144,11 +144,11 @@ private:
       DistQuasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm, MPI_Comm team );
 
 public:
-    static void PackedSizes
+    static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
       const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
 
-    static void Pack
+    static std::size_t Pack
     ( std::vector<byte*>& packedPieces, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
 

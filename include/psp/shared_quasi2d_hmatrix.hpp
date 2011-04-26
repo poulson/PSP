@@ -118,9 +118,8 @@ private:
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
-    static void PackedSizes
-    ( std::size_t& sourceSize, std::size_t& targetSize, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    static std::pair<std::size_t,std::size_t> PackedSizes
+    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
     
     static std::size_t PackedSourceSize
     ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
@@ -128,7 +127,7 @@ public:
     static std::size_t PackedTargetSize
     ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    static void Pack
+    static std::pair<std::size_t,std::size_t> Pack
     ( byte* packedSourceSide, byte* packedTargetSide,
       int sourceRank, int targetRank,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
