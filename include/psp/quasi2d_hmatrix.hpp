@@ -188,10 +188,10 @@ public:
     // Routines useful for packing and unpacking the Quasi2dHMatrix to/from
     // a contiguous buffer.
     std::size_t PackedSize() const;
-    void Pack( byte* packedHMatrix ) const;
-    void Pack( std::vector<byte>& packedHMatrix ) const;
-    void Unpack( const byte* packedHMatrix );
-    void Unpack( const std::vector<byte>& packedHMatrix );
+    std::size_t Pack( byte* packedHMatrix ) const;
+    std::size_t Pack( std::vector<byte>& packedHMatrix ) const;
+    std::size_t Unpack( const byte* packedHMatrix );
+    std::size_t Unpack( const std::vector<byte>& packedHMatrix );
 
     int XSizeSource() const { return _xSizeSource; }
     int XSizeTarget() const { return _xSizeTarget; }

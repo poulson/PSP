@@ -34,9 +34,9 @@ template<typename Scalar,bool Conjugated>
 struct SharedLowRankMatrix
 {
     int height, width, rank;
+    bool ownSourceSide;
     int partner;
 
-    bool ownSourceSide;
     DenseMatrix<Scalar> D;
 
     // Storage for V^[T/H] x. This should be computed by the process owning

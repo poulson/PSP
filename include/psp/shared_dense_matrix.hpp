@@ -33,9 +33,9 @@ template<typename Scalar>
 struct SharedDenseMatrix
 {
     int height, width;
+    bool ownSourceSide;
     int partner;
 
-    bool ownSourceSide;
     DenseMatrix<Scalar> D;
 
     // Temporary storage for the product D x

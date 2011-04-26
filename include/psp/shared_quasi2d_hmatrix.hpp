@@ -140,7 +140,7 @@ public:
 
     ~SharedQuasi2dHMatrix();
 
-    void Unpack( const byte* packedHalf );
+    std::size_t Unpack( const byte* packedHalf );
 };
 
 } // namespace psp

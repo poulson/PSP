@@ -36,7 +36,8 @@ struct DistLowRankMatrix
 {
     int height, width, rank;
     bool inSourceTeam;
-    MPI_Comm myTeam;
+    MPI_Comm comm; // global communicator
+    MPI_Comm team; // communicator for owners of our of the low-rank matrix
     int rootOfOtherTeam;
 
     DenseMatrix<Scalar> D;

@@ -349,7 +349,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::~SharedQuasi2dHMatrix()
 { }
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 ( const byte* packedHalf )
 {
@@ -361,6 +361,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return (head-packedHalf);
 }
 
 //----------------------------------------------------------------------------//

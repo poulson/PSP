@@ -166,7 +166,7 @@ public:
     int LocalWidth() const;
 
     // Unpack this process's portion of the DistQuasi2dHMatrix
-    void Unpack( const byte* packedDistHMatrix, MPI_Comm comm );
+    std::size_t Unpack( const byte* packedDistHMatrix, MPI_Comm comm );
 
     // TODO: Figure out whether to act on PETSc's Vec or our own distributed
     //       vector class.

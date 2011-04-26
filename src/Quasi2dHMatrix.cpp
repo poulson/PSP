@@ -399,7 +399,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSize() const
 }
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 ( byte* packedHMatrix ) const
 {
@@ -411,10 +411,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return (head-packedHMatrix);
 }
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 ( std::vector<byte>& packedHMatrix ) const
 {
@@ -430,10 +431,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Pack
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return (head-&packedHMatrix[0]);
 }
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
 ( const byte* packedHMatrix )
 {
@@ -445,10 +447,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return (head-packedHMatrix);
 }
 
 template<typename Scalar,bool Conjugated>
-void
+std::size_t
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
 ( const std::vector<byte>& packedHMatrix )
 {
@@ -460,6 +463,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
 #ifndef RELEASE
     PopCallStack();
 #endif
+    return (head-&packedHMatrix[0]);
 }
 
 template<typename Scalar,bool Conjugated>
@@ -2666,8 +2670,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
     PopCallStack();
 #endif
 }
-
-
 
 template<typename Scalar,bool Conjugated>
 void
