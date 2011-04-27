@@ -203,7 +203,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
         }
         else
         {
-            // Recurse
+            // Recurse 
             const int newTeamSize = teamSize/2;
             for( int t=0; t<4; ++t )
             {
@@ -478,7 +478,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
         else
         {
-            // Recurse
+            // Recurse in 2x2 blocks:
+            // top-left, top-right, bottom-left, bottom-right
             if( rank == 0 )
             {
                 std::cout << "Packing NODE for " 
@@ -502,9 +503,61 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                 }
             }
             const int newTeamSize = teamSize/2;
-            for( int t=0; t<4; ++t )
+            // Top-left block
+            for( int t=0; t<2; ++t )
             {
-                for( int s=0; s<4; ++s )
+                for( int s=0; s<2; ++s )
+                {
+                    if( rank == 0 )
+                    {
+                        std::cout << "(t,s)=(" << t << "," << s << ")" 
+                                  << std::endl;
+                    }
+                    PackRecursion
+                    ( headPointers, localHeights, localWidths,
+                      sourceRankOffset+newTeamSize*(s/2),
+                      targetRankOffset+newTeamSize*(t/2), newTeamSize,
+                      shell.data.node->Child(t,s) );
+                }
+            }
+            // Top-right block
+            for( int t=0; t<2; ++t )
+            {
+                for( int s=2; s<4; ++s )
+                {
+                    if( rank == 0 )
+                    {
+                        std::cout << "(t,s)=(" << t << "," << s << ")" 
+                                  << std::endl;
+                    }
+                    PackRecursion
+                    ( headPointers, localHeights, localWidths,
+                      sourceRankOffset+newTeamSize*(s/2),
+                      targetRankOffset+newTeamSize*(t/2), newTeamSize,
+                      shell.data.node->Child(t,s) );
+                }
+            }
+            // Bottom-left block
+            for( int t=2; t<4; ++t )
+            {
+                for( int s=0; s<2; ++s )
+                {
+                    if( rank == 0 )
+                    {
+                        std::cout << "(t,s)=(" << t << "," << s << ")" 
+                                  << std::endl;
+                    }
+                    PackRecursion
+                    ( headPointers, localHeights, localWidths,
+                      sourceRankOffset+newTeamSize*(s/2),
+                      targetRankOffset+newTeamSize*(t/2), newTeamSize,
+                      shell.data.node->Child(t,s) );
+                }
+            }
+            // Bottom-right block
+            for( int t=2; t<4; ++t )
+            {
+                for( int s=2; s<4; ++s )
                 {
                     if( rank == 0 )
                     {
@@ -894,12 +947,26 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalSizesRecursion
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
-( const Subcomms& subcomms, unsigned level )
+( const Subcomms& subcomms )
 : _height(0), _width(0), _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), _symmetric(false), 
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(level)
+  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0)
+{ 
+    _shell.type = EMPTY;
+}
+
+template<typename Scalar,bool Conjugated>
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
+( const Subcomms& subcomms, unsigned level, 
+  bool inSourceTeam, bool inTargetTeam )
+: _height(0), _width(0), _numLevels(0), _maxRank(0), 
+  _sourceOffset(0), _targetOffset(0), _symmetric(false), 
+  _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
+  _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
+  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(level),
+  _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam)
 { 
     _shell.type = EMPTY;
 }
@@ -969,6 +1036,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 #endif
     _subcomms = &subcomms;
     _level = 0;
+    _inSourceTeam = true;
+    _inTargetTeam = true;
 
     const byte* head = packedDistHMatrix;
     UnpackRecursion( head, *this );
@@ -989,6 +1058,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 {
     MPI_Comm comm = H._subcomms->Subcomm( 0 );
     MPI_Comm team = H._subcomms->Subcomm( H._level );
+    const bool inSourceTeam = H._inSourceTeam;
+    const bool inTargetTeam = H._inTargetTeam;
+    if( !inSourceTeam && !inTargetTeam )
+    {
+        H._shell.type = EMPTY;
+        return;
+    }
 
     // Read in the header information
     H._height             = *((int*)head);  head += sizeof(int);
@@ -1041,47 +1117,49 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
               H._ySizeSource, H._ySizeTarget, H._zSize );
         Node& node = *shell.data.node;
 
-        // HERE: Branching is incorrect.
-        if( node.inRightTeam )
+        const int teamSize = mpi::CommSize( team );
+        const int teamRank = mpi::CommRank( team );
+        const bool inUpperHalfOfTeam = ( teamRank >= teamSize/2 );
+        // Take care of the top-left block
+        for( int t=0; t<2; ++t )
         {
-            // Our process owns the bottom-right block but participates in all 
-            // but the top-left block.
-            if( rank == 0 )
-                std::cout << "Unpacking NODE on right side" << std::endl;
-            for( int t=0; t<4; ++t )
+            for( int s=0; s<2; ++s )
             {
-                for( int s=0; s<4; ++s )
-                {
-                    node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1 );
-                    // HERE: The current branching is incorrect
-                    if( s >= 2 || t >= 2 )
-                        UnpackRecursion( head, node.Child(t,s) );
-                    else
-                        node.Child(t,s)._shell.type = EMPTY;
-                }
+                bool inSplitSourceTeam = ( !inUpperHalfOfTeam && inSourceTeam );
+                bool inSplitTargetTeam = ( !inUpperHalfOfTeam && inTargetTeam );
+                node.children[s+4*t] = 
+                    new DistQuasi2dHMatrix<Scalar,Conjugated>
+                    ( *H._subcomms, H._level+1, 
+                      inSplitSourceTeam, inSplitTargetTeam );
+                UnpackRecursion( head, node.Child(t,s) );
             }
         }
-        else
+        // Take care of the top-right block
+        for( int t=0; t<2; ++t )
         {
-            // Our process owns the top-left block but participates in all but
-            // the bottom-right block
-            if( rank == 0 )
-                std::cout << "Unpacking NODE on left side" << std::endl;
-            for( int t=0; t<4; ++t )
+            for( int s=2; s<4; ++s )
             {
-                for( int s=0; s<4; ++s )
-                {
-                    node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1 );
-                    // HERE: The current branching is incorrect
-                    if( s < 2 || t < 2 )
-                        UnpackRecursion( head, node.Child(t,s) );
-                    else
-                        node.Child(t,s)._shell.type = EMPTY;
-                }
+                bool inSplitSourceTeam = ( inUpperHalfOfTeam && inSourceTeam );
+                bool inSplitTargetTeam = ( !inUpperHalfOfTeam && inTargetTeam );
+                node.children[s+4*t] = 
+                    new DistQuasi2dHMatrix<Scalar,Conjugated>
+                    ( *H._subcomms, H._level+1,
+                      inSplitSourceTeam, inSplitTargetTeam );
+                UnpackRecursion( head, node.Child(t,s) );
+            }
+        }
+        // Take care of the bottom-left block
+        for( int t=2; t<4; ++t )
+        {
+            for( int s=0; s<2; ++s )
+            {
+                bool inSplitSourceTeam = ( !inUpperHalfOfTeam && inSourceTeam );
+                bool inSplitTargetTeam = ( inUpperHalfOfTeam && inTargetTeam );
+                node.children[s+4*t] =
+                    new DistQuasi2dHMatrix<Scalar,Conjugated>
+                    ( *H._subcomms, H._level+1,
+                      inSplitSourceTeam, inSplitTargetTeam );
+                UnpackRecursion( head, node.Child(t,s) );
             }
         }
         break;

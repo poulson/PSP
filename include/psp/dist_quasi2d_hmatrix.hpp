@@ -141,6 +141,8 @@ private:
 
     const Subcomms* _subcomms;
     unsigned _level;
+    bool _inSourceTeam;
+    bool _inTargetTeam;
 
     void UnpackRecursion
     ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H );
@@ -168,7 +170,10 @@ public:
     ( std::vector<int>& localHeights, std::vector<int>& localWidths,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    DistQuasi2dHMatrix( const Subcomms& subcomms, unsigned level=0 );
+    DistQuasi2dHMatrix( const Subcomms& subcomms );
+    DistQuasi2dHMatrix
+    ( const Subcomms& subcomms, unsigned level, 
+      bool inSourceTeam, bool inTargetTeam );
     DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
     ~DistQuasi2dHMatrix();
 
