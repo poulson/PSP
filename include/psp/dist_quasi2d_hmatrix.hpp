@@ -64,10 +64,10 @@ private:
         std::vector<DistQuasi2dHMatrix*> children;
         int xSourceSizes[2];
         int ySourceSizes[2];
-        int sourceSizes[2];
+        int sourceSizes[4];
         int xTargetSizes[2];
         int yTargetSizes[2];
-        int targetSizes[2];
+        int targetSizes[4];
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
@@ -343,7 +343,7 @@ const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
-: type(NODE), data() 
+: type(EMPTY), data() 
 { }
 
 template<typename Scalar,bool Conjugated>

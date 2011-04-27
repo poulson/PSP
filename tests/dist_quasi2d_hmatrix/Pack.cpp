@@ -190,18 +190,17 @@ main( int argc, char* argv[] )
 
         // Set up our subcommunicators and compute the packed sizes
         psp::Subcomms subcomms( MPI_COMM_WORLD );
-        for( unsigned i=0; i<subcomms.NumLevels(); ++i )
-        {
-            const int subcommRank = psp::mpi::CommRank( subcomms.Subcomm( i ) );
-            const int subcommSize = psp::mpi::CommSize( subcomms.Subcomm( i ) );
-            if( rank == 0 )
-                std::cout << "i=" << i << ", rank=" << subcommRank
-                          << ", size=" << subcommSize << std::endl;
-        }
         std::vector<std::size_t> packedSizes;
         DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
         const std::size_t myMaxSize = 
             *(std::max_element( packedSizes.begin(), packedSizes.end() ));
+        if( rank == 0 )
+        {
+            std::cout << "packedSizes: ";
+            for( int i=0; i<packedSizes.size(); ++i )
+                std::cout << packedSizes[i] << " ";
+            std::cout << "\nmyMaxSize=" << myMaxSize << std::endl;
+        }
 
         // Pack for a DistQuasi2dHMatrix
         if( rank == 0 )
@@ -229,6 +228,8 @@ main( int argc, char* argv[] )
             psp::mpi::AllReduce
             ( &myIntMaxSize, &intMaxSize, 1, MPI_MAX, MPI_COMM_WORLD );
         }
+        if( rank == 0 )
+            std::cout << "maxSize=" << intMaxSize << std::endl;
  
         // AllToAll
         if( rank == 0 )
