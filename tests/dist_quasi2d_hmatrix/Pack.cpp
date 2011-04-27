@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include "psp.hpp"
+#include <algorithm>
 
 void Usage()
 {
@@ -194,18 +195,16 @@ main( int argc, char* argv[] )
             std::cout.flush();
         }
         double packStartTime = MPI_Wtime();
+        psp::Subcomms subcomms( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
-        const std::size_t totalSize = 
-            DistQuasi2d::PackedSizes( packedSizes, H, MPI_COMM_WORLD ); 
-        std::vector<psp::byte> packingBuffer( totalSize );
+        DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
+        const std::size_t myMaxSize = 
+            *(std::max_element( packedSizes.begin(), packedSizes.end() ));
+        std::vector<psp::byte> sendBuffer( p*myMaxSize );
         std::vector<psp::byte*> packedPieces( p );
-        std::size_t offset = 0;
         for( int i=0; i<p; ++i )
-        {
-            packedPieces[i] = &packingBuffer[offset];
-            offset += packedSizes[i];
-        }
-        DistQuasi2d::Pack( packedPieces, H, MPI_COMM_WORLD );
+            packedPieces[i] = &sendBuffer[i*myMaxSize];
+        DistQuasi2d::Pack( packedPieces, H, subcomms );
         double packStopTime = MPI_Wtime();
         if( rank == 0 )
         {
@@ -213,9 +212,46 @@ main( int argc, char* argv[] )
                       << std::endl;
         }
 
-        // AllToAll here?
+        // Compute the maximum package size
+        int myIntMaxSize, intMaxSize;
+        {
+            myIntMaxSize = myMaxSize;
+            psp::mpi::AllReduce
+            ( &myIntMaxSize, &intMaxSize, 1, MPI_MAX, MPI_COMM_WORLD );
+        }
+ 
+        // AllToAll
+        if( rank == 0 )
+        {
+            std::cout << "AllToAll redistribution...";
+            std::cout.flush();
+        }
+        double allToAllStartTime = MPI_Wtime();
+        std::vector<psp::byte> recvBuffer( p*intMaxSize );
+        psp::mpi::AllToAll
+        ( &sendBuffer[0], myIntMaxSize, &recvBuffer[0], intMaxSize,
+          MPI_COMM_WORLD );
+        double allToAllStopTime = MPI_Wtime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " << allToAllStopTime-allToAllStartTime
+                      << " seconds." << std::endl;
+        }
 
-        // Unpack here?
+        // Unpack our part of the matrix defined by process 0
+        if( rank == 0 )
+        {
+            std::cout << "Unpacking...";
+            std::cout.flush();
+        }
+        double unpackStartTime = MPI_Wtime();
+        DistQuasi2d distH( &recvBuffer[0], subcomms );
+        double unpackStopTime = MPI_Wtime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " << unpackStopTime-unpackStartTime
+                      << " seconds." << std::endl;
+        }
     }
     catch( std::exception& e )
     {

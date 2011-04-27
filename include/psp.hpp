@@ -103,11 +103,13 @@ void DumpCallStack();
 #include "psp/quasi2d_hmatrix.hpp"
 
 #include "psp/mpi.hpp"
+#include "psp/subcomms.hpp"
 #include "psp/shared_dense_matrix.hpp"
 #include "psp/shared_low_rank_matrix.hpp"
 #include "psp/shared_quasi2d_hmatrix.hpp"
 // #include "psp/dist_vector.hpp"
 #include "psp/dist_low_rank_matrix.hpp"
+#include "psp/dist_shared_low_rank_matrix.hpp"
 #include "psp/dist_quasi2d_hmatrix.hpp"
 
 #endif // PSP_HPP

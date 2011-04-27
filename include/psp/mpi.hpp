@@ -218,6 +218,23 @@ inline void AllReduce
 }
 
 inline void AllToAll
+( const psp::byte* sendBuf, int sendCount,
+        psp::byte* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllToAll");
+#endif
+    SafeMpi( 
+        MPI_Alltoall
+        ( const_cast<psp::byte*>(sendBuf), sendCount, MPI_UNSIGNED_CHAR,
+                                 recvBuf,  recvCount, MPI_UNSIGNED_CHAR, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void AllToAll
 ( const int* sendBuf, int sendCount,
         int* recvBuf, int recvCount, MPI_Comm comm )
 {
@@ -379,6 +396,17 @@ inline void Broadcast
     SafeMpi(
         MPI_Bcast( buf, count, MPI_DOUBLE_COMPLEX, root, comm )
     );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void CommDup( MPI_Comm comm, MPI_Comm& commDup )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::CommDup");
+#endif
+    SafeMpi( MPI_Comm_dup( comm, &commDup ) );
 #ifndef RELEASE
     PopCallStack();
 #endif

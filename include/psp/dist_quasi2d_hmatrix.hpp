@@ -22,9 +22,12 @@
 #define PSP_DIST_QUASI2D_HMATRIX_HPP 1
 
 #include "psp/quasi2d_hmatrix.hpp"
+#include "psp/subcomms.hpp"
 #include "psp/shared_quasi2d_hmatrix.hpp"
 #include "psp/shared_low_rank_matrix.hpp"
 #include "psp/shared_dense_matrix.hpp"
+#include "psp/dist_low_rank_matrix.hpp"
+#include "psp/dist_shared_low_rank_matrix.hpp"
 
 namespace psp {
 
@@ -65,12 +68,10 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[2];
-        bool inRightTeam;
-        MPI_Comm childTeam;
         Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
-          int zSize, MPI_Comm team );
+          int zSize );
         ~Node();
         DistQuasi2dHMatrix& Child( int i, int j );
         const DistQuasi2dHMatrix& Child( int i, int j ) const;
@@ -82,9 +83,7 @@ private:
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
-        bool inRightTeam;
-        MPI_Comm childTeam;
-        NodeSymmetric( int xSize, int ySize, int zSize, MPI_Comm team );
+        NodeSymmetric( int xSize, int ySize, int zSize );
         ~NodeSymmetric();
         DistQuasi2dHMatrix& Child( int i, int j );
         const DistQuasi2dHMatrix& Child( int i, int j ) const;
@@ -92,14 +91,16 @@ private:
 
     enum ShellType 
     { 
-        NODE, 
-        NODE_SYMMETRIC, 
-        DIST_LOW_RANK, 
-        SHARED_QUASI2D, 
-        SHARED_LOW_RANK, 
-        SHARED_DENSE,
-        QUASI2D,
-        DENSE,
+        NODE,                 // recurse
+        NODE_SYMMETRIC,       // recurse symmetrically
+        DIST_SHARED_LOW_RANK, // each side is distributed to different teams
+        DIST_LOW_RANK,        // both sides are distributed to same team
+        SHARED_QUASI2D,       // shared between two processes
+        SHARED_LOW_RANK,      // each side is given to one process
+        SHARED_DENSE,         // shared between two processes
+        QUASI2D,              // serial
+        LOW_RANK,             // serial
+        DENSE,                // serial
         EMPTY
     };
 
@@ -110,11 +111,13 @@ private:
         {
             Node* node;
             NodeSymmetric* nodeSymmetric;
+            DistSharedLowRankMatrix<Scalar,Conjugated>* DSF;
             DistLowRankMatrix<Scalar,Conjugated>* DF;
             SharedQuasi2dHMatrix<Scalar,Conjugated>* SH;
             SharedLowRankMatrix<Scalar,Conjugated>* SF;
             SharedDenseMatrix<Scalar>* SD;
             Quasi2dHMatrix<Scalar,Conjugated>* H;
+            LowRankMatrix<Scalar,Conjugated>* F;
             DenseMatrix<Scalar>* D;
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
@@ -136,21 +139,24 @@ private:
     int _ySource, _yTarget;
     Shell _shell;
 
-    MPI_Comm _comm;
-    MPI_Comm _team;
+    const Subcomms* _subcomms;
+    unsigned _level;
 
     void UnpackRecursion
-    ( const byte*& head, 
-      DistQuasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm, MPI_Comm team );
+    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H );
+
+    // Ensure that the default constructor is not accessible, a communicator
+    // must be supplied
+    DistQuasi2dHMatrix();
 
 public:
     static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
+      const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
 
     static std::size_t Pack
     ( std::vector<byte*>& packedPieces, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H, MPI_Comm comm );
+      const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
 
     static int ComputeLocalHeight
     ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
@@ -162,11 +168,16 @@ public:
     ( std::vector<int>& localHeights, std::vector<int>& localWidths,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
+    DistQuasi2dHMatrix( const Subcomms& subcomms, unsigned level=0 );
+    DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
+    ~DistQuasi2dHMatrix();
+
     int LocalHeight() const;
     int LocalWidth() const;
 
     // Unpack this process's portion of the DistQuasi2dHMatrix
-    std::size_t Unpack( const byte* packedDistHMatrix, MPI_Comm comm );
+    std::size_t Unpack
+    ( const byte* packedDistHMatrix, const Subcomms& subcomms );
 
     // TODO: Figure out whether to act on PETSc's Vec or our own distributed
     //       vector class.
@@ -192,7 +203,7 @@ inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
 ( int xSizeSource, int xSizeTarget,
   int ySizeSource, int ySizeTarget,
-  int zSize, MPI_Comm team )
+  int zSize )
 : children(16)
 {
     xSourceSizes[0] = xSizeSource/2;
@@ -214,20 +225,6 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
     targetSizes[1] = xTargetSizes[1]*yTargetSizes[0]*zSize;
     targetSizes[2] = xTargetSizes[0]*yTargetSizes[1]*zSize;
     targetSizes[3] = xTargetSizes[1]*yTargetSizes[1]*zSize;
-
-    int teamRank = mpi::CommRank( team );
-    int teamSize = mpi::CommSize( team );
-
-    if( teamRank >= teamSize/2 )
-    {
-        mpi::CommSplit( team, true, teamRank-(teamSize/2), childTeam );    
-        inRightTeam = true;
-    }
-    else
-    {
-        mpi::CommSplit( team, false, teamRank, childTeam );
-        inRightTeam = false;
-    }
 }
 
 template<typename Scalar,bool Conjugated>
@@ -237,7 +234,6 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
     children.clear();
-    mpi::CommFree( childTeam );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -277,7 +273,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
-( int xSize, int ySize, int zSize, MPI_Comm team )
+( int xSize, int ySize, int zSize )
 : children(10)
 {
     xSizes[0] = xSize/2;
@@ -289,20 +285,6 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
     sizes[1] = xSizes[1]*ySizes[0]*zSize;
     sizes[2] = xSizes[0]*ySizes[1]*zSize;
     sizes[3] = xSizes[1]*ySizes[1]*zSize;
-
-    int teamRank = mpi::CommRank( team );
-    int teamSize = mpi::CommSize( team );
-
-    if( teamRank >= teamSize/2 )
-    {
-        mpi::CommSplit( team, true, teamRank-(teamSize/2), childTeam );
-        inRightTeam = true;
-    }
-    else
-    {
-        mpi::CommSplit( team, false, teamRank, childTeam );
-        inRightTeam = false;
-    }
 }
 
 template<typename Scalar,bool Conjugated>
@@ -312,7 +294,6 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
     children.clear();
-    mpi::CommFree( childTeam );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -366,14 +347,16 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 { 
     switch( type )
     {
-    case NODE:            delete data.node; break;
-    case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
-    case DIST_LOW_RANK:   delete data.DF; break;
-    case SHARED_QUASI2D:  delete data.SH; break;
-    case SHARED_LOW_RANK: delete data.SF; break;
-    case SHARED_DENSE:    delete data.SD; break;
-    case QUASI2D:         delete data.H; break;
-    case DENSE:           delete data.D; break;
+    case NODE:                 delete data.node; break;
+    case NODE_SYMMETRIC:       delete data.nodeSymmetric; break;
+    case DIST_SHARED_LOW_RANK: delete data.DSF; break;
+    case DIST_LOW_RANK:        delete data.DF; break;
+    case SHARED_QUASI2D:       delete data.SH; break;
+    case SHARED_LOW_RANK:      delete data.SF; break;
+    case SHARED_DENSE:         delete data.SD; break;
+    case QUASI2D:              delete data.H; break;
+    case LOW_RANK:             delete data.F; break;
+    case DENSE:                delete data.D; break;
     case EMPTY: break;
     }
 }
