@@ -188,6 +188,21 @@ main( int argc, char* argv[] )
                 H.Print("H");
         }
 
+        // Set up our subcommunicators and compute the packed sizes
+        psp::Subcomms subcomms( MPI_COMM_WORLD );
+        for( unsigned i=0; i<subcomms.NumLevels(); ++i )
+        {
+            const int subcommRank = psp::mpi::CommRank( subcomms.Subcomm( i ) );
+            const int subcommSize = psp::mpi::CommSize( subcomms.Subcomm( i ) );
+            if( rank == 0 )
+                std::cout << "i=" << i << ", rank=" << subcommRank
+                          << ", size=" << subcommSize << std::endl;
+        }
+        std::vector<std::size_t> packedSizes;
+        DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
+        const std::size_t myMaxSize = 
+            *(std::max_element( packedSizes.begin(), packedSizes.end() ));
+
         // Pack for a DistQuasi2dHMatrix
         if( rank == 0 )
         {
@@ -195,11 +210,6 @@ main( int argc, char* argv[] )
             std::cout.flush();
         }
         double packStartTime = MPI_Wtime();
-        psp::Subcomms subcomms( MPI_COMM_WORLD );
-        std::vector<std::size_t> packedSizes;
-        DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
-        const std::size_t myMaxSize = 
-            *(std::max_element( packedSizes.begin(), packedSizes.end() ));
         std::vector<psp::byte> sendBuffer( p*myMaxSize );
         std::vector<psp::byte*> packedPieces( p );
         for( int i=0; i<p; ++i )

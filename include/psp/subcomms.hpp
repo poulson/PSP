@@ -62,9 +62,9 @@ Subcomms::Subcomms( MPI_Comm comm )
     while( temp >>= 1 )
         ++log2p;
 
-    _subComms.resize( log2p );
+    _subComms.resize( log2p+1 );
     mpi::CommDup( comm, _subComms[0] );
-    for( unsigned i=1; i<log2p; ++i )
+    for( unsigned i=1; i<=log2p; ++i )
     {
         const int color = rank/(p>>i);
         const int key = rank - color;
