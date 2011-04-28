@@ -57,17 +57,28 @@ Subcomms::Subcomms( MPI_Comm comm )
         throw std::logic_error("Must use a power of two number of processes");
 
     // Simple (yet slow) method for computing log2(p)
-    unsigned log2p = 0;
-    unsigned temp = p;
-    while( temp >>= 1 )
-        ++log2p;
-
-    _subComms.resize( log2p+1 );
-    mpi::CommDup( comm, _subComms[0] );
-    for( unsigned i=1; i<=log2p; ++i )
+    unsigned numLevels = 1;
+    unsigned teamSize = p;
+    while( teamSize != 1 )
     {
-        const int color = rank/(p>>i);
-        const int key = rank - color;
+        if( teamSize >= 4 )    
+            teamSize >>= 2; 
+        else // teamSize == 2
+            teamSize = 1;
+        ++numLevels;
+    }
+
+    _subComms.resize( numLevels );
+    mpi::CommDup( comm, _subComms[0] );
+    teamSize = p;
+    for( unsigned i=1; i<numLevels; ++i )
+    {
+        if( teamSize >= 4 )
+            teamSize >>= 2;
+        else
+            teamSize = 1;
+        const int color = rank/teamSize;
+        const int key = rank - color*teamSize;
         mpi::CommSplit( comm, color, key, _subComms[i] );
     }
 #ifndef RELEASE
@@ -94,10 +105,12 @@ Subcomms::NumLevels() const
     return _subComms.size();
 }
 
+// Return the single-process communicator when querying for levels deeper than
+// the last.
 inline MPI_Comm
 Subcomms::Subcomm( unsigned level ) const
 {
-    return _subComms[level];
+    return _subComms[std::min(level,_subComms.size()-1)];
 }
 
 } // namespace psp

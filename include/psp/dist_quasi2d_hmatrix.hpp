@@ -39,15 +39,13 @@ class DistQuasi2dHMatrix
 private:
     static void PackedSizesRecursion
     ( std::vector<std::size_t>& packedSizes,
-      const std::vector<int>& localHeights,
-      const std::vector<int>& localWidths,
+      const std::vector<int>& localSizes,
       int sourceRankOffset, int targetRankOffset, int teamSize,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void PackRecursion
     ( std::vector<byte**>& headPointers,
-      const std::vector<int>& localHeights,
-      const std::vector<int>& localWidths,
+      const std::vector<int>& localSizes,
       int sourceRankOffset, int targetRankOffset, int teamSize,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
@@ -55,9 +53,7 @@ private:
     ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
 
     static void ComputeLocalSizesRecursion
-    ( int* localHeights, int* localWidths, int teamSize,
-      int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
-      int zSize );
+    ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );
 
     struct Node
     {
@@ -167,7 +163,7 @@ public:
     ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void ComputeLocalSizes
-    ( std::vector<int>& localHeights, std::vector<int>& localWidths,
+    ( std::vector<int>& localSizes, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     DistQuasi2dHMatrix( const Subcomms& subcomms );

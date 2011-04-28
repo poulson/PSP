@@ -194,13 +194,6 @@ main( int argc, char* argv[] )
         DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
         const std::size_t myMaxSize = 
             *(std::max_element( packedSizes.begin(), packedSizes.end() ));
-        if( rank == 0 )
-        {
-            std::cout << "packedSizes: ";
-            for( int i=0; i<packedSizes.size(); ++i )
-                std::cout << packedSizes[i] << " ";
-            std::cout << "\nmyMaxSize=" << myMaxSize << std::endl;
-        }
 
         // Pack for a DistQuasi2dHMatrix
         if( rank == 0 )
@@ -229,7 +222,11 @@ main( int argc, char* argv[] )
             ( &myIntMaxSize, &intMaxSize, 1, MPI_MAX, MPI_COMM_WORLD );
         }
         if( rank == 0 )
-            std::cout << "maxSize=" << intMaxSize << std::endl;
+        {
+            std::cout << "Maximum per-process message size: " 
+                      << ((double)intMaxSize)/(1024.*1024.) << " MB." 
+                      << std::endl;
+        }
  
         // AllToAll
         if( rank == 0 )
@@ -243,6 +240,7 @@ main( int argc, char* argv[] )
         ( &sendBuffer[0], myIntMaxSize, &recvBuffer[0], intMaxSize,
           MPI_COMM_WORLD );
         double allToAllStopTime = MPI_Wtime();
+        MPI_Barrier( MPI_COMM_WORLD );
         if( rank == 0 )
         {
             std::cout << "done: " << allToAllStopTime-allToAllStartTime
