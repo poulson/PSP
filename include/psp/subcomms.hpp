@@ -110,7 +110,7 @@ Subcomms::NumLevels() const
 inline MPI_Comm
 Subcomms::Subcomm( unsigned level ) const
 {
-    return _subComms[std::min(level,_subComms.size()-1)];
+    return _subComms[std::min(level,(unsigned)_subComms.size()-1)];
 }
 
 } // namespace psp
