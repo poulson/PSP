@@ -119,6 +119,9 @@ private:
     void UnpackRecursion
     ( const byte*& head, SharedQuasi2dHMatrix<Scalar,Conjugated>& H );
 
+    void PrecomputeForMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
+
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 

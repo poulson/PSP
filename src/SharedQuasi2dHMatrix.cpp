@@ -514,6 +514,71 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
 }
 
+template<typename Scalar,bool Conjugated>
+void
+psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
+( Scalar alpha, const Vector<Scalar>& xLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SharedQuasi2dHMatrix::PrecomputeForMapVector");
+#endif
+    switch( _shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *_shell.data.node;
+        for( int t=0; t<4; ++t )
+        {
+            int sourceOffset = 0;
+            for( int s=0; s<4; ++s )
+            {
+                Vector<Scalar> xLocalSub;
+                xLocalSub.LockedView
+                ( xLocal, sourceOffset, node.sourceSizes[s] );
+
+                PrecomputeForMapVector( alpha, xLocalSub );
+
+                sourceOffset += node.sourceSizes[s];
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SHARED_LOW_RANK:
+    {
+        const SharedLowRankMatrix<Scalar,Conjugated>& SF = *_shell.data.SF;
+        if( SF.ownSourceSide )
+        {
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixHermitianTransposeVector
+                ( alpha, SF.D, xLocal, SF.z );
+            }
+            else
+            {
+                hmatrix_tools::MatrixTransposeVector
+                ( alpha, SF.D, xLocal, SF.z );
+            }
+        }
+        break;
+    }
+    case SHARED_DENSE:
+    {
+        const SharedDenseMatrix<Scalar>& SD = *_shell.data.SD;
+        if( SD.ownSourceSide )
+            hmatrix_tools::MatrixVector( alpha, SD.D, xLocal, SD.z );
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 template class psp::SharedQuasi2dHMatrix<float,false>;
 template class psp::SharedQuasi2dHMatrix<float,true>;
 template class psp::SharedQuasi2dHMatrix<double,false>;

@@ -1118,7 +1118,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     hmatrix_tools::Scale( beta, yLocal );
 
     // Perform the source team local computations
-    PrecomputeForMapVector( alpha, xLocal, yLocal );
+    PrecomputeForMapVector( alpha, xLocal, yLocal, *this );
 
     // Perform the local Reduce-to-one's
     // TODO
@@ -1130,7 +1130,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     // TODO
 
     // Add the submatrices' contributions onto yLocal
-    PostcomputeForMapVector( yLocal );
+    PostcomputeForMapVector( yLocal, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1143,24 +1143,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
-( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
+  const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::PrecomputeForMapVector");
 #endif
-    PrecomputeForMapVectorRecursion( alpha, xLocal, yLocal, *this );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVectorRecursion
-( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
-  const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const
-{
-    const Shell& shell = H._shell;
+    const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
@@ -1170,7 +1159,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVectorRecursion
         {
             for( int s=0; s<4; ++s )
             {
-                PrecomputeForMapVectorRecursion
+                PrecomputeForMapVector
                 ( alpha, xLocal, yLocal, node.Child(t,s) );
             }
         }
@@ -1221,8 +1210,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVectorRecursion
             const int localSourceOffset = SH._localOffset;
             Vector<Scalar> xLocalPiece;
             xLocalPiece.LockedView( xLocal, localSourceOffset, SH._width );
-            // TODO: Write this function
-            //SH.PrecomputeForMapVector( alpha, xLocalPiece );
+            SH.PrecomputeForMapVector( alpha, xLocalPiece );
         }
         break;
     }
@@ -1290,17 +1278,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVectorRecursion
     case EMPTY:
         break;
     }
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PostcomputeForMapVector
-( Vector<Scalar>& yLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::PostcomputeForMapVector");
-#endif
-    PostcomputeForMapVectorRecursion( yLocal, *this );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1308,10 +1285,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PostcomputeForMapVector
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PostcomputeForMapVectorRecursion
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PostcomputeForMapVector
 ( Vector<Scalar>& yLocal, const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const
 {
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::PostcomputeForMapVector");
+#endif
     // TODO
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 // NOTE: Due to alowing for arbitrary power of 2 numbers of processes rather 

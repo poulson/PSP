@@ -149,17 +149,11 @@ private:
     DistQuasi2dHMatrix();
 
     void PrecomputeForMapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) 
+    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
+      const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) 
     const;
 
-    void PrecomputeForMapVectorRecursion
-    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
-      const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const;
-
     void PostcomputeForMapVector
-    ( Vector<Scalar>& yLocal ) const;
-
-    void PostcomputeForMapVectorRecursion
     ( Vector<Scalar>& yLocal, const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) 
     const;
 
