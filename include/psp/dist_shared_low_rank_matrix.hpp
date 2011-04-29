@@ -30,7 +30,7 @@ namespace psp {
 // sets of rows and the source team divides V into contiguous sets of rows.
 // U V* can be applied to a vector x by forming V* x, which is only r entries,
 // communicating the small set of entries to the target team, and then having
-// each member of the target team locally update their portion of z := U V* x.
+// each member of the target team locally update their portion of U V* x.
 template<typename Scalar,bool Conjugated>
 struct DistSharedLowRankMatrix
 {
@@ -45,7 +45,7 @@ struct DistSharedLowRankMatrix
     // Storage for VLocal^[T/H] x. This should be computed by the process owning
     // the source side and then communicated to the process owning the target 
     // side.
-    mutable Vector<Scalar> y;
+    mutable Vector<Scalar> z;
 };
 
 } // namespace psp

@@ -141,11 +141,27 @@ private:
     bool _inTargetTeam;
 
     void UnpackRecursion
-    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H );
+    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
+      int localSourceOffset=0, int localTargetOffset=0 );
 
     // Ensure that the default constructor is not accessible, a communicator
     // must be supplied
     DistQuasi2dHMatrix();
+
+    void PrecomputeForMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) 
+    const;
+
+    void PrecomputeForMapVectorRecursion
+    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
+      const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const;
+
+    void PostcomputeForMapVector
+    ( Vector<Scalar>& yLocal ) const;
+
+    void PostcomputeForMapVectorRecursion
+    ( Vector<Scalar>& yLocal, const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) 
+    const;
 
 public:
     static std::size_t PackedSizes
@@ -180,12 +196,15 @@ public:
     std::size_t Unpack
     ( const byte* packedDistHMatrix, const Subcomms& subcomms );
 
-    // TODO: Figure out whether to act on PETSc's Vec or our own distributed
-    //       vector class.
-    /*
+    // y := alpha H x
     void MapVector
-    ( Scalar alpha, const DistVector<Scalar>& x, DistVector<Scalar>& y ) const;
-    */
+    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) 
+    const;
+
+    // y := alpha H x + beta y
+    void MapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+      Scalar beta, Vector<Scalar>& yLocal ) const;
 };
 
 } // namespace psp

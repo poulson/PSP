@@ -34,12 +34,13 @@ struct SharedDenseMatrix
 {
     int height, width;
     bool ownSourceSide;
+    int localOffset;
     int partner;
 
     DenseMatrix<Scalar> D;
 
     // Temporary storage for the product D x
-    mutable Vector<Scalar> y;
+    mutable Vector<Scalar> z;
 };
 
 } // namespace psp

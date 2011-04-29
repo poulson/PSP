@@ -27,14 +27,15 @@ namespace psp {
 
 // For parallelizing the application of U V* (where V* = V^T or V^H) when 
 // two processes are involved. One process owns U and the other owns V. Then
-// the process owning V can form y := V* x, which is only r entries, then 
+// the process owning V can form z := V* x, which is only r entries, then 
 // communicate this result to the process owning U so that it may form 
-// z := U y = U (V* x).
+// U y = U (V* x).
 template<typename Scalar,bool Conjugated>
 struct SharedLowRankMatrix
 {
     int height, width, rank;
     bool ownSourceSide;
+    int localOffset;
     int partner;
 
     DenseMatrix<Scalar> D;
@@ -42,7 +43,7 @@ struct SharedLowRankMatrix
     // Storage for V^[T/H] x. This should be computed by the process owning
     // the source side and then communicated to the process owning the target 
     // side.
-    mutable Vector<Scalar> y;
+    mutable Vector<Scalar> z;
 };
 
 } // namespace psp

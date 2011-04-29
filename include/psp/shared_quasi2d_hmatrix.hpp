@@ -108,7 +108,11 @@ private:
     Shell _shell;
 
     bool _ownSourceSide;
+    int _localOffset;
     int _partner;
+
+    // Temporary storage for a matrix-vector product
+    mutable Vector<Scalar> _z;
 
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
