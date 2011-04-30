@@ -530,8 +530,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
                 Vector<Scalar> xSub;
                 xSub.LockedView( x, sourceOffset, node.sourceSizes[s] );
 
-                const Quasi2dHMatrix& ASub = node.Child(t,s);
-                ASub.MapVector( alpha, xSub, (Scalar)1, ySub );
+                node.Child(t,s).MapVector( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += node.sourceSizes[s];
             }
@@ -597,8 +596,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
                 Vector<Scalar> xSub;
                 xSub.LockedView( x, sourceOffset, node.targetSizes[s] );
 
-                const Quasi2dHMatrix& ASub = node.Child(s,t);
-                ASub.TransposeMapVector( alpha, xSub, (Scalar)1, ySub );
+                node.Child(s,t).TransposeMapVector
+                ( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += node.targetSizes[s];
             }
@@ -668,8 +667,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
                 Vector<Scalar> xSub;
                 xSub.LockedView( x, sourceOffset, node.targetSizes[s] );
 
-                const Quasi2dHMatrix& ASub = node.Child(s,t);
-                ASub.HermitianTransposeMapVector
+                node.Child(s,t).HermitianTransposeMapVector
                 ( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += node.targetSizes[s];
@@ -732,8 +730,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
                 Vector<Scalar> xSub;
                 xSub.LockedView( x, sourceOffset, node.targetSizes[s] );
 
-                const Quasi2dHMatrix& ASub = node.Child(s,t);
-                ASub.HermitianTransposeMapVector
+                node.Child(s,t).HermitianTransposeMapVector
                 ( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += node.targetSizes[s];
@@ -825,8 +822,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
                 BSub.LockedView
                 ( B, sourceOffset, 0, node.sourceSizes[s], B.Width() );
 
-                const Quasi2dHMatrix& ASub = node.Child(t,s);
-                ASub.MapMatrix( alpha, BSub, (Scalar)1, CSub );
+                node.Child(t,s).MapMatrix( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += node.sourceSizes[s];
             }
@@ -896,8 +892,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
                 BSub.LockedView
                 ( B, sourceOffset, 0, node.targetSizes[s], B.Width() );
 
-                const Quasi2dHMatrix& ASub = node.Child(s,t);
-                ASub.TransposeMapMatrix( alpha, BSub, (Scalar)1, CSub );
+                node.Child(s,t).TransposeMapMatrix
+                ( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += node.targetSizes[s];
             }
@@ -970,8 +966,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
                 BSub.LockedView
                 ( B, sourceOffset, 0, node.targetSizes[s], B.Width() );
 
-                const Quasi2dHMatrix& ASub = node.Child(s,t);
-                ASub.HermitianTransposeMapMatrix
+                node.Child(s,t).HermitianTransposeMapMatrix
                 ( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += node.targetSizes[s];
@@ -1035,8 +1030,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
                 BSub.LockedView
                 ( B, sourceOffset, 0, node.targetSizes[s], B.Width() );
 
-                const Quasi2dHMatrix& ASub = node.Child(s,t);
-                ASub.HermitianTransposeMapMatrix
+                node.Child(s,t).HermitianTransposeMapMatrix
                 ( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += node.targetSizes[s];
@@ -2783,8 +2777,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
                 Vector<Scalar> xSub;
                 xSub.LockedView( x, sourceOffset, node.sizes[s] );
 
-                const Quasi2dHMatrix& ASub = node.Child(t,s);
-                ASub.MapVector( alpha, xSub, (Scalar)1, ySub );
+                node.Child(t,s).MapVector( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += node.sizes[s];
             }
@@ -2807,8 +2800,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
                 Vector<Scalar> xSub;
                 xSub.LockedView( x, sourceOffset, node.sizes[t] );
 
-                const Quasi2dHMatrix& ASub = node.Child(t,s);
-                ASub.TransposeMapVector( alpha, xSub, (Scalar)1, ySub );
+                node.Child(t,s).TransposeMapVector
+                ( alpha, xSub, (Scalar)1, ySub );
 
                 sourceOffset += node.sizes[t];
             }
@@ -2845,8 +2838,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
                 DenseMatrix<Scalar> BSub;
                 BSub.LockedView( B, sourceOffset, 0, node.sizes[s], B.Width() );
 
-                const Quasi2dHMatrix& ASub = node.Child(t,s);
-                ASub.MapMatrix( alpha, BSub, (Scalar)1, CSub );
+                node.Child(t,s).MapMatrix( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += node.sizes[s];
             }
@@ -2869,8 +2861,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
                 DenseMatrix<Scalar> BSub;
                 BSub.LockedView( B, sourceOffset, 0, node.sizes[t], B.Width() );
 
-                const Quasi2dHMatrix& ASub = node.Child(t,s);
-                ASub.TransposeMapMatrix( alpha, BSub, (Scalar)1, CSub );
+                node.Child(t,s).TransposeMapMatrix
+                ( alpha, BSub, (Scalar)1, CSub );
 
                 sourceOffset += node.sizes[t];
             }

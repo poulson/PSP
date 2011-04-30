@@ -509,17 +509,18 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
 template<typename Scalar,bool Conjugated>
 void
-psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 ( Scalar alpha, const Vector<Scalar>& xLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("SplitQuasi2dHMatrix::PrecomputeForMapVector");
+    PushCallStack("SplitQuasi2dHMatrix::MapVectorPrecompute");
 #endif
-    switch( _shell.type )
+    const Shell& shell = this->_shell;
+    switch( shell.type )
     {
     case NODE:
     {
-        const Node& node = *_shell.data.node;
+        const Node& node = *shell.data.node;
         for( int t=0; t<4; ++t )
         {
             int sourceOffset = 0;
@@ -529,7 +530,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
                 xLocalSub.LockedView
                 ( xLocal, sourceOffset, node.sourceSizes[s] );
 
-                PrecomputeForMapVector( alpha, xLocalSub );
+                node.Child(t,s).MapVectorPrecompute( alpha, xLocalSub );
 
                 sourceOffset += node.sourceSizes[s];
             }
@@ -543,7 +544,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         break;
     case SPLIT_LOW_RANK:
     {
-        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *_shell.data.SF;
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
         if( SF.ownSourceSide )
         {
             if( Conjugated )
@@ -561,11 +562,58 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix<Scalar>& SD = *_shell.data.SD;
+        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
         if( SD.ownSourceSide )
             hmatrix_tools::MatrixVector( alpha, SD.D, xLocal, SD.z );
         break;
     }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
+( Vector<Scalar>& yLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapVectorPostcompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        int targetOffset = 0;
+        for( int t=0; t<4; ++t )
+        {
+            Vector<Scalar> yLocalSub;
+            yLocalSub.LockedView( yLocal, targetOffset, node.targetSizes[t] );
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorPostcompute( yLocalSub );
+            targetOffset += node.targetSizes[t];
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+        if( !SF.ownSourceSide )
+            hmatrix_tools::MatrixVector( (Scalar)1, SF.D, SF.z, yLocal );
+        break;
+    }
+    case SPLIT_DENSE:
+        // Update should have taken place during communication step since it
+        // is simply an axpy.
+        break;
     }
 #ifndef RELEASE
     PopCallStack();

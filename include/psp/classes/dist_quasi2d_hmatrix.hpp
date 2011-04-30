@@ -148,14 +148,12 @@ private:
     // must be supplied
     DistQuasi2dHMatrix();
 
-    void PrecomputeForMapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
-      const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) 
+    void MapVectorPrecompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) 
     const;
 
-    void PostcomputeForMapVector
-    ( Vector<Scalar>& yLocal, const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) 
-    const;
+    void MapVectorPostcompute
+    ( Vector<Scalar>& yLocal ) const;
 
 public:
     static std::size_t PackedSizes

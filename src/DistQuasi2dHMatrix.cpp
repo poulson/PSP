@@ -1118,19 +1118,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     hmatrix_tools::Scale( beta, yLocal );
 
     // Perform the source team local computations
-    PrecomputeForMapVector( alpha, xLocal, yLocal, *this );
+    MapVectorPrecompute( alpha, xLocal, yLocal );
 
-    // Perform the local Reduce-to-one's
-    // TODO
+    // Sum within source teams
+    // TODO: MapVectorSourceTeamSummations
 
     // Pass data from source to target teams
-    // TODO
+    // TODO: MapVectorPassData
 
-    // Locally broadcast data from root
-    // TODO
+    // Locally broadcast data from roots
+    // TODO: MapVectorTargetTeamBroadcasts
 
     // Add the submatrices' contributions onto yLocal
-    PostcomputeForMapVector( yLocal, *this );
+    MapVectorPostcompute( yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1142,12 +1142,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
-( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal,
-  const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
+( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::PrecomputeForMapVector");
+    PushCallStack("DistQuasi2dHMatrix::MapVectorPrecompute");
 #endif
     const Shell& shell = this->_shell;
     switch( shell.type )
@@ -1156,13 +1155,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
     {
         const Node& node = *shell.data.node;
         for( int t=0; t<4; ++t )
-        {
             for( int s=0; s<4; ++s )
-            {
-                PrecomputeForMapVector
-                ( alpha, xLocal, yLocal, node.Child(t,s) );
-            }
-        }
+                node.Child(t,s).MapVectorPrecompute( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -1179,11 +1173,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         {
             // Form z := alpha VLocal^[T/H] xLocal
             DSF.z.Resize( DSF.rank );
-            const DenseMatrix<Scalar>& VLocal = DSF.DLocal;
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemv
-            ( option, VLocal.Height(), DSF.rank, 
-              alpha,     VLocal.LockedBuffer(), VLocal.LDim(), 
+            ( option, DSF.DLocal.Height(), DSF.rank, 
+              alpha,     DSF.DLocal.LockedBuffer(), DSF.DLocal.LDim(), 
                          xLocal.LockedBuffer(), 1,
               (Scalar)0, DSF.z.Buffer(),        1 );
         }
@@ -1207,10 +1200,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
         if( SH._ownSourceSide )
         {
-            const int localSourceOffset = SH._localOffset;
             Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, localSourceOffset, SH._width );
-            SH.PrecomputeForMapVector( alpha, xLocalPiece );
+            xLocalPiece.LockedView( xLocal, SH._localOffset, SH._width );
+            SH.MapVectorPrecompute( alpha, xLocalPiece );
         }
         break;
     }
@@ -1220,9 +1212,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
 
         if( SF.ownSourceSide )
         {
-            const int localSourceOffset = SF.localOffset;
             Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, localSourceOffset, SF.D.Height() );
+            xLocalPiece.LockedView( xLocal, SF.localOffset, SF.D.Height() );
             if( Conjugated )
             {
                 hmatrix_tools::MatrixHermitianTransposeVector
@@ -1241,9 +1232,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
         if( SD.ownSourceSide )
         {
-            const int localSourceOffset = SD.localOffset;
             Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, localSourceOffset, SD.D.Width() );
+            xLocalPiece.LockedView( xLocal, SD.localOffset, SD.width );
             hmatrix_tools::MatrixVector( alpha, SD.D, xLocalPiece, SD.z );
         }
         break;
@@ -1285,13 +1275,97 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PostcomputeForMapVector
-( Vector<Scalar>& yLocal, const DistQuasi2dHMatrix<Scalar,Conjugated>& H ) const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
+( Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::PostcomputeForMapVector");
+    PushCallStack("DistQuasi2dHMatrix::MapVectorPostcompute");
 #endif
-    // TODO
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorPostcompute( yLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        if( !DSF.inSourceTeam )
+        {
+            // yLocal += ULocal z
+            blas::Gemv
+            ( 'N', DSF.DLocal.Height(), DSF.rank,
+              (Scalar)1, DSF.DLocal.LockedBuffer(), DSF.DLocal.LDim(),
+                         DSF.z.LockedBuffer(),      1,
+              (Scalar)1, yLocal.Buffer(),           1 );
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        // yLocal += ULocal z
+        blas::Gemv
+        ( 'N', DF.ULocal.Height(), DF.rank,
+          (Scalar)1, DF.ULocal.LockedBuffer(), DF.ULocal.LDim(),
+                     DF.z.LockedBuffer(),      1,
+          (Scalar)1, yLocal.Buffer(),          1 );
+        break;
+    }
+    case SPLIT_QUASI2D:
+    {
+        const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+        if( !SH._ownSourceSide )
+        {
+            const int localTargetOffset = SH._localOffset;
+            Vector<Scalar> yLocalPiece;
+            yLocalPiece.LockedView( yLocal, localTargetOffset, SH._height );
+            SH.MapVectorPostcompute( yLocal );
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+
+        if( !SF.ownSourceSide )
+        {
+            const int localTargetOffset = SF.localOffset;
+            Vector<Scalar> yLocalPiece;
+            yLocalPiece.LockedView( yLocal, localTargetOffset, SF.D.Height() );
+            hmatrix_tools::MatrixVector
+            ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+        // The update should have been performed during the communication stage
+        // since it did not require any more work than an axpy.
+        break;
+    case QUASI2D:
+        // The update should have been performed at the precompute stage.
+        break;
+    case LOW_RANK:
+        // The update should have been performed at the precompute stage.
+        break;
+    case DENSE:
+        // The update should have been performed at the precompute stage.
+        break;
+    case EMPTY:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
