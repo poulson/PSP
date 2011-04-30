@@ -1121,13 +1121,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     MapVectorPrecompute( alpha, xLocal, yLocal );
 
     // Sum within source teams
-    // TODO: MapVectorSourceTeamSummations
+    MapVectorSourceTeamSummations();
 
     // Pass data from source to target teams
-    // TODO: MapVectorPassData
+    MapVectorPassData();
 
     // Locally broadcast data from roots
-    // TODO: MapVectorTargetTeamBroadcasts
+    MapVectorTargetTeamBroadcasts();
 
     // Add the submatrices' contributions onto yLocal
     MapVectorPostcompute( yLocal );
@@ -1268,6 +1268,47 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     case EMPTY:
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummations() 
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorSourceTeamSummations");
+#endif
+    // TODO: Implement custom Reduce routine for nested communicators
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorPassData");
+#endif
+    // TODO: Implement AllToAll redistribution
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorTargetTeamBroadcasts() 
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorTargetTeamBroadcasts");
+#endif
+    // TODO: Implement custom Broadcast routine for nested communicators
 #ifndef RELEASE
     PopCallStack();
 #endif

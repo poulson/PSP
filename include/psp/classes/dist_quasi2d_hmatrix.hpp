@@ -149,11 +149,12 @@ private:
     DistQuasi2dHMatrix();
 
     void MapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) 
-    const;
-
-    void MapVectorPostcompute
-    ( Vector<Scalar>& yLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorSourceTeamSummations() const;
+    void MapVectorPassData() const;
+    void MapVectorTargetTeamBroadcasts() const;
+    void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
 
 public:
     static std::size_t PackedSizes
