@@ -21,6 +21,10 @@
 #ifndef PSP_DENSE_MATRIX_HPP
 #define PSP_DENSE_MATRIX_HPP 1
 
+#include <stdexcept>
+#include <string>
+#include <vector>
+
 namespace psp {
 
 enum MatrixType { GENERAL, SYMMETRIC /*, HERMITIAN*/ };

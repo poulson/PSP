@@ -21,13 +21,13 @@
 #ifndef PSP_DIST_QUASI2D_HMATRIX_HPP
 #define PSP_DIST_QUASI2D_HMATRIX_HPP 1
 
-#include "psp/quasi2d_hmatrix.hpp"
-#include "psp/subcomms.hpp"
-#include "psp/shared_quasi2d_hmatrix.hpp"
-#include "psp/shared_low_rank_matrix.hpp"
-#include "psp/shared_dense_matrix.hpp"
-#include "psp/dist_low_rank_matrix.hpp"
-#include "psp/dist_shared_low_rank_matrix.hpp"
+#include "psp/classes/quasi2d_hmatrix.hpp"
+#include "psp/classes/subcomms.hpp"
+#include "psp/classes/split_quasi2d_hmatrix.hpp"
+#include "psp/structs/split_low_rank_matrix.hpp"
+#include "psp/structs/split_dense_matrix.hpp"
+#include "psp/structs/dist_low_rank_matrix.hpp"
+#include "psp/structs/dist_split_low_rank_matrix.hpp"
 
 namespace psp {
 
@@ -87,16 +87,16 @@ private:
 
     enum ShellType 
     { 
-        NODE,                 // recurse
-        NODE_SYMMETRIC,       // recurse symmetrically
-        DIST_SHARED_LOW_RANK, // each side is distributed to different teams
-        DIST_LOW_RANK,        // both sides are distributed to same team
-        SHARED_QUASI2D,       // shared between two processes
-        SHARED_LOW_RANK,      // each side is given to one process
-        SHARED_DENSE,         // shared between two processes
-        QUASI2D,              // serial
-        LOW_RANK,             // serial
-        DENSE,                // serial
+        NODE,                // recurse
+        NODE_SYMMETRIC,      // recurse symmetrically
+        DIST_SPLIT_LOW_RANK, // each side is distributed to different teams
+        DIST_LOW_RANK,       // both sides are distributed to same team
+        SPLIT_QUASI2D,       // split between two processes
+        SPLIT_LOW_RANK,      // each side is given to one process
+        SPLIT_DENSE,         // split between two processes
+        QUASI2D,             // serial
+        LOW_RANK,            // serial
+        DENSE,               // serial
         EMPTY
     };
 
@@ -107,11 +107,11 @@ private:
         {
             Node* node;
             NodeSymmetric* nodeSymmetric;
-            DistSharedLowRankMatrix<Scalar,Conjugated>* DSF;
+            DistSplitLowRankMatrix<Scalar,Conjugated>* DSF;
             DistLowRankMatrix<Scalar,Conjugated>* DF;
-            SharedQuasi2dHMatrix<Scalar,Conjugated>* SH;
-            SharedLowRankMatrix<Scalar,Conjugated>* SF;
-            SharedDenseMatrix<Scalar>* SD;
+            SplitQuasi2dHMatrix<Scalar,Conjugated>* SH;
+            SplitLowRankMatrix<Scalar,Conjugated>* SF;
+            SplitDenseMatrix<Scalar>* SD;
             Quasi2dHMatrix<Scalar,Conjugated>* H;
             LowRankMatrix<Scalar,Conjugated>* F;
             DenseMatrix<Scalar>* D;
@@ -361,16 +361,16 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 { 
     switch( type )
     {
-    case NODE:                 delete data.node; break;
-    case NODE_SYMMETRIC:       delete data.nodeSymmetric; break;
-    case DIST_SHARED_LOW_RANK: delete data.DSF; break;
-    case DIST_LOW_RANK:        delete data.DF; break;
-    case SHARED_QUASI2D:       delete data.SH; break;
-    case SHARED_LOW_RANK:      delete data.SF; break;
-    case SHARED_DENSE:         delete data.SD; break;
-    case QUASI2D:              delete data.H; break;
-    case LOW_RANK:             delete data.F; break;
-    case DENSE:                delete data.D; break;
+    case NODE:                delete data.node; break;
+    case NODE_SYMMETRIC:      delete data.nodeSymmetric; break;
+    case DIST_SPLIT_LOW_RANK: delete data.DSF; break;
+    case DIST_LOW_RANK:       delete data.DF; break;
+    case SPLIT_QUASI2D:       delete data.SH; break;
+    case SPLIT_LOW_RANK:      delete data.SF; break;
+    case SPLIT_DENSE:         delete data.SD; break;
+    case QUASI2D:             delete data.H; break;
+    case LOW_RANK:            delete data.F; break;
+    case DENSE:               delete data.D; break;
     case EMPTY: break;
     }
 }

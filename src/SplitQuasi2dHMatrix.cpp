@@ -26,11 +26,11 @@
 
 template<typename Scalar,bool Conjugated>
 std::pair<std::size_t,std::size_t>
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
 ( const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::PackedSizes");
+    PushCallStack("SplitQuasi2dHMatrix::PackedSizes");
 #endif
     // Recurse on this shell to compute the packed sizes
     std::size_t sourceSize=0, targetSize=0;
@@ -43,11 +43,11 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
 
 template<typename Scalar,bool Conjugated>
 std::size_t
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSourceSize
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackedSourceSize
 ( const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::PackedSourceSize");
+    PushCallStack("SplitQuasi2dHMatrix::PackedSourceSize");
 #endif
     std::size_t sourceSize=0, targetSize=0;
     PackedSizesRecursion( sourceSize, targetSize, H );
@@ -59,11 +59,11 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSourceSize
 
 template<typename Scalar,bool Conjugated>
 std::size_t
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedTargetSize
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackedTargetSize
 ( const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::PackedTargetSize");
+    PushCallStack("SplitQuasi2dHMatrix::PackedTargetSize");
 #endif
     std::size_t sourceSize=0, targetSize=0;
     PackedSizesRecursion( sourceSize, targetSize, H );
@@ -75,13 +75,13 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedTargetSize
 
 template<typename Scalar,bool Conjugated>
 std::pair<std::size_t,std::size_t>
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Pack
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::Pack
 ( byte* packedSourceSide, byte* packedTargetSide,
   int sourceRank, int targetRank,
   const Quasi2dHMatrix<Scalar,Conjugated>& H ) 
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::Pack");
+    PushCallStack("SplitQuasi2dHMatrix::Pack");
 #endif
     byte* sourceHead = packedSourceSide;
     byte* targetHead = packedTargetSide;
@@ -100,18 +100,17 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Pack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
 ( std::size_t& sourceSize, std::size_t& targetSize,
   const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
-    typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
+    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
-    // Make space for the SharedQuasi2dHMatrix member variables
+    // Make space for the SplitQuasi2dHMatrix member variables
     {
         const std::size_t headerSize = 
-            16*sizeof(int) + 3*sizeof(bool) + 
-            sizeof(typename SharedQuasi2d::ShellType);
+            16*sizeof(int) + 3*sizeof(bool) + sizeof(ShellType);
         sourceSize += headerSize;
         targetSize += headerSize;
     }
@@ -164,13 +163,13 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
 
 template<typename Scalar,bool Conjugated>
 void
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 ( byte*& sourceHead, byte*& targetHead, 
   int sourceRank, int targetRank,
   const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
-    typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
+    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
     // Write out the source member variables
     *((int*)sourceHead) = H._height;              sourceHead += sizeof(int);
@@ -218,10 +217,10 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     switch( shell.type )
     {
     case Quasi2d::NODE:
-        *((typename SharedQuasi2d::ShellType*)sourceHead) = SharedQuasi2d::NODE;
-        *((typename SharedQuasi2d::ShellType*)targetHead) = SharedQuasi2d::NODE;
-        sourceHead += sizeof(typename SharedQuasi2d::ShellType);
-        targetHead += sizeof(typename SharedQuasi2d::ShellType);
+        *((ShellType*)sourceHead) = NODE;
+        *((ShellType*)targetHead) = NODE;
+        sourceHead += sizeof(ShellType);
+        targetHead += sizeof(ShellType);
         for( int i=0; i<16; ++i )        
         {
             PackRecursion
@@ -230,12 +229,10 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
         break;
     case Quasi2d::NODE_SYMMETRIC:
-        *((typename SharedQuasi2d::ShellType*)sourceHead) = 
-            SharedQuasi2d::NODE_SYMMETRIC;
-        *((typename SharedQuasi2d::ShellType*)targetHead) = 
-            SharedQuasi2d::NODE_SYMMETRIC;
-        sourceHead += sizeof(typename SharedQuasi2d::ShellType);
-        targetHead += sizeof(typename SharedQuasi2d::ShellType);
+        *((ShellType*)sourceHead) = NODE_SYMMETRIC;
+        *((ShellType*)targetHead) = NODE_SYMMETRIC;
+        sourceHead += sizeof(ShellType);
+        targetHead += sizeof(ShellType);
         for( int i=0; i<10; ++i )
         {
             PackRecursion
@@ -245,12 +242,10 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         break;
     case Quasi2d::LOW_RANK:
     {
-        *((typename SharedQuasi2d::ShellType*)sourceHead) = 
-            SharedQuasi2d::SHARED_LOW_RANK;
-        *((typename SharedQuasi2d::ShellType*)targetHead) = 
-            SharedQuasi2d::SHARED_LOW_RANK;
-        sourceHead += sizeof(typename SharedQuasi2d::ShellType);
-        targetHead += sizeof(typename SharedQuasi2d::ShellType);
+        *((ShellType*)sourceHead) = SPLIT_LOW_RANK;
+        *((ShellType*)targetHead) = SPLIT_LOW_RANK;
+        sourceHead += sizeof(ShellType);
+        targetHead += sizeof(ShellType);
 
         const DenseMatrix<Scalar>& U = shell.data.F->U;
         const DenseMatrix<Scalar>& V = shell.data.F->V;
@@ -278,12 +273,10 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     }
     case Quasi2d::DENSE:
     {
-        *((typename SharedQuasi2d::ShellType*)sourceHead) = 
-            SharedQuasi2d::SHARED_DENSE;
-        *((typename SharedQuasi2d::ShellType*)targetHead) = 
-            SharedQuasi2d::SHARED_DENSE;
-        sourceHead += sizeof(typename SharedQuasi2d::ShellType);
-        targetHead += sizeof(typename SharedQuasi2d::ShellType);
+        *((ShellType*)sourceHead) = SPLIT_DENSE;
+        *((ShellType*)targetHead) = SPLIT_DENSE;
+        sourceHead += sizeof(ShellType);
+        targetHead += sizeof(ShellType);
 
         const DenseMatrix<Scalar>& D = *shell.data.D;
         const int m = D.Height();
@@ -322,9 +315,9 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 // Public non-static routines                                                 //
 //----------------------------------------------------------------------------//
 
-// Create an empty shared H-matrix
+// Create an empty split H-matrix
 template<typename Scalar,bool Conjugated>
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::SharedQuasi2dHMatrix()
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::SplitQuasi2dHMatrix()
 : _height(0), _width(0), _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), 
   _symmetric(false), _stronglyAdmissible(false),
@@ -335,11 +328,11 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::SharedQuasi2dHMatrix()
 
 // Create an H-matrix from packed data
 template<typename Scalar,bool Conjugated>
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::SharedQuasi2dHMatrix
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::SplitQuasi2dHMatrix
 ( const byte* packedHalf )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::SharedQuasi2dHMatrix");
+    PushCallStack("SplitQuasi2dHMatrix::SplitQuasi2dHMatrix");
 #endif
     Unpack( packedHalf );
 #ifndef RELEASE
@@ -348,16 +341,16 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::SharedQuasi2dHMatrix
 }
 
 template<typename Scalar,bool Conjugated>
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::~SharedQuasi2dHMatrix()
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::~SplitQuasi2dHMatrix()
 { }
 
 template<typename Scalar,bool Conjugated>
 std::size_t
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Unpack
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 ( const byte* packedHalf )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::Unpack");
+    PushCallStack("SplitQuasi2dHMatrix::Unpack");
 #endif
     const byte* head = packedHalf;
     UnpackRecursion( head, *this );
@@ -373,8 +366,8 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
-( const byte*& head, SharedQuasi2dHMatrix<Scalar,Conjugated>& H )
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
+( const byte*& head, SplitQuasi2dHMatrix<Scalar,Conjugated>& H )
 {
     H._height             = *((int*)head);  head += sizeof(int);
     H._width              = *((int*)head);  head += sizeof(int);
@@ -400,10 +393,10 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     Shell& shell = H._shell;
     switch( shell.type )
     {
-    case NODE:            delete shell.data.node; break;
-    case NODE_SYMMETRIC:  delete shell.data.nodeSymmetric; break;
-    case SHARED_LOW_RANK: delete shell.data.SF; break;
-    case SHARED_DENSE:    delete shell.data.SD; break;
+    case NODE:           delete shell.data.node; break;
+    case NODE_SYMMETRIC: delete shell.data.nodeSymmetric; break;
+    case SPLIT_LOW_RANK: delete shell.data.SF; break;
+    case SPLIT_DENSE:    delete shell.data.SD; break;
     }
 
     // Create this layer of the H-matrix from the packed information
@@ -419,7 +412,7 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         Node& node = *shell.data.node;
         for( int i=0; i<16; ++i )
         {
-            node.children[i] = new SharedQuasi2dHMatrix<Scalar,Conjugated>;
+            node.children[i] = new SplitQuasi2dHMatrix<Scalar,Conjugated>;
             UnpackRecursion( head, *node.children[i] );
         }
         break;
@@ -431,15 +424,15 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         NodeSymmetric& node = *shell.data.nodeSymmetric;
         for( int i=0; i<10; ++i )
         {
-            node.children[i] = new SharedQuasi2dHMatrix<Scalar,Conjugated>;
+            node.children[i] = new SplitQuasi2dHMatrix<Scalar,Conjugated>;
             UnpackRecursion( head, *node.children[i] );
         }
         break;
     }
-    case SHARED_LOW_RANK:
+    case SPLIT_LOW_RANK:
     {
-        shell.data.SF = new SharedLowRankMatrix<Scalar,Conjugated>;
-        SharedLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+        shell.data.SF = new SplitLowRankMatrix<Scalar,Conjugated>;
+        SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
 
         const int m = H._height;
         const int n = H._width;
@@ -472,10 +465,10 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         
         break;
     }
-    case SHARED_DENSE:
+    case SPLIT_DENSE:
     {
-        shell.data.SD = new SharedDenseMatrix<Scalar>;
-        SharedDenseMatrix<Scalar>& SD = *shell.data.SD;
+        shell.data.SD = new SplitDenseMatrix<Scalar>;
+        SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
 
         const int m = H._height;
         const int n = H._width;
@@ -516,11 +509,11 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
 template<typename Scalar,bool Conjugated>
 void
-psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::PrecomputeForMapVector");
+    PushCallStack("SplitQuasi2dHMatrix::PrecomputeForMapVector");
 #endif
     switch( _shell.type )
     {
@@ -548,9 +541,9 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         throw std::logic_error("Symmetric case not yet supported");
 #endif
         break;
-    case SHARED_LOW_RANK:
+    case SPLIT_LOW_RANK:
     {
-        const SharedLowRankMatrix<Scalar,Conjugated>& SF = *_shell.data.SF;
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *_shell.data.SF;
         if( SF.ownSourceSide )
         {
             if( Conjugated )
@@ -566,9 +559,9 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         }
         break;
     }
-    case SHARED_DENSE:
+    case SPLIT_DENSE:
     {
-        const SharedDenseMatrix<Scalar>& SD = *_shell.data.SD;
+        const SplitDenseMatrix<Scalar>& SD = *_shell.data.SD;
         if( SD.ownSourceSide )
             hmatrix_tools::MatrixVector( alpha, SD.D, xLocal, SD.z );
         break;
@@ -579,11 +572,11 @@ psp::SharedQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
 #endif
 }
 
-template class psp::SharedQuasi2dHMatrix<float,false>;
-template class psp::SharedQuasi2dHMatrix<float,true>;
-template class psp::SharedQuasi2dHMatrix<double,false>;
-template class psp::SharedQuasi2dHMatrix<double,true>;
-template class psp::SharedQuasi2dHMatrix<std::complex<float>,false>;
-template class psp::SharedQuasi2dHMatrix<std::complex<float>,true>;
-template class psp::SharedQuasi2dHMatrix<std::complex<double>,false>;
-template class psp::SharedQuasi2dHMatrix<std::complex<double>,true>;
+template class psp::SplitQuasi2dHMatrix<float,false>;
+template class psp::SplitQuasi2dHMatrix<float,true>;
+template class psp::SplitQuasi2dHMatrix<double,false>;
+template class psp::SplitQuasi2dHMatrix<double,true>;
+template class psp::SplitQuasi2dHMatrix<std::complex<float>,false>;
+template class psp::SplitQuasi2dHMatrix<std::complex<float>,true>;
+template class psp::SplitQuasi2dHMatrix<std::complex<double>,false>;
+template class psp::SplitQuasi2dHMatrix<std::complex<double>,true>;

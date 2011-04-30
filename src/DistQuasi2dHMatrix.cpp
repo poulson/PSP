@@ -159,7 +159,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
   const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
-    typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
+    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
     const std::size_t headerSize = 
         15*sizeof(int) + 2*sizeof(bool) + sizeof(ShellType);
@@ -190,9 +190,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             }
             else
             {
-                // Store a shared H-matrix
+                // Store a split H-matrix
                 std::pair<std::size_t,std::size_t> sizes = 
-                    SharedQuasi2d::PackedSizes( H );
+                    SplitQuasi2d::PackedSizes( H );
                 packedSizes[sourceRank] += sizes.first;
                 packedSizes[targetRank] += sizes.second;
             }
@@ -246,9 +246,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             }
             else
             {
-                // Store a shared H-matrix
+                // Store a split H-matrix
                 std::pair<std::size_t,std::size_t> sizes = 
-                    SharedQuasi2d::PackedSizes( H );
+                    SplitQuasi2d::PackedSizes( H );
                 packedSizes[sourceRank] += sizes.first;
                 packedSizes[targetRank] += sizes.second;
             }
@@ -275,7 +275,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             }
             else
             {
-                // Store a shared low-rank matrix                
+                // Store a split low-rank matrix                
 
                 // The source and target processes store the matrix rank, 
                 // whether they are on the source side, their partner's (MPI) 
@@ -302,7 +302,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
             }
             else
             {
-                // Store a distributed shared low-rank matrix
+                // Store a distributed split low-rank matrix
 
                 // Make room for: 
                 //   matrix rank, whether we're on the source side, and the
@@ -381,7 +381,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
   const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
-    typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
+    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
     // Write the header information for every process in the source team
     for( int i=0; i<teamSize; ++i )
@@ -457,16 +457,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                // Store a shared H-matrix 
+                // Store a split H-matrix 
                 byte** hSource = headPointers[sourceRank];
                 byte** hTarget = headPointers[targetRank];
-                *((ShellType*)*hSource) = SHARED_QUASI2D; 
-                *((ShellType*)*hTarget) = SHARED_QUASI2D;
+                *((ShellType*)*hSource) = SPLIT_QUASI2D; 
+                *((ShellType*)*hTarget) = SPLIT_QUASI2D;
                 *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
 
                 std::pair<std::size_t,std::size_t> sizes =
-                    SharedQuasi2d::Pack
+                    SplitQuasi2d::Pack
                     ( *hSource, *hTarget, sourceRank, targetRank, H );
 
                 *hSource += sizes.first;
@@ -627,16 +627,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                // Store a shared H-matrix 
+                // Store a split H-matrix 
                 byte** hSource = headPointers[sourceRank];
                 byte** hTarget = headPointers[targetRank];
-                *((ShellType*)*hSource) = SHARED_QUASI2D; 
-                *((ShellType*)*hTarget) = SHARED_QUASI2D;
+                *((ShellType*)*hSource) = SPLIT_QUASI2D; 
+                *((ShellType*)*hTarget) = SPLIT_QUASI2D;
                 *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
 
                 std::pair<std::size_t,std::size_t> sizes =
-                    SharedQuasi2d::Pack
+                    SplitQuasi2d::Pack
                     ( *hSource, *hTarget, sourceRank, targetRank, H );
                 *hSource += sizes.first;
                 *hTarget += sizes.second;
@@ -680,11 +680,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                // Store a shared low-rank representation
+                // Store a split low-rank representation
                 byte** hSource = headPointers[sourceRank];
                 byte** hTarget = headPointers[targetRank];
-                *((ShellType*)*hSource) = SHARED_LOW_RANK;
-                *((ShellType*)*hTarget) = SHARED_LOW_RANK;
+                *((ShellType*)*hSource) = SPLIT_LOW_RANK;
+                *((ShellType*)*hTarget) = SPLIT_LOW_RANK;
                 *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
 
@@ -754,13 +754,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                // Store a distributed shared low-rank representation
+                // Store a distributed split low-rank representation
                 for( int i=0; i<teamSize; ++i )
                 {
                     byte** hSource = headPointers[sourceRankOffset+i];
                     byte** hTarget = headPointers[targetRankOffset+i];
-                    *((ShellType*)*hSource) = DIST_SHARED_LOW_RANK;
-                    *((ShellType*)*hTarget) = DIST_SHARED_LOW_RANK;
+                    *((ShellType*)*hSource) = DIST_SPLIT_LOW_RANK;
+                    *((ShellType*)*hTarget) = DIST_SPLIT_LOW_RANK;
                     *hSource += sizeof(ShellType);
                     *hTarget += sizeof(ShellType);
                 }
@@ -854,11 +854,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                // Store a shared dense matrix
+                // Store a split dense matrix
                 byte** hSource = headPointers[sourceRank];
                 byte** hTarget = headPointers[targetRank];
-                *((ShellType*)*hSource) = SHARED_DENSE; 
-                *((ShellType*)*hTarget) = SHARED_DENSE;
+                *((ShellType*)*hSource) = SPLIT_DENSE; 
+                *((ShellType*)*hTarget) = SPLIT_DENSE;
                 *hSource += sizeof(ShellType);
                 *hTarget += sizeof(ShellType);
 
@@ -1172,9 +1172,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
 #endif
         break;
     }
-    case DIST_SHARED_LOW_RANK:
+    case DIST_SPLIT_LOW_RANK:
     {
-        const DistSharedLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
         if( DSF.inSourceTeam )
         {
             // Form z := alpha VLocal^[T/H] xLocal
@@ -1202,9 +1202,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
           (Scalar)0, DF.z.Buffer(),            1 );
         break;
     }
-    case SHARED_QUASI2D:
+    case SPLIT_QUASI2D:
     {
-        const SharedQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+        const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
         if( SH._ownSourceSide )
         {
             const int localSourceOffset = SH._localOffset;
@@ -1214,9 +1214,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         }
         break;
     }
-    case SHARED_LOW_RANK:
+    case SPLIT_LOW_RANK:
     {
-        const SharedLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
 
         if( SF.ownSourceSide )
         {
@@ -1236,9 +1236,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PrecomputeForMapVector
         }
         break;
     }
-    case SHARED_DENSE:
+    case SPLIT_DENSE:
     {
-        const SharedDenseMatrix<Scalar>& SD = *shell.data.SD;
+        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
         if( SD.ownSourceSide )
         {
             const int localSourceOffset = SD.localOffset;
@@ -1341,16 +1341,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     Shell& shell = H._shell;
     switch( shell.type ) 
     {
-    case NODE:                 delete shell.data.node; break;
-    case NODE_SYMMETRIC:       delete shell.data.nodeSymmetric; break;
-    case DIST_SHARED_LOW_RANK: delete shell.data.DSF; break;
-    case DIST_LOW_RANK:        delete shell.data.DF; break;
-    case SHARED_QUASI2D:       delete shell.data.SH; break;
-    case SHARED_LOW_RANK:      delete shell.data.SF; break;
-    case SHARED_DENSE:         delete shell.data.SD; break;
-    case QUASI2D:              delete shell.data.H; break;
-    case LOW_RANK:             delete shell.data.F; break;
-    case DENSE:                delete shell.data.D; break;
+    case NODE:                delete shell.data.node; break;
+    case NODE_SYMMETRIC:      delete shell.data.nodeSymmetric; break;
+    case DIST_SPLIT_LOW_RANK: delete shell.data.DSF; break;
+    case DIST_LOW_RANK:       delete shell.data.DF; break;
+    case SPLIT_QUASI2D:       delete shell.data.SH; break;
+    case SPLIT_LOW_RANK:      delete shell.data.SF; break;
+    case SPLIT_DENSE:         delete shell.data.SD; break;
+    case QUASI2D:             delete shell.data.H; break;
+    case LOW_RANK:            delete shell.data.F; break;
+    case DENSE:               delete shell.data.D; break;
     case EMPTY: break;
     }
 
@@ -1502,10 +1502,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         throw std::logic_error("Symmetric case not yet supported");
 #endif
         break;
-    case DIST_SHARED_LOW_RANK:
+    case DIST_SPLIT_LOW_RANK:
     {
-        shell.data.DSF = new DistSharedLowRankMatrix<Scalar,Conjugated>;
-        DistSharedLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        shell.data.DSF = new DistSplitLowRankMatrix<Scalar,Conjugated>;
+        DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
 
         DSF.height = m;
         DSF.width = n;
@@ -1575,12 +1575,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         }
         break;
     }
-    case SHARED_QUASI2D:
+    case SPLIT_QUASI2D:
     {
-        typedef SharedQuasi2dHMatrix<Scalar,Conjugated> SharedQuasi2d;
+        typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
-        shell.data.SH = new SharedQuasi2d;
-        SharedQuasi2d& SH = *shell.data.SH;
+        shell.data.SH = new SplitQuasi2d;
+        SplitQuasi2d& SH = *shell.data.SH;
 
         std::size_t packedSize = SH.Unpack( head );
         head += packedSize;
@@ -1590,10 +1590,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
             SH._localOffset = localTargetOffset;
         break;
     }
-    case SHARED_LOW_RANK:
+    case SPLIT_LOW_RANK:
     {
-        shell.data.SF = new SharedLowRankMatrix<Scalar,Conjugated>;
-        SharedLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+        shell.data.SF = new SplitLowRankMatrix<Scalar,Conjugated>;
+        SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
 
         SF.height = m;
         SF.width = n;
@@ -1625,10 +1625,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         }
         break;
     }
-    case SHARED_DENSE:
+    case SPLIT_DENSE:
     {
-        shell.data.SD = new SharedDenseMatrix<Scalar>;
-        SharedDenseMatrix<Scalar>& SD = *shell.data.SD;
+        shell.data.SD = new SplitDenseMatrix<Scalar>;
+        SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
 
         SD.height = m;
         SD.width = n;

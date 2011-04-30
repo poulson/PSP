@@ -28,11 +28,11 @@
 
 #include "psp/blas.hpp"
 #include "psp/lapack.hpp"
-#include "psp/vector.hpp"
-#include "psp/dense_matrix.hpp"
-#include "psp/low_rank_matrix.hpp"
-#include "psp/sparse_matrix.hpp"
-#include "psp/abstract_hmatrix.hpp"
+#include "psp/classes/vector.hpp"
+#include "psp/classes/dense_matrix.hpp"
+#include "psp/structs/low_rank_matrix.hpp"
+#include "psp/structs/sparse_matrix.hpp"
+#include "psp/classes/abstract_hmatrix.hpp"
 
 namespace psp {
 namespace hmatrix_tools {

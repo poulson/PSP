@@ -21,13 +21,13 @@
 #ifndef PSP_QUASI2D_HMATRIX_HPP
 #define PSP_QUASI2D_HMATRIX_HPP 1
 
-#include "psp/abstract_hmatrix.hpp"
+#include "psp/classes/abstract_hmatrix.hpp"
 #include "psp/hmatrix_tools.hpp"
 
 namespace psp {
 
 // Forward declare friend classes
-template<typename Scalar,bool Conjugated> class SharedQuasi2dHMatrix;
+template<typename Scalar,bool Conjugated> class SplitQuasi2dHMatrix;
 template<typename Scalar,bool Conjugated> class DistQuasi2dHMatrix;
 
 template<typename Scalar,bool Conjugated>
@@ -134,7 +134,7 @@ private:
     void WriteStructureRecursion( std::ofstream& file ) const;
     
 public:    
-    friend class SharedQuasi2dHMatrix<Scalar,Conjugated>;
+    friend class SplitQuasi2dHMatrix<Scalar,Conjugated>;
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
     static void BuildNaturalToHierarchicalMap

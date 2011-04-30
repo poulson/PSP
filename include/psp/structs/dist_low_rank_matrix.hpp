@@ -18,10 +18,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_DIST_SHARED_LOW_RANK_MATRIX_HPP
-#define PSP_DIST_SHARED_LOW_RANK_MATRIX_HPP 1
+#ifndef PSP_DIST_LOW_RANK_MATRIX_HPP
+#define PSP_DIST_LOW_RANK_MATRIX_HPP 1
 
-#include "psp/dense_matrix.hpp"
+#include "psp/classes/dense_matrix.hpp"
 
 namespace psp {
 
@@ -32,22 +32,20 @@ namespace psp {
 // communicating the small set of entries to the target team, and then having
 // each member of the target team locally update their portion of U V* x.
 template<typename Scalar,bool Conjugated>
-struct DistSharedLowRankMatrix
+struct DistLowRankMatrix
 {
     int height, width, rank;
-    bool inSourceTeam;
     MPI_Comm comm; // global communicator
     MPI_Comm team; // communicator for owners of our of the low-rank matrix
-    int rootOfOtherTeam;
 
-    DenseMatrix<Scalar> DLocal;
+    DenseMatrix<Scalar> ULocal;
+    DenseMatrix<Scalar> VLocal;
 
-    // Storage for VLocal^[T/H] x. This should be computed by the process owning
-    // the source side and then communicated to the process owning the target 
-    // side.
+    // Storage for VLocal^[T/H] x. This should be AllReduce'd after local 
+    // computation.
     mutable Vector<Scalar> z;
 };
 
 } // namespace psp
 
-#endif // PSP_DIST_SHARED_LOW_RANK_MATRIX_HPP
+#endif // PSP_DIST_LOW_RANK_MATRIX_HPP

@@ -18,31 +18,34 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_SHARED_DENSE_MATRIX_HPP
-#define PSP_SHARED_DENSE_MATRIX_HPP 1
+#ifndef PSP_SPLIT_LOW_RANK_MATRIX_HPP
+#define PSP_SPLIT_LOW_RANK_MATRIX_HPP 1
 
-#include "psp/dense_matrix.hpp"
-#include "psp/vector.hpp"
+#include "psp/classes/dense_matrix.hpp"
 
 namespace psp {
 
-// A wrapper for a dense matrix that is shared between two processes. 
-// For now, the source process will always own the matrix. This may need
-// to change for triangular/symmetric matrices.
-template<typename Scalar>
-struct SharedDenseMatrix
+// For parallelizing the application of U V* (where V* = V^T or V^H) when 
+// two processes are involved. One process owns U and the other owns V. Then
+// the process owning V can form z := V* x, which is only r entries, then 
+// communicate this result to the process owning U so that it may form 
+// U y = U (V* x).
+template<typename Scalar,bool Conjugated>
+struct SplitLowRankMatrix
 {
-    int height, width;
+    int height, width, rank;
     bool ownSourceSide;
     int localOffset;
     int partner;
 
     DenseMatrix<Scalar> D;
 
-    // Temporary storage for the product D x
+    // Storage for V^[T/H] x. This should be computed by the process owning
+    // the source side and then communicated to the process owning the target 
+    // side.
     mutable Vector<Scalar> z;
 };
 
 } // namespace psp
 
-#endif // PSP_SHARED_DENSE_MATRIX_HPP
+#endif // PSP_SPLIT_LOW_RANK_MATRIX_HPP

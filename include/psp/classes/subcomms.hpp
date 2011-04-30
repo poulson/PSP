@@ -21,7 +21,7 @@
 #ifndef PSP_COMM_TEAMS_HPP
 #define PSP_COMM_TEAMS_HPP 1
 
-#include "mpi.h"
+#include "psp/mpi.hpp"
 
 namespace psp {
 

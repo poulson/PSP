@@ -21,9 +21,9 @@
 #ifndef PSP_ABSTRACT_HMATRIX_HPP
 #define PSP_ABSTRACT_HMATRIX_HPP 1
 
-#include "psp/dense_matrix.hpp"
-#include "psp/low_rank_matrix.hpp"
-#include "psp/vector.hpp"
+#include "psp/classes/dense_matrix.hpp"
+#include "psp/classes/vector.hpp"
+#include "psp/structs/low_rank_matrix.hpp"
 
 namespace psp {
 

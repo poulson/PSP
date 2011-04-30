@@ -18,17 +18,17 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_SHARED_QUASI2D_HMATRIX_HPP
-#define PSP_SHARED_QUASI2D_HMATRIX_HPP 1
+#ifndef PSP_SPLIT_QUASI2D_HMATRIX_HPP
+#define PSP_SPLIT_QUASI2D_HMATRIX_HPP 1
 
-#include "psp/quasi2d_hmatrix.hpp"
-#include "psp/shared_low_rank_matrix.hpp"
-#include "psp/shared_dense_matrix.hpp"
+#include "psp/classes/quasi2d_hmatrix.hpp"
+#include "psp/structs/split_low_rank_matrix.hpp"
+#include "psp/structs/split_dense_matrix.hpp"
 
 namespace psp {
 
 template<typename Scalar,bool Conjugated>
-class SharedQuasi2dHMatrix
+class SplitQuasi2dHMatrix
 {
 private:
     static void PackedSizesRecursion
@@ -42,7 +42,7 @@ private:
 
     struct Node
     {
-        std::vector<SharedQuasi2dHMatrix*> children;
+        std::vector<SplitQuasi2dHMatrix*> children;
         int xSourceSizes[2];
         int ySourceSizes[2];
         int sourceSizes[4];
@@ -54,28 +54,28 @@ private:
           int ySizeSource, int ySizeTarget,
           int zSize );
         ~Node();
-        SharedQuasi2dHMatrix& Child( int i, int j );
-        const SharedQuasi2dHMatrix& Child( int i, int j ) const;
+        SplitQuasi2dHMatrix& Child( int i, int j );
+        const SplitQuasi2dHMatrix& Child( int i, int j ) const;
     };
 
     struct NodeSymmetric
     {
-        std::vector<SharedQuasi2dHMatrix*> children;
+        std::vector<SplitQuasi2dHMatrix*> children;
         int xSizes[2];
         int ySizes[2];
         int sizes[4];
         NodeSymmetric( int xSize, int ySize, int zSize );
         ~NodeSymmetric();
-        SharedQuasi2dHMatrix& Child( int i, int j );
-        const SharedQuasi2dHMatrix& Child( int i, int j ) const;
+        SplitQuasi2dHMatrix& Child( int i, int j );
+        const SplitQuasi2dHMatrix& Child( int i, int j ) const;
     };
 
     enum ShellType 
     { 
         NODE, 
         NODE_SYMMETRIC, 
-        SHARED_LOW_RANK, 
-        SHARED_DENSE
+        SPLIT_LOW_RANK, 
+        SPLIT_DENSE
     };
 
     struct Shell
@@ -85,8 +85,8 @@ private:
         {
             Node* node;
             NodeSymmetric* nodeSymmetric;
-            SharedLowRankMatrix<Scalar,Conjugated>* SF;
-            SharedDenseMatrix<Scalar>* SD;
+            SplitLowRankMatrix<Scalar,Conjugated>* SF;
+            SplitDenseMatrix<Scalar>* SD;
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
         Shell();
@@ -117,7 +117,7 @@ private:
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
     void UnpackRecursion
-    ( const byte*& head, SharedQuasi2dHMatrix<Scalar,Conjugated>& H );
+    ( const byte*& head, SplitQuasi2dHMatrix<Scalar,Conjugated>& H );
 
     void PrecomputeForMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
@@ -139,12 +139,12 @@ public:
       int sourceRank, int targetRank,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    SharedQuasi2dHMatrix();
+    SplitQuasi2dHMatrix();
 
-    SharedQuasi2dHMatrix
+    SplitQuasi2dHMatrix
     ( const byte* packedHalf );
 
-    ~SharedQuasi2dHMatrix();
+    ~SplitQuasi2dHMatrix();
 
     std::size_t Unpack( const byte* packedHalf );
 };
@@ -162,7 +162,7 @@ namespace psp {
 //       order to prevent code duplication.
 template<typename Scalar,bool Conjugated>
 inline
-SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
+SplitQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
 ( int xSizeSource, int xSizeTarget,
   int ySizeSource, int ySizeTarget,
   int zSize )
@@ -191,7 +191,7 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
 
 template<typename Scalar,bool Conjugated>
 inline
-SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
+SplitQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
 {
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
@@ -199,11 +199,11 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
 }
 
 template<typename Scalar,bool Conjugated>
-inline SharedQuasi2dHMatrix<Scalar,Conjugated>&
-SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j )
+inline SplitQuasi2dHMatrix<Scalar,Conjugated>&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::Node::Child");
+    PushCallStack("SplitQuasi2dHMatrix::Node::Child");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
@@ -216,11 +216,11 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j )
 }
 
 template<typename Scalar,bool Conjugated>
-inline const SharedQuasi2dHMatrix<Scalar,Conjugated>&
-SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
+inline const SplitQuasi2dHMatrix<Scalar,Conjugated>&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::Node::Child");
+    PushCallStack("SplitQuasi2dHMatrix::Node::Child");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
@@ -234,7 +234,7 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
 
 template<typename Scalar,bool Conjugated>
 inline
-SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
+SplitQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
 ( int xSize, int ySize, int zSize )
 : children(10)
 {
@@ -251,7 +251,7 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
 
 template<typename Scalar,bool Conjugated>
 inline
-SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
+SplitQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
 {
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
@@ -259,11 +259,11 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::~NodeSymmetric()
 }
 
 template<typename Scalar,bool Conjugated>
-inline SharedQuasi2dHMatrix<Scalar,Conjugated>&
-SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
+inline SplitQuasi2dHMatrix<Scalar,Conjugated>&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::NodeSymmetric::Child");
+    PushCallStack("SplitQuasi2dHMatrix::NodeSymmetric::Child");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
@@ -278,12 +278,12 @@ SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j )
 }
 
 template<typename Scalar,bool Conjugated>
-inline const SharedQuasi2dHMatrix<Scalar,Conjugated>&
-SharedQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j ) 
+inline const SplitQuasi2dHMatrix<Scalar,Conjugated>&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j ) 
 const
 {
 #ifndef RELEASE
-    PushCallStack("SharedQuasi2dHMatrix::NodeSymmetric::Child");
+    PushCallStack("SplitQuasi2dHMatrix::NodeSymmetric::Child");
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( i > 3 || j > 3 )
@@ -299,23 +299,23 @@ const
 
 template<typename Scalar,bool Conjugated>
 inline
-SharedQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
+SplitQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
 : type(NODE), data() 
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
-SharedQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
+SplitQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 {
     switch( type )
     {
     case NODE:            delete data.node; break;
     case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
-    case SHARED_LOW_RANK: delete data.SF; break;
-    case SHARED_DENSE:    delete data.SD; break;
+    case SPLIT_LOW_RANK: delete data.SF; break;
+    case SPLIT_DENSE:    delete data.SD; break;
     }
 }
 
 } // namespace psp
 
-#endif // PSP_SHARED_QUASI2D_HMATRIX_HPP
+#endif // PSP_SPLIT_QUASI2D_HMATRIX_HPP

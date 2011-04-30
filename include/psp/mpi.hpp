@@ -26,6 +26,8 @@
 #include <sstream>
 #include <stdexcept>
 
+#include "mpi.h"
+
 // TODO: Separate implementation from interface.
 
 namespace psp {

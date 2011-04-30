@@ -25,7 +25,10 @@
 #include <complex>
 #include <iostream>
 #include <fstream>
+#include <sstream>
+#include <stdexcept>
 #include <utility>
+#include <vector>
 
 #include "psp/config.h"
 
@@ -92,24 +95,6 @@ void DumpCallStack();
 
 } // namespace psp
 
-#include "psp/blas.hpp"
-#include "psp/lapack.hpp"
-#include "psp/vector.hpp"
-#include "psp/dense_matrix.hpp"
-#include "psp/low_rank_matrix.hpp"
-#include "psp/sparse_matrix.hpp"
-#include "psp/abstract_hmatrix.hpp"
-#include "psp/hmatrix_tools.hpp"
-#include "psp/quasi2d_hmatrix.hpp"
-
-#include "psp/mpi.hpp"
-#include "psp/subcomms.hpp"
-#include "psp/shared_dense_matrix.hpp"
-#include "psp/shared_low_rank_matrix.hpp"
-#include "psp/shared_quasi2d_hmatrix.hpp"
-// #include "psp/dist_vector.hpp"
-#include "psp/dist_low_rank_matrix.hpp"
-#include "psp/dist_shared_low_rank_matrix.hpp"
-#include "psp/dist_quasi2d_hmatrix.hpp"
+#include "psp/classes/dist_quasi2d_hmatrix.hpp"
 
 #endif // PSP_HPP
