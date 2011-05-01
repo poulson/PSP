@@ -1224,6 +1224,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVector");
 #endif
+    yLocal.Resize( LocalHeight() );
     MapVector( alpha, xLocal, (Scalar)0, yLocal );
 #ifndef RELEASE
     PopCallStack();
@@ -1558,6 +1559,7 @@ const
             }
             else
             {
+                DSF.z.Resize( DSF.rank );
                 mpi::Recv
                 ( DSF.z.Buffer(),
                   DSF.rank, DSF.rootOfOtherTeam, 0, DSF.comm );
@@ -1580,7 +1582,10 @@ const
         if( SF.ownSourceSide )
             mpi::Send( SF.z.LockedBuffer(), SF.rank, SF.partner, 0, SF.comm );
         else
+        {
+            SF.z.Resize( SF.rank );
             mpi::Recv( SF.z.Buffer(), SF.rank, SF.partner, 0, SF.comm );
+        }
         break;
     }
     case SPLIT_DENSE:
@@ -1589,7 +1594,10 @@ const
         if( SD.ownSourceSide )
             mpi::Send( SD.z.LockedBuffer(), SD.height, SD.partner, 0, SD.comm );
         else
+        {
+            SD.z.Resize( SD.height );
             mpi::Recv( SD.z.Buffer(), SD.height, SD.partner, 0, SD.comm );
+        }
         break;
     }
     case QUASI2D:
@@ -1650,12 +1658,16 @@ const
     {
         const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
         if( !DSF.inSourceTeam )
+        {
+            DSF.z.Resize( DSF.rank );
             mpi::Broadcast( DSF.z.Buffer(), DSF.rank, 0, DSF.team );
+        }
         break;
     }
     case DIST_LOW_RANK:
     {
         const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        DF.z.Resize( DF.rank );
         mpi::Broadcast( DF.z.Buffer(), DF.rank, 0, DF.team );
         break;
     }
@@ -1743,7 +1755,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         {
             const int localTargetOffset = SH._localOffset;
             Vector<Scalar> yLocalPiece;
-            yLocalPiece.LockedView( yLocal, localTargetOffset, SH._height );
+            yLocalPiece.View( yLocal, localTargetOffset, SH._height );
             SH.MapVectorPostcompute( yLocal );
         }
         break;
@@ -1755,7 +1767,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         {
             const int localTargetOffset = SF.localOffset;
             Vector<Scalar> yLocalPiece;
-            yLocalPiece.LockedView( yLocal, localTargetOffset, SF.D.Height() );
+            yLocalPiece.View( yLocal, localTargetOffset, SF.D.Height() );
             hmatrix_tools::MatrixVector
             ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
         }

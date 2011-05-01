@@ -188,6 +188,20 @@ main( int argc, char* argv[] )
                 H.Print("H");
         }
 
+        // Store the result of our H-matrix applied to a vector of all ones
+        if( rank == 0 )
+        {
+            std::cout << "Multiplying by a vector of all ones...";
+            std::cout.flush();
+        }
+        double matvecStartTime = MPI_Wtime();
+        psp::Vector<Scalar> x( n );
+        Scalar* xBuffer = x.Buffer();
+        for( int i=0; i<n; ++i )
+            xBuffer[i] = (Scalar)1;
+        psp::Vector<Scalar> y;
+        H.MapVector( (Scalar)1, x, y );
+
         // Set up our subcommunicators and compute the packed sizes
         psp::Subcomms subcomms( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
@@ -262,14 +276,23 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
         }
 
+        // Form a local vector of all ones
+        psp::Vector<Scalar> xLocal( distH.LocalWidth() );
+        Scalar* xLocalBuffer = xLocal.Buffer();
+        for( int i=0; i<distH.LocalWidth(); ++i )
+            xLocalBuffer[i] = (Scalar)1;
+
+        // Apply the distributed H-matrix
+        psp::Vector<Scalar> yLocal;
+        distH.MapVector( (Scalar)1, xLocal, yLocal );
+
+        // Measure how close our result is to the serial one
         if( rank == 0 )
         {
-            std::cout << "Root's:\n"
-                      << "local height:    " << distH.LocalHeight() << "\n"
-                      << "local width:     " << distH.LocalWidth() << "\n"
-                      << "first local row: " << distH.FirstLocalRow() << "\n"
-                      << "first local col: " << distH.FirstLocalCol() 
-                      << std::endl;
+            x.Print("x");
+            y.Print("y");
+            xLocal.Print("xLocal");
+            yLocal.Print("yLocal");
         }
     }
     catch( std::exception& e )

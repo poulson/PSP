@@ -611,7 +611,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
         if( SF.ownSourceSide )
             mpi::Send( SF.z.LockedBuffer(), SF.rank, SF.partner, 0, SF.comm );
         else
+        {
+            SF.z.Resize( SF.rank );
             mpi::Recv( SF.z.Buffer(), SF.rank, SF.partner, 0, SF.comm );
+        }
         break;
     }
     case SPLIT_DENSE:
@@ -620,7 +623,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
         if( SD.ownSourceSide )
             mpi::Send( SD.z.LockedBuffer(), SD.height, SD.partner, 0, SD.comm );
         else
+        {
+            SD.z.Resize( SD.height );
             mpi::Recv( SD.z.Buffer(), SD.height, SD.partner, 0, SD.comm );
+        }
         break;
     }
     }
@@ -647,7 +653,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         for( int t=0; t<4; ++t )
         {
             Vector<Scalar> yLocalSub;
-            yLocalSub.LockedView( yLocal, targetOffset, node.targetSizes[t] );
+            yLocalSub.View( yLocal, targetOffset, node.targetSizes[t] );
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorPostcompute( yLocalSub );
             targetOffset += node.targetSizes[t];
@@ -663,7 +669,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     {
         const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
         if( !SF.ownSourceSide )
-            hmatrix_tools::MatrixVector( (Scalar)1, SF.D, SF.z, yLocal );
+        {
+            hmatrix_tools::MatrixVector
+            ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocal );
+        }
         break;
     }
     case SPLIT_DENSE:
