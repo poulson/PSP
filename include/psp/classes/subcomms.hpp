@@ -28,7 +28,7 @@ namespace psp {
 class Subcomms
 {
 private:
-    std::vector<MPI_Comm> _subComms;
+    std::vector<MPI_Comm> _subcomms;
 public:
     Subcomms( MPI_Comm comm );
     ~Subcomms();
@@ -56,7 +56,7 @@ Subcomms::Subcomms( MPI_Comm comm )
     if( !(p && !(p & (p-1))) )
         throw std::logic_error("Must use a power of two number of processes");
 
-    // Simple (yet slow) method for computing log2(p)
+    // Simple (yet slow) method for computing the number of subcommunicators
     unsigned numLevels = 1;
     unsigned teamSize = p;
     while( teamSize != 1 )
@@ -68,8 +68,8 @@ Subcomms::Subcomms( MPI_Comm comm )
         ++numLevels;
     }
 
-    _subComms.resize( numLevels );
-    mpi::CommDup( comm, _subComms[0] );
+    _subcomms.resize( numLevels );
+    mpi::CommDup( comm, _subcomms[0] );
     teamSize = p;
     for( unsigned i=1; i<numLevels; ++i )
     {
@@ -79,7 +79,7 @@ Subcomms::Subcomms( MPI_Comm comm )
             teamSize = 1;
         const int color = rank/teamSize;
         const int key = rank - color*teamSize;
-        mpi::CommSplit( comm, color, key, _subComms[i] );
+        mpi::CommSplit( comm, color, key, _subcomms[i] );
     }
 #ifndef RELEASE
     PopCallStack();
@@ -92,8 +92,8 @@ Subcomms::~Subcomms()
 #ifndef RELEASE
     PushCallStack("Subcomms::~Subcomms");
 #endif
-    for( unsigned i=0; i<_subComms.size(); ++i )
-        mpi::CommFree( _subComms[i] );
+    for( unsigned i=0; i<_subcomms.size(); ++i )
+        mpi::CommFree( _subcomms[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -102,7 +102,7 @@ Subcomms::~Subcomms()
 inline unsigned
 Subcomms::NumLevels() const
 {
-    return _subComms.size();
+    return _subcomms.size();
 }
 
 // Return the single-process communicator when querying for levels deeper than
@@ -110,7 +110,7 @@ Subcomms::NumLevels() const
 inline MPI_Comm
 Subcomms::Subcomm( unsigned level ) const
 {
-    return _subComms[std::min(level,(unsigned)_subComms.size()-1)];
+    return _subcomms[std::min(level,(unsigned)_subcomms.size()-1)];
 }
 
 } // namespace psp

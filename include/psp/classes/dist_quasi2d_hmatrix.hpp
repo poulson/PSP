@@ -152,8 +152,10 @@ private:
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
     void MapVectorSourceTeamSummations() const;
+    void MapVectorNaiveSourceTeamSummations() const;
     void MapVectorPassData() const;
     void MapVectorTargetTeamBroadcasts() const;
+    void MapVectorNaiveTargetTeamBroadcasts() const;
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
 
 public:

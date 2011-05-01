@@ -554,8 +554,8 @@ inline void Gather
 }
 
 inline void Reduce
-( const int* sendBuf, int* recvBuf, int count, int root, 
-  MPI_Op op, MPI_Comm comm )
+( const int* sendBuf, int* recvBuf, 
+  int count, int root, MPI_Op op, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");
@@ -571,8 +571,8 @@ inline void Reduce
 }
 
 inline void Reduce
-( const float* sendBuf, int* recvBuf, int count, int root, 
-  MPI_Op op, MPI_Comm comm )
+( const float* sendBuf, float* recvBuf, 
+  int count, int root, MPI_Op op, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");
@@ -588,8 +588,8 @@ inline void Reduce
 }
 
 inline void Reduce
-( const double* sendBuf, int* recvBuf, int count, int root, 
-  MPI_Op op, MPI_Comm comm )
+( const double* sendBuf, double* recvBuf, 
+  int count, int root, MPI_Op op, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");
@@ -605,8 +605,8 @@ inline void Reduce
 }
 
 inline void Reduce
-( const std::complex<float>* sendBuf, int* recvBuf, int count, 
-  int root, MPI_Op op, MPI_Comm comm )
+( const std::complex<float>* sendBuf, std::complex<float>* recvBuf, 
+  int count, int root, MPI_Op op, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");
@@ -622,8 +622,8 @@ inline void Reduce
 }
 
 inline void Reduce
-( const std::complex<double>* sendBuf, int* recvBuf, int count, 
-  int root, MPI_Op op, MPI_Comm comm )
+( const std::complex<double>* sendBuf, std::complex<double>* recvBuf, 
+  int count, int root, MPI_Op op, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");

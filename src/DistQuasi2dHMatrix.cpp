@@ -1121,13 +1121,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     MapVectorPrecompute( alpha, xLocal, yLocal );
 
     // Sum within source teams
-    MapVectorSourceTeamSummations();
+    //MapVectorSourceTeamSummations();
+    MapVectorNaiveSourceTeamSummations();
 
     // Pass data from source to target teams
     MapVectorPassData();
 
     // Locally broadcast data from roots
-    MapVectorTargetTeamBroadcasts();
+    //MapVectorTargetTeamBroadcasts();
+    MapVectorNaiveTargetTeamBroadcasts();
 
     // Add the submatrices' contributions onto yLocal
     MapVectorPostcompute( yLocal );
@@ -1289,6 +1291,95 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSourceTeamSummations()
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorNaiveSourceTeamSummations");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorNaiveSourceTeamSummations();
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        if( DSF.inSourceTeam )
+        {
+            MPI_Comm team = DSF.team;
+            int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                mpi::Reduce
+                ( (const Scalar*)MPI_IN_PLACE, DSF.z.Buffer(), 
+                  DSF.rank, 0, MPI_SUM, team );
+            }
+            else
+            {
+                mpi::Reduce( DSF.z.Buffer(), 0, DSF.rank, 0, MPI_SUM, team );
+            }
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        MPI_Comm team = DF.team;
+        int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
+        {
+            mpi::Reduce
+            ( (const Scalar*)MPI_IN_PLACE, DF.z.Buffer(), 
+              DF.rank, 0, MPI_SUM, team );
+        }
+        else
+        {
+            mpi::Reduce( DF.z.Buffer(), 0, DF.rank, 0, MPI_SUM, team );
+        }
+        break;
+    }
+    case SPLIT_QUASI2D:
+        // No summations required.
+        break;
+    case SPLIT_LOW_RANK:
+        // No summations required.
+        break;
+    case SPLIT_DENSE:
+        // No summations required.
+        break;
+    case QUASI2D:
+        // No summations required.
+        break;
+    case LOW_RANK:
+        // No summations required.
+        break;
+    case DENSE:
+        // No summations required.
+        break;
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
 {
 #ifndef RELEASE
@@ -1309,6 +1400,71 @@ const
     PushCallStack("DistQuasi2dHMatrix::MapVectorTargetTeamBroadcasts");
 #endif
     // TODO: Implement custom Broadcast routine for nested communicators
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveTargetTeamBroadcasts()
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorNaiveTargetTeamBroadcasts");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorNaiveTargetTeamBroadcasts();
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        if( !DSF.inSourceTeam )
+            mpi::Broadcast( DSF.z.Buffer(), DSF.rank, 0, DSF.team );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        mpi::Broadcast( DF.z.Buffer(), DF.rank, 0, DF.team );
+        break;
+    }
+    case SPLIT_QUASI2D:
+        // No summations required.
+        break;
+    case SPLIT_LOW_RANK:
+        // No summations required.
+        break;
+    case SPLIT_DENSE:
+        // No summations required.
+        break;
+    case QUASI2D:
+        // No summations required.
+        break;
+    case LOW_RANK:
+        // No summations required.
+        break;
+    case DENSE:
+        // No summations required.
+        break;
+    case EMPTY:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
