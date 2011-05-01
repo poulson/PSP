@@ -52,6 +52,9 @@ private:
     static void ComputeLocalDimensionRecursion
     ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
 
+    static void ComputeFirstLocalIndexRecursion
+    ( int& firstLocalIndex, int p, int rank, int xSize, int ySize, int zSize );
+
     static void ComputeLocalSizesRecursion
     ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );
 
@@ -174,6 +177,12 @@ public:
     static int ComputeLocalWidth
     ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
+    static int ComputeFirstLocalRow
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static int ComputeFirstLocalCol
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
     static void ComputeLocalSizes
     ( std::vector<int>& localSizes, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
@@ -187,6 +196,9 @@ public:
 
     int LocalHeight() const;
     int LocalWidth() const;
+
+    int FirstLocalRow() const;
+    int FirstLocalCol() const;
 
     // Unpack this process's portion of the DistQuasi2dHMatrix
     std::size_t Unpack

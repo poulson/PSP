@@ -125,6 +125,44 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalWidth
 }
 
 template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeFirstLocalRow
+( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::ComputeFirstLocalRow");
+    if( !(p && !(p & (p-1))) )
+        throw std::logic_error("Must use a power of two number of processes");
+#endif
+    int firstLocalRow = 0;
+    ComputeFirstLocalIndexRecursion
+    ( firstLocalRow, p, rank, H._xSizeTarget, H._ySizeTarget, H._zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return firstLocalRow;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeFirstLocalCol
+( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::ComputeFirstLocalCol");
+    if( !(p && !(p & (p-1))) )
+        throw std::logic_error("Must use a power of two number of processes");
+#endif
+    int firstLocalCol = 0;
+    ComputeFirstLocalIndexRecursion
+    ( firstLocalCol, p, rank, H._xSizeSource, H._ySizeSource, H._zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return firstLocalCol;
+}
+
+template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalSizes
 ( std::vector<int>& localSizes, const Quasi2dHMatrix<Scalar,Conjugated>& H )
@@ -940,6 +978,55 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalDimensionRecursion
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeFirstLocalIndexRecursion
+( int& firstLocalIndex, int p, int rank, int xSize, int ySize, int zSize )
+{
+    if( p >= 4 )
+    {
+        const int subteam = rank/(p/4);
+        const int subteamRank = rank-subteam*(p/4);
+        const bool onRight = (subteam & 1);
+        const bool onTop = (subteam/2);
+
+        const int xLeftSize = xSize/2;
+        const int xRightSize = xSize - xLeftSize;
+        const int yBottomSize = ySize/2;
+        const int yTopSize = ySize - yBottomSize;
+
+        // Add on this level of offsets
+        if( onRight && onTop )
+            firstLocalIndex += xSize*yBottomSize + xLeftSize*yTopSize;
+        else if( onTop )
+            firstLocalIndex += xSize*yBottomSize;
+        else if( onRight )
+            firstLocalIndex += xLeftSize*yBottomSize;
+
+        ComputeFirstLocalIndexRecursion
+        ( firstLocalIndex, p/4, subteamRank,
+          (onRight ? xRightSize : xLeftSize),
+          (onTop ? yTopSize : yBottomSize), zSize );
+    }
+    else if( p == 2 )
+    {
+        const int subteam = rank/(p/2);
+        const int subteamRank = rank-subteam*(p/2);
+
+        const int yBottomSize = ySize/2;
+        const int yTopSize = ySize - yBottomSize;
+
+        // Add on this level of offsets
+        if( subteam )
+            firstLocalIndex += xSize*yBottomSize;
+
+        ComputeFirstLocalIndexRecursion
+        ( firstLocalIndex, p/2, subteamRank,
+          xSize, 
+          (subteam ? yTopSize : yBottomSize), zSize );
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalSizesRecursion
 ( int* localSizes, int teamSize, int xSize, int ySize, int zSize ) 
 {
@@ -1065,6 +1152,44 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LocalWidth() const
     PopCallStack();
 #endif
     return localWidth;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FirstLocalRow() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::FirstLocalRow");
+#endif
+    int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
+    int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+
+    int firstLocalRow = 0;
+    ComputeFirstLocalIndexRecursion
+    ( firstLocalRow, teamSize, teamRank, _xSizeTarget, _ySizeTarget, _zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return firstLocalRow;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FirstLocalCol() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::FirstLocalCol");
+#endif
+    int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
+    int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+
+    int firstLocalCol = 0;
+    ComputeFirstLocalIndexRecursion
+    ( firstLocalCol, teamSize, teamRank, _xSizeSource, _ySizeSource, _zSize );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return firstLocalCol;
 }
 
 template<typename Scalar,bool Conjugated>

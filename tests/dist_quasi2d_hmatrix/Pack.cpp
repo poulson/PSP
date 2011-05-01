@@ -261,6 +261,16 @@ main( int argc, char* argv[] )
             std::cout << "done: " << unpackStopTime-unpackStartTime
                       << " seconds." << std::endl;
         }
+
+        if( rank == 0 )
+        {
+            std::cout << "Root's:\n"
+                      << "local height:    " << distH.LocalHeight() << "\n"
+                      << "local width:     " << distH.LocalWidth() << "\n"
+                      << "first local row: " << distH.FirstLocalRow() << "\n"
+                      << "first local col: " << distH.FirstLocalCol() 
+                      << std::endl;
+        }
     }
     catch( std::exception& e )
     {
