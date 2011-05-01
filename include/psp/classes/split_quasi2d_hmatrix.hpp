@@ -109,6 +109,7 @@ private:
 
     bool _ownSourceSide;
     int _localOffset;
+    MPI_Comm _comm;
     int _partner;
 
     // Temporary storage for a matrix-vector product
@@ -121,9 +122,8 @@ private:
 
     void MapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
-
-    void MapVectorPostcompute
-    ( Vector<Scalar>& yLocal ) const;
+    void MapVectorNaivePassData() const;
+    void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
 
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
@@ -142,14 +142,14 @@ public:
       int sourceRank, int targetRank,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    SplitQuasi2dHMatrix();
+    SplitQuasi2dHMatrix( MPI_Comm comm );
 
     SplitQuasi2dHMatrix
-    ( const byte* packedHalf );
+    ( const byte* packedHalf, MPI_Comm comm );
 
     ~SplitQuasi2dHMatrix();
 
-    std::size_t Unpack( const byte* packedHalf );
+    std::size_t Unpack( const byte* packedHalf, MPI_Comm comm );
 };
 
 } // namespace psp

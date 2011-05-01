@@ -154,6 +154,7 @@ private:
     void MapVectorSourceTeamSummations() const;
     void MapVectorNaiveSourceTeamSummations() const;
     void MapVectorPassData() const;
+    void MapVectorNaivePassData() const;
     void MapVectorTargetTeamBroadcasts() const;
     void MapVectorNaiveTargetTeamBroadcasts() const;
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;

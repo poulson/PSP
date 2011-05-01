@@ -1125,7 +1125,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     MapVectorNaiveSourceTeamSummations();
 
     // Pass data from source to target teams
-    MapVectorPassData();
+    //MapVectorPassData();
+    MapVectorNaivePassData();
 
     // Locally broadcast data from roots
     //MapVectorTargetTeamBroadcasts();
@@ -1330,7 +1331,8 @@ const
             }
             else
             {
-                mpi::Reduce( DSF.z.Buffer(), 0, DSF.rank, 0, MPI_SUM, team );
+                mpi::Reduce
+                ( DSF.z.LockedBuffer(), 0, DSF.rank, 0, MPI_SUM, team );
             }
         }
         break;
@@ -1348,7 +1350,7 @@ const
         }
         else
         {
-            mpi::Reduce( DF.z.Buffer(), 0, DF.rank, 0, MPI_SUM, team );
+            mpi::Reduce( DF.z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
         }
         break;
     }
@@ -1386,6 +1388,94 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
     PushCallStack("DistQuasi2dHMatrix::MapVectorPassData");
 #endif
     // TODO: Implement AllToAll redistribution
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData()
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorNaivePassData");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorNaivePassData();
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        const int teamRank = mpi::CommRank( DSF.team );
+        if( teamRank == 0 )
+        {
+            if( DSF.inSourceTeam )
+            {
+                mpi::Send
+                ( DSF.z.LockedBuffer(), 
+                  DSF.rank, DSF.rootOfOtherTeam, 0, DSF.comm );
+            }
+            else
+            {
+                mpi::Recv
+                ( DSF.z.Buffer(),
+                  DSF.rank, DSF.rootOfOtherTeam, 0, DSF.comm );
+            }
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+        // No data needs to be passed; both sides are owned by the same team
+        break;
+    case SPLIT_QUASI2D:
+    {
+        const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+        SH.MapVectorNaivePassData();
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+        if( SF.ownSourceSide )
+            mpi::Send( SF.z.LockedBuffer(), SF.rank, SF.partner, 0, SF.comm );
+        else
+            mpi::Recv( SF.z.Buffer(), SF.rank, SF.partner, 0, SF.comm );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
+        if( SD.ownSourceSide )
+            mpi::Send( SD.z.LockedBuffer(), SD.height, SD.partner, 0, SD.comm );
+        else
+            mpi::Recv( SD.z.Buffer(), SD.height, SD.partner, 0, SD.comm );
+        break;
+    }
+    case QUASI2D:
+        break;
+    case LOW_RANK:
+        break;
+    case DENSE:
+        break;
+    case EMPTY:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1536,7 +1626,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     case SPLIT_LOW_RANK:
     {
         const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
-
         if( !SF.ownSourceSide )
         {
             const int localTargetOffset = SF.localOffset;
@@ -1548,9 +1637,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         break;
     }
     case SPLIT_DENSE:
-        // The update should have been performed during the communication stage
-        // since it did not require any more work than an axpy.
+    {
+        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
+        if( !SD.ownSourceSide )
+        {
+            const int localHeight = SD.height;
+            const Scalar* zBuffer = SD.z.LockedBuffer();
+            Scalar* yLocalBuffer = yLocal.Buffer();
+            for( int i=0; i<localHeight; ++i )
+                yLocalBuffer[i] += zBuffer[i];
+        }
         break;
+    }
     case QUASI2D:
         // The update should have been performed at the precompute stage.
         break;
@@ -1850,10 +1948,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
         typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
-        shell.data.SH = new SplitQuasi2d;
+        shell.data.SH = new SplitQuasi2d( comm );
         SplitQuasi2d& SH = *shell.data.SH;
 
-        std::size_t packedSize = SH.Unpack( head );
+        std::size_t packedSize = SH.Unpack( head, comm );
         head += packedSize;
         if( SH._ownSourceSide )
             SH._localOffset = localSourceOffset;
@@ -1868,6 +1966,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
         SF.height = m;
         SF.width = n;
+        SF.comm = comm;
 
         SF.rank          = *((int*)head);  head += sizeof(int);
         SF.ownSourceSide = *((bool*)head); head += sizeof(bool);
@@ -1903,6 +2002,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
         SD.height = m;
         SD.width = n;
+        SD.comm = comm;
 
         SD.ownSourceSide = *((bool*)head); head += sizeof(bool);
         SD.partner       = *((int*)head);  head += sizeof(int);

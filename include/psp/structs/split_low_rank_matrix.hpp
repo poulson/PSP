@@ -36,6 +36,7 @@ struct SplitLowRankMatrix
     int height, width, rank;
     bool ownSourceSide;
     int localOffset;
+    MPI_Comm comm;
     int partner;
 
     DenseMatrix<Scalar> D;

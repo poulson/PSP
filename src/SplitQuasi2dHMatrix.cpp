@@ -317,24 +317,25 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 
 // Create an empty split H-matrix
 template<typename Scalar,bool Conjugated>
-psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::SplitQuasi2dHMatrix()
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::SplitQuasi2dHMatrix
+( MPI_Comm comm )
 : _height(0), _width(0), _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), 
   _symmetric(false), _stronglyAdmissible(false),
   _xSizeSource(0), _xSizeTarget(0), _ySizeSource(0), _ySizeTarget(0),
   _zSize(0), _xSource(0), _xTarget(0), _ySource(0), _yTarget(0),
-  _ownSourceSide(false), _partner(0)
+  _ownSourceSide(false), _comm(comm), _partner(0)
 { }
 
 // Create an H-matrix from packed data
 template<typename Scalar,bool Conjugated>
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::SplitQuasi2dHMatrix
-( const byte* packedHalf )
+( const byte* packedHalf, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::SplitQuasi2dHMatrix");
 #endif
-    Unpack( packedHalf );
+    Unpack( packedHalf, comm );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -347,11 +348,13 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::~SplitQuasi2dHMatrix()
 template<typename Scalar,bool Conjugated>
 std::size_t
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::Unpack
-( const byte* packedHalf )
+( const byte* packedHalf, MPI_Comm comm )
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::Unpack");
 #endif
+    _comm = comm;
+
     const byte* head = packedHalf;
     UnpackRecursion( head, *this );
 #ifndef RELEASE
@@ -369,6 +372,8 @@ void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head, SplitQuasi2dHMatrix<Scalar,Conjugated>& H )
 {
+    MPI_Comm comm = H._comm;
+
     H._height             = *((int*)head);  head += sizeof(int);
     H._width              = *((int*)head);  head += sizeof(int);
     H._numLevels          = *((int*)head);  head += sizeof(int);
@@ -412,7 +417,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         Node& node = *shell.data.node;
         for( int i=0; i<16; ++i )
         {
-            node.children[i] = new SplitQuasi2dHMatrix<Scalar,Conjugated>;
+            node.children[i] = 
+                new SplitQuasi2dHMatrix<Scalar,Conjugated>( comm );
             UnpackRecursion( head, *node.children[i] );
         }
         break;
@@ -424,7 +430,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         NodeSymmetric& node = *shell.data.nodeSymmetric;
         for( int i=0; i<10; ++i )
         {
-            node.children[i] = new SplitQuasi2dHMatrix<Scalar,Conjugated>;
+            node.children[i] = 
+                new SplitQuasi2dHMatrix<Scalar,Conjugated>( comm );
             UnpackRecursion( head, *node.children[i] );
         }
         break;
@@ -440,6 +447,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         SF.height        = m;
         SF.width         = n;
         SF.rank          = r;
+        SF.comm          = comm;
         SF.ownSourceSide = H._ownSourceSide;
         SF.partner       = H._partner;
 
@@ -472,9 +480,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
         const int m = H._height;
         const int n = H._width;
-        SD.height       = m;
-        SD.width        = n;
-        SD.partner      = H._partner;
+        SD.height        = m;
+        SD.width         = n;
+        SD.comm          = comm;
+        SD.partner       = H._partner;
         SD.ownSourceSide = H._ownSourceSide;
 
         if( SD.ownSourceSide )
@@ -575,6 +584,53 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapVectorNaivePassData");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorNaivePassData();
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
+        if( SF.ownSourceSide )
+            mpi::Send( SF.z.LockedBuffer(), SF.rank, SF.partner, 0, SF.comm );
+        else
+            mpi::Recv( SF.z.Buffer(), SF.rank, SF.partner, 0, SF.comm );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
+        if( SD.ownSourceSide )
+            mpi::Send( SD.z.LockedBuffer(), SD.height, SD.partner, 0, SD.comm );
+        else
+            mpi::Recv( SD.z.Buffer(), SD.height, SD.partner, 0, SD.comm );
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 ( Vector<Scalar>& yLocal ) const
 {
@@ -611,9 +667,18 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         break;
     }
     case SPLIT_DENSE:
-        // Update should have taken place during communication step since it
-        // is simply an axpy.
+    {
+        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
+        if( !SD.ownSourceSide )
+        {
+            const int localHeight = SD.height;
+            const Scalar* zBuffer = SD.z.LockedBuffer();
+            Scalar* yLocalBuffer = yLocal.Buffer();
+            for( int i=0; i<localHeight; ++i )
+                yLocalBuffer[i] += zBuffer[i];
+        }
         break;
+    }
     }
 #ifndef RELEASE
     PopCallStack();
