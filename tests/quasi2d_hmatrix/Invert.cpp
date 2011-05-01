@@ -249,7 +249,7 @@ main( int argc, char* argv[] )
             std::cout << "Filling sparse matrix...";
             std::cout.flush();
         }
-        double fillStartTime = MPI_Wtime();
+        double fillStartTime = psp::mpi::WallTime();
         std::vector<Scalar> row;
         std::vector<int> colIndices;
         for( int i=0; i<m; ++i )
@@ -271,7 +271,7 @@ main( int argc, char* argv[] )
             }
         }
         S.rowOffsets.push_back( S.nonzeros.size() );
-        double fillStopTime = MPI_Wtime();
+        double fillStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
@@ -286,9 +286,9 @@ main( int argc, char* argv[] )
             std::cout << "Constructing H-matrix...";
             std::cout.flush();
         }
-        double constructStartTime = MPI_Wtime();
+        double constructStartTime = psp::mpi::WallTime();
         Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
-        double constructStopTime = MPI_Wtime();
+        double constructStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << constructStopTime-constructStartTime 
@@ -311,9 +311,9 @@ main( int argc, char* argv[] )
             std::cout.flush();
         }
         psp::Vector<Scalar> y;
-        double matVecStartTime = MPI_Wtime();
+        double matVecStartTime = psp::mpi::WallTime();
         H.MapVector( 1.0, x, y );
-        double matVecStopTime = MPI_Wtime();
+        double matVecStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << matVecStopTime-matVecStartTime 
@@ -330,10 +330,10 @@ main( int argc, char* argv[] )
                 std::cout << "Making a copy of the H-matrix for inversion...";
                 std::cout.flush();
             }
-            double copyStartTime = MPI_Wtime();
+            double copyStartTime = psp::mpi::WallTime();
             Quasi2d invH;
             invH.CopyFrom( H );
-            double copyStopTime = MPI_Wtime();
+            double copyStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {
                 std::cout << "done: " << copyStopTime-copyStartTime 
@@ -346,9 +346,9 @@ main( int argc, char* argv[] )
                 std::cout << "Directly inverting the H-matrix...";
                 std::cout.flush();
             }
-            double invertStartTime = MPI_Wtime();
+            double invertStartTime = psp::mpi::WallTime();
             invH.DirectInvert();
-            double invertStopTime = MPI_Wtime();
+            double invertStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {
                 std::cout << "done: " << invertStopTime-invertStartTime 
@@ -363,10 +363,10 @@ main( int argc, char* argv[] )
                 std::cout << "Multiplying the direct inverse by a vector...";
                 std::cout.flush();
             }
-            matVecStartTime = MPI_Wtime();
+            matVecStartTime = psp::mpi::WallTime();
             psp::Vector<Scalar> z;
             invH.MapVector( 1.0, y, z );
-            matVecStopTime = MPI_Wtime();
+            matVecStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {
                 std::cout << "done: " << matVecStopTime-matVecStartTime 
@@ -389,10 +389,10 @@ main( int argc, char* argv[] )
                 std::cout << "Making a copy for Schulz inversion...";
                 std::cout.flush();
             }
-            double copyStartTime = MPI_Wtime();
+            double copyStartTime = psp::mpi::WallTime();
             Quasi2d invH;
             invH.CopyFrom( H );
-            double copyStopTime = MPI_Wtime();
+            double copyStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {
                 std::cout << "done: " << copyStopTime-copyStartTime 
@@ -405,9 +405,9 @@ main( int argc, char* argv[] )
                 std::cout << "Schulz inverting the H-matrix...";
                 std::cout.flush();
             }
-            double invertStartTime = MPI_Wtime();
+            double invertStartTime = psp::mpi::WallTime();
             invH.SchulzInvert( maxIts );
-            double invertStopTime = MPI_Wtime();
+            double invertStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {
                 std::cout << "done: " << invertStopTime-invertStartTime 
@@ -422,10 +422,10 @@ main( int argc, char* argv[] )
                 std::cout << "Multiplying the direct inverse by a vector...";
                 std::cout.flush();
             }
-            matVecStartTime = MPI_Wtime();
+            matVecStartTime = psp::mpi::WallTime();
             psp::Vector<Scalar> z;
             invH.MapVector( 1.0, y, z );
-            matVecStopTime = MPI_Wtime();
+            matVecStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {
                 std::cout << "done: " << matVecStopTime-matVecStartTime 

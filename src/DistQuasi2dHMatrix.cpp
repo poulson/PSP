@@ -1080,7 +1080,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _sourceOffset(0), _targetOffset(0), _symmetric(false), 
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0)
+  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0),
+  _inTargetTeam(true), _inSourceTeam(true), 
+  _localSourceOffset(0), _localTargetOffset(0)
 { 
     _shell.type = EMPTY;
 }
@@ -1088,13 +1090,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 ( const Subcomms& subcomms, unsigned level, 
-  bool inSourceTeam, bool inTargetTeam )
+  bool inSourceTeam, bool inTargetTeam,
+  int localSourceOffset, int localTargetOffset )
 : _height(0), _width(0), _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), _symmetric(false), 
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(level),
-  _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam)
+  _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
+  _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset)
 { 
     _shell.type = EMPTY;
 }
@@ -1204,6 +1208,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
     _level = 0;
     _inSourceTeam = true;
     _inTargetTeam = true;
+    _localSourceOffset = 0;
+    _localTargetOffset = 0;
 
     const byte* head = packedDistHMatrix;
     UnpackRecursion( head, *this );
@@ -1330,7 +1336,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         if( SH._ownSourceSide )
         {
             Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, SH._localOffset, SH._width );
+            xLocalPiece.LockedView( xLocal, _localSourceOffset, SH._width );
             SH.MapVectorPrecompute( alpha, xLocalPiece );
         }
         break;
@@ -1342,7 +1348,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         if( SF.ownSourceSide )
         {
             Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, SF.localOffset, SF.D.Height() );
+            xLocalPiece.LockedView( xLocal, _localSourceOffset, SF.D.Height() );
             if( Conjugated )
             {
                 hmatrix_tools::MatrixHermitianTransposeVector
@@ -1362,7 +1368,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         if( SD.ownSourceSide )
         {
             Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, SD.localOffset, SD.width );
+            xLocalPiece.LockedView( xLocal, _localSourceOffset, SD.width );
             hmatrix_tools::MatrixVector( alpha, SD.D, xLocalPiece, SD.z );
         }
         break;
@@ -1372,7 +1378,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
-        H.MapVector( alpha, xLocal, (Scalar)1, yLocal );
+        Vector<Scalar> xLocalPiece, yLocalPiece;
+        xLocalPiece.LockedView( xLocal, _localSourceOffset, H.Width() );
+        yLocalPiece.View( yLocal, _localTargetOffset, H.Height() );
+        H.MapVector( alpha, xLocalPiece, (Scalar)1, yLocalPiece );
         break;
     }
     case LOW_RANK:
@@ -1383,7 +1392,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         // NOTE: I'm not sure this case will ever happen. It would require a
         //       diagonal block to be low-rank.
         const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
-        hmatrix_tools::MatrixVector( alpha, F, xLocal, (Scalar)1, yLocal );
+        Vector<Scalar> xLocalPiece, yLocalPiece;
+        xLocalPiece.LockedView( xLocal, _localSourceOffset, F.Width() );
+        yLocalPiece.View( yLocal, _localTargetOffset, F.Height() );
+        hmatrix_tools::MatrixVector
+        ( alpha, F, xLocalPiece, (Scalar)1, yLocalPiece );
         break;
     }
     case DENSE:
@@ -1391,7 +1404,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
-        hmatrix_tools::MatrixVector( alpha, D, xLocal, (Scalar)1, yLocal );
+        Vector<Scalar> xLocalPiece, yLocalPiece;
+        xLocalPiece.LockedView( xLocal, _localSourceOffset, D.Width() );
+        yLocalPiece.View( yLocal, _localTargetOffset, D.Height() );
+        hmatrix_tools::MatrixVector
+        ( alpha, D, xLocalPiece, (Scalar)1, yLocalPiece );
         break;
     }
     case EMPTY:
@@ -1753,10 +1770,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
         if( !SH._ownSourceSide )
         {
-            const int localTargetOffset = SH._localOffset;
             Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, localTargetOffset, SH._height );
-            SH.MapVectorPostcompute( yLocal );
+            yLocalPiece.View( yLocal, _localTargetOffset, SH._height );
+            SH.MapVectorPostcompute( yLocalPiece );
         }
         break;
     }
@@ -1765,9 +1781,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
         if( !SF.ownSourceSide )
         {
-            const int localTargetOffset = SF.localOffset;
             Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, localTargetOffset, SF.D.Height() );
+            yLocalPiece.View( yLocal, _localTargetOffset, SF.D.Height() );
             hmatrix_tools::MatrixVector
             ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
         }
@@ -1780,7 +1795,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         {
             const int localHeight = SD.height;
             const Scalar* zBuffer = SD.z.LockedBuffer();
-            Scalar* yLocalBuffer = yLocal.Buffer();
+            Scalar* yLocalBuffer = yLocal.Buffer(_localTargetOffset);
             for( int i=0; i<localHeight; ++i )
                 yLocalBuffer[i] += zBuffer[i];
         }
@@ -1811,8 +1826,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
-( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
-  int localSourceOffset, int localTargetOffset )
+( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H )
 {
     MPI_Comm comm = H._subcomms->Subcomm( 0 );
     MPI_Comm team = H._subcomms->Subcomm( H._level );
@@ -1952,10 +1966,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
                         ( *H._subcomms, H._level+1,
-                          inLeftSourceTeam, inTopTargetTeam );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      node.sourceSizes[0]*s, node.targetSizes[0]*t );
+                          inLeftSourceTeam, inTopTargetTeam,
+                          node.sourceSizes[0]*s, node.targetSizes[0]*t );
+                    UnpackRecursion( head, node.Child(t,s) );
                 }
             }
             // Top-right block
@@ -1966,10 +1979,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
                         ( *H._subcomms, H._level+1,
-                          inRightSourceTeam, inTopTargetTeam );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      node.sourceSizes[2]*(s-2), node.targetSizes[0]*t );
+                          inRightSourceTeam, inTopTargetTeam,
+                          node.sourceSizes[2]*(s-2), node.targetSizes[0]*t );
+                    UnpackRecursion( head, node.Child(t,s) );
                 }
             }
             // Bottom-left block
@@ -1980,10 +1992,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     node.children[s+4*t] =
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
                         ( *H._subcomms, H._level+1,
-                          inLeftSourceTeam, inBottomTargetTeam );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      node.sourceSizes[0]*s, node.targetSizes[2]*(t-2) );
+                          inLeftSourceTeam, inBottomTargetTeam,
+                          node.sourceSizes[0]*s, node.targetSizes[2]*(t-2) );
+                    UnpackRecursion( head, node.Child(t,s) );
                 }
             }
             // Bottom-right block
@@ -1994,10 +2005,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
                         ( *H._subcomms, H._level+1,
-                          inRightSourceTeam, inBottomTargetTeam );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      node.sourceSizes[2]*(s-2), node.targetSizes[2]*(t-2) );
+                          inRightSourceTeam, inBottomTargetTeam,
+                          node.sourceSizes[2]*(s-2), 
+                          node.targetSizes[2]*(t-2) );
+                    UnpackRecursion( head, node.Child(t,s) );
                 }
             }
         }
@@ -2090,10 +2101,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
         std::size_t packedSize = SH.Unpack( head, comm );
         head += packedSize;
-        if( SH._ownSourceSide )
-            SH._localOffset = localSourceOffset;
-        else
-            SH._localOffset = localTargetOffset;
         break;
     }
     case SPLIT_LOW_RANK:
@@ -2118,7 +2125,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 std::memcpy( SF.D.Buffer(0,j), head, n*sizeof(Scalar) ); 
                 head += n*sizeof(Scalar);
             }
-            SF.localOffset = localSourceOffset;
         }
         else
         {
@@ -2128,7 +2134,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 std::memcpy( SF.D.Buffer(0,j), head, m*sizeof(Scalar) );
                 head += m*sizeof(Scalar);
             }
-            SF.localOffset = localTargetOffset;
         }
         break;
     }
@@ -2167,11 +2172,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     head += (m-j)*sizeof(Scalar);
                 }
             }
-            SD.localOffset = localSourceOffset;
-        }
-        else
-        {
-            SD.localOffset = localTargetOffset;
         }
         break;
     }

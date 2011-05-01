@@ -143,7 +143,7 @@ main( int argc, char* argv[] )
             std::cout << "Filling sparse matrix...";
             std::cout.flush();
         }
-        double fillStartTime = MPI_Wtime();
+        double fillStartTime = psp::mpi::WallTime();
         std::vector<Scalar> row;
         std::vector<int> colIndices;
         for( int i=0; i<m; ++i )
@@ -164,7 +164,7 @@ main( int argc, char* argv[] )
             }
         }
         S.rowOffsets.push_back( S.nonzeros.size() );
-        double fillStopTime = MPI_Wtime();
+        double fillStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
@@ -177,9 +177,9 @@ main( int argc, char* argv[] )
             std::cout << "Constructing H-matrix...";
             std::cout.flush();
         }
-        double constructStartTime = MPI_Wtime();
+        double constructStartTime = psp::mpi::WallTime();
         Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
-        double constructStopTime = MPI_Wtime();
+        double constructStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << constructStopTime-constructStartTime 
@@ -191,16 +191,22 @@ main( int argc, char* argv[] )
         // Store the result of our H-matrix applied to a vector of all ones
         if( rank == 0 )
         {
-            std::cout << "Multiplying by a vector of all ones...";
+            std::cout << "Multiplying by a vector of all ones for reference...";
             std::cout.flush();
         }
-        double matvecStartTime = MPI_Wtime();
+        double matvecStartTime = psp::mpi::WallTime();
         psp::Vector<Scalar> x( n );
         Scalar* xBuffer = x.Buffer();
         for( int i=0; i<n; ++i )
             xBuffer[i] = (Scalar)1;
         psp::Vector<Scalar> y;
         H.MapVector( (Scalar)1, x, y );
+        double matvecStopTime = psp::mpi::WallTime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " << matvecStopTime-matvecStartTime 
+                      << " seconds." << std::endl;
+        }
 
         // Set up our subcommunicators and compute the packed sizes
         psp::Subcomms subcomms( MPI_COMM_WORLD );
@@ -215,13 +221,13 @@ main( int argc, char* argv[] )
             std::cout << "Packing H-matrix for distribution...";
             std::cout.flush();
         }
-        double packStartTime = MPI_Wtime();
+        double packStartTime = psp::mpi::WallTime();
         std::vector<psp::byte> sendBuffer( p*myMaxSize );
         std::vector<psp::byte*> packedPieces( p );
         for( int i=0; i<p; ++i )
             packedPieces[i] = &sendBuffer[i*myMaxSize];
         DistQuasi2d::Pack( packedPieces, H, subcomms );
-        double packStopTime = MPI_Wtime();
+        double packStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << packStopTime-packStartTime << " seconds."
@@ -248,13 +254,13 @@ main( int argc, char* argv[] )
             std::cout << "AllToAll redistribution...";
             std::cout.flush();
         }
-        double allToAllStartTime = MPI_Wtime();
+        double allToAllStartTime = psp::mpi::WallTime();
         std::vector<psp::byte> recvBuffer( p*intMaxSize );
         psp::mpi::AllToAll
         ( &sendBuffer[0], myIntMaxSize, &recvBuffer[0], intMaxSize,
           MPI_COMM_WORLD );
-        double allToAllStopTime = MPI_Wtime();
-        MPI_Barrier( MPI_COMM_WORLD );
+        double allToAllStopTime = psp::mpi::WallTime();
+        psp::mpi::Barrier( MPI_COMM_WORLD );
         if( rank == 0 )
         {
             std::cout << "done: " << allToAllStopTime-allToAllStartTime
@@ -267,9 +273,9 @@ main( int argc, char* argv[] )
             std::cout << "Unpacking...";
             std::cout.flush();
         }
-        double unpackStartTime = MPI_Wtime();
+        double unpackStartTime = psp::mpi::WallTime();
         DistQuasi2d distH( &recvBuffer[0], subcomms );
-        double unpackStopTime = MPI_Wtime();
+        double unpackStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << unpackStopTime-unpackStartTime
@@ -283,17 +289,43 @@ main( int argc, char* argv[] )
             xLocalBuffer[i] = (Scalar)1;
 
         // Apply the distributed H-matrix
+        if( rank == 0 )
+        {
+            std::cout << "Distributed matvec...";
+            std::cout.flush();
+        }
+        double distMatvecStartTime = psp::mpi::WallTime();
         psp::Vector<Scalar> yLocal;
         distH.MapVector( (Scalar)1, xLocal, yLocal );
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        double distMatvecStopTime = psp::mpi::WallTime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " << distMatvecStopTime-distMatvecStartTime
+                      << " seconds." << std::endl;
+        }
 
         // Measure how close our result is to the serial one
         if( rank == 0 )
         {
-            x.Print("x");
-            y.Print("y");
-            xLocal.Print("xLocal");
-            yLocal.Print("yLocal");
+            std::cout << "Comparing serial and distributed results...";
+            std::cout.flush();
         }
+        psp::Vector<Scalar> yLocalTruth;
+        yLocalTruth.View( y, distH.FirstLocalRow(), distH.LocalHeight() );
+        for( int i=0; i<yLocal.Height(); ++i )
+        {
+            if( std::abs(yLocalTruth.Get(i)-yLocal.Get(i)) > 1e-8 )
+            {
+                std::ostringstream ss;
+                ss << "Answer differed at local index " << i << ", truth was "
+                   << yLocalTruth.Get(i) << ", computed was "
+                   << yLocal.Get(i) << std::endl;
+            }
+        }
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        if( rank == 0 )
+            std::cout << "done" << std::endl;
     }
     catch( std::exception& e )
     {

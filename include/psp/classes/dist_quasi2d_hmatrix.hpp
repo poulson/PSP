@@ -142,10 +142,11 @@ private:
     unsigned _level;
     bool _inSourceTeam;
     bool _inTargetTeam;
+    int _localSourceOffset;
+    int _localTargetOffset;
 
     void UnpackRecursion
-    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
-      int localSourceOffset=0, int localTargetOffset=0 );
+    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H );
 
     // Ensure that the default constructor is not accessible, a communicator
     // must be supplied
@@ -190,7 +191,8 @@ public:
     DistQuasi2dHMatrix( const Subcomms& subcomms );
     DistQuasi2dHMatrix
     ( const Subcomms& subcomms, unsigned level, 
-      bool inSourceTeam, bool inTargetTeam );
+      bool inSourceTeam, bool inTargetTeam, 
+      int localSourceOffset=0, int localTargetOffset=0 );
     DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
     ~DistQuasi2dHMatrix();
 

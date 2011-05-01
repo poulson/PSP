@@ -911,6 +911,11 @@ inline void ReduceScatter
 #endif
 }
 
+inline double WallTime()
+{ 
+    return MPI_Wtime();
+}
+
 } // namespace mpi
 } // namespace psp
 

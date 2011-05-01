@@ -532,16 +532,12 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         const Node& node = *shell.data.node;
         for( int t=0; t<4; ++t )
         {
-            int sourceOffset = 0;
-            for( int s=0; s<4; ++s )
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
                 Vector<Scalar> xLocalSub;
-                xLocalSub.LockedView
-                ( xLocal, sourceOffset, node.sourceSizes[s] );
+                xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
 
                 node.Child(t,s).MapVectorPrecompute( alpha, xLocalSub );
-
-                sourceOffset += node.sourceSizes[s];
             }
         }
         break;
@@ -649,14 +645,12 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     case NODE:
     {
         const Node& node = *shell.data.node;
-        int targetOffset = 0;
-        for( int t=0; t<4; ++t )
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
             Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, targetOffset, node.targetSizes[t] );
+            yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorPostcompute( yLocalSub );
-            targetOffset += node.targetSizes[t];
         }
         break;
     }

@@ -139,7 +139,7 @@ main( int argc, char* argv[] )
             std::cout << "Filling sparse matrix...";
             std::cout.flush();
         }
-        double fillStartTime = MPI_Wtime();
+        double fillStartTime = psp::mpi::WallTime();
         std::vector<Scalar> row;
         std::vector<int> colIndices;
         for( int i=0; i<m; ++i )
@@ -160,7 +160,7 @@ main( int argc, char* argv[] )
             }
         }
         S.rowOffsets.push_back( S.nonzeros.size() );
-        double fillStopTime = MPI_Wtime();
+        double fillStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
@@ -175,9 +175,9 @@ main( int argc, char* argv[] )
             std::cout << "Constructing H-matrix...";
             std::cout.flush();
         }
-        double constructStartTime = MPI_Wtime();
+        double constructStartTime = psp::mpi::WallTime();
         Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
-        double constructStopTime = MPI_Wtime();
+        double constructStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << constructStopTime-constructStartTime 
@@ -198,9 +198,9 @@ main( int argc, char* argv[] )
             std::cout.flush();
         }
         psp::Vector<Scalar> y;
-        double matVecStartTime = MPI_Wtime();
+        double matVecStartTime = psp::mpi::WallTime();
         H.MapVector( 1.0, x, y );
-        double matVecStopTime = MPI_Wtime();
+        double matVecStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << matVecStopTime-matVecStartTime 
@@ -216,9 +216,9 @@ main( int argc, char* argv[] )
             std::cout << "Packing H-matrix...";
             std::cout.flush();
         }
-        double packStartTime = MPI_Wtime();
+        double packStartTime = psp::mpi::WallTime();
         H.Pack( packedHMatrix );
-        double packStopTime = MPI_Wtime();
+        double packStopTime = psp::mpi::WallTime();
         double sizeInMB = ((double)packedHMatrix.size())/(1024.*1024.);
         if( rank == 0 )
         {
@@ -232,9 +232,9 @@ main( int argc, char* argv[] )
             std::cout << "Unpacking H-matrix...";
             std::cout.flush();
         }
-        double unpackStartTime = MPI_Wtime();
+        double unpackStartTime = psp::mpi::WallTime();
         Quasi2d HCopy( packedHMatrix );
-        double unpackStopTime = MPI_Wtime();
+        double unpackStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << unpackStopTime-unpackStartTime 
@@ -251,9 +251,9 @@ main( int argc, char* argv[] )
             std::cout << "Multiplying H-matrix by a vector...";
             std::cout.flush();
         }
-        matVecStartTime = MPI_Wtime();
+        matVecStartTime = psp::mpi::WallTime();
         HCopy.MapVector( 1.0, x, z );
-        matVecStopTime = MPI_Wtime();
+        matVecStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " << matVecStopTime-matVecStartTime 

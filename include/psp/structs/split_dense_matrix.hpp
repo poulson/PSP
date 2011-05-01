@@ -34,7 +34,6 @@ struct SplitDenseMatrix
 {
     int height, width;
     bool ownSourceSide;
-    int localOffset;
     MPI_Comm comm;
     int partner;
 
