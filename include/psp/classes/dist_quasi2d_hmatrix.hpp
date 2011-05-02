@@ -170,6 +170,13 @@ private:
     void MapVectorNaivePassData() const;
 
     void MapVectorTargetTeamBroadcasts() const;
+    void MapVectorTargetTeamBroadcastsCount( std::vector<int>& sizes ) const;
+    void MapVectorTargetTeamBroadcastsPack
+    ( std::vector<Scalar>& buffer,
+      std::vector<int>& offsets ) const;
+    void MapVectorTargetTeamBroadcastsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
     void MapVectorNaiveTargetTeamBroadcasts() const;
 
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
