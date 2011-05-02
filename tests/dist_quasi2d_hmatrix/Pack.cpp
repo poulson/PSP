@@ -140,7 +140,7 @@ main( int argc, char* argv[] )
 
         if( rank == 0 )
         {
-            std::cout << "Filling sparse matrix...";
+            std::cout << "Filling sparse matrices...";
             std::cout.flush();
         }
         double fillStartTime = psp::mpi::WallTime();
@@ -174,7 +174,7 @@ main( int argc, char* argv[] )
         // Convert to H-matrix form
         if( rank == 0 )
         {
-            std::cout << "Constructing H-matrix...";
+            std::cout << "Constructing H-matrices...";
             std::cout.flush();
         }
         double constructStartTime = psp::mpi::WallTime();
@@ -186,6 +186,23 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
             if( print )
                 H.Print("H");
+        }
+
+        // Invert the H-matrix
+        if( rank == 0 )
+        {
+            std::cout << "Inverting H-matrices...";
+            std::cout.flush();
+        }
+        double invertStartTime = psp::mpi::WallTime();
+        H.DirectInvert();
+        double invertStopTime = psp::mpi::WallTime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " << invertStopTime-invertStartTime
+                      << " seconds." << std::endl;
+            if( print )
+                H.Print("inv(H)");
         }
 
         // Store the result of our H-matrix applied to a vector of all ones
@@ -321,6 +338,7 @@ main( int argc, char* argv[] )
                 ss << "Answer differed at local index " << i << ", truth was "
                    << yLocalTruth.Get(i) << ", computed was "
                    << yLocal.Get(i) << std::endl;
+                throw std::logic_error( ss.str().c_str() );
             }
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );

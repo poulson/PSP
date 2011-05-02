@@ -192,11 +192,22 @@ inline void AllReduce
 #ifndef RELEASE
     PushCallStack("mpi::AllReduce");
 #endif
-    SafeMpi(
-        MPI_Allreduce
-        ( const_cast<std::complex<float>*>(sendBuf), recvBuf, count,
-          MPI_COMPLEX, op, comm )
-    );
+    if( op == MPI_SUM )
+    {
+        SafeMpi(
+            MPI_Allreduce
+            ( const_cast<std::complex<float>*>(sendBuf), recvBuf, 2*count, 
+              MPI_FLOAT, op, comm )
+        );
+    }
+    else
+    {
+        SafeMpi(
+            MPI_Allreduce
+            ( const_cast<std::complex<float>*>(sendBuf), recvBuf, count,
+              MPI_COMPLEX, op, comm )
+        );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -209,11 +220,22 @@ inline void AllReduce
 #ifndef RELEASE
     PushCallStack("mpi::AllReduce");
 #endif
-    SafeMpi(
-        MPI_Allreduce
-        ( const_cast<std::complex<double>*>(sendBuf), recvBuf, count,
-          MPI_DOUBLE_COMPLEX, op, comm )
-    );
+    if( op == MPI_SUM )
+    {
+        SafeMpi(
+            MPI_Allreduce
+            ( const_cast<std::complex<double>*>(sendBuf), recvBuf, 2*count, 
+              MPI_DOUBLE, op, comm )
+        );
+    }
+    else
+    {
+        SafeMpi(
+            MPI_Allreduce
+            ( const_cast<std::complex<double>*>(sendBuf), recvBuf, count,
+              MPI_DOUBLE_COMPLEX, op, comm )
+        );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -799,11 +821,22 @@ inline void Reduce
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");
 #endif
-    SafeMpi( 
-        MPI_Reduce
-        ( const_cast<std::complex<float>*>(sendBuf), recvBuf, count, 
-          MPI_COMPLEX, op, root, comm ) 
-    );
+    if( op == MPI_SUM )
+    {
+        SafeMpi(
+            MPI_Reduce
+            ( const_cast<std::complex<float>*>(sendBuf), recvBuf, 2*count,
+              MPI_FLOAT, op, root, comm )
+        );
+    }
+    else
+    {
+        SafeMpi( 
+            MPI_Reduce
+            ( const_cast<std::complex<float>*>(sendBuf), recvBuf, count, 
+              MPI_COMPLEX, op, root, comm ) 
+        );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -816,11 +849,22 @@ inline void Reduce
 #ifndef RELEASE
     PushCallStack("mpi::Reduce");
 #endif
-    SafeMpi( 
-        MPI_Reduce
-        ( const_cast<std::complex<double>*>(sendBuf), recvBuf, count, 
-          MPI_DOUBLE_COMPLEX, op, root, comm ) 
-    );
+    if( op == MPI_SUM )
+    {
+        SafeMpi(
+            MPI_Reduce
+            ( const_cast<std::complex<double>*>(sendBuf), recvBuf, 2*count,
+              MPI_DOUBLE, op, root, comm )
+        );
+    }
+    else
+    {
+        SafeMpi( 
+            MPI_Reduce
+            ( const_cast<std::complex<double>*>(sendBuf), recvBuf, count, 
+              MPI_DOUBLE_COMPLEX, op, root, comm ) 
+        );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -884,11 +928,26 @@ inline void ReduceScatter
 #ifndef RELEASE
     PushCallStack("mpi::ReduceScatter");
 #endif
-    SafeMpi( 
-        MPI_Reduce_scatter
-        ( const_cast<std::complex<float>*>(sendBuf), recvBuf, recvCounts, 
-          MPI_COMPLEX, op, comm ) 
-    );
+    if( op == MPI_SUM )
+    {
+        const int p = mpi::CommSize( comm );
+        std::vector<int> recvCountsDoubled(p);
+        for( int i=0; i<p; ++i )
+            recvCountsDoubled[i] = 2*recvCounts[i];
+        SafeMpi(
+            MPI_Reduce_scatter
+            ( const_cast<std::complex<float>*>(sendBuf), recvBuf, 
+              &recvCountsDoubled[0], MPI_FLOAT, op, comm )
+        );
+    }
+    else
+    {
+        SafeMpi( 
+            MPI_Reduce_scatter
+            ( const_cast<std::complex<float>*>(sendBuf), recvBuf, recvCounts, 
+              MPI_COMPLEX, op, comm ) 
+        );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -901,11 +960,26 @@ inline void ReduceScatter
 #ifndef RELEASE
     PushCallStack("mpi::ReduceScatter");
 #endif
-    SafeMpi( 
-        MPI_Reduce_scatter
-        ( const_cast<std::complex<double>*>(sendBuf), recvBuf, recvCounts, 
-          MPI_DOUBLE_COMPLEX, op, comm ) 
-    );
+    if( op == MPI_SUM )
+    {
+        const int p = mpi::CommSize( comm );
+        std::vector<int> recvCountsDoubled(p);
+        for( int i=0; i<p; ++i )
+            recvCountsDoubled[i] = 2*recvCounts[i];
+        SafeMpi(
+            MPI_Reduce_scatter
+            ( const_cast<std::complex<double>*>(sendBuf), recvBuf, 
+              &recvCountsDoubled[0], MPI_DOUBLE, op, comm )
+        );
+    }
+    else
+    {
+        SafeMpi( 
+            MPI_Reduce_scatter
+            ( const_cast<std::complex<double>*>(sendBuf), recvBuf, recvCounts, 
+              MPI_DOUBLE_COMPLEX, op, comm ) 
+        );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif

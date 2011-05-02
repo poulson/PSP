@@ -1253,8 +1253,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
     MapVectorPrecompute( alpha, xLocal, yLocal );
 
     // Sum within source teams
-    //MapVectorSourceTeamSummations();
-    MapVectorNaiveSourceTeamSummations();
+    MapVectorSourceTeamSummations();
+    //MapVectorNaiveSourceTeamSummations();
 
     // Pass data from source to target teams
     //MapVectorPassData();
@@ -1427,7 +1427,258 @@ const
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorSourceTeamSummations");
 #endif
-    // TODO: Implement custom Reduce routine for nested communicators
+    // Compute the message sizes for each reduce 
+    // (the first and last comms are unneeded)
+    const int numLevels = _subcomms->NumLevels();
+    const int numReduces = std::max(0,numLevels-2);
+    std::vector<int> sizes( numReduces );
+    std::memset( &sizes[0], 0, numReduces*sizeof(int) );
+    MapVectorSourceTeamSummationsCount( sizes );
+
+    // Pack all of the data to be reduced into a single buffer
+    int totalSize = 0;
+    for( int i=0; i<numReduces; ++i )
+        totalSize += sizes[i];
+    std::vector<Scalar> buffer( totalSize );
+    std::vector<int> offsets( numReduces );
+    for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
+        offsets[i] = offset;
+    std::memset( &offsets[0], 0, numReduces*sizeof(int) );
+    MapVectorSourceTeamSummationsPack( buffer, offsets );
+
+    // Reset the offsets vector and then perform the reduces. There should be
+    // at most log_4(p) reduces.
+    for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
+        offsets[i] = offset;
+    for( int i=0; i<numReduces; ++i )
+    {
+        if( sizes[i] != 0 )
+        {
+            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                mpi::Reduce
+                ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
+                  0, MPI_SUM, team );
+            }
+            else
+            {
+                mpi::Reduce
+                ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
+            }
+        }
+    }
+
+    // Unpack the reduced buffers (only roots of subcommunicators have data)
+    MapVectorSourceTeamSummationsUnpack( buffer, offsets );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsCount
+( std::vector<int>& sizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorSourceTeamSummationsCount");
+#endif
+    const Shell& shell = _shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorSourceTeamSummationsCount( sizes );
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        if( DSF.inSourceTeam )
+            sizes[_level-1] += DSF.rank;
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        sizes[_level-1] += DF.rank;
+        break;
+    }
+    case SPLIT_QUASI2D:
+        break;
+    case SPLIT_LOW_RANK:
+        break;
+    case SPLIT_DENSE:
+        break;
+    case QUASI2D:
+        break;
+    case LOW_RANK:
+        break;
+    case DENSE:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsPack
+( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorSourceTeamSummationsPack");
+#endif
+    const Shell& shell = _shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+        {
+            for( int s=0; s<4; ++s )
+            {
+                node.Child(t,s).MapVectorSourceTeamSummationsPack
+                ( buffer, offsets );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        if( DSF.inSourceTeam )
+        {
+            std::memcpy
+            ( &buffer[offsets[_level-1]], DSF.z.LockedBuffer(), 
+              DSF.rank*sizeof(Scalar) );
+            offsets[_level-1] += DSF.rank;
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        std::memcpy
+        ( &buffer[offsets[_level-1]], DF.z.LockedBuffer(), 
+          DF.rank*sizeof(Scalar) );
+        offsets[_level-1] += DF.rank;
+        break;
+    }
+    case SPLIT_QUASI2D:
+        break;
+    case SPLIT_LOW_RANK:
+        break;
+    case SPLIT_DENSE:
+        break;
+    case QUASI2D:
+        break;
+    case LOW_RANK:
+        break;
+    case DENSE:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsUnpack
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorSourceTeamSummationsPack");
+#endif
+    const Shell& shell = _shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.node;
+        for( int t=0; t<4; ++t )
+        {
+            for( int s=0; s<4; ++s )
+            {
+                node.Child(t,s).MapVectorSourceTeamSummationsUnpack
+                ( buffer, offsets );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    }
+    case DIST_SPLIT_LOW_RANK:
+    {
+        const DistSplitLowRankMatrix<Scalar,Conjugated>& DSF = *shell.data.DSF;
+        if( DSF.inSourceTeam )
+        {
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                std::memcpy
+                ( DSF.z.Buffer(), &buffer[offsets[_level-1]], 
+                  DSF.rank*sizeof(Scalar) );
+                offsets[_level-1] += DSF.rank;
+            }
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRankMatrix<Scalar,Conjugated>& DF = *shell.data.DF;
+        MPI_Comm team = _subcomms->Subcomm( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
+        {
+            std::memcpy
+            ( DF.z.Buffer(), &buffer[offsets[_level-1]],
+              DF.rank*sizeof(Scalar) );
+            offsets[_level-1] += DF.rank;
+        }
+        break;
+    }
+    case SPLIT_QUASI2D:
+        break;
+    case SPLIT_LOW_RANK:
+        break;
+    case SPLIT_DENSE:
+        break;
+    case QUASI2D:
+        break;
+    case LOW_RANK:
+        break;
+    case DENSE:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2241,10 +2492,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         throw std::logic_error("Should not need to unpack empty submatrix");
 #endif
         break;
-    default:
-#ifndef RELEASE
-        throw std::logic_error("Invalid enum value");
-#endif
     }
 }
 

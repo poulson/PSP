@@ -61,7 +61,7 @@ void psp::hmatrix_tools::MatrixTransposeVector
 #ifndef RELEASE
     PushCallStack("hmatrix_tools::MatrixTransposeVector (y := D^T x)");
 #endif
-    y.Resize( x.Height() );
+    y.Resize( A.Width() );
     if( A.Symmetric() )
     {
         blas::Symv
@@ -148,7 +148,7 @@ void psp::hmatrix_tools::MatrixTransposeVector
              x.LockedBuffer(),   1, 
       0,     t.Buffer(),         1 );
 
-    y.Resize( x.Height() );
+    y.Resize( A.Width() );
     if( Conjugated )
     {
         Conjugate( t );

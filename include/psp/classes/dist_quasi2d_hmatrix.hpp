@@ -155,12 +155,23 @@ private:
     void MapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
+
     void MapVectorSourceTeamSummations() const;
+    void MapVectorSourceTeamSummationsCount( std::vector<int>& sizes ) const;
+    void MapVectorSourceTeamSummationsPack
+    ( std::vector<Scalar>& buffer, 
+      std::vector<int>& offsets ) const;
+    void MapVectorSourceTeamSummationsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
     void MapVectorNaiveSourceTeamSummations() const;
+
     void MapVectorPassData() const;
     void MapVectorNaivePassData() const;
+
     void MapVectorTargetTeamBroadcasts() const;
     void MapVectorNaiveTargetTeamBroadcasts() const;
+
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
 
 public:
