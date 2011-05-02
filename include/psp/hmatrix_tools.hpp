@@ -1857,7 +1857,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 // F := alpha H^H H,
 template<typename Real,bool Conjugated>
 void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
-( int maxRank, int oversampling, 
+( int oversampling, 
   Real alpha, 
   const psp::AbstractHMatrix<Real>& A,
   const psp::AbstractHMatrix<Real>& B,
@@ -1866,7 +1866,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 #ifndef RELEASE
     PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := A^H A)");
 #endif
-    MatrixTransposeMatrix( maxRank, oversampling, alpha, A, B, F );
+    MatrixTransposeMatrix( oversampling, alpha, A, B, F );
 #ifndef RELEASE
     PopCallStack();
 #endif

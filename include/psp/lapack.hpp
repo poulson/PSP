@@ -565,15 +565,17 @@ inline int ApplyQWorkSize( char side, int m, int n )
 #ifndef RELEASE
     PushCallStack("lapack::ApplyQWorkSize");
 #endif
+    int worksize;
     if( side == 'L' )
-        return std::max(1,n*BLOCKSIZE);
+        worksize = std::max(1,n*BLOCKSIZE);
     else if( side == 'R' )
-        return std::max(1,m*BLOCKSIZE);
+        worksize = std::max(1,m*BLOCKSIZE);
 #ifndef RELEASE
     else
         throw std::logic_error("Invalid side for ApplyQ worksize query.");
     PopCallStack();
 #endif
+    return worksize;
 }
 
 inline void ApplyQ
