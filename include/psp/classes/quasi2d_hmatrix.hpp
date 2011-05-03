@@ -345,7 +345,13 @@ public:
     //     X_k+1 = X_k (2I - A X_k) = (2I - X_k A) X_k,
     // where X_k -> inv(A) if X_0 = alpha A^H,
     // with 0 < alpha < 2/||A||_2^2.
-    void SchulzInvert( int maxIts );
+    //
+    // Require the condition number estimation to be accurate enough that
+    //   Estimate <= ||A||_2 <= theta Estimate, where 1 < theta,
+    // with probability at least 1-10^{-confidence}.
+    //
+    // The values for theta and confidence are currently hardcoded.
+    void SchulzInvert( int numIterations );
 };
 
 } // namespace psp

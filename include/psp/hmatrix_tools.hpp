@@ -631,6 +631,24 @@ template<typename Scalar>
 void Invert( DenseMatrix<Scalar>& D );
 
 /*\
+|*| Compute a vector's two-norm
+\*/
+template<typename Real>
+Real TwoNorm( const Vector<Real>& x );
+template<typename Real>
+Real TwoNorm( const Vector< std::complex<Real> >& x );
+
+/*\
+|*| Estimate the two-norm of an abstract H-matrix
+\*/
+template<typename Real>
+Real EstimateTwoNorm
+( const AbstractHMatrix<Real>& A );
+template<typename Real>
+Real EstimateTwoNorm
+( const AbstractHMatrix< std::complex<Real> >& A );
+
+/*\
 |*| Scale a vector or matrix
 \*/
 template<typename Scalar>
@@ -1344,6 +1362,146 @@ void psp::hmatrix_tools::HermitianTranspose
 }
 
 /*\
+|*| For compute vector two-norms
+\*/
+template<typename Real>
+Real psp::hmatrix_tools::TwoNorm
+( const psp::Vector<Real>& x )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::TwoNorm");
+#endif
+    const Real twoNorm = blas::Nrm2( x.Height(), x.LockedBuffer(), 1 );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return twoNorm;
+}
+
+template<typename Real>
+Real psp::hmatrix_tools::TwoNorm
+( const psp::Vector< std::complex<Real> >& x )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::TwoNorm");
+#endif
+    const Real twoNorm = blas::Nrm2( x.Height(), x.LockedBuffer(), 1 );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return twoNorm;
+}
+
+/*\
+|*| Estimate the two-norm of an abstract H-matrix
+|*|
+|*| We have that
+|*|     (x' (A'A)^k x)^{1/k} <= ||A'A||_2 <= theta^2 (x' (A'A)^k x)^{1/k},
+|*| with probability at least 1 - 0.8 theta^{-k} n^{1/2}.
+|*| 
+|*| Seek the minimum even k, given theta, such that 0.8 theta^{-k} n^{1/2}
+|*| is <= 10^{-confidence}.
+|*|
+|*| Then
+|*|     x' (A'A)^k x = (A^k x)' (A^k x) = (||A^k x||_2)^2
+|*| but ||A||_2 = sqrt(||A'A||_2), so our estimate is
+|*|     (||A^k x||_2)^{1/k} <= ||A||_2 <= theta (||A^k x||_2)^{1/k}
+|*| so that k matrix-vector products are required.
+|*|
+|*| We can solve for such a k via the equations:
+|*|     k >= log_theta( 0.8 sqrt(n) 10^{confidence} )
+|*|        = log( 0.8 sqrt(n) 10^{confidence} ) / log( theta ),
+|*| and set
+|*|     k := ceil(log( 0.8 sqrt(n) 10^{confidence} ) / log( theta ))
+\*/
+template<typename Real>
+Real psp::hmatrix_tools::EstimateTwoNorm
+( const psp::AbstractHMatrix<Real>& A )
+{
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::EstimateTwoNorm");
+#endif
+    const Real theta = 1.5;
+    const Real confidence = 6;
+
+    const int n = A.Height();
+    const int k = ceil(log(0.8*sqrt(n)*pow10(confidence))/log(theta));
+#ifndef RELEASE
+    std::cerr << "Going to use A^" << k << " in order to estimate "
+              << "||A||_2 within " << (theta-1.0)*100 << "% with probability "
+              << "1-10^{-" << confidence << "}" << std::endl;
+#endif
+    // Sample the unit sphere
+    Vector<Real> x( n );
+    {
+        hmatrix_tools::GaussianRandomVector( x );
+        const Real twoNorm = hmatrix_tools::TwoNorm( x );
+        hmatrix_tools::Scale( ((Real)1)/twoNorm, x );
+    }
+
+    Real estimate = theta; 
+    const Real root = ((Real)1) / ((Real)k);
+    Vector<Real> y;
+    for( int i=0; i<k; ++i )
+    {
+        A.MapVector( (Real)1, x, y );
+        hmatrix_tools::Copy( y, x );
+        const Real twoNorm = hmatrix_tools::TwoNorm( x );
+        hmatrix_tools::Scale( ((Real)1)/twoNorm, x );
+        estimate *= pow( twoNorm, root );
+    }
+#ifndef RELEASE
+    std::cerr << "Estimated ||A||_2 as " << estimate << std::endl;
+    PopCallStack();
+#endif
+    return estimate;
+}
+
+template<typename Real>
+Real psp::hmatrix_tools::EstimateTwoNorm
+( const psp::AbstractHMatrix< std::complex<Real> >& A )
+{
+    typedef std::complex<Real> Scalar;
+#ifndef RELEASE
+    PushCallStack("hmatrix_tools::EstimateTwoNorm");
+#endif
+    const Real theta = 1.5;
+    const Real confidence = 6;
+
+    const int n = A.Height();
+    const int k = ceil(log(0.8*sqrt(n)*pow10(confidence))/log(theta));
+#ifndef RELEASE
+    std::cerr << "Going to use A^" << k  << " in order to estimate "
+              << "||A||_2 within " << (theta-1.0)*100 << "% with probability "
+              << "1-10^{-" << confidence << "}" << std::endl;
+#endif
+    // Sample the unit sphere
+    Vector<Scalar> x( n );
+    {
+        hmatrix_tools::GaussianRandomVector( x );
+        const Real twoNorm = hmatrix_tools::TwoNorm( x );
+        hmatrix_tools::Scale( ((Scalar)1)/twoNorm, x );
+    }
+
+    Real estimate = theta; 
+    const Real root = ((Real)1) / ((Real)k);
+    Vector<Scalar> y;
+    for( int i=0; i<k; ++i )
+    {
+        A.MapVector( (Scalar)1, x, y );
+        hmatrix_tools::Copy( y, x );
+        const Real twoNorm = hmatrix_tools::TwoNorm( x );
+        hmatrix_tools::Scale( ((Scalar)1)/twoNorm, x );
+        estimate *= pow( twoNorm, root );
+    }
+#ifndef RELEASE
+    std::cerr << "Estimated ||A||_2 as " << estimate << std::endl;
+    PopCallStack();
+#endif
+    return estimate;
+}
+
+/*\
 |*| For scaling vectors and matrices
 \*/
 
@@ -2043,7 +2201,7 @@ psp::hmatrix_tools::GaussianRandomVector
     PushCallStack("hmatrix_tools::GaussianRandomVector");
 #endif
     // Use BoxMuller for every pair of entries
-    const int n = x.size();
+    const int n = x.Height();
     const int numPairs = (n+1)/2;
     Real* buffer = x.Buffer();
     for( int i=0; i<numPairs-1; ++i )
@@ -2070,7 +2228,7 @@ psp::hmatrix_tools::GaussianRandomVector
 #ifndef RELEASE
     PushCallStack("hmatrix_tools::GaussianRandomVector");
 #endif
-    const int n = x.size();
+    const int n = x.Height();
     std::complex<Real>* buffer = x.Buffer();
     for( int i=0; i<n; ++i )
         GaussianRandomVariable( buffer[i] );

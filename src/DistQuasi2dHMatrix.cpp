@@ -1081,7 +1081,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0),
-  _inTargetTeam(true), _inSourceTeam(true), 
+  _inSourceTeam(true), _inTargetTeam(true),
   _localSourceOffset(0), _localTargetOffset(0)
 { 
     _shell.type = EMPTY;
@@ -1517,16 +1517,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsCount
         break;
     }
     case SPLIT_QUASI2D:
-        break;
     case SPLIT_LOW_RANK:
-        break;
     case SPLIT_DENSE:
-        break;
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -1587,16 +1583,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsPack
         break;
     }
     case SPLIT_QUASI2D:
-        break;
     case SPLIT_LOW_RANK:
-        break;
     case SPLIT_DENSE:
-        break;
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -1667,16 +1659,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsUnpack
         break;
     }
     case SPLIT_QUASI2D:
-        break;
     case SPLIT_LOW_RANK:
-        break;
     case SPLIT_DENSE:
-        break;
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -1749,23 +1737,11 @@ const
         break;
     }
     case SPLIT_QUASI2D:
-        // No summations required.
-        break;
     case SPLIT_LOW_RANK:
-        // No summations required.
-        break;
     case SPLIT_DENSE:
-        // No summations required.
-        break;
     case QUASI2D:
-        // No summations required.
-        break;
     case LOW_RANK:
-        // No summations required.
-        break;
     case DENSE:
-        // No summations required.
-        break;
     case EMPTY:
         break;
     }
@@ -1869,11 +1845,8 @@ const
         break;
     }
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
-        break;
     case EMPTY:
         break;
     }
@@ -1970,16 +1943,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorTargetTeamBroadcastsCount
         break;
     }
     case SPLIT_QUASI2D:
-        break;
     case SPLIT_LOW_RANK:
-        break;
     case SPLIT_DENSE:
-        break;
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -2050,16 +2019,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorTargetTeamBroadcastsPack
         break;
     }
     case SPLIT_QUASI2D:
-        break;
     case SPLIT_LOW_RANK:
-        break;
     case SPLIT_DENSE:
-        break;
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -2122,16 +2087,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorTargetTeamBroadcastsUnpack
         break;
     }
     case SPLIT_QUASI2D:
-        break;
     case SPLIT_LOW_RANK:
-        break;
     case SPLIT_DENSE:
-        break;
     case QUASI2D:
-        break;
     case LOW_RANK:
-        break;
     case DENSE:
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -2183,23 +2144,11 @@ const
         break;
     }
     case SPLIT_QUASI2D:
-        // No summations required.
-        break;
     case SPLIT_LOW_RANK:
-        // No summations required.
-        break;
     case SPLIT_DENSE:
-        // No summations required.
-        break;
     case QUASI2D:
-        // No summations required.
-        break;
     case LOW_RANK:
-        // No summations required.
-        break;
     case DENSE:
-        // No summations required.
-        break;
     case EMPTY:
         break;
     }
@@ -2296,14 +2245,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         break;
     }
     case QUASI2D:
-        // The update should have been performed at the precompute stage.
-        break;
     case LOW_RANK:
-        // The update should have been performed at the precompute stage.
-        break;
     case DENSE:
-        // The update should have been performed at the precompute stage.
-        break;
     case EMPTY:
         break;
     }

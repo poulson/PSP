@@ -148,7 +148,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
             packedSize += m*n*sizeof(Scalar);
         else
             packedSize += ((m*m+m)/2)*sizeof(Scalar);
-
         break;
     }
     }
@@ -244,7 +243,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                 head += (m-j)*sizeof(Scalar);
             }
         }
-
         break;
     }
     }
@@ -2213,7 +2211,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
 // A := inv(A) using Schulz iterations, X_k+1 := (2I - X_k A) X_k
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert( int maxIts )
+psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
+( int numIterations )
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::SchulzInvert");
@@ -2222,20 +2221,18 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert( int maxIts )
     if( this->IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
 #endif
-    // Need to find alpha s.t. 0 < alpha < 2/||A||_2^2, but we do not have
-    // a cheap way of estimating ||A||_2, so instead pick alpha very small.
-    //
-    // TODO: Allow alpha as a parameter
-    std::cout << "TODO: Implement a 2-norm estimator for choosing alpha" 
-              << std::endl;
-    Scalar alpha = ((Scalar)1)/((Scalar)1.e7);
+    if( numIterations <= 0 )
+        throw std::logic_error("Must use at least 1 iteration.");
+
+    const Scalar estimate = hmatrix_tools::EstimateTwoNorm( *this );
+    const Scalar alpha = ((Scalar)2) / (estimate*estimate);
 
     // Initialize X_0 := alpha A^H
     Quasi2dHMatrix<Scalar,Conjugated> X;
     X.HermitianTransposeFrom( *this );
     X.Scale( alpha );
 
-    for( int k=0; k<maxIts; ++k )
+    for( int k=0; k<numIterations; ++k )
     {
         // Form Z := 2I - X_k A
         Quasi2dHMatrix<Scalar,Conjugated> Z;        
@@ -2580,10 +2577,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     Shell& shell = H._shell;
     switch( shell.type )
     {
-    case NODE:           delete shell.data.node; break;
+    case NODE:           delete shell.data.node;          break;
     case NODE_SYMMETRIC: delete shell.data.nodeSymmetric; break;
-    case LOW_RANK:       delete shell.data.F; break;
-    case DENSE:          delete shell.data.D; break;
+    case LOW_RANK:       delete shell.data.F;             break;
+    case DENSE:          delete shell.data.D;             break;
     }
 
     // Create this layer of the H-matrix from the packed information
@@ -2673,7 +2670,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 head += (m-j)*sizeof(Scalar);
             }
         }
-
         break;
     }
 }

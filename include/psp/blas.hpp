@@ -40,6 +40,18 @@ extern "C" {
 typedef std::complex<float> scomplex;
 typedef std::complex<double> dcomplex;
 
+float BLAS(snrm2)
+( const int* n, const float* x, const int* incx );
+
+double BLAS(dnrm2)
+( const int* n, const double* x, const int* incx );
+
+float BLAS(scnrm2)
+( const int* n, const scomplex* x, const int* incx );
+
+double BLAS(dznrm2)
+( const int* n, const dcomplex* x, const int* incx );
+
 void BLAS(sscal)
 ( const int* n, const float* alpha, float* x, const int* incx );
 
@@ -180,6 +192,34 @@ void BLAS(ztrmm)
 
 namespace psp {
 namespace blas {
+
+//----------------------------------------------------------------------------//
+// Compute the two-norm of a vector                                           //
+//----------------------------------------------------------------------------//
+
+inline float Nrm2
+( int n, const float* x, int incx )
+{
+    return BLAS(snrm2)( &n, x, &incx );
+}
+
+inline double Nrm2
+( int n, const double* x, int incx )
+{
+    return BLAS(dnrm2)( &n, x, &incx );
+}
+
+inline float Nrm2
+( int n, const scomplex* x, int incx )
+{
+    return BLAS(scnrm2)( &n, x, &incx );
+}
+
+inline double Nrm2
+( int n, const dcomplex* x, int incx )
+{
+    return BLAS(dznrm2)( &n, x, &incx );
+}
 
 //----------------------------------------------------------------------------//
 // Scale a vector                                                             //

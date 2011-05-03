@@ -381,7 +381,7 @@ main( int argc, char* argv[] )
         }
 
         // Schulz iteration tests
-        for( int maxIts=10; maxIts<60; maxIts+=10 )
+        for( int numIterations=10; numIterations<60; numIterations+=10 )
         {
             // Make a copy
             if( rank == 0 )
@@ -406,7 +406,7 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             double invertStartTime = psp::mpi::WallTime();
-            invH.SchulzInvert( maxIts );
+            invH.SchulzInvert( numIterations );
             double invertStopTime = psp::mpi::WallTime();
             if( rank == 0 )
             {

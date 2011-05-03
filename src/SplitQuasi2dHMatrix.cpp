@@ -303,9 +303,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                 sourceHead += (m-j)*sizeof(Scalar);
             }
         }
-
         // There is no target information to write
-
         break;
     }
     }
@@ -398,10 +396,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     Shell& shell = H._shell;
     switch( shell.type )
     {
-    case NODE:           delete shell.data.node; break;
+    case NODE:           delete shell.data.node;          break;
     case NODE_SYMMETRIC: delete shell.data.nodeSymmetric; break;
-    case SPLIT_LOW_RANK: delete shell.data.SF; break;
-    case SPLIT_DENSE:    delete shell.data.SD; break;
+    case SPLIT_LOW_RANK: delete shell.data.SF;            break;
+    case SPLIT_DENSE:    delete shell.data.SD;            break;
     }
 
     // Create this layer of the H-matrix from the packed information
@@ -510,7 +508,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 }
             }
         }
-
         break;
     }
     }
