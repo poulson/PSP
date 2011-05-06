@@ -22,6 +22,7 @@
 #define PSP_HMATRIX_TOOLS_HPP 1
 
 #include <complex>
+#include <cmath>
 #include <cstdlib> // for integer abs
 #include <cstring> // for std::memset and std::memcpy
 #include <vector> 
@@ -1425,7 +1426,7 @@ Real psp::hmatrix_tools::EstimateTwoNorm
     const Real confidence = 6;
 
     const int n = A.Height();
-    const int k = ceil(log(0.8*sqrt(n)*pow10(confidence))/log(theta));
+    const int k = ceil(log(0.8*sqrt(n)*pow(10,confidence))/log(theta));
 #ifndef RELEASE
     std::cerr << "Going to use A^" << k << " in order to estimate "
               << "||A||_2 within " << (theta-1.0)*100 << "% with probability "
@@ -1469,7 +1470,7 @@ Real psp::hmatrix_tools::EstimateTwoNorm
     const Real confidence = 6;
 
     const int n = A.Height();
-    const int k = ceil(log(0.8*sqrt(n)*pow10(confidence))/log(theta));
+    const int k = ceil(log(0.8*sqrt(n)*pow(10,confidence))/log(theta));
 #ifndef RELEASE
     std::cerr << "Going to use A^" << k  << " in order to estimate "
               << "||A||_2 within " << (theta-1.0)*100 << "% with probability "

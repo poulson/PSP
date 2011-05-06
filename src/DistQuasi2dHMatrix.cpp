@@ -1777,9 +1777,104 @@ const
     case NODE:
     {
         const Node& node = *shell.data.node;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorNaivePassData();
+
+        MPI_Comm team = _subcomms->Subcomm( _level );
+        const int teamSize = mpi::CommSize( team );
+        const int teamRank = mpi::CommRank( team );
+        if( teamSize == 2 )
+        {
+            if( teamRank == 0 )     
+            {
+                // Take care of the top-left quadrant within our subteam
+                node.Child(0,0).MapVectorNaivePassData();
+                node.Child(0,1).MapVectorNaivePassData();
+                node.Child(1,0).MapVectorNaivePassData();
+                node.Child(1,1).MapVectorNaivePassData();
+            }
+            else
+            {
+                // Take care of the bottom-right quadrant within our subteam 
+                node.Child(2,2).MapVectorNaivePassData();
+                node.Child(2,3).MapVectorNaivePassData();
+                node.Child(3,2).MapVectorNaivePassData();
+                node.Child(3,3).MapVectorNaivePassData();
+            }
+            // Top-right quadrant
+            node.Child(0,2).MapVectorNaivePassData();
+            node.Child(0,3).MapVectorNaivePassData();
+            node.Child(1,2).MapVectorNaivePassData();
+            node.Child(1,3).MapVectorNaivePassData();
+
+            // Bottom-left quadrant
+            node.Child(2,0).MapVectorNaivePassData();
+            node.Child(2,1).MapVectorNaivePassData();
+            node.Child(3,0).MapVectorNaivePassData();
+            node.Child(3,1).MapVectorNaivePassData();
+        }
+        else // teamSize >= 4
+        {
+            const int subteam = teamRank / (teamSize/4);
+            switch( subteam )
+            {
+            case 0:
+                // Take care of the work specific to our subteam
+                node.Child(0,0).MapVectorNaivePassData();
+                // Interact with subteam 1
+                node.Child(0,1).MapVectorNaivePassData();
+                node.Child(1,0).MapVectorNaivePassData();
+                // Interact with subteam 2
+                node.Child(0,2).MapVectorNaivePassData();
+                node.Child(2,0).MapVectorNaivePassData();
+                // Interact with subteam 3
+                node.Child(0,3).MapVectorNaivePassData();
+                node.Child(3,0).MapVectorNaivePassData();
+                break;
+            case 1:
+                // Take care of the work specific to our subteam
+                node.Child(1,1).MapVectorNaivePassData();
+                // Interact with subteam 0
+                node.Child(0,1).MapVectorNaivePassData();
+                node.Child(1,0).MapVectorNaivePassData();
+                // Interact with subteam 3
+                node.Child(1,3).MapVectorNaivePassData(); 
+                node.Child(3,1).MapVectorNaivePassData();
+                // Interact with subteam 2
+                node.Child(1,2).MapVectorNaivePassData();
+                node.Child(2,1).MapVectorNaivePassData();
+                break;
+            case 2:
+                // Take care of the work specific to our subteam
+                node.Child(2,2).MapVectorNaivePassData();
+                // Interact with subteam 3
+                node.Child(2,3).MapVectorNaivePassData();
+                node.Child(3,2).MapVectorNaivePassData();
+                // Interact with subteam 0
+                node.Child(0,2).MapVectorNaivePassData();
+                node.Child(2,0).MapVectorNaivePassData();
+                // Interact with subteam 1
+                node.Child(1,2).MapVectorNaivePassData();
+                node.Child(2,1).MapVectorNaivePassData();
+                break;
+            case 3:
+                // Take care of the work specific to our subteam
+                node.Child(3,3).MapVectorNaivePassData();
+                // Interact with subteam 2
+                node.Child(2,3).MapVectorNaivePassData();
+                node.Child(3,2).MapVectorNaivePassData();
+                // Interact with subteam 1
+                node.Child(1,3).MapVectorNaivePassData();
+                node.Child(3,1).MapVectorNaivePassData();
+                // Interact with subteam 0
+                node.Child(0,3).MapVectorNaivePassData();
+                node.Child(3,0).MapVectorNaivePassData();
+                break;
+            default:
+#ifndef RELEASE
+                throw std::logic_error("Invalid subteam");
+#endif
+                break;
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
