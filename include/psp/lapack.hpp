@@ -41,6 +41,19 @@ extern "C" {
 typedef std::complex<float> scomplex;
 typedef std::complex<double> dcomplex;
 
+float LAPACK(slamch)( const char* cmach );
+double LAPACK(dlamch)( const char* cmach );
+
+float LAPACK(slapy2)
+( const float* alpha, const float* beta );
+double LAPACK(dlapy2)
+( const double* alpha, const double* beta );
+
+float LAPACK(slapy3)
+( const float* alpha, const float* beta, const float* gamma );
+double LAPACK(dlapy3)
+( const double* alpha, const double* beta, const double* gamma );
+
 void LAPACK(sgeqrf)
 ( const int* m, const int* n,
   float* A, const int* lda,
@@ -324,6 +337,66 @@ void LAPACK(zsytri)
 
 namespace psp {
 namespace lapack {
+
+//----------------------------------------------------------------------------//
+// Machine constants                                                          //
+//----------------------------------------------------------------------------//
+
+template<typename Real> Real MachineEpsilon();
+
+template<> 
+inline float MachineEpsilon<float>()
+{
+    const char cmach = 'E';
+    return LAPACK(slamch)( &cmach );
+}
+
+template<> 
+inline double MachineEpsilon<double>()
+{
+    const char cmach = 'E';
+    return LAPACK(dlamch)( &cmach );
+}
+
+template<typename Real> Real MachineSafeMin();
+
+template<>
+inline float MachineSafeMin()
+{
+    const char cmach = 'S';
+    return LAPACK(slamch)( &cmach );
+}
+
+template<>
+inline double MachineSafeMin()
+{
+    const char cmach = 'S';
+    return LAPACK(dlamch)( &cmach );
+}
+
+//----------------------------------------------------------------------------//
+// Safe Norms (avoid under/over-flow)                                         //
+//----------------------------------------------------------------------------//
+
+inline float SafeNorm( float alpha, float beta ) 
+{
+    return LAPACK(slapy2)( &alpha, &beta );
+}
+
+inline double SafeNorm( double alpha, double beta )
+{
+    return LAPACK(dlapy2)( &alpha, &beta );
+}
+
+inline float SafeNorm( float alpha, float beta, float gamma )
+{
+    return LAPACK(slapy3)( &alpha, &beta, &gamma );
+}
+
+inline double SafeNorm( double alpha, double beta, double gamma )
+{
+    return LAPACK(dlapy3)( &alpha, &beta, &gamma );
+}
 
 //----------------------------------------------------------------------------//
 // Unpivoted QR                                                               //

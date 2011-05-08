@@ -1713,9 +1713,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
 #ifndef RELEASE
         else
-        {
             std::logic_error("Invalid H-matrix combination.");
-        }
 #endif
     }
     else if( C.NumLevels() > 1 )
@@ -1772,42 +1770,31 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else
         {
-            if( this->Symmetric() && B.Symmetric() )
-            {
+#ifndef RELEASE
+            if( this->Symmetric() || B.Symmetric() )
                 throw std::logic_error("Unsupported h-matrix multipy case.");
-            }
-            else if( this->Symmetric() && !B.Symmetric() )
-            {
-                throw std::logic_error("Unsupported h-matrix multiply case.");
-            }
-            else if( !this->Symmetric() && B.Symmetric() )
-            {
-                throw std::logic_error("Unsupported h-matrix multiply case.");
-            }
-            else /* !this->Symmetric() && !B.Symmetric() */
-            {
-                const Node& nodeA = *this->_shell.data.node;
-                const Node& nodeB = *B._shell.data.node;
-                Node& nodeC = *C._shell.data.node;
+#endif
+            const Node& nodeA = *this->_shell.data.node;
+            const Node& nodeB = *B._shell.data.node;
+            Node& nodeC = *C._shell.data.node;
 
-                for( int t=0; t<4; ++t )
+            for( int t=0; t<4; ++t )
+            {
+                for( int s=0; s<4; ++s )
                 {
-                    for( int s=0; s<4; ++s )
+                    // Create the H-matrix here
+                    nodeC.children[s+4*t] = 
+                        new Quasi2dHMatrix<Scalar,Conjugated>;
+
+                    // Initialize the [t,s] box of C with the first product
+                    nodeA.Child(t,0).MapMatrix
+                    ( alpha, nodeB.Child(0,s), nodeC.Child(t,s) );
+
+                    // Add the other three products onto it
+                    for( int u=1; u<4; ++u )
                     {
-                        // Create the H-matrix here
-                        nodeC.children[s+4*t] = 
-                            new Quasi2dHMatrix<Scalar,Conjugated>;
-
-                        // Initialize the [t,s] box of C with the first product
-                        nodeA.Child(t,0).MapMatrix
-                        ( alpha, nodeB.Child(0,s), nodeC.Child(t,s) );
-
-                        // Add the other three products onto it
-                        for( int u=1; u<4; ++u )
-                        {
-                            nodeA.Child(t,u).MapMatrix
-                            ( alpha, nodeB.Child(u,s), 1, nodeC.Child(t,s) );
-                        }
+                        nodeA.Child(t,u).MapMatrix
+                        ( alpha, nodeB.Child(u,s), 1, nodeC.Child(t,s) );
                     }
                 }
             }
@@ -1967,9 +1954,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
 #ifndef RELEASE
         else
-        {
             std::logic_error("Invalid H-matrix combination.");
-        }
 #endif
     }
     else if( C.NumLevels() > 1 )
