@@ -807,7 +807,7 @@ void GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
 |*| matrices with their nonzeros packed columnwise.
 \*/
 template<typename Scalar>
-void PackedQR( const int r, Scalar* buffer, Scalar* work );
+void PackedQR( const int r, Scalar* RESTRICT buffer, Scalar* RESTRICT work );
 
 } // namespace hmatrix_tools
 } // namespace psp

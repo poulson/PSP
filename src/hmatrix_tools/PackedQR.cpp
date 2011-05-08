@@ -142,7 +142,8 @@ std::complex<Real> Householder( const int m, std::complex<Real>* buffer )
 //
 // NOTE: This has _NOT_ yet been verified/debugged.
 template<typename Scalar>
-void psp::hmatrix_tools::PackedQR( const int r, Scalar* A, Scalar* work )
+void psp::hmatrix_tools::PackedQR
+( const int r, Scalar* RESTRICT A, Scalar* RESTRICT work )
 {
     // Initialize the pointer at the first diagonal value
     Scalar* diag = A;
@@ -199,10 +200,18 @@ void psp::hmatrix_tools::PackedQR( const int r, Scalar* A, Scalar* work )
 }
 
 template void psp::hmatrix_tools::PackedQR
-( int r, float* buffer, float* work );
+( int r, 
+  float* RESTRICT A, 
+  float* RESTRICT work );
 template void psp::hmatrix_tools::PackedQR
-( int r, double* buffer, double* work );
+( int r, 
+  double* RESTRICT A, 
+  double* RESTRICT work );
 template void psp::hmatrix_tools::PackedQR
-( int r, std::complex<float>* buffer, std::complex<float>* work );
+( int r, 
+  std::complex<float>* RESTRICT A, 
+  std::complex<float>* RESTRICT work );
 template void psp::hmatrix_tools::PackedQR
-( int r, std::complex<double>* buffer, std::complex<double>* work );
+( int r, 
+  std::complex<double>* RESTRICT A, 
+  std::complex<double>* RESTRICT work );
