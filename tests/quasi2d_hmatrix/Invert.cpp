@@ -419,7 +419,7 @@ main( int argc, char* argv[] )
             // Test for discrepancies in x and inv(H) H x
             if( rank == 0 )
             {
-                std::cout << "Multiplying the direct inverse by a vector...";
+                std::cout << "Multiplying the Schulz inverse by a vector...";
                 std::cout.flush();
             }
             matVecStartTime = psp::mpi::WallTime();
