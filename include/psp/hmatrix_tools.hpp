@@ -644,10 +644,10 @@ Real TwoNorm( const Vector< std::complex<Real> >& x );
 \*/
 template<typename Real>
 Real EstimateTwoNorm
-( const AbstractHMatrix<Real>& A );
+( const AbstractHMatrix<Real>& A, Real theta, Real confidence );
 template<typename Real>
 Real EstimateTwoNorm
-( const AbstractHMatrix< std::complex<Real> >& A );
+( const AbstractHMatrix< std::complex<Real> >& A, Real theta, Real confidence );
 
 /*\
 |*| Scale a vector or matrix
@@ -1417,18 +1417,19 @@ Real psp::hmatrix_tools::TwoNorm
 \*/
 template<typename Real>
 Real psp::hmatrix_tools::EstimateTwoNorm
-( const psp::AbstractHMatrix<Real>& A )
+( const psp::AbstractHMatrix<Real>& A, Real theta, Real confidence )
 {
 #ifndef RELEASE
     PushCallStack("hmatrix_tools::EstimateTwoNorm");
+    if( theta <= 1 )
+        throw std::logic_error("Theta must be > 1");
+    if( confidence <= 0 )
+        throw std::logic_error("Confidence must positive.");
 #endif
-    const Real theta = 1.5;
-    const Real confidence = 6;
-
     const int n = A.Height();
     const int k = ceil(log(0.8*sqrt(n)*pow(10,confidence))/log(theta));
 #ifndef RELEASE
-    std::cerr << "Going to use A^" << k << " in order to estimate "
+    std::cerr << "Going to use A^" << k  << " in order to estimate "
               << "||A||_2 within " << (theta-1.0)*100 << "% with probability "
               << "1-10^{-" << confidence << "}" << std::endl;
 #endif
@@ -1460,15 +1461,17 @@ Real psp::hmatrix_tools::EstimateTwoNorm
 
 template<typename Real>
 Real psp::hmatrix_tools::EstimateTwoNorm
-( const psp::AbstractHMatrix< std::complex<Real> >& A )
+( const psp::AbstractHMatrix< std::complex<Real> >& A, 
+  Real theta, Real confidence )
 {
     typedef std::complex<Real> Scalar;
 #ifndef RELEASE
     PushCallStack("hmatrix_tools::EstimateTwoNorm");
+    if( theta <= 1 )
+        throw std::logic_error("Theta must be > 1");
+    if( confidence <= 0 )
+        throw std::logic_error("Confidence must positive.");
 #endif
-    const Real theta = 1.5;
-    const Real confidence = 6;
-
     const int n = A.Height();
     const int k = ceil(log(0.8*sqrt(n)*pow(10,confidence))/log(theta));
 #ifndef RELEASE

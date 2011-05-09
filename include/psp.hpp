@@ -46,6 +46,7 @@ inline std::complex<Real>
 Conj( std::complex<Real> alpha )
 { return std::conj( alpha ); }
 
+// For reading and writing to a buffer
 template<typename T>
 inline void Write( byte*& head, const T& t )
 {
@@ -75,6 +76,16 @@ inline T Read( const byte** head )
     *head += sizeof(T);
     return retval;
 }
+
+// For extracting the underlying real datatype, 
+// e.g., typename RealBase<Scalar>::type a = 3.0;
+template<typename Real>
+struct RealBase
+{ typedef Real type; };
+
+template<typename Real>
+struct RealBase< std::complex<Real> >
+{ typedef Real type; };
 
 // Create a wrappers around real and std::complex<real> types so that they
 // can be conveniently printed in a more Matlab-compatible format.

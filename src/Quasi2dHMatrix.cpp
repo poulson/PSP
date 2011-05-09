@@ -2212,7 +2212,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
-( int numIterations )
+( int numIterations, 
+  typename RealBase<Scalar>::type theta, 
+  typename RealBase<Scalar>::type confidence )
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::SchulzInvert");
@@ -2220,11 +2222,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
         throw std::logic_error("Cannot invert non-square matrices");
     if( this->IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
+    if( theta <= 1 )
+        throw std::logic_error("Theta must be > 1");
+    if( confidence <= 0 )
+        throw std::logic_error("Confidence must be positive");
 #endif
     if( numIterations <= 0 )
         throw std::logic_error("Must use at least 1 iteration.");
 
-    const Scalar estimate = hmatrix_tools::EstimateTwoNorm( *this );
+    const Scalar estimate = 
+        hmatrix_tools::EstimateTwoNorm( *this, theta, confidence );
     const Scalar alpha = ((Scalar)2) / (estimate*estimate);
 
     // Initialize X_0 := alpha A^H

@@ -351,7 +351,10 @@ public:
     // with probability at least 1-10^{-confidence}.
     //
     // The values for theta and confidence are currently hardcoded.
-    void SchulzInvert( int numIterations );
+    void SchulzInvert
+    ( int numIterations, 
+      typename RealBase<Scalar>::type theta=1.5, 
+      typename RealBase<Scalar>::type confidence=6 );
 };
 
 } // namespace psp
