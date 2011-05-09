@@ -110,7 +110,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     // Make space for the SplitQuasi2dHMatrix member variables
     {
         const std::size_t headerSize = 
-            16*sizeof(int) + 3*sizeof(bool) + sizeof(ShellType);
+            16*sizeof(int) + 2*sizeof(bool) + sizeof(ShellType);
         sourceSize += headerSize;
         targetSize += headerSize;
     }
@@ -172,55 +172,53 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
     // Write out the source member variables
-    *((int*)sourceHead) = H._height;              sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._width;               sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._numLevels;           sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._maxRank;             sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._sourceOffset;        sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._targetOffset;        sourceHead += sizeof(int);
-    *((bool*)sourceHead) = H._symmetric;          sourceHead += sizeof(bool);
-    *((bool*)sourceHead) = H._stronglyAdmissible; sourceHead += sizeof(bool);
-    *((int*)sourceHead) = H._xSizeSource;         sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._xSizeTarget;         sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._ySizeSource;         sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._ySizeTarget;         sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._zSize;               sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._xSource;             sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._xTarget;             sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._ySource;             sourceHead += sizeof(int);
-    *((int*)sourceHead) = H._yTarget;             sourceHead += sizeof(int);
-    *((bool*)sourceHead) = true;                  sourceHead += sizeof(bool);
-    *((int*)sourceHead) = targetRank;             sourceHead += sizeof(int);
+    Write( sourceHead, H._height );
+    Write( sourceHead, H._width );
+    Write( sourceHead, H._numLevels );
+    Write( sourceHead, H._maxRank );
+    Write( sourceHead, H._sourceOffset );
+    Write( sourceHead, H._targetOffset );
+    //Write( sourceHead, H._type );
+    Write( sourceHead, H._stronglyAdmissible );
+    Write( sourceHead, H._xSizeSource );
+    Write( sourceHead, H._xSizeTarget );
+    Write( sourceHead, H._ySizeSource );
+    Write( sourceHead, H._ySizeTarget );
+    Write( sourceHead, H._zSize );
+    Write( sourceHead, H._xSource );
+    Write( sourceHead, H._xTarget );
+    Write( sourceHead, H._ySource );
+    Write( sourceHead, H._yTarget );
+    Write( sourceHead, true );
+    Write( sourceHead, targetRank );
     
     // Write out the target member variables
-    *((int*)targetHead) = H._height;              targetHead += sizeof(int);
-    *((int*)targetHead) = H._width;               targetHead += sizeof(int);
-    *((int*)targetHead) = H._numLevels;           targetHead += sizeof(int);
-    *((int*)targetHead) = H._maxRank;             targetHead += sizeof(int);
-    *((int*)targetHead) = H._sourceOffset;        targetHead += sizeof(int);
-    *((int*)targetHead) = H._targetOffset;        targetHead += sizeof(int);
-    *((bool*)targetHead) = H._symmetric;          targetHead += sizeof(bool);
-    *((bool*)targetHead) = H._stronglyAdmissible; targetHead += sizeof(bool);
-    *((int*)targetHead) = H._xSizeSource;         targetHead += sizeof(int);
-    *((int*)targetHead) = H._xSizeTarget;         targetHead += sizeof(int);
-    *((int*)targetHead) = H._ySizeSource;         targetHead += sizeof(int);
-    *((int*)targetHead) = H._ySizeTarget;         targetHead += sizeof(int);
-    *((int*)targetHead) = H._zSize;               targetHead += sizeof(int);
-    *((int*)targetHead) = H._xSource;             targetHead += sizeof(int);
-    *((int*)targetHead) = H._xTarget;             targetHead += sizeof(int);
-    *((int*)targetHead) = H._ySource;             targetHead += sizeof(int);
-    *((int*)targetHead) = H._yTarget;             targetHead += sizeof(int);
-    *((bool*)targetHead) = false;                 targetHead += sizeof(bool);
-    *((int*)targetHead) = sourceRank;             targetHead += sizeof(int);
+    Write( targetHead, H._height );
+    Write( targetHead, H._width );
+    Write( targetHead, H._numLevels );
+    Write( targetHead, H._maxRank );
+    Write( targetHead, H._sourceOffset );
+    Write( targetHead, H._targetOffset );
+    //Write( targetHead, H._type );
+    Write( targetHead, H._stronglyAdmissible );
+    Write( targetHead, H._xSizeSource );
+    Write( targetHead, H._xSizeTarget );
+    Write( targetHead, H._ySizeSource );
+    Write( targetHead, H._ySizeTarget );
+    Write( targetHead, H._zSize );
+    Write( targetHead, H._xSource );
+    Write( targetHead, H._xTarget );
+    Write( targetHead, H._ySource );
+    Write( targetHead, H._yTarget );
+    Write( targetHead, false );
+    Write( targetHead, sourceRank );
 
     const typename Quasi2d::Shell& shell = H._shell;
     switch( shell.type )
     {
     case Quasi2d::NODE:
-        *((ShellType*)sourceHead) = NODE;
-        *((ShellType*)targetHead) = NODE;
-        sourceHead += sizeof(ShellType);
-        targetHead += sizeof(ShellType);
+        Write( sourceHead, NODE );
+        Write( targetHead, NODE );
         for( int i=0; i<16; ++i )        
         {
             PackRecursion
@@ -229,10 +227,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
         break;
     case Quasi2d::NODE_SYMMETRIC:
-        *((ShellType*)sourceHead) = NODE_SYMMETRIC;
-        *((ShellType*)targetHead) = NODE_SYMMETRIC;
-        sourceHead += sizeof(ShellType);
-        targetHead += sizeof(ShellType);
+        Write( sourceHead, NODE_SYMMETRIC );
+        Write( targetHead, NODE_SYMMETRIC );
         for( int i=0; i<10; ++i )
         {
             PackRecursion
@@ -242,10 +238,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         break;
     case Quasi2d::LOW_RANK:
     {
-        *((ShellType*)sourceHead) = SPLIT_LOW_RANK;
-        *((ShellType*)targetHead) = SPLIT_LOW_RANK;
-        sourceHead += sizeof(ShellType);
-        targetHead += sizeof(ShellType);
+        Write( sourceHead, SPLIT_LOW_RANK );
+        Write( targetHead, SPLIT_LOW_RANK );
 
         const DenseMatrix<Scalar>& U = shell.data.F->U;
         const DenseMatrix<Scalar>& V = shell.data.F->V;
@@ -254,7 +248,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const int r = U.Width();
 
         // Write out the source information
-        *((int*)sourceHead) = r; sourceHead += sizeof(int);
+        Write( sourceHead, r );
         for( int j=0; j<r; ++j )
         {
             std::memcpy( sourceHead, V.LockedBuffer(0,j), n*sizeof(Scalar) );
@@ -262,7 +256,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         }
 
         // Write out the target information
-        *((int*)targetHead) = r; targetHead += sizeof(int);
+        Write( targetHead, r );
         for( int j=0; j<r; ++j )
         {
             std::memcpy( targetHead, U.LockedBuffer(0,j), m*sizeof(Scalar) );
@@ -273,10 +267,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     }
     case Quasi2d::DENSE:
     {
-        *((ShellType*)sourceHead) = SPLIT_DENSE;
-        *((ShellType*)targetHead) = SPLIT_DENSE;
-        sourceHead += sizeof(ShellType);
-        targetHead += sizeof(ShellType);
+        Write( sourceHead, SPLIT_DENSE );
+        Write( targetHead, SPLIT_DENSE );
 
         const DenseMatrix<Scalar>& D = *shell.data.D;
         const int m = D.Height();
@@ -284,7 +276,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const MatrixType type = D.Type();
 
         // Write out the source information
-        *((MatrixType*)sourceHead) = type; sourceHead += sizeof(MatrixType);
+        Write( sourceHead, type );
         if( type == GENERAL )
         {
             for( int j=0; j<n; ++j )
@@ -319,7 +311,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::SplitQuasi2dHMatrix
 ( MPI_Comm comm )
 : _height(0), _width(0), _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), 
-  _symmetric(false), _stronglyAdmissible(false),
+  /*_type(GENERAL),*/ _stronglyAdmissible(false),
   _xSizeSource(0), _xSizeTarget(0), _ySizeSource(0), _ySizeTarget(0),
   _zSize(0), _xSource(0), _xTarget(0), _ySource(0), _yTarget(0),
   _ownSourceSide(false), _comm(comm), _partner(0)
@@ -372,25 +364,25 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 {
     MPI_Comm comm = H._comm;
 
-    H._height             = *((int*)head);  head += sizeof(int);
-    H._width              = *((int*)head);  head += sizeof(int);
-    H._numLevels          = *((int*)head);  head += sizeof(int);
-    H._maxRank            = *((int*)head);  head += sizeof(int);
-    H._sourceOffset       = *((int*)head);  head += sizeof(int);
-    H._targetOffset       = *((int*)head);  head += sizeof(int);
-    H._symmetric          = *((bool*)head); head += sizeof(bool);
-    H._stronglyAdmissible = *((bool*)head); head += sizeof(bool);
-    H._xSizeSource        = *((int*)head);  head += sizeof(int);
-    H._xSizeTarget        = *((int*)head);  head += sizeof(int);
-    H._ySizeSource        = *((int*)head);  head += sizeof(int);
-    H._ySizeTarget        = *((int*)head);  head += sizeof(int);
-    H._zSize              = *((int*)head);  head += sizeof(int);
-    H._xSource            = *((int*)head);  head += sizeof(int);
-    H._xTarget            = *((int*)head);  head += sizeof(int);
-    H._ySource            = *((int*)head);  head += sizeof(int);
-    H._yTarget            = *((int*)head);  head += sizeof(int);
-    H._ownSourceSide     = *((bool*)head);  head += sizeof(bool);
-    H._partner            = *((int*)head);  head += sizeof(int);
+    H._height             = Read<int>( head );
+    H._width              = Read<int>( head );
+    H._numLevels          = Read<int>( head );
+    H._maxRank            = Read<int>( head );
+    H._sourceOffset       = Read<int>( head );
+    H._targetOffset       = Read<int>( head );
+    //H._type = Read<MatrixType>( head );
+    H._stronglyAdmissible = Read<bool>( head );
+    H._xSizeSource        = Read<int>( head );
+    H._xSizeTarget        = Read<int>( head );
+    H._ySizeSource        = Read<int>( head );
+    H._ySizeTarget        = Read<int>( head );
+    H._zSize              = Read<int>( head );
+    H._xSource            = Read<int>( head );
+    H._xTarget            = Read<int>( head );
+    H._ySource            = Read<int>( head );
+    H._yTarget            = Read<int>( head );
+    H._ownSourceSide      = Read<bool>( head );
+    H._partner            = Read<int>( head );
 
     // Delete the old shell information if it exists
     Shell& shell = H._shell;
@@ -403,7 +395,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
 
     // Create this layer of the H-matrix from the packed information
-    shell.type = *((ShellType*)head); head += sizeof(ShellType);
+    shell.type = Read<ShellType>( head );
     switch( shell.type )
     {
     case NODE:
@@ -436,24 +428,18 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_LOW_RANK:
     {
-        shell.data.SF = new SplitLowRankMatrix<Scalar,Conjugated>;
-        SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
-
+        shell.data.SF = new SplitLowRankMatrix;
+        SplitLowRankMatrix& SF = *shell.data.SF;
         const int m = H._height;
         const int n = H._width;
-        const int r = *((int*)head); head += sizeof(int);
-        SF.height        = m;
-        SF.width         = n;
-        SF.rank          = r;
-        SF.comm          = comm;
-        SF.ownSourceSide = H._ownSourceSide;
-        SF.partner       = H._partner;
+
+        SF.rank = Read<int>( head );
 
         SF.D.SetType( GENERAL );
-        if( SF.ownSourceSide )
+        if( _ownSourceSide )
         {
-            SF.D.Resize( n, r );
-            for( int j=0; j<r; ++j )
+            SF.D.Resize( n, SF.rank );
+            for( int j=0; j<SF.rank; ++j )
             {
                 std::memcpy( SF.D.Buffer(0,j), head, n*sizeof(Scalar) );
                 head += n*sizeof(Scalar);
@@ -461,33 +447,26 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         }
         else
         {
-            SF.D.Resize( m, r );
-            for( int j=0; j<r; ++j )
+            SF.D.Resize( m, SF.rank );
+            for( int j=0; j<SF.rank; ++j )
             {
                 std::memcpy( SF.D.Buffer(0,j), head, m*sizeof(Scalar) );
                 head += m*sizeof(Scalar);
             }
         }
-        
         break;
     }
     case SPLIT_DENSE:
     {
-        shell.data.SD = new SplitDenseMatrix<Scalar>;
-        SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
+        shell.data.SD = new SplitDenseMatrix;
+        SplitDenseMatrix& SD = *shell.data.SD;
 
         const int m = H._height;
         const int n = H._width;
-        SD.height        = m;
-        SD.width         = n;
-        SD.comm          = comm;
-        SD.partner       = H._partner;
-        SD.ownSourceSide = H._ownSourceSide;
 
-        if( SD.ownSourceSide )
+        if( _ownSourceSide )
         {
-            const MatrixType type = *((MatrixType*)head); 
-            head += sizeof(MatrixType);
+            const MatrixType type = Read<MatrixType>( head );
 
             SD.D.SetType( type );
             SD.D.Resize( m, n );
@@ -546,8 +525,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         break;
     case SPLIT_LOW_RANK:
     {
-        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
-        if( SF.ownSourceSide )
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        if( _ownSourceSide )
         {
             if( Conjugated )
             {
@@ -564,8 +543,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
-        if( SD.ownSourceSide )
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        if( _ownSourceSide )
             hmatrix_tools::MatrixVector( alpha, SD.D, xLocal, SD.z );
         break;
     }
@@ -600,25 +579,25 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
         break;
     case SPLIT_LOW_RANK:
     {
-        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
-        if( SF.ownSourceSide )
-            mpi::Send( SF.z.LockedBuffer(), SF.rank, SF.partner, 0, SF.comm );
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        if( _ownSourceSide )
+            mpi::Send( SF.z.LockedBuffer(), SF.rank, _partner, 0, _comm );
         else
         {
             SF.z.Resize( SF.rank );
-            mpi::Recv( SF.z.Buffer(), SF.rank, SF.partner, 0, SF.comm );
+            mpi::Recv( SF.z.Buffer(), SF.rank, _partner, 0, _comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
-        if( SD.ownSourceSide )
-            mpi::Send( SD.z.LockedBuffer(), SD.height, SD.partner, 0, SD.comm );
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        if( _ownSourceSide )
+            mpi::Send( SD.z.LockedBuffer(), _height, _partner, 0, _comm );
         else
         {
-            SD.z.Resize( SD.height );
-            mpi::Recv( SD.z.Buffer(), SD.height, SD.partner, 0, SD.comm );
+            SD.z.Resize( _height );
+            mpi::Recv( SD.z.Buffer(), _height, _partner, 0, _comm );
         }
         break;
     }
@@ -658,8 +637,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         break;
     case SPLIT_LOW_RANK:
     {
-        const SplitLowRankMatrix<Scalar,Conjugated>& SF = *shell.data.SF;
-        if( !SF.ownSourceSide )
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        if( !_ownSourceSide )
         {
             hmatrix_tools::MatrixVector
             ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocal );
@@ -668,10 +647,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix<Scalar>& SD = *shell.data.SD;
-        if( !SD.ownSourceSide )
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        if( !_ownSourceSide )
         {
-            const int localHeight = SD.height;
+            const int localHeight = _height;
             const Scalar* zBuffer = SD.z.LockedBuffer();
             Scalar* yLocalBuffer = yLocal.Buffer();
             for( int i=0; i<localHeight; ++i )

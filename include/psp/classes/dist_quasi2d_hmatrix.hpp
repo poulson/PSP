@@ -22,12 +22,8 @@
 #define PSP_DIST_QUASI2D_HMATRIX_HPP 1
 
 #include "psp/classes/quasi2d_hmatrix.hpp"
-#include "psp/classes/subcomms.hpp"
 #include "psp/classes/split_quasi2d_hmatrix.hpp"
-#include "psp/structs/split_low_rank_matrix.hpp"
-#include "psp/structs/split_dense_matrix.hpp"
-#include "psp/structs/dist_low_rank_matrix.hpp"
-#include "psp/structs/dist_split_low_rank_matrix.hpp"
+#include "psp/classes/subcomms.hpp"
 
 namespace psp {
 
@@ -57,6 +53,26 @@ private:
 
     static void ComputeLocalSizesRecursion
     ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );
+
+    struct DistLowRankMatrix
+    {
+        int rank;
+        DenseMatrix<Scalar> ULocal, VLocal;
+        mutable Vector<Scalar> z;
+    };
+
+    struct SplitLowRankMatrix
+    {
+        int rank;
+        DenseMatrix<Scalar> D;
+        mutable Vector<Scalar> z;
+    };
+
+    struct SplitDenseMatrix
+    {
+        DenseMatrix<Scalar> D;
+        mutable Vector<Scalar> z;
+    };
 
     struct Node
     {
@@ -92,10 +108,9 @@ private:
     { 
         NODE,                // recurse
         NODE_SYMMETRIC,      // recurse symmetrically
-        DIST_SPLIT_LOW_RANK, // each side is distributed to different teams
-        DIST_LOW_RANK,       // both sides are distributed to same team
+        DIST_LOW_RANK,       // each side is distributed
         SPLIT_QUASI2D,       // split between two processes
-        SPLIT_LOW_RANK,      // each side is given to one process
+        SPLIT_LOW_RANK,      // each side is given to a different process
         SPLIT_DENSE,         // split between two processes
         QUASI2D,             // serial
         LOW_RANK,            // serial
@@ -110,11 +125,10 @@ private:
         {
             Node* node;
             NodeSymmetric* nodeSymmetric;
-            DistSplitLowRankMatrix<Scalar,Conjugated>* DSF;
-            DistLowRankMatrix<Scalar,Conjugated>* DF;
+            DistLowRankMatrix* DF;
             SplitQuasi2dHMatrix<Scalar,Conjugated>* SH;
-            SplitLowRankMatrix<Scalar,Conjugated>* SF;
-            SplitDenseMatrix<Scalar>* SD;
+            SplitLowRankMatrix* SF;
+            SplitDenseMatrix* SD;
             Quasi2dHMatrix<Scalar,Conjugated>* H;
             LowRankMatrix<Scalar,Conjugated>* F;
             DenseMatrix<Scalar>* D;
@@ -128,7 +142,6 @@ private:
     int _numLevels;
     int _maxRank;
     int _sourceOffset, _targetOffset;
-    bool _symmetric; // TODO: Replace with MatrixType
     bool _stronglyAdmissible;
 
     int _xSizeSource, _xSizeTarget;
@@ -142,11 +155,13 @@ private:
     unsigned _level;
     bool _inSourceTeam;
     bool _inTargetTeam;
+    int _rootOfOtherTeam; // only applies if in only source or target team
     int _localSourceOffset;
     int _localTargetOffset;
 
     void UnpackRecursion
-    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H );
+    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
+      int sourceRankOffset, int targetRankOffset );
 
     // Ensure that the default constructor is not accessible, a communicator
     // must be supplied
@@ -395,16 +410,15 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 { 
     switch( type )
     {
-    case NODE:                delete data.node; break;
-    case NODE_SYMMETRIC:      delete data.nodeSymmetric; break;
-    case DIST_SPLIT_LOW_RANK: delete data.DSF; break;
-    case DIST_LOW_RANK:       delete data.DF; break;
-    case SPLIT_QUASI2D:       delete data.SH; break;
-    case SPLIT_LOW_RANK:      delete data.SF; break;
-    case SPLIT_DENSE:         delete data.SD; break;
-    case QUASI2D:             delete data.H; break;
-    case LOW_RANK:            delete data.F; break;
-    case DENSE:               delete data.D; break;
+    case NODE:           delete data.node; break;
+    case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
+    case DIST_LOW_RANK:  delete data.DF; break;
+    case SPLIT_QUASI2D:  delete data.SH; break;
+    case SPLIT_LOW_RANK: delete data.SF; break;
+    case SPLIT_DENSE:    delete data.SD; break;
+    case QUASI2D:        delete data.H; break;
+    case LOW_RANK:       delete data.F; break;
+    case DENSE:          delete data.D; break;
     case EMPTY: break;
     }
 }

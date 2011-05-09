@@ -46,6 +46,36 @@ inline std::complex<Real>
 Conj( std::complex<Real> alpha )
 { return std::conj( alpha ); }
 
+template<typename T>
+inline void Write( byte*& head, const T& t )
+{
+    *((T*)head) = t;
+    head += sizeof(T);
+}
+
+template<typename T>
+inline void Write( byte** head, const T& t )
+{
+    *((T*)*head) = t;
+    *head += sizeof(T);
+}
+
+template<typename T>
+inline T Read( const byte*& head )
+{
+    T retval = *((const T*)head);
+    head += sizeof(T);
+    return retval;
+}
+
+template<typename T>
+inline T Read( const byte** head )
+{
+    T retval = *((const T*)*head);
+    *head += sizeof(T);
+    return retval;
+}
+
 // Create a wrappers around real and std::complex<real> types so that they
 // can be conveniently printed in a more Matlab-compatible format.
 //

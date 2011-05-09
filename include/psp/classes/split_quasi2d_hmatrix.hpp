@@ -22,8 +22,6 @@
 #define PSP_SPLIT_QUASI2D_HMATRIX_HPP 1
 
 #include "psp/classes/quasi2d_hmatrix.hpp"
-#include "psp/structs/split_low_rank_matrix.hpp"
-#include "psp/structs/split_dense_matrix.hpp"
 
 namespace psp {
 
@@ -39,6 +37,19 @@ private:
     ( byte*& sourceHead, byte*& targetHead,
       int sourceRank, int targetRank,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    struct SplitLowRankMatrix
+    {
+        int rank;
+        DenseMatrix<Scalar> D;
+        mutable Vector<Scalar> z;
+    };
+
+    struct SplitDenseMatrix
+    {
+        DenseMatrix<Scalar> D;
+        mutable Vector<Scalar> z;
+    };
 
     struct Node
     {
@@ -85,8 +96,8 @@ private:
         {
             Node* node;
             NodeSymmetric* nodeSymmetric;
-            SplitLowRankMatrix<Scalar,Conjugated>* SF;
-            SplitDenseMatrix<Scalar>* SD;
+            SplitLowRankMatrix* SF;
+            SplitDenseMatrix* SD;
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
         Shell();
@@ -97,7 +108,7 @@ private:
     int _numLevels;
     int _maxRank;
     int _sourceOffset, _targetOffset;
-    bool _symmetric; // TODO: Replace with MatrixType
+    // TODO: Make use of MatrixType
     bool _stronglyAdmissible;
 
     int _xSizeSource, _xSizeTarget;
@@ -112,7 +123,7 @@ private:
     MPI_Comm _comm;
     int _partner;
 
-    // Temporary storage for a matrix-vector product
+    // Temporary storage
     mutable Vector<Scalar> _z;
 
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
