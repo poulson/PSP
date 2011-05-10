@@ -122,14 +122,14 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
         for( int i=0; i<16; ++i )
         {
             PackedSizesRecursion
-            ( sourceSize, targetSize, *shell.data.node->children[i] );
+            ( sourceSize, targetSize, *shell.data.N->children[i] );
         }
         break;
     case Quasi2d::NODE_SYMMETRIC:
         for( int i=0; i<10; ++i )
         {
             PackedSizesRecursion
-            ( sourceSize, targetSize, *shell.data.nodeSymmetric->children[i] );
+            ( sourceSize, targetSize, *shell.data.NS->children[i] );
         }
         break;
     case Quasi2d::LOW_RANK:
@@ -223,7 +223,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         {
             PackRecursion
             ( sourceHead, targetHead, sourceRank, targetRank, 
-              *shell.data.node->children[i] );
+              *shell.data.N->children[i] );
         }
         break;
     case Quasi2d::NODE_SYMMETRIC:
@@ -233,7 +233,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         {
             PackRecursion
             ( sourceHead, targetHead, sourceRank, targetRank, 
-              *shell.data.nodeSymmetric->children[i] );
+              *shell.data.NS->children[i] );
         }
         break;
     case Quasi2d::LOW_RANK:
@@ -388,10 +388,10 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     Shell& shell = H._shell;
     switch( shell.type )
     {
-    case NODE:           delete shell.data.node;          break;
-    case NODE_SYMMETRIC: delete shell.data.nodeSymmetric; break;
-    case SPLIT_LOW_RANK: delete shell.data.SF;            break;
-    case SPLIT_DENSE:    delete shell.data.SD;            break;
+    case NODE:           delete shell.data.N;  break;
+    case NODE_SYMMETRIC: delete shell.data.NS; break;
+    case SPLIT_LOW_RANK: delete shell.data.SF; break;
+    case SPLIT_DENSE:    delete shell.data.SD; break;
     }
 
     // Create this layer of the H-matrix from the packed information
@@ -400,11 +400,11 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
     case NODE:
     {
-        shell.data.node = 
+        shell.data.N = 
             new Node
             ( H._xSizeSource, H._xSizeTarget,
               H._ySizeSource, H._ySizeTarget, H._zSize );
-        Node& node = *shell.data.node;
+        Node& node = *shell.data.N;
         for( int i=0; i<16; ++i )
         {
             node.children[i] = 
@@ -415,9 +415,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case NODE_SYMMETRIC:
     {
-        shell.data.nodeSymmetric = 
+        shell.data.NS = 
             new NodeSymmetric( H._xSizeSource, H._ySizeSource, H._zSize );
-        NodeSymmetric& node = *shell.data.nodeSymmetric;
+        NodeSymmetric& node = *shell.data.NS;
         for( int i=0; i<10; ++i )
         {
             node.children[i] = 
@@ -505,7 +505,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     {
     case NODE:
     {
-        const Node& node = *shell.data.node;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
         {
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
@@ -524,10 +524,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 #endif
         break;
     case SPLIT_LOW_RANK:
-    {
-        const SplitLowRankMatrix& SF = *shell.data.SF;
         if( _ownSourceSide )
         {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
             if( Conjugated )
             {
                 hmatrix_tools::MatrixHermitianTransposeVector
@@ -540,14 +539,57 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
             }
         }
         break;
-    }
     case SPLIT_DENSE:
-    {
-        const SplitDenseMatrix& SD = *shell.data.SD;
         if( _ownSourceSide )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
             hmatrix_tools::MatrixVector( alpha, SD.D, xLocal, SD.z );
+        }
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
+( Scalar alpha, const Vector<Scalar>& xLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::TransposeMapVectorPrecompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            Vector<Scalar> xLocalSub;
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapVectorPrecompute
+                ( alpha, xLocalSub );
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( !_ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            hmatrix_tools::MatrixTransposeVector( alpha, SF.D, xLocal, SF.z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
     }
 #ifndef RELEASE
     PopCallStack();
@@ -566,7 +608,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
     {
     case NODE:
     {
-        const Node& node = *shell.data.node;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorNaivePassData();
@@ -609,6 +651,60 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
 
 template<typename Scalar,bool Conjugated>
 void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
+( const Vector<Scalar>& xLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::TransposeMapVectorNaivePassData");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapVectorNaivePassData( xLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        if( !_ownSourceSide )
+            mpi::Send( SF.z.LockedBuffer(), SF.rank, _partner, 0, _comm );
+        else
+        {
+            SF.z.Resize( SF.rank );
+            mpi::Recv( SF.z.Buffer(), SF.rank, _partner, 0, _comm );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        if( !_ownSourceSide )
+            mpi::Send( xLocal.LockedBuffer(), _height, _partner, 0, _comm );
+        else
+        {
+            SD.z.Resize( _height );
+            mpi::Recv( SD.z.Buffer(), _height, _partner, 0, _comm );
+        }
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 ( Vector<Scalar>& yLocal ) const
 {
@@ -620,7 +716,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     {
     case NODE:
     {
-        const Node& node = *shell.data.node;
+        const Node& node = *shell.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
             Vector<Scalar> yLocalSub;
@@ -636,20 +732,17 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 #endif
         break;
     case SPLIT_LOW_RANK:
-    {
-        const SplitLowRankMatrix& SF = *shell.data.SF;
         if( !_ownSourceSide )
         {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
             hmatrix_tools::MatrixVector
             ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocal );
         }
         break;
-    }
     case SPLIT_DENSE:
-    {
-        const SplitDenseMatrix& SD = *shell.data.SD;
         if( !_ownSourceSide )
         {
+            const SplitDenseMatrix& SD = *shell.data.SD;
             const int localHeight = _height;
             const Scalar* zBuffer = SD.z.LockedBuffer();
             Scalar* yLocalBuffer = yLocal.Buffer();
@@ -658,6 +751,68 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         }
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
+( Scalar alpha, Vector<Scalar>& yLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapVectorPostcompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            Vector<Scalar> yLocalSub;
+            yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+            for( int t=0; t<4; ++t )
+                node.Child(t,s).TransposeMapVectorPostcompute
+                ( alpha, yLocalSub );
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( _ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            if( Conjugated )
+            {
+                // yLocal += conj(V) z
+                hmatrix_tools::Conjugate( SF.z );
+                hmatrix_tools::Conjugate( yLocal );
+                hmatrix_tools::MatrixVector
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocal );
+                hmatrix_tools::Conjugate( yLocal );
+            }
+            else
+            {
+                hmatrix_tools::MatrixVector
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocal );
+            }
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _ownSourceSide )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            hmatrix_tools::MatrixTransposeVector
+            ( alpha, SD.D, SD.z, (Scalar)1, yLocal );
+        }
+        break;
     }
 #ifndef RELEASE
     PopCallStack();

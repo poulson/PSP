@@ -123,8 +123,8 @@ private:
         ShellType type;
         union Data
         {
-            Node* node;
-            NodeSymmetric* nodeSymmetric;
+            Node* N;
+            NodeSymmetric* NS;
             DistLowRankMatrix* DF;
             SplitQuasi2dHMatrix<Scalar,Conjugated>* SH;
             SplitLowRankMatrix* SF;
@@ -170,31 +170,53 @@ private:
     void MapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
-
-    void MapVectorSourceTeamSummations() const;
-    void MapVectorSourceTeamSummationsCount( std::vector<int>& sizes ) const;
-    void MapVectorSourceTeamSummationsPack
+    void MapVectorSummations() const;
+    void MapVectorSummationsCount( std::vector<int>& sizes ) const;
+    void MapVectorSummationsPack
     ( std::vector<Scalar>& buffer, 
       std::vector<int>& offsets ) const;
-    void MapVectorSourceTeamSummationsUnpack
+    void MapVectorSummationsUnpack
     ( const std::vector<Scalar>& buffer,
             std::vector<int>& offsets ) const;
-    void MapVectorNaiveSourceTeamSummations() const;
-
+    void MapVectorNaiveSummations() const;
     void MapVectorPassData() const;
     void MapVectorNaivePassData() const;
-
-    void MapVectorTargetTeamBroadcasts() const;
-    void MapVectorTargetTeamBroadcastsCount( std::vector<int>& sizes ) const;
-    void MapVectorTargetTeamBroadcastsPack
+    void MapVectorBroadcasts() const;
+    void MapVectorBroadcastsCount( std::vector<int>& sizes ) const;
+    void MapVectorBroadcastsPack
     ( std::vector<Scalar>& buffer,
       std::vector<int>& offsets ) const;
-    void MapVectorTargetTeamBroadcastsUnpack
+    void MapVectorBroadcastsUnpack
     ( const std::vector<Scalar>& buffer,
             std::vector<int>& offsets ) const;
-    void MapVectorNaiveTargetTeamBroadcasts() const;
-
+    void MapVectorNaiveBroadcasts() const;
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
+
+    void TransposeMapVectorPrecompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void TransposeMapVectorSummations() const;
+    void TransposeMapVectorSummationsCount( std::vector<int>& sizes ) const;
+    void TransposeMapVectorSummationsPack
+    ( std::vector<Scalar>& buffer,
+      std::vector<int>& offsets ) const;
+    void TransposeMapVectorSummationsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
+    void TransposeMapVectorNaiveSummations() const;
+    void TransposeMapVectorPassData( const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorNaivePassData( const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorBroadcasts() const;
+    void TransposeMapVectorBroadcastsCount( std::vector<int>& sizes ) const;
+    void TransposeMapVectorBroadcastsPack
+    ( std::vector<Scalar>& buffer,
+      std::vector<int>& offsets ) const;
+    void TransposeMapVectorBroadcastsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
+    void TransposeMapVectorNaiveBroadcasts() const;
+    void TransposeMapVectorPostcompute
+    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 
 public:
     static std::size_t PackedSizes
@@ -241,13 +263,23 @@ public:
 
     // y := alpha H x
     void MapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) 
-    const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
 
     // y := alpha H x + beta y
     void MapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
-      Scalar beta, Vector<Scalar>& yLocal ) const;
+      Scalar beta,        Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H^T x
+    void TransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H^T x + beta y
+    void TransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+      Scalar beta,        Vector<Scalar>& yLocal ) const;
 };
 
 } // namespace psp
@@ -410,15 +442,15 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 { 
     switch( type )
     {
-    case NODE:           delete data.node; break;
-    case NODE_SYMMETRIC: delete data.nodeSymmetric; break;
+    case NODE:           delete data.N;  break;
+    case NODE_SYMMETRIC: delete data.NS; break;
     case DIST_LOW_RANK:  delete data.DF; break;
     case SPLIT_QUASI2D:  delete data.SH; break;
     case SPLIT_LOW_RANK: delete data.SF; break;
     case SPLIT_DENSE:    delete data.SD; break;
-    case QUASI2D:        delete data.H; break;
-    case LOW_RANK:       delete data.F; break;
-    case DENSE:          delete data.D; break;
+    case QUASI2D:        delete data.H;  break;
+    case LOW_RANK:       delete data.F;  break;
+    case DENSE:          delete data.D;  break;
     case EMPTY: break;
     }
 }

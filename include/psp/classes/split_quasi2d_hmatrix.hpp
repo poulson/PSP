@@ -94,8 +94,8 @@ private:
         ShellType type;
         union Data
         {
-            Node* node;
-            NodeSymmetric* nodeSymmetric;
+            Node* N;
+            NodeSymmetric* NS;
             SplitLowRankMatrix* SF;
             SplitDenseMatrix* SD;
             Data() { std::memset( this, 0, sizeof(Data) ); }
@@ -135,6 +135,12 @@ private:
     ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
     void MapVectorNaivePassData() const;
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
+
+    void TransposeMapVectorPrecompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorNaivePassData( const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorPostcompute
+    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
@@ -323,8 +329,8 @@ SplitQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 {
     switch( type )
     {
-    case NODE:            delete data.node; break;
-    case NODE_SYMMETRIC:  delete data.nodeSymmetric; break;
+    case NODE:           delete data.N;  break;
+    case NODE_SYMMETRIC: delete data.NS; break;
     case SPLIT_LOW_RANK: delete data.SF; break;
     case SPLIT_DENSE:    delete data.SD; break;
     }
