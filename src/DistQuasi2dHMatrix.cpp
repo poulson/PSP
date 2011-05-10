@@ -1248,12 +1248,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         break;
     }
     case NODE_SYMMETRIC:
-    {
 #ifndef RELEASE
         throw std::logic_error("Symmetric case not yet written");
 #endif
         break;
-    }
     case DIST_LOW_RANK:
     {
         const DistLowRankMatrix& DF = *shell.data.DF;
@@ -1437,12 +1435,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSourceTeamSummationsCount
         break;
     }
     case NODE_SYMMETRIC:
-    {
 #ifndef RELEASE
         throw std::logic_error("Symmetric case not yet supported");
 #endif
         break;
-    }
     case DIST_LOW_RANK:
     {
         const DistLowRankMatrix& DF = *shell.data.DF;
@@ -1646,6 +1642,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
     PushCallStack("DistQuasi2dHMatrix::MapVectorPassData");
 #endif
     // TODO: Implement AllToAll redistribution
+    throw std::logic_error("Non-naive MapVectorPassData not yet written");
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1673,7 +1670,7 @@ const
         {
             if( teamRank == 0 )     
             {
-                // Take care of the top-left quadrant within our subteam
+                // Take care of the top-left quadrant within our subteams
                 node.Child(0,0).MapVectorNaivePassData();
                 node.Child(0,1).MapVectorNaivePassData();
                 node.Child(1,0).MapVectorNaivePassData();
@@ -1681,7 +1678,7 @@ const
             }
             else
             {
-                // Take care of the bottom-right quadrant within our subteam 
+                // Take care of the bottom-right quadrant within our subteams
                 node.Child(2,2).MapVectorNaivePassData();
                 node.Child(2,3).MapVectorNaivePassData();
                 node.Child(3,2).MapVectorNaivePassData();
@@ -1705,7 +1702,7 @@ const
             switch( subteam )
             {
             case 0:
-                // Take care of the work specific to our subteam
+                // Take care of the work specific to our subteams
                 node.Child(0,0).MapVectorNaivePassData();
                 // Interact with subteam 1
                 node.Child(0,1).MapVectorNaivePassData();
@@ -1718,7 +1715,7 @@ const
                 node.Child(3,0).MapVectorNaivePassData();
                 break;
             case 1:
-                // Take care of the work specific to our subteam
+                // Take care of the work specific to our subteams
                 node.Child(1,1).MapVectorNaivePassData();
                 // Interact with subteam 0
                 node.Child(0,1).MapVectorNaivePassData();
@@ -1731,7 +1728,7 @@ const
                 node.Child(2,1).MapVectorNaivePassData();
                 break;
             case 2:
-                // Take care of the work specific to our subteam
+                // Take care of the work specific to our subteams
                 node.Child(2,2).MapVectorNaivePassData();
                 // Interact with subteam 3
                 node.Child(2,3).MapVectorNaivePassData();
@@ -1744,7 +1741,7 @@ const
                 node.Child(2,1).MapVectorNaivePassData();
                 break;
             case 3:
-                // Take care of the work specific to our subteam
+                // Take care of the work specific to our subteams
                 node.Child(3,3).MapVectorNaivePassData();
                 // Interact with subteam 2
                 node.Child(2,3).MapVectorNaivePassData();
