@@ -196,7 +196,8 @@ private:
     ( Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorSummations() const;
-    void TransposeMapVectorSummationsCount( std::vector<int>& sizes ) const;
+    void TransposeMapVectorSummationsCount
+    ( std::vector<int>& sizes ) const;
     void TransposeMapVectorSummationsPack
     ( std::vector<Scalar>& buffer,
       std::vector<int>& offsets ) const;
@@ -204,10 +205,13 @@ private:
     ( const std::vector<Scalar>& buffer,
             std::vector<int>& offsets ) const;
     void TransposeMapVectorNaiveSummations() const;
-    void TransposeMapVectorPassData( const Vector<Scalar>& xLocal ) const;
-    void TransposeMapVectorNaivePassData( const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorPassData
+    ( const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorNaivePassData
+    ( const Vector<Scalar>& xLocal ) const;
     void TransposeMapVectorBroadcasts() const;
-    void TransposeMapVectorBroadcastsCount( std::vector<int>& sizes ) const;
+    void TransposeMapVectorBroadcastsCount
+    ( std::vector<int>& sizes ) const;
     void TransposeMapVectorBroadcastsPack
     ( std::vector<Scalar>& buffer,
       std::vector<int>& offsets ) const;
@@ -216,6 +220,20 @@ private:
             std::vector<int>& offsets ) const;
     void TransposeMapVectorNaiveBroadcasts() const;
     void TransposeMapVectorPostcompute
+    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+
+    void HermitianTransposeMapVectorPrecompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void HermitianTransposeMapVectorSummations() const;
+    void HermitianTransposeMapVectorNaiveSummations() const;
+    void HermitianTransposeMapVectorPassData
+    ( const Vector<Scalar>& xLocal ) const;
+    void HermitianTransposeMapVectorNaivePassData
+    ( const Vector<Scalar>& xLocal ) const;
+    void HermitianTransposeMapVectorBroadcasts() const;
+    void HermitianTransposeMapVectorNaiveBroadcasts() const;
+    void HermitianTransposeMapVectorPostcompute
     ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 
 public:
@@ -279,6 +297,16 @@ public:
     // y := alpha H^T x + beta y
     void TransposeMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
+      Scalar beta,        Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H' x
+    void HermitianTransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H' x + beta y
+    void HermitianTransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
       Scalar beta,        Vector<Scalar>& yLocal ) const;
 };
 

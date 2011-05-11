@@ -1207,6 +1207,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
+( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
+#endif
+    yLocal.Resize( LocalWidth() );
+    HermitianTransposeMapVector( alpha, xLocal, (Scalar)0, yLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal, 
   Scalar beta, Vector<Scalar>& yLocal ) const
@@ -1255,9 +1270,38 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
     TransposeMapVectorNaivePassData( xLocal );
 
     TransposeMapVectorBroadcasts();
-    //TransposeMapVectorNaiveSourceTeamBroadcasts();
+    //TransposeMapVectorNaiveBroadcasts();
 
     TransposeMapVectorPostcompute( alpha, yLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+  Scalar beta, Vector<Scalar>& yLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
+#endif
+    // y := beta y
+    hmatrix_tools::Scale( beta, yLocal );
+
+    HermitianTransposeMapVectorPrecompute( alpha, xLocal, yLocal );
+
+    HermitianTransposeMapVectorSummations();
+    //HermitianTransposeMapVectorNaiveSummations();
+
+    //HermitianTransposeMapVectorPassData( xLocal );
+    HermitianTransposeMapVectorNaivePassData( xLocal );
+
+    HermitianTransposeMapVectorBroadcasts();
+    //HermitianTransposeMapVectorNaiveBroadcasts();
+
+    HermitianTransposeMapVectorPostcompute( alpha, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1494,6 +1538,113 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorPrecompute
+( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPrecompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapVectorPrecompute
+                ( alpha, xLocal, yLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            // Form z := alpha ULocal^H xLocal
+            const DistLowRankMatrix& DF = *shell.data.DF;
+            DF.z.Resize( DF.rank );
+            blas::Gemv
+            ( 'C', DF.ULocal.Height(), DF.rank, 
+              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                         xLocal.LockedBuffer(),    1,
+              (Scalar)0, DF.z.Buffer(),            1 );
+        }
+        break;
+    case SPLIT_QUASI2D:
+        if( _inTargetTeam )
+        {
+            const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+            Vector<Scalar> xLocalPiece;
+            xLocalPiece.LockedView( xLocal, _localTargetOffset, SH._height );
+            SH.HermitianTransposeMapVectorPrecompute( alpha, xLocalPiece );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            Vector<Scalar> xLocalPiece;
+            xLocalPiece.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
+            hmatrix_tools::MatrixHermitianTransposeVector
+            ( alpha, SF.D, xLocalPiece, SF.z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+    case QUASI2D:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
+        Vector<Scalar> xLocalPiece, yLocalPiece;
+        xLocalPiece.LockedView( xLocal, _localTargetOffset, H.Height() );
+        yLocalPiece.View( yLocal, _localSourceOffset, H.Width() );
+        H.HermitianTransposeMapVector
+        ( alpha, xLocalPiece, (Scalar)1, yLocalPiece );
+        break;
+    }
+    case LOW_RANK:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        //
+        // NOTE: I'm not sure this case will ever happen. It would require a
+        //       diagonal block to be low-rank.
+        const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
+        Vector<Scalar> xLocalPiece, yLocalPiece;
+        xLocalPiece.LockedView( xLocal, _localTargetOffset, F.Height() );
+        yLocalPiece.View( yLocal, _localSourceOffset, F.Width() );
+        hmatrix_tools::MatrixHermitianTransposeVector
+        ( alpha, F, xLocalPiece, (Scalar)1, yLocalPiece );
+        break;
+    }
+    case DENSE:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        Vector<Scalar> xLocalPiece, yLocalPiece;
+        xLocalPiece.LockedView( xLocal, _localTargetOffset, D.Height() );
+        yLocalPiece.View( yLocal, _localSourceOffset, D.Width() );
+        hmatrix_tools::MatrixHermitianTransposeVector
+        ( alpha, D, xLocalPiece, (Scalar)1, yLocalPiece );
+        break;
+    }
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations() 
 const
 {
@@ -1603,6 +1754,22 @@ const
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     TransposeMapVectorSummationsUnpack( buffer, offsets );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorSummations() 
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorSummations");
+#endif
+    // This unconjugated version is identical
+    TransposeMapVectorSummations();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2012,6 +2179,23 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorNaiveSummations()
+const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaiveSummations");
+#endif
+    // The unconjugated version should be identical
+    TransposeMapVectorNaiveSummations();
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
 {
 #ifndef RELEASE
@@ -2034,6 +2218,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
 #endif
     // TODO: Implement AllToAll redistribution
     throw std::logic_error("Non-naive version not yet written");
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVectorPassData
+( const Vector<Scalar>& xLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPassData");
+#endif
+    // The unconjugated version should be identical
+    TransposeMapVectorPassData( xLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2436,6 +2635,23 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorNaivePassData
+( const Vector<Scalar>& xLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaivePassData");
+#endif
+    // The unconjugated version should be identical
+    TransposeMapVectorNaivePassData( xLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcasts() 
 const
 {
@@ -2525,6 +2741,22 @@ const
 
     // Unpack the broadcasted buffers 
     TransposeMapVectorBroadcastsUnpack( buffer, offsets );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorBroadcasts() 
+const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorBroadcasts");
+#endif
+    // The unconjugated version should be identical
+    TransposeMapVectorBroadcasts();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2916,6 +3148,22 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorNaiveBroadcasts() const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaiveBroadcasts");
+#endif
+    // The unconjugated version should be identical
+    TransposeMapVectorNaiveBroadcasts();
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 ( Vector<Scalar>& yLocal ) const
 {
@@ -3081,6 +3329,112 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
             Vector<Scalar> yLocalPiece;
             yLocalPiece.View( yLocal, _localSourceOffset, SD.D.Width() );
             hmatrix_tools::MatrixTransposeVector
+            ( alpha, SD.D, SD.z, (Scalar)1, yLocalPiece );
+        }
+        break;
+    case QUASI2D:
+    case LOW_RANK:
+    case DENSE:
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapVectorPostcompute
+( Scalar alpha, Vector<Scalar>& yLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPostcompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapVectorPostcompute
+                ( alpha, yLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            // yLocal += (VLocal^[T/H])^H z
+            const DistLowRankMatrix& DF = *shell.data.DF;
+            if( Conjugated )
+            {
+                // yLocal += VLocal z
+                blas::Gemv
+                ( 'N', DF.VLocal.Height(), DF.rank,
+                  (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
+                             DF.z.LockedBuffer(),      1,
+                  (Scalar)1, yLocal.Buffer(),          1 );
+            }
+            else
+            {
+                // yLocal += conj(VLocal) z
+                hmatrix_tools::Conjugate( DF.z );
+                hmatrix_tools::Conjugate( yLocal );
+                blas::Gemv
+                ( 'N', DF.VLocal.Height(), DF.rank,
+                  (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
+                             DF.z.LockedBuffer(),      1,
+                  (Scalar)1, yLocal.Buffer(),          1 );
+                hmatrix_tools::Conjugate( yLocal );
+            }
+        }
+        break;
+    case SPLIT_QUASI2D:
+        if( _inSourceTeam )
+        {
+            const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+            Vector<Scalar> yLocalPiece;
+            yLocalPiece.View( yLocal, _localSourceOffset, this->_width );
+            SH.HermitianTransposeMapVectorPostcompute( alpha, yLocalPiece );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            Vector<Scalar> yLocalPiece;
+            yLocalPiece.View( yLocal, _localSourceOffset, SF.D.Width() );
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixVector
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
+            }
+            else
+            {
+                // yLocal += conj(V) z
+                hmatrix_tools::Conjugate( SF.z );
+                hmatrix_tools::Conjugate( yLocalPiece );
+                hmatrix_tools::MatrixVector
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
+                hmatrix_tools::Conjugate( yLocalPiece );
+            }
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _inSourceTeam )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            Vector<Scalar> yLocalPiece;
+            yLocalPiece.View( yLocal, _localSourceOffset, SD.D.Width() );
+            hmatrix_tools::MatrixHermitianTransposeVector
             ( alpha, SD.D, SD.z, (Scalar)1, yLocalPiece );
         }
         break;

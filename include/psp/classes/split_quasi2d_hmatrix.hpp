@@ -138,10 +138,17 @@ private:
 
     void TransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
-    void TransposeMapVectorNaivePassData( const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorNaivePassData
+    ( const Vector<Scalar>& xLocal ) const;
     void TransposeMapVectorPostcompute
     ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 
+    void HermitianTransposeMapVectorPrecompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
+    void HermitianTransposeMapVectorNaivePassData
+    ( const Vector<Scalar>& xLocal ) const;
+    void HermitianTransposeMapVectorPostcompute
+    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
