@@ -59,6 +59,7 @@ private:
         int rank;
         DenseMatrix<Scalar> ULocal, VLocal;
         mutable Vector<Scalar> z;
+        mutable DenseMatrix<Scalar> Z;
     };
 
     struct SplitLowRankMatrix
@@ -66,12 +67,14 @@ private:
         int rank;
         DenseMatrix<Scalar> D;
         mutable Vector<Scalar> z;
+        mutable DenseMatrix<Scalar> Z;
     };
 
     struct SplitDenseMatrix
     {
         DenseMatrix<Scalar> D;
         mutable Vector<Scalar> z;
+        mutable DenseMatrix<Scalar> Z;
     };
 
     struct Node

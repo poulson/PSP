@@ -43,12 +43,14 @@ private:
         int rank;
         DenseMatrix<Scalar> D;
         mutable Vector<Scalar> z;
+        mutable DenseMatrix<Scalar> Z;
     };
 
     struct SplitDenseMatrix
     {
         DenseMatrix<Scalar> D;
         mutable Vector<Scalar> z;
+        mutable DenseMatrix<Scalar> Z;
     };
 
     struct Node
@@ -125,6 +127,7 @@ private:
 
     // Temporary storage
     mutable Vector<Scalar> _z;
+    mutable DenseMatrix<Scalar> _Z;
 
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
@@ -136,6 +139,11 @@ private:
     void MapVectorNaivePassData() const;
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
 
+    void MapMatrixPrecompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
+    void MapMatrixNaivePassData( const DenseMatrix<Scalar>& XLocal ) const;
+    void MapMatrixPostcompute( DenseMatrix<Scalar>& YLocal ) const;
+
     void TransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
     void TransposeMapVectorNaivePassData
@@ -143,12 +151,26 @@ private:
     void TransposeMapVectorPostcompute
     ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 
+    void TransposeMapMatrixPrecompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
+    void TransposeMapMatrixNaivePassData
+    ( const DenseMatrix<Scalar>& XLocal ) const;
+    void TransposeMapMatrixPostcompute
+    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
+
     void HermitianTransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
     void HermitianTransposeMapVectorNaivePassData
     ( const Vector<Scalar>& xLocal ) const;
     void HermitianTransposeMapVectorPostcompute
     ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+
+    void HermitianTransposeMapMatrixPrecompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
+    void HermitianTransposeMapMatrixNaivePassData
+    ( const DenseMatrix<Scalar>& XLocal ) const;
+    void HermitianTransposeMapMatrixPostcompute
+    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 

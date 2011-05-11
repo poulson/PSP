@@ -554,6 +554,69 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapMatrixPrecompute");
+    if( XLocal.Type() != GENERAL )
+        throw std::logic_error("Can only map general matrices.");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+        {
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                DenseMatrix<Scalar> XLocalSub;
+                XLocalSub.LockedView
+                ( XLocal, sOffset, 0, node.sourceSizes[s], XLocal.Width() );
+
+                node.Child(t,s).MapMatrixPrecompute( alpha, XLocalSub );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( _ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixHermitianTransposeMatrix
+                ( alpha, SF.D, XLocal, SF.Z );
+            }
+            else
+            {
+                hmatrix_tools::MatrixTransposeMatrix
+                ( alpha, SF.D, XLocal, SF.Z );
+            }
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _ownSourceSide )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocal, SD.Z );
+        }
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
 ( Scalar alpha, const Vector<Scalar>& xLocal ) const
 {
@@ -586,6 +649,51 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
             hmatrix_tools::MatrixTransposeVector( alpha, SF.D, xLocal, SF.z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixPrecompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            DenseMatrix<Scalar> XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, tOffset, 0, node.targetSizes[t], XLocal.Width() );
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapMatrixPrecompute
+                ( alpha, XLocalSub );
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( !_ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            hmatrix_tools::MatrixTransposeMatrix( alpha, SF.D, XLocal, SF.Z );
         }
         break;
     case SPLIT_DENSE:
@@ -632,6 +740,53 @@ HermitianTransposeMapVectorPrecompute
             const SplitLowRankMatrix& SF = *shell.data.SF;
             hmatrix_tools::MatrixHermitianTransposeVector
             ( alpha, SF.D, xLocal, SF.z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapMatrixPrecompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            DenseMatrix<Scalar> XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, tOffset, 0, node.targetSizes[t], XLocal.Width() );
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                ( alpha, XLocalSub );
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( !_ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            hmatrix_tools::MatrixHermitianTransposeMatrix
+            ( alpha, SF.D, XLocal, SF.Z );
         }
         break;
     case SPLIT_DENSE:
@@ -697,6 +852,69 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
 
 template<typename Scalar,bool Conjugated>
 void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
+( const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapMatrixNaivePassData");
+#endif
+    const int width = XLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapMatrixNaivePassData( XLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        // We can safely assume that SF.Z has its ldim equal to its height
+        if( _ownSourceSide )
+        {
+            mpi::Send
+            ( SF.Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
+        }
+        else
+        {
+            SF.Z.Resize( SF.rank, width, SF.rank );
+            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _partner, 0, _comm );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        // We can safely assume that SF.Z has its ldim equal to its height
+        if( _ownSourceSide )
+        {
+            mpi::Send
+            ( SD.Z.LockedBuffer(), _height*width, _partner, 0, _comm );
+        }
+        else
+        {
+            SD.Z.Resize( _height, width, _height );
+            mpi::Recv( SD.Z.Buffer(), _height*width, _partner, 0, _comm );
+        }
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
 ( const Vector<Scalar>& xLocal ) const
 {
@@ -740,6 +958,85 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
         {
             SD.z.Resize( _height );
             mpi::Recv( SD.z.Buffer(), _height, _partner, 0, _comm );
+        }
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
+( const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixNaivePassData");
+#endif
+    const int width = XLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapMatrixNaivePassData( XLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        if( !_ownSourceSide )
+        {
+            // We can safely assume SF.Z's ldim is equal to its height
+            mpi::Send
+            ( SF.Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
+        }
+        else
+        {
+            SF.Z.Resize( SF.rank, width, SF.rank );
+            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _partner, 0, _comm );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        if( !_ownSourceSide )
+        {
+
+            if( XLocal.Height() == XLocal.LDim() )
+            {
+                SD.Z.Resize( _height, width, _height );
+                for( int j=0; j<width; ++j )
+                {
+                    std::memcpy
+                    ( SD.Z.Buffer(0,j), XLocal.LockedBuffer(0,j), 
+                      _height*sizeof(Scalar) );
+                }
+                mpi::Send
+                ( SD.Z.LockedBuffer(), _height*width, _partner, 0, _comm );
+            }
+            else
+            {
+                // We must pack XLocal since it's not contiguous in memory
+                mpi::Send
+                ( XLocal.LockedBuffer(), _height*width, _partner, 0, _comm );
+            }
+        }
+        else
+        {
+            SD.Z.Resize( _height, width, _height );
+            mpi::Recv( SD.Z.Buffer(), _height*width, _partner, 0, _comm );
         }
         break;
     }
@@ -805,6 +1102,86 @@ HermitianTransposeMapVectorNaivePassData
     PopCallStack();
 #endif
 }
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapMatrixNaivePassData
+( const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("SplitQuasi2dHMatrix::HermitianTransposeMapMatrixNaivePassData");
+#endif
+    const int width = XLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapMatrixNaivePassData
+                ( XLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRankMatrix& SF = *shell.data.SF;
+        if( !_ownSourceSide )
+        {
+            // We can safely assume SF.Z's ldim is equal to its height
+            mpi::Send( SF.Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
+        }
+        else
+        {
+            SF.Z.Resize( SF.rank, width, SF.rank );
+            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _partner, 0, _comm );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDenseMatrix& SD = *shell.data.SD;
+        if( !_ownSourceSide )
+        {
+            if( XLocal.LDim() != XLocal.Height() )
+            {
+                SD.Z.Resize( _height, width, _height );
+                for( int j=0; j<width; ++j )
+                {
+                    std::memcpy
+                    ( SD.Z.Buffer(0,j), XLocal.LockedBuffer(0,j), 
+                      _height*sizeof(Scalar) );
+                }
+                mpi::Send
+                ( SD.Z.LockedBuffer(), _height*width, _partner, 0, _comm );
+            }
+            else
+            {
+                mpi::Send
+                ( XLocal.LockedBuffer(), _height*width, _partner, 0, _comm );
+            }
+        }
+        else
+        {
+            SD.Z.Resize( _height, width, _height );
+            mpi::Recv( SD.Z.Buffer(), _height*width, _partner, 0, _comm );
+        }
+        break;
+    }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+// HERE
 
 template<typename Scalar,bool Conjugated>
 void
