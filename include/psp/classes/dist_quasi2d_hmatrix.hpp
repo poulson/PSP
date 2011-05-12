@@ -195,6 +195,31 @@ private:
     void MapVectorNaiveBroadcasts() const;
     void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
 
+    void MapMatrixPrecompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixSummations() const;
+    void MapMatrixSummationsCount( std::vector<int>& sizes ) const;
+    void MapMatrixSummationsPack
+    ( std::vector<Scalar>& buffer, 
+      std::vector<int>& offsets ) const;
+    void MapMatrixSummationsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
+    void MapMatrixNaiveSummations() const;
+    void MapMatrixPassData() const;
+    void MapMatrixNaivePassData() const;
+    void MapMatrixBroadcasts() const;
+    void MapMatrixBroadcastsCount( std::vector<int>& sizes ) const;
+    void MapMatrixBroadcastsPack
+    ( std::vector<Scalar>& buffer,
+      std::vector<int>& offsets ) const;
+    void MapMatrixBroadcastsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
+    void MapMatrixNaiveBroadcasts() const;
+    void MapMatrixPostcompute( DenseMatrix<Scalar>& YLocal ) const;
+
     void TransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
@@ -225,6 +250,36 @@ private:
     void TransposeMapVectorPostcompute
     ( Scalar alpha, Vector<Scalar>& yLocal ) const;
 
+    void TransposeMapMatrixPrecompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void TransposeMapMatrixSummations() const;
+    void TransposeMapMatrixSummationsCount
+    ( std::vector<int>& sizes ) const;
+    void TransposeMapMatrixSummationsPack
+    ( std::vector<Scalar>& buffer,
+      std::vector<int>& offsets ) const;
+    void TransposeMapMatrixSummationsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
+    void TransposeMapMatrixNaiveSummations() const;
+    void TransposeMapMatrixPassData
+    ( const DenseMatrix<Scalar>& XLocal ) const;
+    void TransposeMapMatrixNaivePassData
+    ( const DenseMatrix<Scalar>& XLocal ) const;
+    void TransposeMapMatrixBroadcasts() const;
+    void TransposeMapMatrixBroadcastsCount
+    ( std::vector<int>& sizes ) const;
+    void TransposeMapMatrixBroadcastsPack
+    ( std::vector<Scalar>& buffer,
+      std::vector<int>& offsets ) const;
+    void TransposeMapMatrixBroadcastsUnpack
+    ( const std::vector<Scalar>& buffer,
+            std::vector<int>& offsets ) const;
+    void TransposeMapMatrixNaiveBroadcasts() const;
+    void TransposeMapMatrixPostcompute
+    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
+
     void HermitianTransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
@@ -238,6 +293,20 @@ private:
     void HermitianTransposeMapVectorNaiveBroadcasts() const;
     void HermitianTransposeMapVectorPostcompute
     ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+
+    void HermitianTransposeMapMatrixPrecompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void HermitianTransposeMapMatrixSummations() const;
+    void HermitianTransposeMapMatrixNaiveSummations() const;
+    void HermitianTransposeMapMatrixPassData
+    ( const DenseMatrix<Scalar>& XLocal ) const;
+    void HermitianTransposeMapMatrixNaivePassData
+    ( const DenseMatrix<Scalar>& XLocal ) const;
+    void HermitianTransposeMapMatrixBroadcasts() const;
+    void HermitianTransposeMapMatrixNaiveBroadcasts() const;
+    void HermitianTransposeMapMatrixPostcompute
+    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
 
 public:
     static std::size_t PackedSizes
@@ -292,6 +361,16 @@ public:
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
       Scalar beta,        Vector<Scalar>& yLocal ) const;
 
+    // Y := alpha H X
+    void MapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+
+    // Y := alpha H X + beta Y
+    void MapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
     // y := alpha H^T x
     void TransposeMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
@@ -302,6 +381,16 @@ public:
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
       Scalar beta,        Vector<Scalar>& yLocal ) const;
 
+    // Y := alpha H^T X
+    void TransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+
+    // Y := alpha H^T X + beta Y
+    void TransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
     // y := alpha H' x
     void HermitianTransposeMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal,
@@ -311,6 +400,16 @@ public:
     void HermitianTransposeMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal,
       Scalar beta,        Vector<Scalar>& yLocal ) const;
+
+    // Y := alpha H' X
+    void HermitianTransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+
+    // Y := alpha H' X + beta Y
+    void HermitianTransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
 };
 
 } // namespace psp

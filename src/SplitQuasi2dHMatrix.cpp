@@ -495,7 +495,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
-( Scalar alpha, const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::MapVectorPrecompute");
@@ -506,13 +507,13 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
+            yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
-                Vector<Scalar> xLocalSub;
                 xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
-
                 node.Child(t,s).MapVectorPrecompute( alpha, xLocalSub );
             }
         }
@@ -555,27 +556,29 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::MapMatrixPrecompute");
     if( XLocal.Type() != GENERAL )
         throw std::logic_error("Can only map general matrices.");
 #endif
+    const int width = XLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
+            YLocalSub.View( YLocal, tOffset, 0, node.targetSizes[t], width );
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
-                DenseMatrix<Scalar> XLocalSub;
                 XLocalSub.LockedView
-                ( XLocal, sOffset, 0, node.sourceSizes[s], XLocal.Width() );
-
+                ( XLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).MapMatrixPrecompute( alpha, XLocalSub );
             }
         }
@@ -618,7 +621,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
-( Scalar alpha, const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapVectorPrecompute");
@@ -629,13 +633,16 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     case NODE:
     {
         const Node& node = *shell.data.N;
+        Vector<Scalar> xLocalSub, yLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
-            Vector<Scalar> xLocalSub;
             xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
-            for( int s=0; s<4; ++s )
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).TransposeMapVectorPrecompute
-                ( alpha, xLocalSub );
+                ( alpha, xLocalSub, yLocalSub );
+            }
         }
         break;
     }
@@ -662,25 +669,31 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixPrecompute");
 #endif
+    const int width = YLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
     {
         const Node& node = *shell.data.N;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
-            DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, tOffset, 0, node.targetSizes[t], XLocal.Width() );
-            for( int s=0; s<4; ++s )
+            ( XLocal, tOffset, 0, node.targetSizes[t], width );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                YLocalSub.View
+                ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).TransposeMapMatrixPrecompute
-                ( alpha, XLocalSub );
+                ( alpha, XLocalSub, YLocalSub );
+            }
         }
         break;
     }
@@ -708,7 +721,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapVectorPrecompute
-( Scalar alpha, const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::HermitianTransposeMapVectorPrecompute");
@@ -719,13 +733,16 @@ HermitianTransposeMapVectorPrecompute
     case NODE:
     {
         const Node& node = *shell.data.N;
+        Vector<Scalar> xLocalSub, yLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
-            Vector<Scalar> xLocalSub;
             xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
-            for( int s=0; s<4; ++s )
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).HermitianTransposeMapVectorPrecompute
-                ( alpha, xLocalSub );
+                ( alpha, xLocalSub, yLocalSub );
+            }
         }
         break;
     }
@@ -754,25 +771,31 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapMatrixPrecompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
 #endif
+    const int width = YLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
     {
         const Node& node = *shell.data.N;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
-            DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, tOffset, 0, node.targetSizes[t], XLocal.Width() );
-            for( int s=0; s<4; ++s )
+            ( XLocal, tOffset, 0, node.targetSizes[t], width );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                YLocalSub.View
+                ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).HermitianTransposeMapMatrixPrecompute
-                ( alpha, XLocalSub );
+                ( alpha, XLocalSub, YLocalSub );
+            }
         }
         break;
     }
@@ -799,7 +822,9 @@ HermitianTransposeMapMatrixPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::MapVectorNaivePassData");
@@ -810,9 +835,17 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorNaivePassData();
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                xLocalSub.View( xLocal, sOffset, node.sourceSizes[s] );
+                node.Child(t,s).MapVectorNaivePassData
+                ( alpha, xLocalSub, yLocalSub );
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
@@ -853,7 +886,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData() const
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
-( const DenseMatrix<Scalar>& XLocal ) const
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::MapMatrixNaivePassData");
@@ -865,9 +899,18 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixNaivePassData( XLocal );
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            YLocalSub.View( YLocal, tOffset, 0, node.targetSizes[t], width );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                XLocalSub.LockedView
+                ( XLocal, sOffset, 0, node.sourceSizes[s], width );
+                node.Child(t,s).MapMatrixNaivePassData
+                ( alpha, XLocalSub, YLocalSub );
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
@@ -916,7 +959,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
-( const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapVectorNaivePassData");
@@ -927,9 +971,17 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorNaivePassData( xLocal );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                node.Child(t,s).TransposeMapVectorNaivePassData
+                ( alpha, xLocalSub, yLocalSub );
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
@@ -970,7 +1022,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
-( const DenseMatrix<Scalar>& XLocal ) const
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixNaivePassData");
@@ -982,9 +1035,19 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixNaivePassData( XLocal );
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            XLocalSub.LockedView
+            ( XLocal, tOffset, 0, node.targetSizes[t], width );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                YLocalSub.View
+                ( YLocal, sOffset, 0, node.sourceSizes[s], width );
+                node.Child(t,s).TransposeMapMatrixNaivePassData
+                ( alpha, XLocalSub, YLocalSub );
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
@@ -1050,7 +1113,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapVectorNaivePassData
-( const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1062,10 +1126,17 @@ HermitianTransposeMapVectorNaivePassData
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).HermitianTransposeMapVectorNaivePassData
-                ( xLocal );
+                ( alpha, xLocalSub, yLocalSub );
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
@@ -1107,7 +1178,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapMatrixNaivePassData
-( const DenseMatrix<Scalar>& XLocal ) const
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1120,10 +1192,19 @@ HermitianTransposeMapMatrixNaivePassData
     case NODE:
     {
         const Node& node = *shell.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            XLocalSub.LockedView
+            ( XLocal, tOffset, 0, node.targetSizes[t], width );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                YLocalSub.View
+                ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).HermitianTransposeMapMatrixNaivePassData
-                ( XLocal );
+                ( alpha, XLocalSub, YLocalSub );
+            }
+        }
         break;
     }
     case NODE_SYMMETRIC:
@@ -1181,12 +1262,12 @@ HermitianTransposeMapMatrixNaivePassData
     PopCallStack();
 #endif
 }
-// HERE
 
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
-( Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::MapVectorPostcompute");
@@ -1197,12 +1278,16 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     case NODE:
     {
         const Node& node = *shell.data.N;
+        Vector<Scalar> xLocalSub, yLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
-            Vector<Scalar> yLocalSub;
             yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorPostcompute( yLocalSub );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
+                node.Child(t,s).MapVectorPostcompute
+                ( alpha, xLocalSub, yLocalSub );
+            }
         }
         break;
     }
@@ -1238,8 +1323,71 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapMatrixPostcompute");
+#endif
+    const int width = YLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            YLocalSub.View( YLocal, tOffset, 0, node.targetSizes[t], width );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                XLocalSub.LockedView
+                ( XLocal, sOffset, 0, node.sourceSizes[s], width );
+                node.Child(t,s).MapMatrixPostcompute( YLocalSub );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( !_ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            hmatrix_tools::MatrixMatrix
+            ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+        }
+        break;
+    case SPLIT_DENSE:
+        if( !_ownSourceSide )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            const int localHeight = _height;
+            for( int j=0; j<width; ++j )
+            {
+                Scalar* YLocalCol = YLocal.Buffer(0,j);
+                const Scalar* ZCol = SD.Z.LockedBuffer(0,j);
+                for( int i=0; i<localHeight; ++i )
+                    YLocalCol[i] += ZCol[i];
+            }
+        }
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
-( Scalar alpha, Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapVectorPostcompute");
@@ -1250,13 +1398,16 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
     case NODE:
     {
         const Node& node = *shell.data.N;
+        Vector<Scalar> xLocalSub, yLocalSub;
         for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
         {
-            Vector<Scalar> yLocalSub;
             yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
-            for( int t=0; t<4; ++t )
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
                 node.Child(t,s).TransposeMapVectorPostcompute
-                ( alpha, yLocalSub );
+                ( alpha, xLocalSub, yLocalSub );
+            }
         }
         break;
     }
@@ -1301,9 +1452,79 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixPostcompute");
+#endif
+    const int width = YLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            YLocalSub.View( YLocal, sOffset, 0, node.sourceSizes[s], width );
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                XLocalSub.LockedView
+                ( XLocal, tOffset, 0, node.targetSizes[t], width );
+                node.Child(t,s).TransposeMapMatrixPostcompute
+                ( alpha, XLocalSub, YLocalSub );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( _ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            if( Conjugated )
+            {
+                // YLocal += conj(V) Z
+                hmatrix_tools::Conjugate( SF.Z );
+                hmatrix_tools::Conjugate( YLocal );
+                hmatrix_tools::MatrixMatrix
+                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+                hmatrix_tools::Conjugate( YLocal );
+            }
+            else
+            {
+                hmatrix_tools::MatrixMatrix
+                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+            }
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _ownSourceSide )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            hmatrix_tools::MatrixTransposeMatrix
+            ( alpha, SD.D, SD.Z, (Scalar)1, YLocal );
+        }
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapVectorPostcompute
-( Scalar alpha, Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1315,13 +1536,16 @@ HermitianTransposeMapVectorPostcompute
     case NODE:
     {
         const Node& node = *shell.data.N;
+        Vector<Scalar> xLocalSub, yLocalSub;
         for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
         {
-            Vector<Scalar> yLocalSub;
             yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
-            for( int t=0; t<4; ++t )
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
                 node.Child(t,s).HermitianTransposeMapVectorPostcompute
-                ( alpha, yLocalSub );
+                ( alpha, xLocalSub, yLocalSub );
+            }
         }
         break;
     }
@@ -1356,6 +1580,77 @@ HermitianTransposeMapVectorPostcompute
             const SplitDenseMatrix& SD = *shell.data.SD;
             hmatrix_tools::MatrixHermitianTransposeVector
             ( alpha, SD.D, SD.z, (Scalar)1, yLocal );
+        }
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapMatrixPostcompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("SplitQuasi2dHMatrix::HermitianTransposeMapMatrixPostcompute");
+#endif
+    const int width = YLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            YLocalSub.View( YLocal, sOffset, 0, node.sourceSizes[s], width );
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                XLocalSub.LockedView
+                ( XLocal, tOffset, 0, node.targetSizes[t], width );
+                node.Child(t,s).HermitianTransposeMapMatrixPostcompute
+                ( alpha, XLocalSub, YLocalSub );
+            }
+        }
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet supported");
+#endif
+        break;
+    case SPLIT_LOW_RANK:
+        if( _ownSourceSide )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixMatrix
+                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+            }
+            else
+            {
+                // YLocal += conj(V) Z
+                hmatrix_tools::Conjugate( SF.Z );
+                hmatrix_tools::Conjugate( YLocal );
+                hmatrix_tools::MatrixMatrix
+                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+                hmatrix_tools::Conjugate( YLocal );
+            }
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _ownSourceSide )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            hmatrix_tools::MatrixHermitianTransposeMatrix
+            ( alpha, SD.D, SD.Z, (Scalar)1, YLocal );
         }
         break;
     }

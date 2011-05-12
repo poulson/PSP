@@ -1172,19 +1172,33 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
     return (head-packedDistHMatrix);
 }
 
-// HERE: Rethink whether or not to create a DistVec class. The current sketch
-//       simply uses serial vectors in order to simplify the interface with 
-//       PETSc.
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
-( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVector");
 #endif
     yLocal.Resize( LocalHeight() );
     MapVector( alpha, xLocal, (Scalar)0, yLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapMatrix");
+#endif
+    YLocal.Resize( LocalHeight(), XLocal.Width() );
+    MapMatrix( alpha, XLocal, (Scalar)0, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1207,6 +1221,22 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrix");
+#endif
+    YLocal.Resize( LocalWidth(), XLocal.Width() );
+    TransposeMapMatrix( alpha, XLocal, (Scalar)0, YLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
 {
@@ -1222,9 +1252,25 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrix");
+#endif
+    YLocal.Resize( LocalWidth(), XLocal.Width() );
+    HermitianTransposeMapMatrix( alpha, XLocal, (Scalar)0, YLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal, 
-  Scalar beta, Vector<Scalar>& yLocal ) const
+  Scalar beta,        Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVector");
@@ -1234,16 +1280,45 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 
     MapVectorPrecompute( alpha, xLocal, yLocal );
 
-    MapVectorSummations();
-    //MapVectorNaiveSummations();
+    MapVectorSummations( alpha, xLocal, yLocal );
+    //MapVectorNaiveSummations( alpha, xLocal, yLocal );
 
-    //MapVectorPassData();
-    MapVectorNaivePassData();
+    //MapVectorPassData( alpha, xLocal, yLocal );
+    MapVectorNaivePassData( alpha, xLocal, yLocal );
 
-    MapVectorBroadcasts();
-    //MapVectorNaiveBroadcasts();
+    MapVectorBroadcasts( alpha, xLocal, yLocal );
+    //MapVectorNaiveBroadcasts( alpha, xLocal, yLocal );
 
-    MapVectorPostcompute( yLocal );
+    MapVectorPostcompute( alpha, xLocal, yLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+  Scalar beta,        DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVector");
+#endif
+    // Y := beta Y 
+    hmatrix_tools::Scale( beta, YLocal );
+
+    MapMatrixPrecompute( alpha, XLocal, YLocal );
+
+    MapMatrixSummations( alpha, XLocal, YLocal);
+    //MapMatrixNaiveSummations( alpha, XLocal, YLocal );
+
+    //MapMatrixPassData( alpha, XLocal, YLocal );
+    MapMatrixNaivePassData( alpha, XLocal, YLocal );
+
+    MapMatrixBroadcasts( alpha, XLocal, YLocal );
+    //MapMatrixNaiveBroadcasts( alpha, XLocal, YLocal );
+
+    MapMatrixPostcompute( alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1263,16 +1338,45 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 
     TransposeMapVectorPrecompute( alpha, xLocal, yLocal );
 
-    TransposeMapVectorSummations();
-    //TransposeMapVectorNaiveSummations();
+    TransposeMapVectorSummations( alpha, xLocal, yLocal );
+    //TransposeMapVectorNaiveSummations( alpha, xLocal, yLocal );
 
-    //TransposeMapVectorPassData( xLocal );
-    TransposeMapVectorNaivePassData( xLocal );
+    //TransposeMapVectorPassData( alpha, xLocal, yLocal );
+    TransposeMapVectorNaivePassData( alpha, xLocal, yLocal );
 
-    TransposeMapVectorBroadcasts();
-    //TransposeMapVectorNaiveBroadcasts();
+    TransposeMapVectorBroadcasts( alpha, xLocal, yLocal );
+    //TransposeMapVectorNaiveBroadcasts( alpha, xLocal, yLocal );
 
-    TransposeMapVectorPostcompute( alpha, yLocal );
+    TransposeMapVectorPostcompute( alpha, xLocal, yLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+  Scalar beta,        DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrix");
+#endif
+    // Y := beta Y 
+    hmatrix_tools::Scale( beta, YLocal );
+
+    TransposeMapMatrixPrecompute( alpha, XLocal, YLocal );
+
+    TransposeMapMatrixSummations( alpha, XLocal, YLocal );
+    //TransposeMapMatrixNaiveSummations( alpha, XLocal, YLocal );
+
+    //TransposeMapMatrixPassData( alpha, XLocal, YLocal );
+    TransposeMapMatrixNaivePassData( alpha, XLocal, YLocal );
+
+    TransposeMapMatrixBroadcasts( alpha, XLocal, YLocal );
+    //TransposeMapMatrixNaiveBroadcasts( alpha, XLocal, YLocal );
+
+    TransposeMapMatrixPostcompute( alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1282,7 +1386,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal, 
-  Scalar beta, Vector<Scalar>& yLocal ) const
+  Scalar beta,        Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
@@ -1292,16 +1396,45 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 
     HermitianTransposeMapVectorPrecompute( alpha, xLocal, yLocal );
 
-    HermitianTransposeMapVectorSummations();
-    //HermitianTransposeMapVectorNaiveSummations();
+    HermitianTransposeMapVectorSummations( alpha, xLocal, yLocal );
+    //HermitianTransposeMapVectorNaiveSummations( alpha, xLocal, yLocal );
 
-    //HermitianTransposeMapVectorPassData( xLocal );
-    HermitianTransposeMapVectorNaivePassData( xLocal );
+    //HermitianTransposeMapVectorPassData( alpha, xLocal, yLocal );
+    HermitianTransposeMapVectorNaivePassData( alpha, xLocal, yLocal );
 
-    HermitianTransposeMapVectorBroadcasts();
-    //HermitianTransposeMapVectorNaiveBroadcasts();
+    HermitianTransposeMapVectorBroadcasts( alpha, xLocal, yLocal);
+    //HermitianTransposeMapVectorNaiveBroadcasts( alpha, xLocal, yLocal );
 
-    HermitianTransposeMapVectorPostcompute( alpha, yLocal );
+    HermitianTransposeMapVectorPostcompute( alpha, xLocal, yLocal );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+  Scalar beta,        DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
+#endif
+    // Y := beta Y 
+    hmatrix_tools::Scale( beta, YLocal );
+
+    HermitianTransposeMapMatrixPrecompute( alpha, XLocal, YLocal );
+
+    HermitianTransposeMapMatrixSummations( alpha, XLocal, YLocal );
+    //HermitianTransposeMapMatrixNaiveSummations( alpha, XLocal, YLocal );
+
+    //HermitianTransposeMapMatrixPassData( alpha, XLocal, YLocal );
+    HermitianTransposeMapMatrixNaivePassData( alpha, XLocal, YLocal );
+
+    HermitianTransposeMapMatrixBroadcasts( alpha, XLocal, YLocal );
+    //HermitianTransposeMapMatrixNaiveBroadcasts( alpha, XLocal, YLocal );
+
+    HermitianTransposeMapMatrixPostcompute( alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1645,8 +1778,9 @@ HermitianTransposeMapVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations() 
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal /* HERE */ ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorSummations");

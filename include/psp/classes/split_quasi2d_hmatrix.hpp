@@ -135,42 +135,64 @@ private:
     ( const byte*& head, SplitQuasi2dHMatrix<Scalar,Conjugated>& H );
 
     void MapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
-    void MapVectorNaivePassData() const;
-    void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorNaivePassData
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorPostcompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
 
     void MapMatrixPrecompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
-    void MapMatrixNaivePassData( const DenseMatrix<Scalar>& XLocal ) const;
-    void MapMatrixPostcompute( DenseMatrix<Scalar>& YLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixNaivePassData
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixPostcompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
 
     void TransposeMapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorNaivePassData
-    ( const Vector<Scalar>& xLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorPostcompute
-    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
 
     void TransposeMapMatrixPrecompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixNaivePassData
-    ( const DenseMatrix<Scalar>& XLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixPostcompute
-    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
 
     void HermitianTransposeMapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorNaivePassData
-    ( const Vector<Scalar>& xLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorPostcompute
-    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
 
     void HermitianTransposeMapMatrixPrecompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixNaivePassData
-    ( const DenseMatrix<Scalar>& XLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixPostcompute
-    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
