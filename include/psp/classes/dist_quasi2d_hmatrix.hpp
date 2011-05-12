@@ -173,140 +173,248 @@ private:
     void MapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
-    void MapVectorSummations() const;
-    void MapVectorSummationsCount( std::vector<int>& sizes ) const;
+    void MapVectorSummations
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorSummationsCount
+    ( std::vector<int>& sizes,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void MapVectorSummationsPack
-    ( std::vector<Scalar>& buffer, 
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets, 
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void MapVectorSummationsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void MapVectorNaiveSummations() const;
-    void MapVectorPassData() const;
-    void MapVectorNaivePassData() const;
-    void MapVectorBroadcasts() const;
-    void MapVectorBroadcastsCount( std::vector<int>& sizes ) const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorNaiveSummations
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorPassData
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorNaivePassData
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorBroadcasts
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorBroadcastsCount
+    ( std::vector<int>& sizes,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void MapVectorBroadcastsPack
-    ( std::vector<Scalar>& buffer,
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void MapVectorBroadcastsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void MapVectorNaiveBroadcasts() const;
-    void MapVectorPostcompute( Vector<Scalar>& yLocal ) const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorNaiveBroadcasts
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void MapVectorPostcompute
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
 
     void MapMatrixPrecompute
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
-    void MapMatrixSummations() const;
-    void MapMatrixSummationsCount( std::vector<int>& sizes ) const;
+    void MapMatrixSummations
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixSummationsCount
+    ( std::vector<int>& sizes,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixSummationsPack
-    ( std::vector<Scalar>& buffer, 
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixSummationsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void MapMatrixNaiveSummations() const;
-    void MapMatrixPassData() const;
-    void MapMatrixNaivePassData() const;
-    void MapMatrixBroadcasts() const;
-    void MapMatrixBroadcastsCount( std::vector<int>& sizes ) const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixNaiveSummations
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixPassData
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixNaivePassData
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixBroadcasts
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixBroadcastsCount
+    ( std::vector<int>& sizes,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixBroadcastsPack
-    ( std::vector<Scalar>& buffer,
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixBroadcastsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void MapMatrixNaiveBroadcasts() const;
-    void MapMatrixPostcompute( DenseMatrix<Scalar>& YLocal ) const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixNaiveBroadcasts
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixPostcompute
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                          DenseMatrix<Scalar>& YLocal ) const;
 
     void TransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void TransposeMapVectorSummations() const;
+    void TransposeMapVectorSummations
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorSummationsCount
-    ( std::vector<int>& sizes ) const;
+    ( std::vector<int>& sizes,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorSummationsPack
-    ( std::vector<Scalar>& buffer,
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorSummationsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void TransposeMapVectorNaiveSummations() const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void TransposeMapVectorNaiveSummations
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorPassData
-    ( const Vector<Scalar>& xLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorNaivePassData
-    ( const Vector<Scalar>& xLocal ) const;
-    void TransposeMapVectorBroadcasts() const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void TransposeMapVectorBroadcasts
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorBroadcastsCount
-    ( std::vector<int>& sizes ) const;
+    ( std::vector<int>& sizes,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorBroadcastsPack
-    ( std::vector<Scalar>& buffer,
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorBroadcastsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void TransposeMapVectorNaiveBroadcasts() const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void TransposeMapVectorNaiveBroadcasts
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorPostcompute
-    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
 
     void TransposeMapMatrixPrecompute
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void TransposeMapMatrixSummations() const;
+    void TransposeMapMatrixSummations
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixSummationsCount
-    ( std::vector<int>& sizes ) const;
+    ( std::vector<int>& sizes,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixSummationsPack
-    ( std::vector<Scalar>& buffer,
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixSummationsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void TransposeMapMatrixNaiveSummations() const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void TransposeMapMatrixNaiveSummations
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixPassData
-    ( const DenseMatrix<Scalar>& XLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixNaivePassData
-    ( const DenseMatrix<Scalar>& XLocal ) const;
-    void TransposeMapMatrixBroadcasts() const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void TransposeMapMatrixBroadcasts
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixBroadcastsCount
-    ( std::vector<int>& sizes ) const;
+    ( std::vector<int>& sizes,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixBroadcastsPack
-    ( std::vector<Scalar>& buffer,
-      std::vector<int>& offsets ) const;
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixBroadcastsUnpack
-    ( const std::vector<Scalar>& buffer,
-            std::vector<int>& offsets ) const;
-    void TransposeMapMatrixNaiveBroadcasts() const;
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void TransposeMapMatrixNaiveBroadcasts
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixPostcompute
-    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
 
     void HermitianTransposeMapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void HermitianTransposeMapVectorSummations() const;
-    void HermitianTransposeMapVectorNaiveSummations() const;
+    void HermitianTransposeMapVectorSummations
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void HermitianTransposeMapVectorNaiveSummations
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorPassData
-    ( const Vector<Scalar>& xLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorNaivePassData
-    ( const Vector<Scalar>& xLocal ) const;
-    void HermitianTransposeMapVectorBroadcasts() const;
-    void HermitianTransposeMapVectorNaiveBroadcasts() const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void HermitianTransposeMapVectorBroadcasts
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+    void HermitianTransposeMapVectorNaiveBroadcasts
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorPostcompute
-    ( Scalar alpha, Vector<Scalar>& yLocal ) const;
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
 
     void HermitianTransposeMapMatrixPrecompute
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void HermitianTransposeMapMatrixSummations() const;
-    void HermitianTransposeMapMatrixNaiveSummations() const;
+    void HermitianTransposeMapMatrixSummations
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void HermitianTransposeMapMatrixNaiveSummations
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixPassData
-    ( const DenseMatrix<Scalar>& XLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixNaivePassData
-    ( const DenseMatrix<Scalar>& XLocal ) const;
-    void HermitianTransposeMapMatrixBroadcasts() const;
-    void HermitianTransposeMapMatrixNaiveBroadcasts() const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void HermitianTransposeMapMatrixBroadcasts
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+    void HermitianTransposeMapMatrixNaiveBroadcasts
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixPostcompute
-    ( Scalar alpha, DenseMatrix<Scalar>& YLocal ) const;
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
 
 public:
     static std::size_t PackedSizes

@@ -514,7 +514,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
                 xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
-                node.Child(t,s).MapVectorPrecompute( alpha, xLocalSub );
+                node.Child(t,s).MapVectorPrecompute
+                ( alpha, xLocalSub, yLocalSub );
             }
         }
         break;
@@ -579,7 +580,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             {
                 XLocalSub.LockedView
                 ( XLocal, sOffset, 0, node.sourceSizes[s], width );
-                node.Child(t,s).MapMatrixPrecompute( alpha, XLocalSub );
+                node.Child(t,s).MapMatrixPrecompute
+                ( alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -841,7 +843,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
             yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
-                xLocalSub.View( xLocal, sOffset, node.sourceSizes[s] );
+                xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).MapVectorNaivePassData
                 ( alpha, xLocalSub, yLocalSub );
             }
@@ -1345,7 +1347,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
             {
                 XLocalSub.LockedView
                 ( XLocal, sOffset, 0, node.sourceSizes[s], width );
-                node.Child(t,s).MapMatrixPostcompute( YLocalSub );
+                node.Child(t,s).MapMatrixPostcompute
+                ( alpha, XLocalSub, YLocalSub );
             }
         }
         break;

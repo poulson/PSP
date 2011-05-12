@@ -60,7 +60,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
 template<typename Scalar,bool Conjugated>
 std::size_t
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Pack
-( std::vector<byte*>& packedPieces, 
+( std::vector<byte*>& packedSubs, 
   const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms )
 {
 #ifndef RELEASE
@@ -68,7 +68,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Pack
 #endif
     MPI_Comm comm = subcomms.Subcomm(0);
     const int p = mpi::CommSize( comm );
-    std::vector<byte*> heads = packedPieces;
+    std::vector<byte*> heads = packedSubs;
     std::vector<byte**> headPointers(p); 
     for( int i=0; i<p; ++i )
         headPointers[i] = &heads[i];
@@ -79,7 +79,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Pack
 
     std::size_t totalSize = 0;
     for( int i=0; i<p; ++i )
-        totalSize += (*headPointers[i]-packedPieces[i]);
+        totalSize += (*headPointers[i]-packedSubs[i]);
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1057,12 +1057,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
-( const byte* packedPiece, const Subcomms& subcomms )
+( const byte* packedSub, const Subcomms& subcomms )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::DistQuasi2dHMatrix");
 #endif
-    Unpack( packedPiece, subcomms );
+    Unpack( packedSub, subcomms );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1486,26 +1486,27 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         if( _inSourceTeam )
         {
             const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localSourceOffset, SH._width );
-            SH.MapVectorPrecompute( alpha, xLocalPiece );
+            Vector<Scalar> xLocalSub, yLocalSub;
+            xLocalSub.LockedView( xLocal, _localSourceOffset, SH._width );
+            yLocalSub.View( yLocal, _localTargetOffset, SH._height );
+            SH.MapVectorPrecompute( alpha, xLocalSub, yLocalSub );
         }
         break;
     case SPLIT_LOW_RANK:
         if( _inSourceTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localSourceOffset, SF.D.Height() );
+            Vector<Scalar> xLocalSub;
+            xLocalSub.LockedView( xLocal, _localSourceOffset, SF.D.Height() );
             if( Conjugated )
             {
                 hmatrix_tools::MatrixHermitianTransposeVector
-                ( alpha, SF.D, xLocalPiece, SF.z );
+                ( alpha, SF.D, xLocalSub, SF.z );
             }
             else
             {
                 hmatrix_tools::MatrixTransposeVector
-                ( alpha, SF.D, xLocalPiece, SF.z );
+                ( alpha, SF.D, xLocalSub, SF.z );
             }
         }
         break;
@@ -1513,9 +1514,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         if( _inSourceTeam )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localSourceOffset, this->_width );
-            hmatrix_tools::MatrixVector( alpha, SD.D, xLocalPiece, SD.z );
+            Vector<Scalar> xLocalSub;
+            xLocalSub.LockedView( xLocal, _localSourceOffset, this->_width );
+            hmatrix_tools::MatrixVector( alpha, SD.D, xLocalSub, SD.z );
         }
         break;
     case QUASI2D:
@@ -1523,10 +1524,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localSourceOffset, H.Width() );
-        yLocalPiece.View( yLocal, _localTargetOffset, H.Height() );
-        H.MapVector( alpha, xLocalPiece, (Scalar)1, yLocalPiece );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localSourceOffset, H.Width() );
+        yLocalSub.View( yLocal, _localTargetOffset, H.Height() );
+        H.MapVector( alpha, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case LOW_RANK:
@@ -1537,11 +1538,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         // NOTE: I'm not sure this case will ever happen. It would require a
         //       diagonal block to be low-rank.
         const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localSourceOffset, F.Width() );
-        yLocalPiece.View( yLocal, _localTargetOffset, F.Height() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localSourceOffset, F.Width() );
+        yLocalSub.View( yLocal, _localTargetOffset, F.Height() );
         hmatrix_tools::MatrixVector
-        ( alpha, F, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case DENSE:
@@ -1549,11 +1550,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localSourceOffset, D.Width() );
-        yLocalPiece.View( yLocal, _localTargetOffset, D.Height() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localSourceOffset, D.Width() );
+        yLocalSub.View( yLocal, _localTargetOffset, D.Height() );
         hmatrix_tools::MatrixVector
-        ( alpha, D, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case EMPTY:
@@ -1606,19 +1607,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         if( _inTargetTeam )
         {
             const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localTargetOffset, SH._height );
-            SH.TransposeMapVectorPrecompute( alpha, xLocalPiece );
+            Vector<Scalar> xLocalSub, yLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
+            yLocalSub.View( yLocal, _localSourceOffset, SH._width );
+            SH.TransposeMapVectorPrecompute( alpha, xLocalSub, yLocalSub );
         }
         break;
     case SPLIT_LOW_RANK:
         if( _inTargetTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
+            Vector<Scalar> xLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
             hmatrix_tools::MatrixTransposeVector
-            ( alpha, SF.D, xLocalPiece, SF.z );
+            ( alpha, SF.D, xLocalSub, SF.z );
         }
         break;
     case SPLIT_DENSE:
@@ -1628,10 +1630,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localTargetOffset, H.Height() );
-        yLocalPiece.View( yLocal, _localSourceOffset, H.Width() );
-        H.TransposeMapVector( alpha, xLocalPiece, (Scalar)1, yLocalPiece );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, H.Height() );
+        yLocalSub.View( yLocal, _localSourceOffset, H.Width() );
+        H.TransposeMapVector( alpha, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case LOW_RANK:
@@ -1642,11 +1644,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         // NOTE: I'm not sure this case will ever happen. It would require a
         //       diagonal block to be low-rank.
         const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localTargetOffset, F.Height() );
-        yLocalPiece.View( yLocal, _localSourceOffset, F.Width() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, F.Height() );
+        yLocalSub.View( yLocal, _localSourceOffset, F.Width() );
         hmatrix_tools::MatrixTransposeVector
-        ( alpha, F, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case DENSE:
@@ -1654,11 +1656,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localTargetOffset, D.Height() );
-        yLocalPiece.View( yLocal, _localSourceOffset, D.Width() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, D.Height() );
+        yLocalSub.View( yLocal, _localSourceOffset, D.Width() );
         hmatrix_tools::MatrixTransposeVector
-        ( alpha, D, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case EMPTY:
@@ -1712,19 +1714,21 @@ HermitianTransposeMapVectorPrecompute
         if( _inTargetTeam )
         {
             const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localTargetOffset, SH._height );
-            SH.HermitianTransposeMapVectorPrecompute( alpha, xLocalPiece );
+            Vector<Scalar> xLocalSub, yLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
+            yLocalSub.View( yLocal, _localSourceOffset, SH._width );
+            SH.HermitianTransposeMapVectorPrecompute
+            ( alpha, xLocalSub, yLocalSub );
         }
         break;
     case SPLIT_LOW_RANK:
         if( _inTargetTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
+            Vector<Scalar> xLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
             hmatrix_tools::MatrixHermitianTransposeVector
-            ( alpha, SF.D, xLocalPiece, SF.z );
+            ( alpha, SF.D, xLocalSub, SF.z );
         }
         break;
     case SPLIT_DENSE:
@@ -1734,11 +1738,11 @@ HermitianTransposeMapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localTargetOffset, H.Height() );
-        yLocalPiece.View( yLocal, _localSourceOffset, H.Width() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, H.Height() );
+        yLocalSub.View( yLocal, _localSourceOffset, H.Width() );
         H.HermitianTransposeMapVector
-        ( alpha, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case LOW_RANK:
@@ -1749,11 +1753,11 @@ HermitianTransposeMapVectorPrecompute
         // NOTE: I'm not sure this case will ever happen. It would require a
         //       diagonal block to be low-rank.
         const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localTargetOffset, F.Height() );
-        yLocalPiece.View( yLocal, _localSourceOffset, F.Width() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, F.Height() );
+        yLocalSub.View( yLocal, _localSourceOffset, F.Width() );
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, F, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case DENSE:
@@ -1761,11 +1765,11 @@ HermitianTransposeMapVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
-        Vector<Scalar> xLocalPiece, yLocalPiece;
-        xLocalPiece.LockedView( xLocal, _localTargetOffset, D.Height() );
-        yLocalPiece.View( yLocal, _localSourceOffset, D.Width() );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, D.Height() );
+        yLocalSub.View( yLocal, _localSourceOffset, D.Width() );
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, D, xLocalPiece, (Scalar)1, yLocalPiece );
+        ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
     case EMPTY:
@@ -1780,7 +1784,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
 ( Scalar alpha, const Vector<Scalar>& xLocal, 
-                      Vector<Scalar>& yLocal /* HERE */ ) const
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorSummations");
@@ -1791,7 +1795,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    MapVectorSummationsCount( sizes );
+    MapVectorSummationsCount( sizes, alpha, xLocal, yLocal );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -1802,7 +1806,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
     for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numReduces*sizeof(int) );
-    MapVectorSummationsPack( buffer, offsets );
+    MapVectorSummationsPack( buffer, offsets, alpha, xLocal, yLocal );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -1829,7 +1833,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    MapVectorSummationsUnpack( buffer, offsets );
+    MapVectorSummationsUnpack( buffer, offsets, alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1837,8 +1841,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummations() 
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummations
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorSummations");
@@ -1849,7 +1854,7 @@ const
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    TransposeMapVectorSummationsCount( sizes );
+    TransposeMapVectorSummationsCount( sizes, alpha, xLocal, yLocal );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -1860,7 +1865,7 @@ const
     for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numReduces*sizeof(int) );
-    TransposeMapVectorSummationsPack( buffer, offsets );
+    TransposeMapVectorSummationsPack( buffer, offsets, alpha, xLocal, yLocal );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -1887,7 +1892,8 @@ const
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    TransposeMapVectorSummationsUnpack( buffer, offsets );
+    TransposeMapVectorSummationsUnpack
+    ( buffer, offsets, alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1896,14 +1902,15 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorSummations() 
-const
+HermitianTransposeMapVectorSummations
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorSummations");
 #endif
     // This unconjugated version is identical
-    TransposeMapVectorSummations();
+    TransposeMapVectorSummations( alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1912,7 +1919,9 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsCount
-( std::vector<int>& sizes ) const
+( std::vector<int>& sizes, 
+  Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorSummationsCount");
@@ -1925,7 +1934,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsCount
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorSummationsCount( sizes );
+                node.Child(t,s).MapVectorSummationsCount
+                ( sizes, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -1954,7 +1964,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsCount
-( std::vector<int>& sizes ) const
+( std::vector<int>& sizes,
+  Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorSummationsCount");
@@ -1967,7 +1979,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsCount
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorSummationsCount( sizes );
+                node.Child(t,s).TransposeMapVectorSummationsCount
+                ( sizes, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -1996,7 +2009,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorSummationsPack");
@@ -2009,7 +2024,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsPack
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorSummationsPack( buffer, offsets );
+                node.Child(t,s).MapVectorSummationsPack
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2044,7 +2060,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorSummationsPack");
@@ -2058,7 +2076,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorSummationsPack
-                ( buffer, offsets );
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2093,7 +2111,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorSummationsPack");
@@ -2106,7 +2126,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsUnpack
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorSummationsUnpack( buffer, offsets );
+                node.Child(t,s).MapVectorSummationsUnpack
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2146,7 +2167,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorSummationsPack");
@@ -2160,7 +2183,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorSummationsUnpack
-                ( buffer, offsets );
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2199,8 +2222,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSummations()
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSummations
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorNaiveSummations");
@@ -2213,7 +2237,8 @@ const
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorNaiveSummations();
+                node.Child(t,s).MapVectorNaiveSummations
+                ( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2256,8 +2281,9 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations()
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorNaiveSummations");
@@ -2270,7 +2296,8 @@ const
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorNaiveSummations();
+                node.Child(t,s).TransposeMapVectorNaiveSummations
+                ( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2314,15 +2341,16 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorNaiveSummations()
-const
+HermitianTransposeMapVectorNaiveSummations
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
     ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaiveSummations");
 #endif
     // The unconjugated version should be identical
-    TransposeMapVectorNaiveSummations();
+    TransposeMapVectorNaiveSummations( alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2330,7 +2358,9 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorPassData");
@@ -2345,7 +2375,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData() const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
-( const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorPassData");
@@ -2360,13 +2391,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVectorPassData
-( const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPassData");
 #endif
     // The unconjugated version should be identical
-    TransposeMapVectorPassData( xLocal );
+    TransposeMapVectorPassData( alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2374,8 +2406,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVectorPassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData()
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorNaivePassData");
@@ -2395,30 +2428,30 @@ const
             if( teamRank == 0 )     
             {
                 // Take care of the top-left quadrant within our subteams
-                node.Child(0,0).MapVectorNaivePassData();
-                node.Child(0,1).MapVectorNaivePassData();
-                node.Child(1,0).MapVectorNaivePassData();
-                node.Child(1,1).MapVectorNaivePassData();
+                node.Child(0,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(0,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(1,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(1,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
             }
             else
             {
                 // Take care of the bottom-right quadrant within our subteams
-                node.Child(2,2).MapVectorNaivePassData();
-                node.Child(2,3).MapVectorNaivePassData();
-                node.Child(3,2).MapVectorNaivePassData();
-                node.Child(3,3).MapVectorNaivePassData();
+                node.Child(2,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(2,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
             }
             // Top-right quadrant
-            node.Child(0,2).MapVectorNaivePassData();
-            node.Child(0,3).MapVectorNaivePassData();
-            node.Child(1,2).MapVectorNaivePassData();
-            node.Child(1,3).MapVectorNaivePassData();
+            node.Child(0,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+            node.Child(0,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+            node.Child(1,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+            node.Child(1,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
 
             // Bottom-left quadrant
-            node.Child(2,0).MapVectorNaivePassData();
-            node.Child(2,1).MapVectorNaivePassData();
-            node.Child(3,0).MapVectorNaivePassData();
-            node.Child(3,1).MapVectorNaivePassData();
+            node.Child(2,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
+            node.Child(2,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
+            node.Child(3,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
+            node.Child(3,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
         }
         else // teamSize >= 4
         {
@@ -2427,55 +2460,55 @@ const
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).MapVectorNaivePassData();
+                node.Child(0,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 1
-                node.Child(0,1).MapVectorNaivePassData();
-                node.Child(1,0).MapVectorNaivePassData();
+                node.Child(0,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(1,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 2
-                node.Child(0,2).MapVectorNaivePassData();
-                node.Child(2,0).MapVectorNaivePassData();
+                node.Child(0,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(2,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 3
-                node.Child(0,3).MapVectorNaivePassData();
-                node.Child(3,0).MapVectorNaivePassData();
+                node.Child(0,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).MapVectorNaivePassData();
+                node.Child(1,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 0
-                node.Child(0,1).MapVectorNaivePassData();
-                node.Child(1,0).MapVectorNaivePassData();
+                node.Child(0,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(1,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 3
-                node.Child(1,3).MapVectorNaivePassData(); 
-                node.Child(3,1).MapVectorNaivePassData();
+                node.Child(1,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 2
-                node.Child(1,2).MapVectorNaivePassData();
-                node.Child(2,1).MapVectorNaivePassData();
+                node.Child(1,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(2,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).MapVectorNaivePassData();
+                node.Child(2,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 3
-                node.Child(2,3).MapVectorNaivePassData();
-                node.Child(3,2).MapVectorNaivePassData();
+                node.Child(2,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 0
-                node.Child(0,2).MapVectorNaivePassData();
-                node.Child(2,0).MapVectorNaivePassData();
+                node.Child(0,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(2,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 1
-                node.Child(1,2).MapVectorNaivePassData();
-                node.Child(2,1).MapVectorNaivePassData();
+                node.Child(1,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(2,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).MapVectorNaivePassData();
+                node.Child(3,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 2
-                node.Child(2,3).MapVectorNaivePassData();
-                node.Child(3,2).MapVectorNaivePassData();
+                node.Child(2,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,2).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 1
-                node.Child(1,3).MapVectorNaivePassData();
-                node.Child(3,1).MapVectorNaivePassData();
+                node.Child(1,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,1).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 // Interact with subteam 0
-                node.Child(0,3).MapVectorNaivePassData();
-                node.Child(3,0).MapVectorNaivePassData();
+                node.Child(0,3).MapVectorNaivePassData( alpha, xLocal, yLocal );
+                node.Child(3,0).MapVectorNaivePassData( alpha, xLocal, yLocal );
                 break;
             default:
 #ifndef RELEASE
@@ -2519,7 +2552,10 @@ const
     case SPLIT_QUASI2D:
     {
         const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-        SH.MapVectorNaivePassData();
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localSourceOffset, SH._width );
+        yLocalSub.View( yLocal, _localTargetOffset, SH._height );
+        SH.MapVectorNaivePassData( alpha, xLocalSub, yLocalSub );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -2571,7 +2607,8 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
-( const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorNaivePassData");
@@ -2591,30 +2628,46 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
             if( teamRank == 0 )     
             {
                 // Take care of the top-left quadrant within our subteams
-                node.Child(0,0).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(0,1).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(1,0).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(1,1).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(0,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(1,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(1,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
             }
             else
             {
                 // Take care of the bottom-right quadrant within our subteams
-                node.Child(2,2).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(2,3).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,2).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,3).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(2,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(2,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
             }
             // Top-right quadrant
-            node.Child(0,2).TransposeMapVectorNaivePassData( xLocal );
-            node.Child(0,3).TransposeMapVectorNaivePassData( xLocal );
-            node.Child(1,2).TransposeMapVectorNaivePassData( xLocal );
-            node.Child(1,3).TransposeMapVectorNaivePassData( xLocal );
+            node.Child(0,2).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
+            node.Child(0,3).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
+            node.Child(1,2).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
+            node.Child(1,3).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
 
             // Bottom-left quadrant
-            node.Child(2,0).TransposeMapVectorNaivePassData( xLocal );
-            node.Child(2,1).TransposeMapVectorNaivePassData( xLocal );
-            node.Child(3,0).TransposeMapVectorNaivePassData( xLocal );
-            node.Child(3,1).TransposeMapVectorNaivePassData( xLocal );
+            node.Child(2,0).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
+            node.Child(2,1).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
+            node.Child(3,0).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
+            node.Child(3,1).TransposeMapVectorNaivePassData
+            ( alpha, xLocal, yLocal );
         }
         else // teamSize >= 4
         {
@@ -2623,60 +2676,86 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 1
-                node.Child(0,1).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(1,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(1,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 2
-                node.Child(0,2).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(2,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(2,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 3
-                node.Child(0,3).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(1,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 0
-                node.Child(0,1).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(1,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(1,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 3
-                node.Child(1,3).TransposeMapVectorNaivePassData( xLocal ); 
-                node.Child(3,1).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(1,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal ); 
+                node.Child(3,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 2
-                node.Child(1,2).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(2,1).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(1,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(2,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(2,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 3
-                node.Child(2,3).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,2).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(2,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 0
-                node.Child(0,2).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(2,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(2,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 1
-                node.Child(1,2).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(2,1).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(1,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(2,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(3,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 2
-                node.Child(2,3).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,2).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(2,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,2).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 1
-                node.Child(1,3).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,1).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(1,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,1).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 // Interact with subteam 0
-                node.Child(0,3).TransposeMapVectorNaivePassData( xLocal );
-                node.Child(3,0).TransposeMapVectorNaivePassData( xLocal );
+                node.Child(0,3).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
+                node.Child(3,0).TransposeMapVectorNaivePassData
+                ( alpha, xLocal, yLocal );
                 break;
             default:
-#ifndef RELEASE
-                throw std::logic_error("Invalid subteam");
-#endif
+                // This should be impossible
                 break;
             }
         }
@@ -2715,7 +2794,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
     case SPLIT_QUASI2D:
     {
         const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-        SH.TransposeMapVectorNaivePassData( xLocal );
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
+        yLocalSub.View( yLocal, _localSourceOffset, SH._width );
+        SH.TransposeMapVectorNaivePassData( alpha, xLocalSub, yLocalSub );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -2742,10 +2824,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
 
         if( _inTargetTeam )
         {
-            Vector<Scalar> xLocalPiece;
-            xLocalPiece.LockedView( xLocal, _localTargetOffset, this->_height );
+            Vector<Scalar> xLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, this->_height );
             mpi::Send
-            ( xLocalPiece.LockedBuffer(), this->_height, 
+            ( xLocalSub.LockedBuffer(), this->_height, 
               _rootOfOtherTeam, 0, comm );
         }
         else
@@ -2771,14 +2853,15 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapVectorNaivePassData
-( const Vector<Scalar>& xLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
     ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaivePassData");
 #endif
     // The unconjugated version should be identical
-    TransposeMapVectorNaivePassData( xLocal );
+    TransposeMapVectorNaivePassData( alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2786,8 +2869,9 @@ HermitianTransposeMapVectorNaivePassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcasts() 
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcasts
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorBroadcasts");
@@ -2798,7 +2882,7 @@ const
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    MapVectorBroadcastsCount( sizes );
+    MapVectorBroadcastsCount( sizes, alpha, xLocal, yLocal );
 
     // Pack all of the data to be broadcasted into a single buffer
     // (only roots of subcommunicators contribute)
@@ -2810,7 +2894,7 @@ const
     for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numBroadcasts*sizeof(int) );
-    MapVectorBroadcastsPack( buffer, offsets );
+    MapVectorBroadcastsPack( buffer, offsets, alpha, xLocal, yLocal );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -2826,7 +2910,7 @@ const
     }
 
     // Unpack the broadcasted buffers 
-    MapVectorBroadcastsUnpack( buffer, offsets );
+    MapVectorBroadcastsUnpack( buffer, offsets, alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2834,8 +2918,9 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcasts() 
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcasts
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorBroadcasts");
@@ -2846,7 +2931,7 @@ const
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    TransposeMapVectorBroadcastsCount( sizes );
+    TransposeMapVectorBroadcastsCount( sizes, alpha, xLocal, yLocal );
 
     // Pack all of the data to be broadcasted into a single buffer
     // (only roots of subcommunicators contribute)
@@ -2858,7 +2943,7 @@ const
     for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numBroadcasts*sizeof(int) );
-    TransposeMapVectorBroadcastsPack( buffer, offsets );
+    TransposeMapVectorBroadcastsPack( buffer, offsets, alpha, xLocal, yLocal );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -2874,7 +2959,8 @@ const
     }
 
     // Unpack the broadcasted buffers 
-    TransposeMapVectorBroadcastsUnpack( buffer, offsets );
+    TransposeMapVectorBroadcastsUnpack
+    ( buffer, offsets, alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2883,14 +2969,15 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorBroadcasts() 
-const
+HermitianTransposeMapVectorBroadcasts
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMapVectorBroadcasts();
+    TransposeMapVectorBroadcasts( alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2899,7 +2986,9 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsCount
-( std::vector<int>& sizes ) const
+( std::vector<int>& sizes,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorBroadcastsCount");
@@ -2912,7 +3001,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsCount
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorBroadcastsCount( sizes );
+                node.Child(t,s).MapVectorBroadcastsCount
+                ( sizes, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2941,7 +3031,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsCount
-( std::vector<int>& sizes ) const
+( std::vector<int>& sizes,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorBroadcastsCount");
@@ -2954,7 +3046,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsCount
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorBroadcastsCount( sizes );
+                node.Child(t,s).TransposeMapVectorBroadcastsCount
+                ( sizes, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -2983,7 +3076,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorBroadcastsPack");
@@ -2996,7 +3091,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsPack
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorBroadcastsPack( buffer, offsets );
+                node.Child(t,s).MapVectorBroadcastsPack
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3036,7 +3132,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorBroadcastsPack");
@@ -3050,7 +3148,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorBroadcastsPack
-                ( buffer, offsets );
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3090,7 +3188,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorBroadcastsPack");
@@ -3103,7 +3203,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsUnpack
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorBroadcastsUnpack( buffer, offsets );
+                node.Child(t,s).MapVectorBroadcastsUnpack
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3139,7 +3240,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorBroadcastsPack");
@@ -3153,7 +3256,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorBroadcastsUnpack
-                ( buffer, offsets );
+                ( buffer, offsets, alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3188,8 +3291,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveBroadcasts()
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveBroadcasts
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorNaiveBroadcasts");
@@ -3202,7 +3306,8 @@ const
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorNaiveBroadcasts();
+                node.Child(t,s).MapVectorNaiveBroadcasts
+                ( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3235,8 +3340,9 @@ const
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts()
-const
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorNaiveBroadcasts");
@@ -3249,7 +3355,8 @@ const
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorNaiveBroadcasts();
+                node.Child(t,s).TransposeMapVectorNaiveBroadcasts
+                ( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3283,14 +3390,16 @@ const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorNaiveBroadcasts() const
+HermitianTransposeMapVectorNaiveBroadcasts
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
     ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaiveBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMapVectorNaiveBroadcasts();
+    TransposeMapVectorNaiveBroadcasts( alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -3299,7 +3408,8 @@ HermitianTransposeMapVectorNaiveBroadcasts() const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
-( Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVectorPostcompute");
@@ -3312,7 +3422,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorPostcompute( yLocal );
+                node.Child(t,s).MapVectorPostcompute( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3336,19 +3446,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         if( _inTargetTeam )
         {
             const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localTargetOffset, this->_height );
-            SH.MapVectorPostcompute( yLocalPiece );
+            Vector<Scalar> xLocalSub, yLocalSub;
+            xLocalSub.LockedView( xLocal, _localSourceOffset, this->_width );
+            yLocalSub.View( yLocal, _localTargetOffset, this->_height );
+            SH.MapVectorPostcompute( alpha, xLocalSub, yLocalSub );
         }
         break;
     case SPLIT_LOW_RANK:
         if( _inTargetTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localTargetOffset, SF.D.Height() );
+            Vector<Scalar> yLocalSub;
+            yLocalSub.View( yLocal, _localTargetOffset, SF.D.Height() );
             hmatrix_tools::MatrixVector
-            ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
+            ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalSub );
         }
         break;
     case SPLIT_DENSE:
@@ -3376,7 +3487,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
-( Scalar alpha, Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal, 
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVectorPostcompute");
@@ -3389,7 +3501,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
         const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorPostcompute( alpha, yLocal );
+                node.Child(t,s).TransposeMapVectorPostcompute
+                ( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3429,30 +3542,31 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
         if( _inSourceTeam )
         {
             const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localSourceOffset, this->_width );
-            SH.TransposeMapVectorPostcompute( alpha, yLocalPiece );
+            Vector<Scalar> xLocalSub, yLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, this->_height );
+            yLocalSub.View( yLocal, _localSourceOffset, this->_width );
+            SH.TransposeMapVectorPostcompute( alpha, xLocalSub, yLocalSub );
         }
         break;
     case SPLIT_LOW_RANK:
         if( _inSourceTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localSourceOffset, SF.D.Width() );
+            Vector<Scalar> yLocalSub;
+            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Width() );
             if( Conjugated )
             {
                 // yLocal += conj(V) z
                 hmatrix_tools::Conjugate( SF.z );
-                hmatrix_tools::Conjugate( yLocalPiece );
+                hmatrix_tools::Conjugate( yLocalSub );
                 hmatrix_tools::MatrixVector
-                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
-                hmatrix_tools::Conjugate( yLocalPiece );
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalSub );
+                hmatrix_tools::Conjugate( yLocalSub );
             }
             else
             {
                 hmatrix_tools::MatrixVector
-                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalSub );
             }
         }
         break;
@@ -3460,10 +3574,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
         if( _inSourceTeam )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localSourceOffset, SD.D.Width() );
+            Vector<Scalar> yLocalSub;
+            yLocalSub.View( yLocal, _localSourceOffset, SD.D.Width() );
             hmatrix_tools::MatrixTransposeVector
-            ( alpha, SD.D, SD.z, (Scalar)1, yLocalPiece );
+            ( alpha, SD.D, SD.z, (Scalar)1, yLocalSub );
         }
         break;
     case QUASI2D:
@@ -3481,7 +3595,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapVectorPostcompute
-( Scalar alpha, Vector<Scalar>& yLocal ) const
+( Scalar alpha, const Vector<Scalar>& xLocal,
+                      Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPostcompute");
@@ -3495,7 +3610,7 @@ HermitianTransposeMapVectorPostcompute
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).HermitianTransposeMapVectorPostcompute
-                ( alpha, yLocal );
+                ( alpha, xLocal, yLocal );
         break;
     }
     case NODE_SYMMETRIC:
@@ -3535,30 +3650,32 @@ HermitianTransposeMapVectorPostcompute
         if( _inSourceTeam )
         {
             const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localSourceOffset, this->_width );
-            SH.HermitianTransposeMapVectorPostcompute( alpha, yLocalPiece );
+            Vector<Scalar> xLocalSub, yLocalSub;
+            xLocalSub.LockedView( xLocal, _localTargetOffset, this->_height );
+            yLocalSub.View( yLocal, _localSourceOffset, this->_width );
+            SH.HermitianTransposeMapVectorPostcompute
+            ( alpha, xLocalSub, yLocalSub );
         }
         break;
     case SPLIT_LOW_RANK:
         if( _inSourceTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localSourceOffset, SF.D.Width() );
+            Vector<Scalar> yLocalSub;
+            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Width() );
             if( Conjugated )
             {
                 hmatrix_tools::MatrixVector
-                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalSub );
             }
             else
             {
                 // yLocal += conj(V) z
                 hmatrix_tools::Conjugate( SF.z );
-                hmatrix_tools::Conjugate( yLocalPiece );
+                hmatrix_tools::Conjugate( yLocalSub );
                 hmatrix_tools::MatrixVector
-                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalPiece );
-                hmatrix_tools::Conjugate( yLocalPiece );
+                ( (Scalar)1, SF.D, SF.z, (Scalar)1, yLocalSub );
+                hmatrix_tools::Conjugate( yLocalSub );
             }
         }
         break;
@@ -3566,10 +3683,10 @@ HermitianTransposeMapVectorPostcompute
         if( _inSourceTeam )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
-            Vector<Scalar> yLocalPiece;
-            yLocalPiece.View( yLocal, _localSourceOffset, SD.D.Width() );
+            Vector<Scalar> yLocalSub;
+            yLocalSub.View( yLocal, _localSourceOffset, SD.D.Width() );
             hmatrix_tools::MatrixHermitianTransposeVector
-            ( alpha, SD.D, SD.z, (Scalar)1, yLocalPiece );
+            ( alpha, SD.D, SD.z, (Scalar)1, yLocalSub );
         }
         break;
     case QUASI2D:
