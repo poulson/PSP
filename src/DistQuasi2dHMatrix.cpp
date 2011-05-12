@@ -1567,6 +1567,133 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
+#endif
+    const int width = XLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapMatrixPrecompute( alpha, XLocal, YLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            // Form Z := alpha VLocal^[T/H] XLocal
+            const DistLowRankMatrix& DF = *shell.data.DF;
+            DF.Z.Resize( DF.rank, width, DF.rank );
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', DF.rank, width, DF.VLocal.Height(), 
+              alpha,     DF.VLocal.LockedBuffer(), DF.VLocal.LDim(), 
+                         XLocal.LockedBuffer(),    XLocal.LDim(),
+              (Scalar)0, DF.Z.Buffer(),            DF.Z.LDim() );
+        }
+        break;
+    case SPLIT_QUASI2D:
+        if( _inSourceTeam )
+        {
+            const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+            DenseMatrix<Scalar> XLocalSub, YLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localSourceOffset, 0, SH._width, width );
+            YLocalSub.View
+            ( YLocal, _localTargetOffset, 0, SH._height, width );
+            SH.MapMatrixPrecompute( alpha, XLocalSub, YLocalSub );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            DenseMatrix<Scalar> XLocalSub, YLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localSourceOffset, 0, SF.D.Height(), width );
+            if( Conjugated )
+            {
+                hmatrix_tools::MatrixHermitianTransposeMatrix
+                ( alpha, SF.D, XLocalSub, SF.Z );
+            }
+            else
+            {
+                hmatrix_tools::MatrixTransposeMatrix
+                ( alpha, SF.D, XLocalSub, SF.Z );
+            }
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _inSourceTeam )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            DenseMatrix<Scalar> XLocalSub, YLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localSourceOffset, 0, this->_width, width );
+            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, SD.Z );
+        }
+        break;
+    case QUASI2D:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, H.Width(), width );
+        YLocalSub.View( YLocal, _localTargetOffset, 0, H.Height(), width );
+        H.MapMatrix( alpha, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case LOW_RANK:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        //
+        // NOTE: I'm not sure this case will ever happen. It would require a
+        //       diagonal block to be low-rank.
+        const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, F.Width(), width );
+        YLocalSub.View( YLocal, _localTargetOffset, 0, F.Height(), width );
+        hmatrix_tools::MatrixMatrix
+        ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case DENSE:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, D.Width(), width );
+        YLocalSub.View( YLocal, _localTargetOffset, 0, D.Height(), width );
+        hmatrix_tools::MatrixMatrix
+        ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
 ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
 {
@@ -1661,6 +1788,122 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         yLocalSub.View( yLocal, _localSourceOffset, D.Width() );
         hmatrix_tools::MatrixTransposeVector
         ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
+        break;
+    }
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPrecompute");
+#endif
+    const int width = XLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapMatrixPrecompute
+                ( alpha, XLocal, YLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            // Form Z := alpha ULocal^T XLocal
+            const DistLowRankMatrix& DF = *shell.data.DF;
+            DF.Z.Resize( DF.rank, width, DF.rank );
+            blas::Gemm
+            ( 'T', 'N', DF.rank, width, DF.ULocal.Height(),
+              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                         XLocal.LockedBuffer(),    XLocal.LDim(),
+              (Scalar)0, DF.Z.Buffer(),            DF.Z.LDim() );
+        }
+        break;
+    case SPLIT_QUASI2D:
+        if( _inTargetTeam )
+        {
+            const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+            DenseMatrix<Scalar> XLocalSub, YLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localTargetOffset, 0, SH._height, width );
+            YLocalSub.View
+            ( YLocal, _localSourceOffset, 0, SH._width, width );
+            SH.TransposeMapMatrixPrecompute( alpha, XLocalSub, YLocalSub );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            DenseMatrix<Scalar> XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localTargetOffset, 0, SF.D.Width(), width );
+            hmatrix_tools::MatrixTransposeMatrix
+            ( alpha, SF.D, XLocalSub, SF.Z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+    case QUASI2D:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, H.Height(), width );
+        YLocalSub.View
+        ( YLocal, _localSourceOffset, 0, H.Width(), width );
+        H.TransposeMapMatrix( alpha, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case LOW_RANK:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        //
+        // NOTE: I'm not sure this case will ever happen. It would require a
+        //       diagonal block to be low-rank.
+        const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, F.Height(), width );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, F.Width(), width );
+        hmatrix_tools::MatrixTransposeMatrix
+        ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case DENSE:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, D.Height(), width );
+        YLocalSub.View
+        ( YLocal, _localSourceOffset, 0, D.Width(), width );
+        hmatrix_tools::MatrixTransposeMatrix
+        ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
     case EMPTY:
@@ -1780,6 +2023,123 @@ HermitianTransposeMapVectorPrecompute
 #endif
 }
 
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapMatrixPrecompute
+( Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+                      DenseMatrix<Scalar>& YLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
+#endif
+    const int width = XLocal.Width();
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case NODE:
+    {
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                ( alpha, XLocal, YLocal );
+        break;
+    }
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Symmetric case not yet written");
+#endif
+        break;
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            // Form Z := alpha ULocal^H XLocal
+            const DistLowRankMatrix& DF = *shell.data.DF;
+            DF.Z.Resize( DF.rank, width, DF.rank );
+            blas::Gemm
+            ( 'C', 'N', DF.rank, width, DF.ULocal.Height(), 
+              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                         XLocal.LockedBuffer(),    XLocal.LDim(),
+              (Scalar)0, DF.Z.Buffer(),            DF.Z.LDim() );
+        }
+        break;
+    case SPLIT_QUASI2D:
+        if( _inTargetTeam )
+        {
+            const SplitQuasi2dHMatrix<Scalar,Conjugated>& SH = *shell.data.SH;
+            DenseMatrix<Scalar> XLocalSub, YLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localTargetOffset, 0, SH._height, width );
+            YLocalSub.View( YLocal, _localSourceOffset, 0, SH._width, width );
+            SH.HermitianTransposeMapMatrixPrecompute
+            ( alpha, XLocalSub, YLocalSub );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const SplitLowRankMatrix& SF = *shell.data.SF;
+            DenseMatrix<Scalar> XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localTargetOffset, 0, SF.D.Width(), width );
+            hmatrix_tools::MatrixHermitianTransposeMatrix
+            ( alpha, SF.D, XLocalSub, SF.Z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+    case QUASI2D:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const Quasi2dHMatrix<Scalar,Conjugated>& H = *shell.data.H;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, H.Height(), width );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, H.Width(), width );
+        H.HermitianTransposeMapMatrix
+        ( alpha, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case LOW_RANK:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        //
+        // NOTE: I'm not sure this case will ever happen. It would require a
+        //       diagonal block to be low-rank.
+        const LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, F.Height(), width );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, F.Width(), width );
+        hmatrix_tools::MatrixHermitianTransposeMatrix
+        ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case DENSE:
+    {
+        // There is no communication required for this piece, so simply perform
+        // the entire update.
+        const DenseMatrix<Scalar>& D = *shell.data.D;
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, D.Height(), width );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, D.Width(), width );
+        hmatrix_tools::MatrixHermitianTransposeMatrix
+        ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
+        break;
+    }
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+// HERE
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummations
