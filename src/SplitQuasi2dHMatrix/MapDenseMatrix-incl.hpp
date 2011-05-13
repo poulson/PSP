@@ -22,7 +22,8 @@
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -30,12 +31,31 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     if( XLocal.Type() != GENERAL )
         throw std::logic_error("Can only map general matrices.");
 #endif
+    // Clear the context
+    switch( context._shell.type )
+    {
+    case NODE:
+        delete context._shell.data.N; break;
+
+    case NODE_SYMMETRIC:
+        delete context._shell.data.NS; break;
+
+    case SPLIT_LOW_RANK:
+    case SPLIT_DENSE:
+        delete context._shell.data.z; break;
+    }
+
     const int width = XLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
     {
+        context._shell.type = NODE;
+        context._shell.data.N = new MapDenseMatrixContext::NodeContext();
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -46,7 +66,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                 XLocalSub.LockedView
                 ( XLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).MapMatrixPrecompute
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -57,28 +77,41 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 #endif
         break;
     case SPLIT_LOW_RANK:
+    {
+        context._shell.type = SPLIT_LOW_RANK;
+        context._shell.data.Z = new DenseMatrix<Scalar>();
+
         if( _ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
+            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+
             if( Conjugated )
             {
                 hmatrix_tools::MatrixHermitianTransposeMatrix
-                ( alpha, SF.D, XLocal, SF.Z );
+                ( alpha, SF.D, XLocal, Z );
             }
             else
             {
                 hmatrix_tools::MatrixTransposeMatrix
-                ( alpha, SF.D, XLocal, SF.Z );
+                ( alpha, SF.D, XLocal, Z );
             }
         }
         break;
+    }
     case SPLIT_DENSE:
+    {
+        context._shell.type = SPLIT_DENSE;
+        context._shell.data.Z = new DenseMatrix<Scalar>();
+
         if( _ownSourceSide )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
-            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocal, SD.Z );
+            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocal, Z );
         }
         break;
+    }
     }
 #ifndef RELEASE
     PopCallStack();
@@ -88,18 +121,38 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixPrecompute");
 #endif
+    // Clear the context
+    switch( context._shell.type )
+    {
+    case NODE:
+        delete context._shell.data.N; break;
+
+    case NODE_SYMMETRIC:
+        delete context._shell.data.NS; break;
+
+    case SPLIT_LOW_RANK:
+    case SPLIT_DENSE:
+        delete context._shell.data.z; break;
+    }
+
     const int width = XLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
     {
+        context._shell.type = NODE;
+        context._shell.data.N = new MapDenseMatrixContext::NodeContext();
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -111,7 +164,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
                 YLocalSub.View
                 ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).TransposeMapMatrixPrecompute
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -122,14 +175,25 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
 #endif
         break;
     case SPLIT_LOW_RANK:
+    {
+        context._shell.type = SPLIT_LOW_RANK;
+        context._shell.data.Z = new DenseMatrix<Scalar>();
+
         if( !_ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            hmatrix_tools::MatrixTransposeMatrix( alpha, SF.D, XLocal, SF.Z );
+            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+
+            hmatrix_tools::MatrixTransposeMatrix( alpha, SF.D, XLocal, Z );
         }
         break;
+    }
     case SPLIT_DENSE:
+    {
+        context._shell.type = SPLIT_DENSE;
+        context._shell.data.Z = new DenseMatrix<Scalar>();
         break;
+    }
     }
 #ifndef RELEASE
     PopCallStack();
@@ -140,18 +204,38 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapMatrixPrecompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
 #endif
+    // Clear the context
+    switch( context._shell.type )
+    {
+    case NODE:
+        delete context._shell.data.N; break;
+
+    case NODE_SYMMETRIC:
+        delete context._shell.data.NS; break;
+
+    case SPLIT_LOW_RANK:
+    case SPLIT_DENSE:
+        delete context._shell.data.z; break;
+    }
+
     const int width = YLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
     {
+        context._shell.type = NODE;
+        context._shell.data.N = new MapDenseMatrixContext::NodeContext();
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -163,7 +247,7 @@ HermitianTransposeMapMatrixPrecompute
                 YLocalSub.View
                 ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).HermitianTransposeMapMatrixPrecompute
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -174,15 +258,24 @@ HermitianTransposeMapMatrixPrecompute
 #endif
         break;
     case SPLIT_LOW_RANK:
+    {
+        context._shell.type = SPLIT_LOW_RANK;
+        context._shell.data.Z = new DenseMatrix<Scalar>();
         if( !_ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
+            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             hmatrix_tools::MatrixHermitianTransposeMatrix
-            ( alpha, SF.D, XLocal, SF.Z );
+            ( alpha, SF.D, XLocal, Z );
         }
         break;
+    }
     case SPLIT_DENSE:
+    {
+        context._shell.type = SPLIT_DENSE;
+        context._shell.data.Z = new DenseMatrix<Scalar>();
         break;
+    }
     }
 #ifndef RELEASE
     PopCallStack();
@@ -192,7 +285,8 @@ HermitianTransposeMapMatrixPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -204,6 +298,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
     {
     case NODE:
     {
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -214,7 +311,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
                 XLocalSub.LockedView
                 ( XLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).MapMatrixNaivePassData
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -227,32 +324,34 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
     case SPLIT_LOW_RANK:
     {
         const SplitLowRankMatrix& SF = *shell.data.SF;
+        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
         // We can safely assume that SF.Z has its ldim equal to its height
         if( _ownSourceSide )
         {
             mpi::Send
-            ( SF.Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
+            ( Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
         }
         else
         {
-            SF.Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _partner, 0, _comm );
+            Z.Resize( SF.rank, width, SF.rank );
+            mpi::Recv( Z.Buffer(), SF.rank*width, _partner, 0, _comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
         const SplitDenseMatrix& SD = *shell.data.SD;
+        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
         // We can safely assume that SF.Z has its ldim equal to its height
         if( _ownSourceSide )
         {
             mpi::Send
-            ( SD.Z.LockedBuffer(), _height*width, _partner, 0, _comm );
+            ( Z.LockedBuffer(), _height*width, _partner, 0, _comm );
         }
         else
         {
-            SD.Z.Resize( _height, width, _height );
-            mpi::Recv( SD.Z.Buffer(), _height*width, _partner, 0, _comm );
+            Z.Resize( _height, width, _height );
+            mpi::Recv( Z.Buffer(), _height*width, _partner, 0, _comm );
         }
         break;
     }
@@ -265,7 +364,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -277,6 +377,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     {
     case NODE:
     {
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -288,7 +391,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
                 YLocalSub.View
                 ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).TransposeMapMatrixNaivePassData
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -301,37 +404,38 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     case SPLIT_LOW_RANK:
     {
         const SplitLowRankMatrix& SF = *shell.data.SF;
+        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
         if( !_ownSourceSide )
         {
-            // We can safely assume SF.Z's ldim is equal to its height
+            // We can safely assume Z's ldim is equal to its height
             mpi::Send
-            ( SF.Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
+            ( Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
         }
         else
         {
-            SF.Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _partner, 0, _comm );
+            Z.Resize( SF.rank, width, SF.rank );
+            mpi::Recv( Z.Buffer(), SF.rank*width, _partner, 0, _comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
         const SplitDenseMatrix& SD = *shell.data.SD;
+        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
         if( !_ownSourceSide )
         {
-
             if( XLocal.Height() != XLocal.LDim() )
             {
                 // We must pack XLocal since it's not contiguous in memory
-                SD.Z.Resize( _height, width, _height );
+                Z.Resize( _height, width, _height );
                 for( int j=0; j<width; ++j )
                 {
                     std::memcpy
-                    ( SD.Z.Buffer(0,j), XLocal.LockedBuffer(0,j), 
+                    ( Z.Buffer(0,j), XLocal.LockedBuffer(0,j), 
                       _height*sizeof(Scalar) );
                 }
                 mpi::Send
-                ( SD.Z.LockedBuffer(), _height*width, _partner, 0, _comm );
+                ( Z.LockedBuffer(), _height*width, _partner, 0, _comm );
             }
             else
             {
@@ -341,8 +445,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         }
         else
         {
-            SD.Z.Resize( _height, width, _height );
-            mpi::Recv( SD.Z.Buffer(), _height*width, _partner, 0, _comm );
+            Z.Resize( _height, width, _height );
+            mpi::Recv( Z.Buffer(), _height*width, _partner, 0, _comm );
         }
         break;
     }
@@ -356,7 +460,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapMatrixNaivePassData
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -369,6 +474,9 @@ HermitianTransposeMapMatrixNaivePassData
     {
     case NODE:
     {
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -380,7 +488,7 @@ HermitianTransposeMapMatrixNaivePassData
                 YLocalSub.View
                 ( YLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).HermitianTransposeMapMatrixNaivePassData
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -393,34 +501,36 @@ HermitianTransposeMapMatrixNaivePassData
     case SPLIT_LOW_RANK:
     {
         const SplitLowRankMatrix& SF = *shell.data.SF;
+        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
         if( !_ownSourceSide )
         {
-            // We can safely assume SF.Z's ldim is equal to its height
-            mpi::Send( SF.Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
+            // We can safely assume Z's ldim is equal to its height
+            mpi::Send( Z.LockedBuffer(), SF.rank*width, _partner, 0, _comm );
         }
         else
         {
-            SF.Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _partner, 0, _comm );
+            Z.Resize( SF.rank, width, SF.rank );
+            mpi::Recv( Z.Buffer(), SF.rank*width, _partner, 0, _comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
         const SplitDenseMatrix& SD = *shell.data.SD;
+        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
         if( !_ownSourceSide )
         {
             if( XLocal.LDim() != XLocal.Height() )
             {
-                SD.Z.Resize( _height, width, _height );
+                Z.Resize( _height, width, _height );
                 for( int j=0; j<width; ++j )
                 {
                     std::memcpy
-                    ( SD.Z.Buffer(0,j), XLocal.LockedBuffer(0,j), 
+                    ( Z.Buffer(0,j), XLocal.LockedBuffer(0,j), 
                       _height*sizeof(Scalar) );
                 }
                 mpi::Send
-                ( SD.Z.LockedBuffer(), _height*width, _partner, 0, _comm );
+                ( Z.LockedBuffer(), _height*width, _partner, 0, _comm );
             }
             else
             {
@@ -430,8 +540,8 @@ HermitianTransposeMapMatrixNaivePassData
         }
         else
         {
-            SD.Z.Resize( _height, width, _height );
-            mpi::Recv( SD.Z.Buffer(), _height*width, _partner, 0, _comm );
+            Z.Resize( _height, width, _height );
+            mpi::Recv( Z.Buffer(), _height*width, _partner, 0, _comm );
         }
         break;
     }
@@ -444,7 +554,8 @@ HermitianTransposeMapMatrixNaivePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -456,6 +567,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
     {
     case NODE:
     {
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.Z;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -466,7 +580,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
                 XLocalSub.LockedView
                 ( XLocal, sOffset, 0, node.sourceSizes[s], width );
                 node.Child(t,s).MapMatrixPostcompute
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -480,19 +594,21 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
         if( !_ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
+            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             hmatrix_tools::MatrixMatrix
-            ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+            ( (Scalar)1, SF.D, Z, (Scalar)1, YLocal );
         }
         break;
     case SPLIT_DENSE:
         if( !_ownSourceSide )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
+            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             const int localHeight = _height;
             for( int j=0; j<width; ++j )
             {
                 Scalar* YLocalCol = YLocal.Buffer(0,j);
-                const Scalar* ZCol = SD.Z.LockedBuffer(0,j);
+                const Scalar* ZCol = Z.LockedBuffer(0,j);
                 for( int i=0; i<localHeight; ++i )
                     YLocalCol[i] += ZCol[i];
             }
@@ -507,7 +623,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
 template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -519,6 +636,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
     {
     case NODE:
     {
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
@@ -529,7 +649,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
                 XLocalSub.LockedView
                 ( XLocal, tOffset, 0, node.targetSizes[t], width );
                 node.Child(t,s).TransposeMapMatrixPostcompute
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -543,19 +663,20 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
         if( _ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
+            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             if( Conjugated )
             {
                 // YLocal += conj(V) Z
-                hmatrix_tools::Conjugate( SF.Z );
+                hmatrix_tools::Conjugate( Z );
                 hmatrix_tools::Conjugate( YLocal );
                 hmatrix_tools::MatrixMatrix
-                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+                ( (Scalar)1, SF.D, Z, (Scalar)1, YLocal );
                 hmatrix_tools::Conjugate( YLocal );
             }
             else
             {
                 hmatrix_tools::MatrixMatrix
-                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+                ( (Scalar)1, SF.D, Z, (Scalar)1, YLocal );
             }
         }
         break;
@@ -563,8 +684,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
         if( _ownSourceSide )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
+            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             hmatrix_tools::MatrixTransposeMatrix
-            ( alpha, SD.D, SD.Z, (Scalar)1, YLocal );
+            ( alpha, SD.D, Z, (Scalar)1, YLocal );
         }
         break;
     }
@@ -577,7 +699,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapMatrixPostcompute
-( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
@@ -590,6 +713,9 @@ HermitianTransposeMapMatrixPostcompute
     {
     case NODE:
     {
+        MapDenseMatrixContext::NodeContext& nodeContext = 
+            *context._shell.data.Z;
+
         const Node& node = *shell.data.N;
         DenseMatrix<Scalar> XLocalSub, YLocalSub;
         for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
@@ -600,7 +726,7 @@ HermitianTransposeMapMatrixPostcompute
                 XLocalSub.LockedView
                 ( XLocal, tOffset, 0, node.targetSizes[t], width );
                 node.Child(t,s).HermitianTransposeMapMatrixPostcompute
-                ( alpha, XLocalSub, YLocalSub );
+                ( nodeContext.Child(t,s), alpha, XLocalSub, YLocalSub );
             }
         }
         break;
@@ -614,18 +740,19 @@ HermitianTransposeMapMatrixPostcompute
         if( _ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
+            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             if( Conjugated )
             {
                 hmatrix_tools::MatrixMatrix
-                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+                ( (Scalar)1, SF.D, Z, (Scalar)1, YLocal );
             }
             else
             {
                 // YLocal += conj(V) Z
-                hmatrix_tools::Conjugate( SF.Z );
+                hmatrix_tools::Conjugate( Z );
                 hmatrix_tools::Conjugate( YLocal );
                 hmatrix_tools::MatrixMatrix
-                ( (Scalar)1, SF.D, SF.Z, (Scalar)1, YLocal );
+                ( (Scalar)1, SF.D, Z, (Scalar)1, YLocal );
                 hmatrix_tools::Conjugate( YLocal );
             }
         }
@@ -634,8 +761,9 @@ HermitianTransposeMapMatrixPostcompute
         if( _ownSourceSide )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
+            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
             hmatrix_tools::MatrixHermitianTransposeMatrix
-            ( alpha, SD.D, SD.Z, (Scalar)1, YLocal );
+            ( alpha, SD.D, Z, (Scalar)1, YLocal );
         }
         break;
     }

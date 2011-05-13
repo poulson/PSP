@@ -48,15 +48,11 @@ private:
     {
         int rank;
         DenseMatrix<Scalar> D;
-        mutable Vector<Scalar> z;
-        mutable DenseMatrix<Scalar> Z;
     };
 
     struct SplitDenseMatrix
     {
         DenseMatrix<Scalar> D;
-        mutable Vector<Scalar> z;
-        mutable DenseMatrix<Scalar> Z;
     };
 
     struct Node
@@ -112,6 +108,58 @@ private:
         ~Shell();
     };
 
+    struct MapVectorContext
+    {
+        struct NodeContext
+        {
+            std::vector<MapVectorContext*> children;
+            NodeContext();
+            ~NodeContext();
+            MapVectorContext& Child( int t, int s );
+            const MapVectorContext& Child( int t, int s ) const;
+        };
+        struct ContextShell
+        {
+            ShellType type;
+            union Data
+            {
+                Node* N;
+                NodeSymmetric* NS;
+                Vector<Scalar>* z;
+                Data() { std::memset( this, 0, sizeof(Data) ); }
+            } data;
+            ContextShell();
+            ~ContextShell();
+        };
+        ContextShell _shell;
+    };
+
+    struct MapDenseMatrixContext
+    {
+        struct NodeContext
+        {
+            std::vector<MapDenseMatrixContext*> children;
+            NodeContext();
+            ~NodeContext();
+            MapDenseMatrixContext& Child( int t, int s );
+            const MapDenseMatrixContext& Child( int t, int s ) const;
+        };
+        struct ContextShell
+        {
+            ShellType type;
+            union Data
+            {
+                Node* N;
+                NodeSymmetric* NS;
+                DenseMatrix<Scalar>* Z;
+                Data() { std::memset( this, 0, sizeof(Data) ); }
+            } data;
+            ContextShell();
+            ~ContextShell();
+        };
+        ContextShell _shell;
+    };
+
     /*
      * Private member data
      */
@@ -134,10 +182,6 @@ private:
     MPI_Comm _comm;
     int _partner;
 
-    // Temporary storage
-    mutable Vector<Scalar> _z;
-    mutable DenseMatrix<Scalar> _Z;
-
     /*
      * Private non-static member functions
      */
@@ -147,63 +191,81 @@ private:
     ( const byte*& head, SplitQuasi2dHMatrix<Scalar,Conjugated>& H );
 
     void MapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
     void MapVectorNaivePassData
-    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
     void MapVectorPostcompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
     void MapMatrixPrecompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixNaivePassData
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixPostcompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
 
     void TransposeMapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorNaivePassData
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorPostcompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
     void TransposeMapMatrixPrecompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixNaivePassData
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixPostcompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
 
     void HermitianTransposeMapVectorPrecompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorNaivePassData
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorPostcompute
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
+    ( MapVectorContext& context,
+      Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
     void HermitianTransposeMapMatrixPrecompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixNaivePassData
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixPostcompute
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
@@ -402,6 +464,173 @@ SplitQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
     case NODE_SYMMETRIC: delete data.NS; break;
     case SPLIT_LOW_RANK: delete data.SF; break;
     case SPLIT_DENSE:    delete data.SD; break;
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+NodeContext::NodeContext()
+: children(16)
+{
+    for( int i=0; i<16; ++i )
+        children[i] = new MapVectorContext();
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+NodeContext::~NodeContext()
+{
+    for( int i=0; i<16; ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline typename SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+NodeContext::Child( int t, int s )
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapVectorContext::NodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const typename SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+NodeContext::Child( int t, int s ) const
+{
+#ifndef RELEASE
+    PushCallStack("SplitQuasi2dHMatrix::MapVectorContext::NodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+ContextShell::ContextShell()
+: type(NODE), data()
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+ContextShell::~ContextShell()
+{
+    switch( type )
+    {
+    case NODE:
+        delete data.N; break;
+
+    case NODE_SYMMETRIC:
+        delete data.NS; break;
+
+    case SPLIT_LOW_RANK:
+    case SPLIT_DENSE:
+        delete data.z; break;
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+NodeContext::NodeContext()
+: children(16)
+{
+    for( int i=0; i<16; ++i )
+        children[i] = new MapDenseMatrixContext();
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+NodeContext::~NodeContext()
+{
+    for( int i=0; i<16; ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline typename SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+NodeContext::Child( int t, int s )
+{
+#ifndef RELEASE
+    PushCallStack
+    ("SplitQuasi2dHMatrix::MapDenseMatrixContext::NodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const typename 
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext&
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+NodeContext::Child( int t, int s ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("SplitQuasi2dHMatrix::MapDenseMatrixContext::NodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+ContextShell::ContextShell()
+: type(NODE), data()
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline
+SplitQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+ContextShell::~ContextShell()
+{
+    switch( type )
+    {
+    case NODE:
+        delete data.N; break;
+
+    case NODE_SYMMETRIC:
+        delete data.NS; break;
+
+    case SPLIT_LOW_RANK:
+    case SPLIT_DENSE:
+        delete data.Z; break;
     }
 }
 

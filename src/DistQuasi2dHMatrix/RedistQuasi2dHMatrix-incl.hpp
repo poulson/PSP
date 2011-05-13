@@ -1107,7 +1107,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     switch( shell.type ) 
     {
     case NODE:           delete shell.data.N; break;
-    case NODE_SYMMETRIC: delete shell.data.NS; break;
     case DIST_LOW_RANK:  delete shell.data.DF; break;
     case SPLIT_QUASI2D:  delete shell.data.SH; break;
     case SPLIT_LOW_RANK: delete shell.data.SF; break;
@@ -1282,11 +1281,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         }
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
     {
         shell.data.DF = new DistLowRankMatrix;

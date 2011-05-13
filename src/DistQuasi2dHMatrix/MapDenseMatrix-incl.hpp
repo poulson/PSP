@@ -76,21 +76,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrix");
 #endif
-    // Y := beta Y 
     hmatrix_tools::Scale( beta, YLocal );
 
-    MapMatrixPrecompute( alpha, XLocal, YLocal );
+    MapDenseMatrixContext context;
+    MapMatrixPrecompute( context, alpha, XLocal, YLocal );
 
-    MapMatrixSummations( alpha, XLocal, YLocal);
-    //MapMatrixNaiveSummations( alpha, XLocal, YLocal );
+    MapMatrixSummations( context );
+    //MapMatrixNaiveSummations( context );
 
-    //MapMatrixPassData( alpha, XLocal, YLocal );
-    MapMatrixNaivePassData( alpha, XLocal, YLocal );
+    //MapMatrixPassData( context, alpha, XLocal, YLocal );
+    MapMatrixNaivePassData( context, alpha, XLocal, YLocal );
 
-    MapMatrixBroadcasts( alpha, XLocal, YLocal );
-    //MapMatrixNaiveBroadcasts( alpha, XLocal, YLocal );
+    MapMatrixBroadcasts( context );
+    //MapMatrixNaiveBroadcasts( context );
 
-    MapMatrixPostcompute( alpha, XLocal, YLocal );
+    MapMatrixPostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -105,21 +105,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrix");
 #endif
-    // Y := beta Y 
     hmatrix_tools::Scale( beta, YLocal );
 
-    TransposeMapMatrixPrecompute( alpha, XLocal, YLocal );
+    MapDenseMatrixContext context;
+    TransposeMapMatrixPrecompute( context, alpha, XLocal, YLocal );
 
-    TransposeMapMatrixSummations( alpha, XLocal, YLocal );
-    //TransposeMapMatrixNaiveSummations( alpha, XLocal, YLocal );
+    TransposeMapMatrixSummations( context );
+    //TransposeMapMatrixNaiveSummations( context );
 
-    //TransposeMapMatrixPassData( alpha, XLocal, YLocal );
-    TransposeMapMatrixNaivePassData( alpha, XLocal, YLocal );
+    //TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
+    TransposeMapMatrixNaivePassData( context, alpha, XLocal, YLocal );
 
-    TransposeMapMatrixBroadcasts( alpha, XLocal, YLocal );
-    //TransposeMapMatrixNaiveBroadcasts( alpha, XLocal, YLocal );
+    TransposeMapMatrixBroadcasts( context );
+    //TransposeMapMatrixNaiveBroadcasts( context );
 
-    TransposeMapMatrixPostcompute( alpha, XLocal, YLocal );
+    TransposeMapMatrixPostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -134,21 +134,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrix");
 #endif
-    // Y := beta Y 
     hmatrix_tools::Scale( beta, YLocal );
 
-    HermitianTransposeMapMatrixPrecompute( alpha, XLocal, YLocal );
+    MapDenseMatrixContext context;
+    HermitianTransposeMapMatrixPrecompute( context, alpha, XLocal, YLocal );
 
-    HermitianTransposeMapMatrixSummations( alpha, XLocal, YLocal );
-    //HermitianTransposeMapMatrixNaiveSummations( alpha, XLocal, YLocal );
+    HermitianTransposeMapMatrixSummations( context );
+    //HermitianTransposeMapMatrixNaiveSummations( context );
 
-    //HermitianTransposeMapMatrixPassData( alpha, XLocal, YLocal );
-    HermitianTransposeMapMatrixNaivePassData( alpha, XLocal, YLocal );
+    //HermitianTransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
+    HermitianTransposeMapMatrixNaivePassData( context, alpha, XLocal, YLocal );
 
-    HermitianTransposeMapMatrixBroadcasts( alpha, XLocal, YLocal );
-    //HermitianTransposeMapMatrixNaiveBroadcasts( alpha, XLocal, YLocal );
+    HermitianTransposeMapMatrixBroadcasts( context );
+    //HermitianTransposeMapMatrixNaiveBroadcasts( context );
 
-    HermitianTransposeMapMatrixPostcompute( alpha, XLocal, YLocal );
+    HermitianTransposeMapMatrixPostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -158,6 +158,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 // Private non-static routines                                                //
 //----------------------------------------------------------------------------//
 
+// HERE
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
@@ -179,11 +180,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                 node.Child(t,s).MapMatrixPrecompute( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -307,11 +303,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -424,11 +415,6 @@ HermitianTransposeMapMatrixPrecompute
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -675,11 +661,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsCount
                 ( sizes, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
             sizes[_level-1] += shell.data.DF->rank*XLocal.Width();
@@ -720,11 +701,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsCount
                 ( sizes, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
             sizes[_level-1] += shell.data.DF->rank*XLocal.Width();
@@ -766,11 +742,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsPack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -818,11 +789,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsPack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -870,11 +836,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsUnpack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -927,11 +888,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsUnpack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -983,11 +939,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -1043,11 +994,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveSummations
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -1263,11 +1209,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
         }
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
     {
         if( _inSourceTeam && _inTargetTeam )
@@ -1509,11 +1450,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         }
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
     {
         if( _inSourceTeam && _inTargetTeam )
@@ -1775,11 +1711,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsCount
                 ( sizes, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
             sizes[_level-1] += shell.data.DF->rank*XLocal.Width();
@@ -1820,11 +1751,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsCount
                 ( sizes, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
             sizes[_level-1] += shell.data.DF->rank*XLocal.Width();
@@ -1866,11 +1792,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -1923,11 +1844,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -1980,11 +1896,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -2033,11 +1944,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
                 ( buffer, offsets, alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet supported");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -2085,11 +1991,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -2135,11 +2036,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -2202,11 +2098,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
                 node.Child(t,s).MapMatrixPostcompute( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
@@ -2289,11 +2180,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
@@ -2402,11 +2288,6 @@ HermitianTransposeMapMatrixPostcompute
                 ( alpha, XLocal, YLocal );
         break;
     }
-    case NODE_SYMMETRIC:
-#ifndef RELEASE
-        throw std::logic_error("Symmetric case not yet written");
-#endif
-        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
