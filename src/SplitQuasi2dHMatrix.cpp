@@ -677,7 +677,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
 #ifndef RELEASE
     PushCallStack("SplitQuasi2dHMatrix::TransposeMapMatrixPrecompute");
 #endif
-    const int width = YLocal.Width();
+    const int width = XLocal.Width();
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
@@ -1079,8 +1079,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         if( !_ownSourceSide )
         {
 
-            if( XLocal.Height() == XLocal.LDim() )
+            if( XLocal.Height() != XLocal.LDim() )
             {
+                // We must pack XLocal since it's not contiguous in memory
                 SD.Z.Resize( _height, width, _height );
                 for( int j=0; j<width; ++j )
                 {
@@ -1093,7 +1094,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
             }
             else
             {
-                // We must pack XLocal since it's not contiguous in memory
                 mpi::Send
                 ( XLocal.LockedBuffer(), _height*width, _partner, 0, _comm );
             }

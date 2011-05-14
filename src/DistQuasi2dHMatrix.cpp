@@ -947,11 +947,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeFirstLocalIndexRecursion
 
         // Add on this level of offsets
         if( onRight && onTop )
-            firstLocalIndex += xSize*yBottomSize + xLeftSize*yTopSize;
+            firstLocalIndex += (xSize*yBottomSize + xLeftSize*yTopSize)*zSize;
         else if( onTop )
-            firstLocalIndex += xSize*yBottomSize;
+            firstLocalIndex += xSize*yBottomSize*zSize;
         else if( onRight )
-            firstLocalIndex += xLeftSize*yBottomSize;
+            firstLocalIndex += xLeftSize*yBottomSize*zSize;
 
         ComputeFirstLocalIndexRecursion
         ( firstLocalIndex, p/4, subteamRank,
@@ -968,7 +968,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeFirstLocalIndexRecursion
 
         // Add on this level of offsets
         if( subteam )
-            firstLocalIndex += xSize*yBottomSize;
+            firstLocalIndex += xSize*yBottomSize*zSize;
 
         ComputeFirstLocalIndexRecursion
         ( firstLocalIndex, p/2, subteamRank,
@@ -1418,7 +1418,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
   Scalar beta,        DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
+    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrix");
 #endif
     // Y := beta Y 
     hmatrix_tools::Scale( beta, YLocal );
@@ -1745,7 +1745,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
             Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
+            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Height() );
             hmatrix_tools::MatrixTransposeVector
             ( alpha, SF.D, xLocalSub, SF.z );
         }
@@ -1856,7 +1856,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
             const SplitLowRankMatrix& SF = *shell.data.SF;
             DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SF.D.Width(), width );
+            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
             hmatrix_tools::MatrixTransposeMatrix
             ( alpha, SF.D, XLocalSub, SF.Z );
         }
@@ -1969,7 +1969,7 @@ HermitianTransposeMapVectorPrecompute
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
             Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Width() );
+            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Height() );
             hmatrix_tools::MatrixHermitianTransposeVector
             ( alpha, SF.D, xLocalSub, SF.z );
         }
@@ -2082,7 +2082,7 @@ HermitianTransposeMapMatrixPrecompute
             const SplitLowRankMatrix& SF = *shell.data.SF;
             DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SF.D.Width(), width );
+            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
             hmatrix_tools::MatrixHermitianTransposeMatrix
             ( alpha, SF.D, XLocalSub, SF.Z );
         }
@@ -3728,7 +3728,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
             if( _inSourceTeam )
             {
                 mpi::Send
-                ( DF.Z.LockedBuffer(), DF.rank*width, _rootOfOtherTeam, 0, comm );
+                ( DF.Z.LockedBuffer(), DF.rank*width, 
+                  _rootOfOtherTeam, 0, comm );
             }
             else
             {
@@ -3761,7 +3762,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
         else
         {
             SF.Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( SF.Z.Buffer(), SF.rank*width, _rootOfOtherTeam, 0, comm );
+            mpi::Recv
+            ( SF.Z.Buffer(), SF.rank*width, _rootOfOtherTeam, 0, comm );
         }
         break;
     }
@@ -5660,7 +5662,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
             Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Width() );
+            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Height() );
             if( Conjugated )
             {
                 // yLocal += conj(V) z
@@ -5771,7 +5773,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
             const SplitLowRankMatrix& SF = *shell.data.SF;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SF.D.Width(), width );
+            ( YLocal, _localSourceOffset, 0, SF.D.Height(), width );
             if( Conjugated )
             {
                 // YLocal += conj(V) Z
@@ -5881,7 +5883,7 @@ HermitianTransposeMapVectorPostcompute
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
             Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Width() );
+            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Height() );
             if( Conjugated )
             {
                 hmatrix_tools::MatrixVector
@@ -5994,7 +5996,7 @@ HermitianTransposeMapMatrixPostcompute
             const SplitLowRankMatrix& SF = *shell.data.SF;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SF.D.Width(), width );
+            ( YLocal, _localSourceOffset, 0, SF.D.Height(), width );
             if( Conjugated )
             {
                 hmatrix_tools::MatrixMatrix

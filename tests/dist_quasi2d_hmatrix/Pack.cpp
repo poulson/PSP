@@ -205,23 +205,40 @@ main( int argc, char* argv[] )
                 H.Print("inv(H)");
         }
 
-        // Store the result of our H-matrix applied to a vector of all ones
+        // Store the result of a serial hmat-mat
         if( rank == 0 )
         {
-            std::cout << "Multiplying by a vector of all ones for reference...";
+            std::cout << "Y := H X...";
             std::cout.flush();
         }
-        double matvecStartTime = psp::mpi::WallTime();
-        psp::Vector<Scalar> x( n );
-        Scalar* xBuffer = x.Buffer();
-        for( int i=0; i<n; ++i )
-            xBuffer[i] = (Scalar)1;
-        psp::Vector<Scalar> y;
-        H.MapVector( (Scalar)1, x, y );
-        double matvecStopTime = psp::mpi::WallTime();
+        double hmatMatStartTime = psp::mpi::WallTime();
+        psp::DenseMatrix<Scalar> X( n, 30 );
+        for( int j=0; j<X.Width(); ++j )
+            for( int i=0; i<n; ++i )
+                X.Set( i, j, i+j );
+        psp::DenseMatrix<Scalar> Y;
+        H.MapMatrix( (Scalar)1, X, Y );
+        double hmatMatStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
-            std::cout << "done: " << matvecStopTime-matvecStartTime 
+            std::cout << "done: " << hmatMatStopTime-hmatMatStartTime 
+                      << " seconds." << std::endl;
+        }
+        
+        // Store the result of a serial hmat-trans-mat
+        if( rank == 0 )
+        {
+            std::cout << "Z := H' X...";
+            std::cout.flush();
+        }
+        double hmatHermTransMatStartTime = psp::mpi::WallTime();
+        psp::DenseMatrix<Scalar> Z;
+        H.HermitianTransposeMapMatrix( (Scalar)1, X, Z );
+        double hmatHermTransMatStopTime = psp::mpi::WallTime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " 
+                      << hmatHermTransMatStopTime-hmatHermTransMatStartTime 
                       << " seconds." << std::endl;
         }
 
@@ -299,46 +316,97 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
         }
 
-        // Form a local vector of all ones
-        psp::Vector<Scalar> xLocal( distH.LocalWidth() );
-        Scalar* xLocalBuffer = xLocal.Buffer();
-        for( int i=0; i<distH.LocalWidth(); ++i )
-            xLocalBuffer[i] = (Scalar)1;
-
         // Apply the distributed H-matrix
         if( rank == 0 )
         {
-            std::cout << "Distributed matvec...";
+            std::cout << "Distributed Y := H X...";
             std::cout.flush();
         }
-        double distMatvecStartTime = psp::mpi::WallTime();
-        psp::Vector<Scalar> yLocal;
-        distH.MapVector( (Scalar)1, xLocal, yLocal );
+        psp::DenseMatrix<Scalar> XLocal;
+        XLocal.LockedView
+        ( X, distH.FirstLocalCol(), 0, distH.LocalWidth(), X.Width() );
+        double distHmatMatStartTime = psp::mpi::WallTime();
+        psp::DenseMatrix<Scalar> YLocal;
+        distH.MapMatrix( (Scalar)1, XLocal, YLocal );
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distMatvecStopTime = psp::mpi::WallTime();
+        double distHmatMatStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
-            std::cout << "done: " << distMatvecStopTime-distMatvecStartTime
+            std::cout << "done: " << distHmatMatStopTime-distHmatMatStartTime
                       << " seconds." << std::endl;
         }
 
-        // Measure how close our result is to the serial one
+        // Measure how close our result is to the serial results
         if( rank == 0 )
         {
             std::cout << "Comparing serial and distributed results...";
             std::cout.flush();
         }
-        psp::Vector<Scalar> yLocalTruth;
-        yLocalTruth.View( y, distH.FirstLocalRow(), distH.LocalHeight() );
-        for( int i=0; i<yLocal.Height(); ++i )
+        psp::DenseMatrix<Scalar> YLocalTruth;
+        YLocalTruth.View
+        ( Y, distH.FirstLocalRow(), 0, distH.LocalHeight(), X.Width() );
+        for( int j=0; j<YLocal.Width(); ++j )
         {
-            if( std::abs(yLocalTruth.Get(i)-yLocal.Get(i)) > 1e-8 )
+            for( int i=0; i<YLocal.Height(); ++i )
             {
-                std::ostringstream ss;
-                ss << "Answer differed at local index " << i << ", truth was "
-                   << yLocalTruth.Get(i) << ", computed was "
-                   << yLocal.Get(i) << std::endl;
-                throw std::logic_error( ss.str().c_str() );
+                if( std::abs(YLocalTruth.Get(i,j)-YLocal.Get(i,j)) > 1e-8 )
+                {
+                    std::ostringstream ss;
+                    ss << "Answer differed at local index (" 
+                        << i << "," << j << "), truth was "
+                       << YLocalTruth.Get(i,j) << ", computed was "
+                       << YLocal.Get(i,j) << std::endl;
+                    throw std::logic_error( ss.str().c_str() );
+                }
+            }
+        }
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        if( rank == 0 )
+            std::cout << "done" << std::endl;
+        
+        // Apply the Hermitian-transposed distributed H-matrix
+        if( rank == 0 )
+        {
+            std::cout << "Distributed Z := H' X...";
+            std::cout.flush();
+        }
+        XLocal.LockedView
+        ( X, distH.FirstLocalRow(), 0, distH.LocalHeight(), X.Width() );
+        double distHmatHermTransMatStartTime = psp::mpi::WallTime();
+        psp::DenseMatrix<Scalar> ZLocal;
+        distH.HermitianTransposeMapMatrix( (Scalar)1, XLocal, ZLocal );
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        double distHmatHermTransMatStopTime = psp::mpi::WallTime();
+        if( rank == 0 )
+        {
+            std::cout << "done: " 
+                      << distHmatHermTransMatStopTime-
+                         distHmatHermTransMatStartTime
+                      << " seconds." << std::endl;
+        }
+
+        // Measure how close our result is to the serial results
+        if( rank == 0 )
+        {
+            std::cout << "Comparing serial and distributed results...";
+            std::cout.flush();
+        }
+        psp::DenseMatrix<Scalar> ZLocalTruth;
+        ZLocalTruth.View
+        ( Z, distH.FirstLocalCol(), 0, distH.LocalWidth(), X.Width() );
+        for( int j=0; j<ZLocal.Width(); ++j )
+        {
+            for( int i=0; i<ZLocal.Height(); ++i )
+            {
+                if( std::abs(ZLocalTruth.Get(i,j)-ZLocal.Get(i,j)) > 1e-8 )
+                {
+                    std::ostringstream ss;
+                    ss << "Answer differed at local index (" 
+                        << i << "," << j << "), truth was "
+                       << ZLocalTruth.Get(i,j) << ", computed was "
+                       << ZLocal.Get(i,j) << std::endl;
+                    throw std::logic_error( ss.str().c_str() );
+                }
             }
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
@@ -357,3 +425,4 @@ main( int argc, char* argv[] )
     MPI_Finalize();
     return 0;
 }
+
