@@ -34,6 +34,9 @@ template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
 private:
+    /*
+     * Private static member functions
+     */
     static void PackedSizeRecursion
     ( std::size_t& packedSize, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
@@ -45,6 +48,9 @@ private:
     ( int* map, int& index, int level, int numLevels,
       int xSize, int ySize, int zSize, int thisXSize, int thisYSize );
 
+    /*
+     * Private data structures
+     */
     struct Node
     {
         std::vector<Quasi2dHMatrix*> children;
@@ -98,7 +104,9 @@ private:
         ~Shell();
     };
 
-    // Data specific to our quasi-2d H-matrix
+    /*
+     * Private member data
+     */
     int _xSizeSource, _xSizeTarget;
     int _ySizeSource, _ySizeTarget;
     int _zSize;
@@ -106,6 +114,9 @@ private:
     int _ySource, _yTarget;
     Shell _shell;
 
+    /*
+     * Private non-static member functions
+     */
     bool Admissible() const;
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
@@ -137,10 +148,15 @@ public:
     friend class SplitQuasi2dHMatrix<Scalar,Conjugated>;
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
+    /*
+     * Public static member functions
+     */
     static void BuildNaturalToHierarchicalMap
     ( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels );
 
-    // Default constructor
+    /*
+     * Public non-static member functions
+     */
     Quasi2dHMatrix();
 
     // Create a square top-level H-matrix

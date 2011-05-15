@@ -27,12 +27,13 @@
 
 namespace psp {
 
-// We will enforce the requirement that is a power of 2 numbers or processes, 
-// but not more than 4^{numLevels-1}.
 template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
 private:
+    /*
+     * Private static functions
+     */
     static void PackedSizesRecursion
     ( std::vector<std::size_t>& packedSizes,
       const std::vector<int>& localSizes,
@@ -54,6 +55,9 @@ private:
     static void ComputeLocalSizesRecursion
     ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );
 
+    /*
+     * Private data structures
+     */
     struct DistLowRankMatrix
     {
         int rank;
@@ -141,6 +145,36 @@ private:
         ~Shell();
     };
 
+    // HERE:
+    /*
+    struct MapVectorContext
+    {
+        enum ContextType
+        {
+            ...
+        };
+    };
+
+    struct MapDenseMatrixContext
+    {
+        enum ContextType
+        {
+            ...
+        };
+    };
+
+    struct MapHMatrixContext
+    {
+        enum ContextType
+        {
+            ...
+        };
+    };
+    */
+
+    /*
+     * Private data
+     */
     int _height, _width;
     int _numLevels;
     int _maxRank;
@@ -162,13 +196,17 @@ private:
     int _localSourceOffset;
     int _localTargetOffset;
 
-    void UnpackRecursion
-    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
-      int sourceRankOffset, int targetRankOffset );
-
+    /*
+     * Private non-static member functions
+     */
+    
     // Ensure that the default constructor is not accessible, a communicator
     // must be supplied
     DistQuasi2dHMatrix();
+
+    void UnpackRecursion
+    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
+      int sourceRankOffset, int targetRankOffset );
 
     void MapVectorPrecompute
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
@@ -417,6 +455,9 @@ private:
                           DenseMatrix<Scalar>& YLocal ) const;
 
 public:
+    /*
+     * Public static member functions
+     */
     static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
       const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
@@ -441,6 +482,9 @@ public:
     ( std::vector<int>& localSizes, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
+    /*
+     * Public non-static member functions
+     */
     DistQuasi2dHMatrix( const Subcomms& subcomms );
     DistQuasi2dHMatrix
     ( const Subcomms& subcomms, unsigned level, 

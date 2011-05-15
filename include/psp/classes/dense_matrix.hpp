@@ -34,6 +34,10 @@ enum MatrixType { GENERAL, SYMMETRIC /*, HERMITIAN*/ };
 template<typename Scalar>
 class DenseMatrix
 {
+private:
+    /*
+     * Private member data
+     */
     int _height, _width;
     int _ldim; // leading dimension of matrix
     bool _viewing;
@@ -44,6 +48,9 @@ class DenseMatrix
     MatrixType _type;
 
 public:
+    /*
+     * Public non-static member functions
+     */
     DenseMatrix
     ( MatrixType type=GENERAL );
     DenseMatrix

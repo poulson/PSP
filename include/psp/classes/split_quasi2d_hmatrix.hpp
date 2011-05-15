@@ -29,6 +29,9 @@ template<typename Scalar,bool Conjugated>
 class SplitQuasi2dHMatrix
 {
 private:
+    /*
+     * Private static member functions
+     */
     static void PackedSizesRecursion
     ( std::size_t& sourceSize, std::size_t& targetSize, 
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
@@ -38,6 +41,9 @@ private:
       int sourceRank, int targetRank,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
+    /*
+     * Private data structures
+     */
     struct SplitLowRankMatrix
     {
         int rank;
@@ -106,6 +112,9 @@ private:
         ~Shell();
     };
 
+    /*
+     * Private member data
+     */
     int _height, _width;
     int _numLevels;
     int _maxRank;
@@ -129,6 +138,9 @@ private:
     mutable Vector<Scalar> _z;
     mutable DenseMatrix<Scalar> _Z;
 
+    /*
+     * Private non-static member functions
+     */
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
     void UnpackRecursion
@@ -196,6 +208,9 @@ private:
 public:
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
+    /*
+     * Public static member functions
+     */
     static std::pair<std::size_t,std::size_t> PackedSizes
     ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
     
@@ -210,6 +225,9 @@ public:
       int sourceRank, int targetRank,
       const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
+    /*
+     * Public non-static member functions
+     */
     SplitQuasi2dHMatrix( MPI_Comm comm );
 
     SplitQuasi2dHMatrix

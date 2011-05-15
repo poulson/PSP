@@ -31,6 +31,9 @@ template<typename Scalar>
 class AbstractHMatrix
 {
 protected:
+    /*
+     * Protected member data
+     */
     int _height, _width;
     int _numLevels;
     int _maxRank;
@@ -38,6 +41,9 @@ protected:
     bool _symmetric;
     bool _stronglyAdmissible;
 
+    /*
+     * Protected non-static member functions
+     */
     AbstractHMatrix()
     : _height(0), _width(0), _numLevels(0), _maxRank(0), 
       _sourceOffset(0), _targetOffset(0),
@@ -54,6 +60,9 @@ protected:
     { }
 
 public:
+    /*
+     * Public non-static non-virtual member functions
+     */
     int Height() const { return _height; }
     int Width() const  { return _width; }
     int NumLevels() const { return _numLevels; }
@@ -63,6 +72,9 @@ public:
     bool Symmetric() const { return _symmetric; }
     bool StronglyAdmissible() const { return _stronglyAdmissible; }
 
+    /*
+     * Public non-static virtual member functions
+     */
     // Display the equivalent dense matrix
     virtual void Print( const std::string& tag ) const = 0;
 

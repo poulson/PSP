@@ -46,9 +46,9 @@ namespace hmatrix_tools {
 // the reusability of this code.                                              //
 //----------------------------------------------------------------------------//
 
-/*\
-|*| Ensure that the low-rank matrix has a rank of at most 'maxRank'
-\*/
+/*
+ *  Ensure that the low-rank matrix has a rank of at most 'maxRank'
+ */
 template<typename Real,bool Conjugated>
 void Compress
 ( int maxRank, 
@@ -64,9 +64,9 @@ void Compress( int maxRank, LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void Compress( int maxRank, LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
-/*\
-|*| Convert a subset of a sparse matrix to dense/low-rank form
-\*/
+/*
+ *  Convert a subset of a sparse matrix to dense/low-rank form
+ */
 template<typename Scalar>
 void ConvertSubmatrix
 ( DenseMatrix<Scalar>& D, const SparseMatrix<Scalar>& S,
@@ -76,9 +76,9 @@ void ConvertSubmatrix
 ( LowRankMatrix<Scalar,Conjugated>& F, const SparseMatrix<Scalar>& S,
   int iStart, int jStart, int height, int width );
 
-/*\
-|*| Generalized addition of two dense/low-rank matrices, C := alpha A + beta B
-\*/
+/*
+ *  Generalized addition of two dense/low-rank matrices, C := alpha A + beta B
+ */
 // D := alpha D + beta D
 template<typename Scalar>
 void MatrixAdd
@@ -110,9 +110,9 @@ void MatrixAdd
   Scalar beta,  const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 
-/*\
-|*| Generalized update of two dense/low-rank matrices, B := alpha A + beta B
-\*/
+/*
+ *  Generalized update of two dense/low-rank matrices, B := alpha A + beta B
+ */
 // D := alpha D + beta D
 template<typename Scalar>
 void MatrixUpdate
@@ -129,10 +129,10 @@ void MatrixUpdate
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
   Scalar beta,        DenseMatrix<Scalar>& B );
 
-/*\
-|*| Generalized add of two low-rank matrices, C := alpha A + beta B, 
-|*| where C is then forced to be of rank at most 'maxRank'
-\*/
+/*
+ *  Generalized add of two low-rank matrices, C := alpha A + beta B, 
+ *  where C is then forced to be of rank at most 'maxRank'
+ */
 template<typename Real,bool Conjugated>
 void MatrixAddRounded
 ( int maxRank,
@@ -148,10 +148,10 @@ void MatrixAddRounded
   const LowRankMatrix<std::complex<Real>,Conjugated>& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& C );
 
-/*\
-|*| Generalized update of a low-rank matrix, B := alpha A + beta B, 
-|*| where B is then forced to be of rank at most 'maxRank'
-\*/
+/*
+ *  Generalized update of a low-rank matrix, B := alpha A + beta B, 
+ *  where B is then forced to be of rank at most 'maxRank'
+ */
 template<typename Real,bool Conjugated>
 void MatrixUpdateRounded
 ( int maxRank,
@@ -166,15 +166,15 @@ void MatrixUpdateRounded
         LowRankMatrix<std::complex<Real>,Conjugated>& B
 );
 
-/*\
-|*| Matrix Matrix multiply, C := alpha A B
-|*|
-|*| When the resulting matrix is dense, an update form is also provided, i.e.,
-|*| C := alpha A B + beta C
-|*|
-|*| A routine for forming a low-rank matrix from the product of two black-box 
-|*| matrix and matrix-transpose vector multiplication routines is also provided.
-\*/
+/*
+ *  Matrix Matrix multiply, C := alpha A B
+ * 
+ *  When the resulting matrix is dense, an update form is also provided, i.e.,
+ *  C := alpha A B + beta C
+ * 
+ *  A routine for forming a low-rank matrix from the product of two black-box 
+ *  matrix and matrix-transpose vector multiplication routines is also provided.
+ */
 // D := alpha D D
 template<typename Scalar>
 void MatrixMatrix
@@ -287,15 +287,15 @@ void MatrixMatrix
   const AbstractHMatrix< std::complex<Real> >& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
-/*\
-|*| Matrix Transpose Matrix Multiply, C := alpha A^T B
-|*|
-|*| When the resulting matrix is dense, an update form is also provided, i.e.,
-|*| C := alpha A^T B + beta C
-|*|
-|*| A routine for forming a low-rank matrix from the product of two black-box 
-|*| matrix and matrix-transpose vector multiplication routines is also provided.
-\*/
+/*
+ *  Matrix Transpose Matrix Multiply, C := alpha A^T B
+ * 
+ *  When the resulting matrix is dense, an update form is also provided, i.e.,
+ *  C := alpha A^T B + beta C
+ * 
+ *  A routine for forming a low-rank matrix from the product of two black-box 
+ *  matrix and matrix-transpose vector multiplication routines is also provided.
+ */
 // D := alpha D^T D
 template<typename Scalar>
 void MatrixTransposeMatrix
@@ -408,15 +408,15 @@ void MatrixTransposeMatrix
   const AbstractHMatrix< std::complex<Real> >& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
-/*\
-|*| Matrix Hermitian Transpose Matrix Multiply, C := alpha A^H B
-|*|
-|*| When the resulting matrix is dense, an update form is also provided, i.e.,
-|*| C := alpha A^H B + beta C
-|*|
-|*| A routine for forming a low-rank matrix from the product of two black-box 
-|*| matrix and matrix-transpose vector multiplication routines is also provided.
-\*/
+/*
+ *  Matrix Hermitian Transpose Matrix Multiply, C := alpha A^H B
+ * 
+ *  When the resulting matrix is dense, an update form is also provided, i.e.,
+ *  C := alpha A^H B + beta C
+ * 
+ *  A routine for forming a low-rank matrix from the product of two black-box 
+ *  matrix and matrix-transpose vector multiplication routines is also provided.
+ */
 // D := alpha D^H D
 template<typename Scalar>
 void MatrixHermitianTransposeMatrix
@@ -529,9 +529,9 @@ void MatrixHermitianTransposeMatrix
   const AbstractHMatrix< std::complex<Real> >& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
-/*\
-|*| Matrix-Vector multiply, y := alpha A x + beta y
-\*/
+/*
+ *  Matrix-Vector multiply, y := alpha A x + beta y
+ */
 // y := alpha D x + beta y
 template<typename Scalar>
 void MatrixVector
@@ -545,9 +545,9 @@ void MatrixVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
-/*\
-|*| Matrix-Vector multiply, y := alpha A x 
-\*/
+/*
+ *  Matrix-Vector multiply, y := alpha A x 
+ */
 // y := alpha D x
 template<typename Scalar>
 void MatrixVector
@@ -561,9 +561,9 @@ void MatrixVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
-/*\
-|*| Matrix-Transpose-Vector multiply, y := alpha A^T x + beta y
-\*/
+/*
+ *  Matrix-Transpose-Vector multiply, y := alpha A^T x + beta y
+ */
 // y := alpha D^T x + beta y
 template<typename Scalar>
 void MatrixTransposeVector
@@ -577,9 +577,9 @@ void MatrixTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
-/*\
-|*| Matrix-Transpose-Vector multiply, y := alpha A^T x 
-\*/
+/*
+ *  Matrix-Transpose-Vector multiply, y := alpha A^T x 
+ */
 // y := alpha D^T x
 template<typename Scalar>
 void MatrixTransposeVector
@@ -593,9 +593,9 @@ void MatrixTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
-/*\
-|*| Matrix-Hermitian-Transpose-Vector multiply, y := alpha A^H x + beta y
-\*/
+/*
+ *  Matrix-Hermitian-Transpose-Vector multiply, y := alpha A^H x + beta y
+ */
 // y := alpha D^H x + beta y
 template<typename Scalar>
 void MatrixHermitianTransposeVector
@@ -609,9 +609,9 @@ void MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 
-/*\
-|*| Matrix-Hermitian-Transpose-Vector multiply, y := alpha A^H x 
-\*/
+/*
+ *  Matrix-Hermitian-Transpose-Vector multiply, y := alpha A^H x 
+ */
 // y := alpha D^H x
 template<typename Scalar>
 void MatrixHermitianTransposeVector
@@ -625,23 +625,23 @@ void MatrixHermitianTransposeVector
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 
-/*\
-|*| Dense inversion, D := inv(D)
-\*/
+/*
+ *  Dense inversion, D := inv(D)
+ */
 template<typename Scalar>
 void Invert( DenseMatrix<Scalar>& D );
 
-/*\
-|*| Compute a vector's two-norm
-\*/
+/*
+ *  Compute a vector's two-norm
+ */
 template<typename Real>
 Real TwoNorm( const Vector<Real>& x );
 template<typename Real>
 Real TwoNorm( const Vector< std::complex<Real> >& x );
 
-/*\
-|*| Estimate the two-norm of an abstract H-matrix
-\*/
+/*
+ *  Estimate the two-norm of an abstract H-matrix
+ */
 template<typename Real>
 Real EstimateTwoNorm
 ( const AbstractHMatrix<Real>& A, Real theta, Real confidence );
@@ -649,9 +649,9 @@ template<typename Real>
 Real EstimateTwoNorm
 ( const AbstractHMatrix< std::complex<Real> >& A, Real theta, Real confidence );
 
-/*\
-|*| Scale a vector or matrix
-\*/
+/*
+ *  Scale a vector or matrix
+ */
 template<typename Scalar>
 void Scale( Scalar alpha, Vector<Scalar>& x );
 
@@ -661,9 +661,9 @@ void Scale( Scalar alpha, DenseMatrix<Scalar>& D );
 template<typename Scalar,bool Conjugated>
 void Scale( Scalar alpha, LowRankMatrix<Scalar,Conjugated>& F );
 
-/*\
-|*| Copy a vector or matrix
-\*/
+/*
+ *  Copy a vector or matrix
+ */
 template<typename Scalar>
 void Copy( const Vector<Scalar>& x, Vector<Scalar>& y );
 template<typename Scalar>
@@ -679,9 +679,9 @@ void Copy
 ( const LowRankMatrix<Scalar,Conjugated>& A, 
         LowRankMatrix<Scalar,Conjugated>& B );
 
-/*\
-|*| Conjugate a vector or matrix
-\*/
+/*
+ *  Conjugate a vector or matrix
+ */
 template<typename Real>
 void Conjugate( Vector<Real>& x );
 template<typename Real>
@@ -756,9 +756,9 @@ void Conjugate
 ( const LowRankMatrix<std::complex<Real>,Conjugated>& F1,
         LowRankMatrix<std::complex<Real>,Conjugated>& F2 );
 
-/*\
-|*| Transpose a matrix: B := A^T
-\*/
+/*
+ *  Transpose a matrix: B := A^T
+ */
 template<typename Scalar>
 void Transpose
 ( const DenseMatrix<Scalar>& A, 
@@ -769,9 +769,9 @@ void Transpose
 ( const LowRankMatrix<Scalar,Conjugated>& A, 
         LowRankMatrix<Scalar,Conjugated>& B );
 
-/*\
-|*| Hermitian-transpose a matrix: B := A^H
-\*/
+/*
+ *  Hermitian-transpose a matrix: B := A^H
+ */
 template<typename Scalar>
 void HermitianTranspose
 ( const DenseMatrix<Scalar>& A, 
@@ -782,9 +782,9 @@ void HermitianTranspose
 ( const LowRankMatrix<Scalar,Conjugated>& A,
         LowRankMatrix<Scalar,Conjugated>& B );
 
-/*\
-|*| For generating Gaussian random variables/vectors
-\*/
+/*
+ *  For generating Gaussian random variables/vectors
+ */
 template<typename Real>
 void Uniform( Real& U );
 template<typename Real>
@@ -802,10 +802,10 @@ void GaussianRandomVectors( DenseMatrix<Real>& A );
 template<typename Real>
 void GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
 
-/*\
-|*| For computing the in-place QR decomposition of two r x r upper-triangular
-|*| matrices with their nonzeros packed columnwise.
-\*/
+/*
+ *  For computing the in-place QR decomposition of two r x r upper-triangular
+ *  matrices with their nonzeros packed columnwise.
+ */
 template<typename Scalar>
 void PackedQR( const int r, Scalar* RESTRICT buffer, Scalar* RESTRICT work );
 
@@ -816,9 +816,9 @@ void PackedQR( const int r, Scalar* RESTRICT buffer, Scalar* RESTRICT work );
 // Header implementations                                                     //
 //----------------------------------------------------------------------------//
 
-/*\
-|*| Copy a vector or matrix
-\*/
+/*
+ *  Copy a vector or matrix
+ */
 template<typename Scalar>
 void psp::hmatrix_tools::Copy
 ( const psp::Vector<Scalar>& x, psp::Vector<Scalar>& y )
@@ -921,9 +921,9 @@ void psp::hmatrix_tools::Copy
 #endif
 }
 
-/*\
-|*| Conjugate a vector or matrix
-\*/
+/*
+ *  Conjugate a vector or matrix
+ */
 
 template<typename Real> 
 void psp::hmatrix_tools::Conjugate
@@ -1257,9 +1257,9 @@ void psp::hmatrix_tools::Conjugate
 #endif
 }
 
-/*\
-|*| Transpose a matrix, B := A^T
-\*/
+/*
+ *  Transpose a matrix, B := A^T
+ */
 
 template<typename Scalar>
 void psp::hmatrix_tools::Transpose
@@ -1313,9 +1313,9 @@ void psp::hmatrix_tools::Transpose
 #endif
 }
 
-/*\
-|*| Hermitian-transpose a matrix, B := A^H
-\*/
+/*
+ *  Hermitian-transpose a matrix, B := A^H
+ */
 
 template<typename Scalar>
 void psp::hmatrix_tools::HermitianTranspose
@@ -1369,9 +1369,9 @@ void psp::hmatrix_tools::HermitianTranspose
 #endif
 }
 
-/*\
-|*| For compute vector two-norms
-\*/
+/*
+ *  For compute vector two-norms
+ */
 template<typename Real>
 Real psp::hmatrix_tools::TwoNorm
 ( const psp::Vector<Real>& x )
@@ -1400,28 +1400,28 @@ Real psp::hmatrix_tools::TwoNorm
     return twoNorm;
 }
 
-/*\
-|*| Estimate the two-norm of an abstract H-matrix
-|*|
-|*| We have that
-|*|     (x' (A'A)^k x)^{1/k} <= ||A'A||_2 <= theta^2 (x' (A'A)^k x)^{1/k},
-|*| with probability at least 1 - 0.8 theta^{-k} n^{1/2}.
-|*| 
-|*| Seek the minimum even k, given theta, such that 0.8 theta^{-k} n^{1/2}
-|*| is <= 10^{-confidence}.
-|*|
-|*| Then
-|*|     x' (A'A)^k x = (A^k x)' (A^k x) = (||A^k x||_2)^2
-|*| but ||A||_2 = sqrt(||A'A||_2), so our estimate is
-|*|     (||A^k x||_2)^{1/k} <= ||A||_2 <= theta (||A^k x||_2)^{1/k}
-|*| so that k matrix-vector products are required.
-|*|
-|*| We can solve for such a k via the equations:
-|*|     k >= log_theta( 0.8 sqrt(n) 10^{confidence} )
-|*|        = log( 0.8 sqrt(n) 10^{confidence} ) / log( theta ),
-|*| and set
-|*|     k := ceil(log( 0.8 sqrt(n) 10^{confidence} ) / log( theta ))
-\*/
+/*
+ *  Estimate the two-norm of an abstract H-matrix
+ * 
+ *  We have that
+ *      (x' (A'A)^k x)^{1/k} <= ||A'A||_2 <= theta^2 (x' (A'A)^k x)^{1/k},
+ *  with probability at least 1 - 0.8 theta^{-k} n^{1/2}.
+ *  
+ *  Seek the minimum even k, given theta, such that 0.8 theta^{-k} n^{1/2}
+ *  is <= 10^{-confidence}.
+ * 
+ *  Then
+ *      x' (A'A)^k x = (A^k x)' (A^k x) = (||A^k x||_2)^2
+ *  but ||A||_2 = sqrt(||A'A||_2), so our estimate is
+ *      (||A^k x||_2)^{1/k} <= ||A||_2 <= theta (||A^k x||_2)^{1/k}
+ *  so that k matrix-vector products are required.
+ * 
+ *  We can solve for such a k via the equations:
+ *      k >= log_theta( 0.8 sqrt(n) 10^{confidence} )
+ *         = log( 0.8 sqrt(n) 10^{confidence} ) / log( theta ),
+ *  and set
+ *      k := ceil(log( 0.8 sqrt(n) 10^{confidence} ) / log( theta ))
+ */
 template<typename Real>
 Real psp::hmatrix_tools::EstimateTwoNorm
 ( const psp::AbstractHMatrix<Real>& A, Real theta, Real confidence )
@@ -1512,9 +1512,9 @@ Real psp::hmatrix_tools::EstimateTwoNorm
     return estimate;
 }
 
-/*\
-|*| For scaling vectors and matrices
-\*/
+/*
+ *  For scaling vectors and matrices
+ */
 
 template<typename Scalar>
 void psp::hmatrix_tools::Scale
@@ -1602,9 +1602,9 @@ void psp::hmatrix_tools::Scale
 #endif
 }
 
-/*\
-|*| For forming low-rank approximations to the product of H-matrices
-\*/
+/*
+ *  For forming low-rank approximations to the product of H-matrices
+ */
 
 // F := alpha H H,
 template<typename Real,bool Conjugated>
@@ -2153,9 +2153,9 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 #endif
 }
 
-/*\
-|*| For generating Gaussian random variables/vectors
-\*/
+/*
+ *  For generating Gaussian random variables/vectors
+ */
 
 // Return a uniform sample from [0,1]
 template<typename Real>
