@@ -225,23 +225,23 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         }
         break;
     case SPLIT_QUASI2D:
+    {
         context._shell.type = SPLIT_QUASI2D;
         context._shell.data.SH = 
             new typename SplitQuasi2d::MapDenseMatrixContext();
-        if( _inSourceTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-                *context._shell.data.SH;
 
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, SH._width, width );
-            YLocalSub.View
-            ( YLocal, _localTargetOffset, 0, SH._height, width );
-            SH.MapMatrixPrecompute( splitContext, alpha, XLocalSub, YLocalSub );
-        }
+        const SplitQuasi2d& SH = *shell.data.SH;
+        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
+            *context._shell.data.SH;
+
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localSourceOffset, 0, SH._width, width );
+        YLocalSub.View
+        ( YLocal, _localTargetOffset, 0, SH._height, width );
+        SH.MapMatrixPrecompute( splitContext, alpha, XLocalSub, YLocalSub );
         break;
+    }
     case SPLIT_LOW_RANK:
         context._shell.type = SPLIT_LOW_RANK;
         context._shell.data.Z = new DenseMatrix<Scalar>();
@@ -396,24 +396,23 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
         }
         break;
     case SPLIT_QUASI2D:
+    {
         context._shell.type = SPLIT_QUASI2D;
         context._shell.data.SH = 
             new typename SplitQuasi2d::MapDenseMatrixContext();
-        if( _inTargetTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-                *context._shell.data.SH;
 
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SH._height, width );
-            YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SH._width, width );
-            SH.TransposeMapMatrixPrecompute
-            ( splitContext, alpha, XLocalSub, YLocalSub );
-        }
+        const SplitQuasi2d& SH = *shell.data.SH;
+        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
+            *context._shell.data.SH;
+
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, SH._height, width );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, SH._width, width );
+        SH.TransposeMapMatrixPrecompute
+        ( splitContext, alpha, XLocalSub, YLocalSub );
         break;
+    }
     case SPLIT_LOW_RANK:
         context._shell.type = SPLIT_LOW_RANK;
         context._shell.data.Z = new DenseMatrix<Scalar>();
@@ -554,23 +553,23 @@ HermitianTransposeMapMatrixPrecompute
         }
         break;
     case SPLIT_QUASI2D:
+    {
         context._shell.type = SPLIT_QUASI2D;
         context._shell.data.SH = 
             new typename SplitQuasi2d::MapDenseMatrixContext();
-        if( _inTargetTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-                *context._shell.data.SH;
 
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SH._height, width );
-            YLocalSub.View( YLocal, _localSourceOffset, 0, SH._width, width );
-            SH.HermitianTransposeMapMatrixPrecompute
-            ( splitContext, alpha, XLocalSub, YLocalSub );
-        }
+        const SplitQuasi2d& SH = *shell.data.SH;
+        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
+            *context._shell.data.SH;
+
+        DenseMatrix<Scalar> XLocalSub, YLocalSub;
+        XLocalSub.LockedView
+        ( XLocal, _localTargetOffset, 0, SH._height, width );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, SH._width, width );
+        SH.HermitianTransposeMapMatrixPrecompute
+        ( splitContext, alpha, XLocalSub, YLocalSub );
         break;
+    }
     case SPLIT_LOW_RANK:
         context._shell.type = SPLIT_LOW_RANK;
         context._shell.data.Z = new DenseMatrix<Scalar>();
@@ -2186,7 +2185,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
             *context._shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixNaiveBroadcasts( context, width );
+                node.Child(t,s).MapMatrixNaiveBroadcasts
+                ( nodeContext.Child(t,s), width );
         break;
     }
     case DIST_LOW_RANK:
@@ -2233,7 +2233,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixNaiveBroadcasts
-                ( context, width );
+                ( nodeContext.Child(t,s), width );
         break;
     }
     case DIST_LOW_RANK:

@@ -35,6 +35,12 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     case NODE: 
         delete context._shell.data.N; break;
 
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Deleting NODE_SYMMETRIC");
+#endif
+        break;
+
     case SPLIT_LOW_RANK: 
     case SPLIT_DENSE: 
         delete context._shell.data.z; break;
@@ -121,6 +127,12 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     {
     case NODE: 
         delete context._shell.data.N; break;
+    
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Deleting NODE_SYMMETRIC");
+#endif
+        break;
 
     case SPLIT_LOW_RANK: 
     case SPLIT_DENSE: 
@@ -195,6 +207,12 @@ HermitianTransposeMapVectorPrecompute
     {
     case NODE: 
         delete context._shell.data.N; break;
+    
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Deleting NODE_SYMMETRIC");
+#endif
+        break;
 
     case SPLIT_LOW_RANK: 
     case SPLIT_DENSE: 
@@ -310,7 +328,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix& SD = *shell.data.SD;
         Vector<Scalar>& z = *context._shell.data.z;
         if( _ownSourceSide )
             mpi::Send( z.LockedBuffer(), _height, _partner, 0, _comm );
@@ -379,7 +396,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix& SD = *shell.data.SD;
         Vector<Scalar>& z = *context._shell.data.z;
         if( !_ownSourceSide )
             mpi::Send( xLocal.LockedBuffer(), _height, _partner, 0, _comm );
@@ -450,7 +466,6 @@ HermitianTransposeMapVectorNaivePassData
     }
     case SPLIT_DENSE:
     {
-        const SplitDenseMatrix& SD = *shell.data.SD;
         Vector<Scalar>& z = *context._shell.data.z;
         if( !_ownSourceSide )
             mpi::Send( xLocal.LockedBuffer(), _height, _partner, 0, _comm );
@@ -517,7 +532,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     case SPLIT_DENSE:
         if( !_ownSourceSide )
         {
-            const SplitDenseMatrix& SD = *shell.data.SD;
             const Vector<Scalar>& z = *context._shell.data.z;
 
             const int localHeight = _height;

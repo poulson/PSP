@@ -546,6 +546,12 @@ ContextShell::~ContextShell()
     case NODE:
         delete data.N; break;
 
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Destructed NODE_SYMMETRIC");
+#endif
+        break;
+
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
         delete data.z; break;
@@ -627,6 +633,12 @@ ContextShell::~ContextShell()
     {
     case NODE:
         delete data.N; break;
+
+    case NODE_SYMMETRIC:
+#ifndef RELEASE
+        throw std::logic_error("Destructed NODE_SYMMETRIC");
+#endif
+        break;
 
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:

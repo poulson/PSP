@@ -221,20 +221,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         }
         break;
     case SPLIT_QUASI2D:
+    {
         context._shell.type = SPLIT_QUASI2D;
         context._shell.data.SH = new typename SplitQuasi2d::MapVectorContext();
-        if( _inSourceTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapVectorContext& splitContext = 
-                *context._shell.data.SH;
 
-            Vector<Scalar> xLocalSub, yLocalSub;
-            xLocalSub.LockedView( xLocal, _localSourceOffset, SH._width );
-            yLocalSub.View( yLocal, _localTargetOffset, SH._height );
-            SH.MapVectorPrecompute( splitContext, alpha, xLocalSub, yLocalSub );
-        }
+        const SplitQuasi2d& SH = *shell.data.SH;
+        typename SplitQuasi2d::MapVectorContext& splitContext = 
+            *context._shell.data.SH;
+
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localSourceOffset, SH._width );
+        yLocalSub.View( yLocal, _localTargetOffset, SH._height );
+        SH.MapVectorPrecompute( splitContext, alpha, xLocalSub, yLocalSub );
         break;
+    }
     case SPLIT_LOW_RANK:
         context._shell.type = SPLIT_LOW_RANK;
         context._shell.data.z = new Vector<Scalar>();
@@ -384,21 +384,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         }
         break;
     case SPLIT_QUASI2D:
+    {
         context._shell.type = SPLIT_QUASI2D;
         context._shell.data.SH = new typename SplitQuasi2d::MapVectorContext();
-        if( _inTargetTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapVectorContext& splitContext = 
-                *context._shell.data.SH;
 
-            Vector<Scalar> xLocalSub, yLocalSub;
-            xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
-            yLocalSub.View( yLocal, _localSourceOffset, SH._width );
-            SH.TransposeMapVectorPrecompute
-            ( splitContext, alpha, xLocalSub, yLocalSub );
-        }
+        const SplitQuasi2d& SH = *shell.data.SH;
+        typename SplitQuasi2d::MapVectorContext& splitContext = 
+            *context._shell.data.SH;
+
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
+        yLocalSub.View( yLocal, _localSourceOffset, SH._width );
+        SH.TransposeMapVectorPrecompute
+        ( splitContext, alpha, xLocalSub, yLocalSub );
         break;
+    }
     case SPLIT_LOW_RANK:
         context._shell.type = SPLIT_LOW_RANK;
         context._shell.data.z = new Vector<Scalar>();
@@ -531,21 +531,21 @@ HermitianTransposeMapVectorPrecompute
         }
         break;
     case SPLIT_QUASI2D:
+    {
         context._shell.type = SPLIT_QUASI2D;
         context._shell.data.SH = new typename SplitQuasi2d::MapVectorContext();
-        if( _inTargetTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapVectorContext& splitContext = 
-                *context._shell.data.SH;
 
-            Vector<Scalar> xLocalSub, yLocalSub;
-            xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
-            yLocalSub.View( yLocal, _localSourceOffset, SH._width );
-            SH.HermitianTransposeMapVectorPrecompute
-            ( splitContext, alpha, xLocalSub, yLocalSub );
-        }
+        const SplitQuasi2d& SH = *shell.data.SH;
+        typename SplitQuasi2d::MapVectorContext& splitContext = 
+            *context._shell.data.SH;
+
+        Vector<Scalar> xLocalSub, yLocalSub;
+        xLocalSub.LockedView( xLocal, _localTargetOffset, SH._height );
+        yLocalSub.View( yLocal, _localSourceOffset, SH._width );
+        SH.HermitianTransposeMapVectorPrecompute
+        ( splitContext, alpha, xLocalSub, yLocalSub );
         break;
+    }
     case SPLIT_LOW_RANK:
         context._shell.type = SPLIT_LOW_RANK;
         context._shell.data.z = new Vector<Scalar>();

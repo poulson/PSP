@@ -30,7 +30,10 @@ namespace psp {
 template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
+    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
+    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 private:
+
     /*
      * Private static functions
      */
@@ -38,13 +41,13 @@ private:
     ( std::vector<std::size_t>& packedSizes,
       const std::vector<int>& localSizes,
       int sourceRankOffset, int targetRankOffset, int teamSize,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+      const Quasi2d& H );
 
     static void PackRecursion
     ( std::vector<byte**>& headPointers,
       const std::vector<int>& localSizes,
       int sourceRankOffset, int targetRankOffset, int teamSize,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+      const Quasi2d& H );
 
     static void ComputeLocalDimensionRecursion
     ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
@@ -58,8 +61,6 @@ private:
     /*
      * Private data structures
      */
-    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
-    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
     struct DistLowRankMatrix
     {
@@ -119,7 +120,7 @@ private:
             SplitQuasi2d* SH;
             SplitLowRankMatrix* SF;
             SplitDenseMatrix* SD;
-            Quasi2dHMatrix<Scalar,Conjugated>* H;
+            Quasi2d* H;
             LowRankMatrix<Scalar,Conjugated>* F;
             DenseMatrix<Scalar>* D;
             Data() { std::memset( this, 0, sizeof(Data) ); }
@@ -444,27 +445,26 @@ public:
      */
     static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
+      const Quasi2d& H, const Subcomms& subcomms );
 
     static std::size_t Pack
     ( std::vector<byte*>& packedPieces, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
+      const Quasi2d& H, const Subcomms& subcomms );
 
     static int ComputeLocalHeight
-    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    ( int p, int rank, const Quasi2d& H );
 
     static int ComputeLocalWidth
-    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    ( int p, int rank, const Quasi2d& H );
 
     static int ComputeFirstLocalRow
-    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    ( int p, int rank, const Quasi2d& H );
 
     static int ComputeFirstLocalCol
-    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    ( int p, int rank, const Quasi2d& H );
 
     static void ComputeLocalSizes
-    ( std::vector<int>& localSizes, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    ( std::vector<int>& localSizes, const Quasi2d& H );
 
     /*
      * Public non-static member functions
