@@ -58,6 +58,7 @@ private:
     /*
      * Private data structures
      */
+    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
     typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
 
     struct DistLowRankMatrix
@@ -230,7 +231,7 @@ private:
     void MapVectorSummations
     ( MapVectorContext& context ) const;
     void MapVectorSummationsCount
-    ( std::vector<int>& sizes, MapVectorContext& context ) const;
+    ( std::vector<int>& sizes ) const;
     void MapVectorSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets, 
       MapVectorContext& context ) const;
@@ -250,7 +251,7 @@ private:
     void MapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void MapVectorBroadcastsCount
-    ( std::vector<int>& sizes, MapVectorContext& context ) const;
+    ( std::vector<int>& sizes ) const;
     void MapVectorBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapVectorContext& context ) const;
@@ -269,9 +270,9 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixSummations
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void MapMatrixSummationsCount
-    ( std::vector<int>& sizes, MapDenseMatrixContext& context ) const;
+    ( std::vector<int>& sizes, int width ) const;
     void MapMatrixSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
@@ -289,17 +290,17 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
     void MapMatrixBroadcasts
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void MapMatrixBroadcastsCount
-    ( std::vector<int>& sizes, MapDenseMatrixContext& context ) const;
+    ( std::vector<int>& sizes, int width ) const;
     void MapMatrixBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
     void MapMatrixBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MapDenseMatrixContext& context ) const;
+      MapDenseMatrixContext& context, int width ) const;
     void MapMatrixNaiveBroadcasts
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void MapMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
@@ -312,7 +313,7 @@ private:
     void TransposeMapVectorSummations
     ( MapVectorContext& context ) const;
     void TransposeMapVectorSummationsCount
-    ( std::vector<int>& sizes, MapVectorContext& context ) const;
+    ( std::vector<int>& sizes ) const;
     void TransposeMapVectorSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapVectorContext& context ) const;
@@ -332,7 +333,7 @@ private:
     void TransposeMapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void TransposeMapVectorBroadcastsCount
-    ( std::vector<int>& sizes, MapVectorContext& context ) const;
+    ( std::vector<int>& sizes ) const;
     void TransposeMapVectorBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapVectorContext& context ) const;
@@ -351,9 +352,9 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixSummations
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixSummationsCount
-    ( std::vector<int>& sizes, MapDenseMatrixContext& context ) const;
+    ( std::vector<int>& sizes, int width ) const;
     void TransposeMapMatrixSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
@@ -371,17 +372,17 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixBroadcasts
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixBroadcastsCount
-    ( std::vector<int>& sizes, MapDenseMatrixContext& context ) const;
+    ( std::vector<int>& sizes, int width ) const;
     void TransposeMapMatrixBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
     void TransposeMapMatrixBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MapDenseMatrixContext& context ) const;
+      MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixNaiveBroadcasts
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
@@ -417,7 +418,7 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixSummations
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapMatrixNaiveSummations
     ( MapDenseMatrixContext& context ) const;
     void HermitianTransposeMapMatrixPassData
@@ -429,9 +430,9 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
     void HermitianTransposeMapMatrixBroadcasts
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapMatrixNaiveBroadcasts
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,

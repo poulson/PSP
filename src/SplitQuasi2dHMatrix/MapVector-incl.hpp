@@ -35,9 +35,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     case NODE: 
         delete context._shell.data.N; break;
 
-    case NODE_SYMMETRIC: 
-        delete context._shell.data.NS; break;
-
     case SPLIT_LOW_RANK: 
     case SPLIT_DENSE: 
         delete context._shell.data.z; break;
@@ -49,8 +46,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     case NODE:
     {
         context._shell.type = NODE;
-        context._shell.data.N = new MapVectorContext::NodeContext();
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        context._shell.data.N = new typename MapVectorContext::NodeContext();
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -96,9 +94,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
 
         if( _ownSourceSide )
         {
-            const DenseMatrix<Scalar>& D = *shell.data.SD;
+            const SplitDenseMatrix& SD = *shell.data.SD;
             Vector<Scalar>& z = *context._shell.data.z;
-            hmatrix_tools::MatrixVector( alpha, D, xLocal, z );
+            hmatrix_tools::MatrixVector( alpha, SD.D, xLocal, z );
         }
         break;
     }
@@ -124,9 +122,6 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     case NODE: 
         delete context._shell.data.N; break;
 
-    case NODE_SYMMETRIC: 
-        delete context._shell.data.NS; break;
-
     case SPLIT_LOW_RANK: 
     case SPLIT_DENSE: 
         delete context._shell.data.z; break;
@@ -138,8 +133,9 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     case NODE:
     {
         context._shell.type = NODE;
-        context._shell.data.N = new MapVectorContext::NodeContext();
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        context._shell.data.N = new typename MapVectorContext::NodeContext();
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -200,9 +196,6 @@ HermitianTransposeMapVectorPrecompute
     case NODE: 
         delete context._shell.data.N; break;
 
-    case NODE_SYMMETRIC: 
-        delete context._shell.data.NS; break;
-
     case SPLIT_LOW_RANK: 
     case SPLIT_DENSE: 
         delete context._shell.data.z; break;
@@ -214,8 +207,9 @@ HermitianTransposeMapVectorPrecompute
     case NODE:
     {
         context._shell.type = NODE;
-        context._shell.data.N = new MapVectorContext::NodeContext();
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        context._shell.data.N = new typename MapVectorContext::NodeContext();
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -277,7 +271,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
     {
     case NODE:
     {
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -347,7 +342,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
     {
     case NODE:
     {
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -417,7 +413,8 @@ HermitianTransposeMapVectorNaivePassData
     {
     case NODE:
     {
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -485,7 +482,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     {
     case NODE:
     {
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.z;
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -550,7 +548,8 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
     {
     case NODE:
     {
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.N;
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -575,7 +574,7 @@ psp::SplitQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
         if( _ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            const Vector<Scalar>& z = *context._shell.data.z;
+            Vector<Scalar>& z = *context._shell.data.z;
             if( Conjugated )
             {
                 // yLocal += conj(V) z
@@ -624,7 +623,8 @@ HermitianTransposeMapVectorPostcompute
     {
     case NODE:
     {
-        MapVectorContext::NodeContext& nodeContext = *context._shell.data.z;
+        typename MapVectorContext::NodeContext& nodeContext = 
+            *context._shell.data.N;
 
         const Node& node = *shell.data.N;
         Vector<Scalar> xLocalSub, yLocalSub;
@@ -649,7 +649,7 @@ HermitianTransposeMapVectorPostcompute
         if( _ownSourceSide )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            const Vector<Scalar>& z = *context._shell.data.z;
+            Vector<Scalar>& z = *context._shell.data.z;
 
             if( Conjugated )
             {

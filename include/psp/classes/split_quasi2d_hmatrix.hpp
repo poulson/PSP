@@ -28,6 +28,103 @@ namespace psp {
 template<typename Scalar,bool Conjugated>
 class SplitQuasi2dHMatrix
 {
+    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
+public:
+    /*
+     * Public static member functions
+     */
+    static std::pair<std::size_t,std::size_t> PackedSizes
+    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
+    
+    static std::size_t PackedSourceSize
+    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static std::size_t PackedTargetSize
+    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    static std::pair<std::size_t,std::size_t> Pack
+    ( byte* packedSourceSide, byte* packedTargetSide,
+      int sourceRank, int targetRank,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
+
+    /*
+     * Public non-static member functions
+     */
+    SplitQuasi2dHMatrix( MPI_Comm comm );
+
+    SplitQuasi2dHMatrix
+    ( const byte* packedHalf, MPI_Comm comm );
+
+    ~SplitQuasi2dHMatrix();
+
+    std::size_t Unpack( const byte* packedHalf, MPI_Comm comm );
+    
+    /*
+     * Public member structs/classes
+     */
+
+    // The coupling with DistQuasi2dHMatrix is unfortunately too tight to avoid
+    // making these public. Perhaps SplitQuasi2dHMatrix should be a member class
+    // of DistQuasi2dHMatrix, but that would make the headers complicated.
+
+    enum ShellType 
+    { 
+        NODE, 
+        NODE_SYMMETRIC, 
+        SPLIT_LOW_RANK, 
+        SPLIT_DENSE
+    };
+
+    struct MapVectorContext
+    {
+        struct NodeContext
+        {
+            std::vector<MapVectorContext*> children;
+            NodeContext();
+            ~NodeContext();
+            MapVectorContext& Child( int t, int s );
+            const MapVectorContext& Child( int t, int s ) const;
+        };
+        struct ContextShell
+        {
+            ShellType type;
+            union Data
+            {
+                NodeContext* N;
+                Vector<Scalar>* z;
+                Data() { std::memset( this, 0, sizeof(Data) ); }
+            } data;
+            ContextShell();
+            ~ContextShell();
+        };
+        ContextShell _shell;
+    };
+
+    struct MapDenseMatrixContext
+    {
+        struct NodeContext
+        {
+            std::vector<MapDenseMatrixContext*> children;
+            NodeContext();
+            ~NodeContext();
+            MapDenseMatrixContext& Child( int t, int s );
+            const MapDenseMatrixContext& Child( int t, int s ) const;
+        };
+        struct ContextShell
+        {
+            ShellType type;
+            union Data
+            {
+                NodeContext* N;
+                DenseMatrix<Scalar>* Z;
+                Data() { std::memset( this, 0, sizeof(Data) ); }
+            } data;
+            ContextShell();
+            ~ContextShell();
+        };
+        ContextShell _shell;
+    };
+
 private:
     /*
      * Private static member functions
@@ -85,14 +182,6 @@ private:
         const SplitQuasi2dHMatrix& Child( int i, int j ) const;
     };
 
-    enum ShellType 
-    { 
-        NODE, 
-        NODE_SYMMETRIC, 
-        SPLIT_LOW_RANK, 
-        SPLIT_DENSE
-    };
-
     struct Shell
     {
         ShellType type;
@@ -106,58 +195,6 @@ private:
         } data;
         Shell();
         ~Shell();
-    };
-
-    struct MapVectorContext
-    {
-        struct NodeContext
-        {
-            std::vector<MapVectorContext*> children;
-            NodeContext();
-            ~NodeContext();
-            MapVectorContext& Child( int t, int s );
-            const MapVectorContext& Child( int t, int s ) const;
-        };
-        struct ContextShell
-        {
-            ShellType type;
-            union Data
-            {
-                Node* N;
-                NodeSymmetric* NS;
-                Vector<Scalar>* z;
-                Data() { std::memset( this, 0, sizeof(Data) ); }
-            } data;
-            ContextShell();
-            ~ContextShell();
-        };
-        ContextShell _shell;
-    };
-
-    struct MapDenseMatrixContext
-    {
-        struct NodeContext
-        {
-            std::vector<MapDenseMatrixContext*> children;
-            NodeContext();
-            ~NodeContext();
-            MapDenseMatrixContext& Child( int t, int s );
-            const MapDenseMatrixContext& Child( int t, int s ) const;
-        };
-        struct ContextShell
-        {
-            ShellType type;
-            union Data
-            {
-                Node* N;
-                NodeSymmetric* NS;
-                DenseMatrix<Scalar>* Z;
-                Data() { std::memset( this, 0, sizeof(Data) ); }
-            } data;
-            ContextShell();
-            ~ContextShell();
-        };
-        ContextShell _shell;
     };
 
     /*
@@ -267,37 +304,6 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-public:
-    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
-
-    /*
-     * Public static member functions
-     */
-    static std::pair<std::size_t,std::size_t> PackedSizes
-    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
-    
-    static std::size_t PackedSourceSize
-    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    static std::size_t PackedTargetSize
-    ( const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    static std::pair<std::size_t,std::size_t> Pack
-    ( byte* packedSourceSide, byte* packedTargetSide,
-      int sourceRank, int targetRank,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    /*
-     * Public non-static member functions
-     */
-    SplitQuasi2dHMatrix( MPI_Comm comm );
-
-    SplitQuasi2dHMatrix
-    ( const byte* packedHalf, MPI_Comm comm );
-
-    ~SplitQuasi2dHMatrix();
-
-    std::size_t Unpack( const byte* packedHalf, MPI_Comm comm );
 };
 
 } // namespace psp
@@ -540,9 +546,6 @@ ContextShell::~ContextShell()
     case NODE:
         delete data.N; break;
 
-    case NODE_SYMMETRIC:
-        delete data.NS; break;
-
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
         delete data.z; break;
@@ -624,9 +627,6 @@ ContextShell::~ContextShell()
     {
     case NODE:
         delete data.N; break;
-
-    case NODE_SYMMETRIC:
-        delete data.NS; break;
 
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:

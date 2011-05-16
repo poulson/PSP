@@ -33,6 +33,8 @@ template<typename Scalar,bool Conjugated> class DistQuasi2dHMatrix;
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
+    friend class SplitQuasi2dHMatrix<Scalar,Conjugated>;
+    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 private:
     /*
      * Private static member functions
@@ -143,10 +145,8 @@ private:
     const;
 
     void WriteStructureRecursion( std::ofstream& file ) const;
-    
+
 public:    
-    friend class SplitQuasi2dHMatrix<Scalar,Conjugated>;
-    friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 
     /*
      * Public static member functions
