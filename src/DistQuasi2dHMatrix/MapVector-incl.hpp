@@ -168,8 +168,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     // Clear the context
     switch( context._shell.type )
     {
-    case NODE:
-        delete context._shell.data.N; break;
+    case DIST_NODE:
+        delete context._shell.data.DN; break;
 
     case SPLIT_QUASI2D:
         delete context._shell.data.SH; break;
@@ -189,14 +189,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        context._shell.type = NODE;
-        context._shell.data.N = new typename MapVectorContext::NodeContext();
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        context._shell.type = DIST_NODE;
+        context._shell.data.DN = 
+            new typename MapVectorContext::DistNodeContext();
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
 
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorPrecompute
@@ -332,8 +333,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     // Clear the context
     switch( context._shell.type )
     {
-    case NODE:
-        delete context._shell.data.N; break;
+    case DIST_NODE:
+        delete context._shell.data.DN; break;
 
     case SPLIT_QUASI2D:
         delete context._shell.data.SH; break;
@@ -353,14 +354,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        context._shell.type = NODE;
-        context._shell.data.N = new typename MapVectorContext::NodeContext();
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        context._shell.type = DIST_NODE;
+        context._shell.data.DN = 
+            new typename MapVectorContext::DistNodeContext();
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
 
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorPrecompute
@@ -479,8 +481,8 @@ HermitianTransposeMapVectorPrecompute
     // Clear the context
     switch( context._shell.type )
     {
-    case NODE:
-        delete context._shell.data.N; break;
+    case DIST_NODE:
+        delete context._shell.data.DN; break;
 
     case SPLIT_QUASI2D:
         delete context._shell.data.SH; break;
@@ -500,14 +502,15 @@ HermitianTransposeMapVectorPrecompute
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        context._shell.type = NODE;
-        context._shell.data.N = new typename MapVectorContext::NodeContext();
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        context._shell.type = DIST_NODE;
+        context._shell.data.DN = 
+            new typename MapVectorContext::DistNodeContext();
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
 
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).HermitianTransposeMapVectorPrecompute
@@ -758,9 +761,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsCount
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorSummationsCount( sizes );
@@ -795,9 +798,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsCount
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorSummationsCount( sizes );
@@ -833,11 +836,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsPack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorSummationsPack
@@ -881,11 +884,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsPack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorSummationsPack
@@ -929,11 +932,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsUnpack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorSummationsUnpack
@@ -982,11 +985,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsUnpack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorSummationsUnpack
@@ -1034,11 +1037,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSummations
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorNaiveSummations
@@ -1090,11 +1093,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorNaiveSummations
@@ -1213,11 +1216,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
 
         MPI_Comm team = _subcomms->Subcomm( _level );
         const int teamSize = mpi::CommSize( team );
@@ -1456,11 +1459,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
 
         MPI_Comm team = _subcomms->Subcomm( _level );
         const int teamSize = mpi::CommSize( team );
@@ -1828,9 +1831,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsCount
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorBroadcastsCount( sizes );
@@ -1865,9 +1868,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsCount
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
+        const DistNode& node = *shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorBroadcastsCount( sizes );
@@ -1903,11 +1906,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsPack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorBroadcastsPack
@@ -1956,11 +1959,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsPack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorBroadcastsPack
@@ -2009,11 +2012,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsUnpack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorBroadcastsUnpack
@@ -2057,11 +2060,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsUnpack
     const Shell& shell = _shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorBroadcastsUnpack
@@ -2104,11 +2107,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveBroadcasts
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorNaiveBroadcasts
@@ -2150,11 +2153,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorNaiveBroadcasts
@@ -2215,11 +2218,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorPostcompute
@@ -2299,11 +2302,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapVectorPostcompute
@@ -2413,11 +2416,11 @@ HermitianTransposeMapVectorPostcompute
     const Shell& shell = this->_shell;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     {
-        const Node& node = *shell.data.N;
-        typename MapVectorContext::NodeContext& nodeContext = 
-            *context._shell.data.N;
+        const DistNode& node = *shell.data.DN;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context._shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).HermitianTransposeMapVectorPostcompute

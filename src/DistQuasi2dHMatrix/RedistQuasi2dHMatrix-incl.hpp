@@ -506,14 +506,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             for( int i=0; i<teamSize; ++i )
             {
                 byte** hSource = headPointers[sourceRankOffset+i];
-                Write( hSource, NODE );
+                Write( hSource, DIST_NODE );
             }
             if( sourceRankOffset != targetRankOffset )
             {
                 for( int i=0; i<teamSize; ++i )
                 {
                     byte** hTarget = headPointers[targetRankOffset+i];
-                    Write( hTarget, NODE );
+                    Write( hTarget, DIST_NODE );
                 }
             }
             const int newTeamSize = teamSize/2;
@@ -571,14 +571,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             for( int i=0; i<teamSize; ++i )
             {
                 byte** hSource = headPointers[sourceRankOffset+i];
-                Write( hSource, NODE );
+                Write( hSource, DIST_NODE );
             }
             if( sourceRankOffset != targetRankOffset )
             {
                 for( int i=0; i<teamSize; ++i )
                 {
                     byte** hTarget = headPointers[targetRankOffset+i];
-                    Write( hTarget, NODE );
+                    Write( hTarget, DIST_NODE );
                 }
             }
             const int newTeamSize = teamSize/4;
@@ -1106,7 +1106,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     Shell& shell = H._shell;
     switch( shell.type ) 
     {
-    case NODE:           delete shell.data.N; break;
+    case DIST_NODE:      delete shell.data.DN; break;
     case DIST_LOW_RANK:  delete shell.data.DF; break;
     case SPLIT_QUASI2D:  delete shell.data.SH; break;
     case SPLIT_LOW_RANK: delete shell.data.SF; break;
@@ -1123,13 +1123,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     const int n = H._width;
     switch( shell.type )
     {
-    case NODE:
+    case DIST_NODE:
     { 
-        shell.data.N = 
-            new Node
+        shell.data.DN = 
+            new DistNode
             ( H._xSizeSource, H._xSizeTarget,
               H._ySizeSource, H._ySizeTarget, H._zSize );
-        Node& node = *shell.data.N;
+        DistNode& node = *shell.data.DN;
 
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );

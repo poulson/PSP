@@ -202,7 +202,7 @@ private:
         DenseMatrix<Scalar> D;
     };
 
-    struct Node
+    struct DistNode
     {
         std::vector<DistQuasi2dHMatrix*> children;
         int xSourceSizes[2];
@@ -211,18 +211,18 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[4];
-        Node
+        DistNode
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
           int zSize );
-        ~Node();
+        ~DistNode();
         DistQuasi2dHMatrix& Child( int t, int s );
         const DistQuasi2dHMatrix& Child( int t, int s ) const;
     };
 
     enum ShellType 
     { 
-        NODE,                // recurse
+        DIST_NODE,           // recurse
         DIST_LOW_RANK,       // each side is distributed
         SPLIT_QUASI2D,       // split between two processes
         SPLIT_LOW_RANK,      // each side is given to a different process
@@ -238,7 +238,7 @@ private:
         ShellType type;
         union Data
         {
-            Node* N;
+            DistNode* DN;
             DistLowRankMatrix* DF;
             SplitQuasi2d* SH;
             SplitLowRankMatrix* SF;
@@ -254,11 +254,11 @@ private:
 
     struct MapVectorContext
     {
-        struct NodeContext
+        struct DistNodeContext
         {
             std::vector<MapVectorContext*> children;
-            NodeContext();
-            ~NodeContext();
+            DistNodeContext();
+            ~DistNodeContext();
             MapVectorContext& Child( int t, int s );
             const MapVectorContext& Child( int t, int s ) const;
         };
@@ -267,7 +267,7 @@ private:
             ShellType type;
             union Data
             {
-                NodeContext* N;     
+                DistNodeContext* DN;
                 typename SplitQuasi2d::MapVectorContext* SH;
                 Vector<Scalar>* z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
@@ -280,11 +280,11 @@ private:
     
     struct MapDenseMatrixContext
     {
-        struct NodeContext
+        struct DistNodeContext
         {
             std::vector<MapDenseMatrixContext*> children;
-            NodeContext();
-            ~NodeContext();
+            DistNodeContext();
+            ~DistNodeContext();
             MapDenseMatrixContext& Child( int t, int s );
             const MapDenseMatrixContext& Child( int t, int s ) const;
         };
@@ -293,7 +293,7 @@ private:
             ShellType type;
             union Data
             {
-                NodeContext* N;     
+                DistNodeContext* DN; 
                 typename SplitQuasi2d::MapDenseMatrixContext* SH;
                 DenseMatrix<Scalar>* Z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
@@ -343,11 +343,11 @@ private:
          * Structs for the different types of matrix blocks. Some store several
          * types of updates.
          */
-        struct NodeContext
+        struct DistNodeContext
         {
             std::vector<MapHMatrixContext*> children;
-            NodeContext();
-            ~NodeContext();
+            DistNodeContext();
+            ~DistNodeContext();
             MapHMatrixContext& Child( int t, int s );
             const MapHMatrixContext& Child( int t, int s ) const;
 
@@ -378,7 +378,7 @@ private:
             ShellType type;
             union Data
             {
-                NodeContext* N;
+                DistNodeContext* DN;
                 //typename SplitQuasi2d::MapHMatrixContext* SH;
                 // TODO
             } data;
@@ -652,7 +652,7 @@ namespace psp {
  */
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
+DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::DistNode
 ( int xSizeSource, int xSizeTarget,
   int ySizeSource, int ySizeTarget,
   int zSize )
@@ -681,7 +681,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
+DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::~DistNode()
 {
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
@@ -690,10 +690,10 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
 
 template<typename Scalar,bool Conjugated>
 inline DistQuasi2dHMatrix<Scalar,Conjugated>&
-DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int t, int s )
+DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::Child( int t, int s )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::Node::Child");
+    PushCallStack("DistQuasi2dHMatrix::DistNode::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -707,10 +707,10 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int t, int s )
 
 template<typename Scalar,bool Conjugated>
 inline const DistQuasi2dHMatrix<Scalar,Conjugated>&
-DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int t, int s ) const
+DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::Child( int t, int s ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::Node::Child");
+    PushCallStack("DistQuasi2dHMatrix::DistNode::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -734,7 +734,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 { 
     switch( type )
     {
-    case NODE:           delete data.N;  break;
+    case DIST_NODE:      delete data.DN; break;
     case DIST_LOW_RANK:  delete data.DF; break;
     case SPLIT_QUASI2D:  delete data.SH; break;
     case SPLIT_LOW_RANK: delete data.SF; break;
@@ -749,7 +749,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-NodeContext::NodeContext()
+DistNodeContext::DistNodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
@@ -759,7 +759,7 @@ NodeContext::NodeContext()
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-NodeContext::~NodeContext()
+DistNodeContext::~DistNodeContext()
 {
     for( int i=0; i<16; ++i )
         delete children[i];
@@ -769,10 +769,11 @@ NodeContext::~NodeContext()
 template<typename Scalar,bool Conjugated>
 inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext&
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-NodeContext::Child( int t, int s )
+DistNodeContext::Child( int t, int s )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapVectorContext::NodeContext::Child");
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapVectorContext::DistNodeContext::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -787,10 +788,11 @@ NodeContext::Child( int t, int s )
 template<typename Scalar,bool Conjugated>
 inline const typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext&
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-NodeContext::Child( int t, int s ) const
+DistNodeContext::Child( int t, int s ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapVectorContext::NodeContext::Child");
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapVectorContext::DistNodeContext::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -816,8 +818,8 @@ ContextShell::~ContextShell()
 {
     switch( type )
     {
-    case NODE: 
-        delete data.N; break;
+    case DIST_NODE: 
+        delete data.DN; break;
 
     case SPLIT_QUASI2D: 
         delete data.SH; break;
@@ -838,7 +840,7 @@ ContextShell::~ContextShell()
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-NodeContext::NodeContext()
+DistNodeContext::DistNodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
@@ -848,7 +850,7 @@ NodeContext::NodeContext()
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-NodeContext::~NodeContext()
+DistNodeContext::~DistNodeContext()
 {
     for( int i=0; i<16; ++i )
         delete children[i];
@@ -858,11 +860,11 @@ NodeContext::~NodeContext()
 template<typename Scalar,bool Conjugated>
 inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext&
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-NodeContext::Child( int t, int s )
+DistNodeContext::Child( int t, int s )
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::MapDenseMatrixContext::NodeContext::Child");
+    ("DistQuasi2dHMatrix::MapDenseMatrixContext::DistNodeContext::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -878,11 +880,11 @@ template<typename Scalar,bool Conjugated>
 inline const typename 
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext&
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-NodeContext::Child( int t, int s ) const
+DistNodeContext::Child( int t, int s ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::MapDenseMatrixContext::NodeContext::Child");
+    ("DistQuasi2dHMatrix::MapDenseMatrixContext::DistNodeContext::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -908,8 +910,8 @@ ContextShell::~ContextShell()
 {
     switch( type )
     {
-    case NODE: 
-        delete data.N; break;
+    case DIST_NODE: 
+        delete data.DN; break;
 
     case SPLIT_QUASI2D: 
         delete data.SH; break;
