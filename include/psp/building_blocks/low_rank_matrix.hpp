@@ -21,7 +21,7 @@
 #ifndef PSP_LOW_RANK_MATRIX_HPP
 #define PSP_LOW_RANK_MATRIX_HPP 1
 
-#include "psp/classes/dense_matrix.hpp"
+#include "psp/building_blocks/dense_matrix.hpp"
 
 namespace psp {
 

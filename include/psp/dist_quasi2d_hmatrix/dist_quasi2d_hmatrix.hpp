@@ -21,9 +21,9 @@
 #ifndef PSP_DIST_QUASI2D_HMATRIX_HPP
 #define PSP_DIST_QUASI2D_HMATRIX_HPP 1
 
-#include "psp/classes/quasi2d_hmatrix.hpp"
-#include "psp/classes/split_quasi2d_hmatrix.hpp"
-#include "psp/classes/subcomms.hpp"
+#include "psp/building_blocks/mpi.hpp"
+#include "psp/quasi2d_hmatrix.hpp"
+#include "psp/dist_quasi2d_hmatrix/split_quasi2d_hmatrix.hpp"
 
 namespace psp {
 
@@ -32,8 +32,131 @@ class DistQuasi2dHMatrix
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
     typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
-private:
 
+public:
+    /*
+     * Public data structures
+     */
+    class Subcomms
+    {
+    private:
+        std::vector<MPI_Comm> _subcomms;
+    public:
+        Subcomms( MPI_Comm comm );
+        ~Subcomms();
+
+        unsigned NumLevels() const;
+        MPI_Comm Subcomm( unsigned level ) const;
+    };
+
+    /*
+     * Public static member functions
+     */
+    static std::size_t PackedSizes
+    ( std::vector<std::size_t>& packedSizes,
+      const Quasi2d& H, const Subcomms& subcomms );
+
+    static std::size_t Pack
+    ( std::vector<byte*>& packedPieces, 
+      const Quasi2d& H, const Subcomms& subcomms );
+
+    static int ComputeLocalHeight
+    ( int p, int rank, const Quasi2d& H );
+
+    static int ComputeLocalWidth
+    ( int p, int rank, const Quasi2d& H );
+
+    static int ComputeFirstLocalRow
+    ( int p, int rank, const Quasi2d& H );
+
+    static int ComputeFirstLocalCol
+    ( int p, int rank, const Quasi2d& H );
+
+    static void ComputeLocalSizes
+    ( std::vector<int>& localSizes, const Quasi2d& H );
+
+    /*
+     * Public non-static member functions
+     */
+    DistQuasi2dHMatrix( const Subcomms& subcomms );
+    DistQuasi2dHMatrix
+    ( const Subcomms& subcomms, unsigned level, 
+      bool inSourceTeam, bool inTargetTeam, 
+      int localSourceOffset=0, int localTargetOffset=0 );
+    DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
+    ~DistQuasi2dHMatrix();
+
+    int LocalHeight() const;
+    int LocalWidth() const;
+
+    int FirstLocalRow() const;
+    int FirstLocalCol() const;
+
+    // Unpack this process's portion of the DistQuasi2dHMatrix
+    std::size_t Unpack
+    ( const byte* packedDistHMatrix, const Subcomms& subcomms );
+
+    // y := alpha H x
+    void MapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H x + beta y
+    void MapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+      Scalar beta,        Vector<Scalar>& yLocal ) const;
+
+    // Y := alpha H X
+    void MapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+
+    // Y := alpha H X + beta Y
+    void MapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
+    // y := alpha H^T x
+    void TransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+                          Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H^T x + beta y
+    void TransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal, 
+      Scalar beta,        Vector<Scalar>& yLocal ) const;
+
+    // Y := alpha H^T X
+    void TransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+
+    // Y := alpha H^T X + beta Y
+    void TransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
+    // y := alpha H' x
+    void HermitianTransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+                          Vector<Scalar>& yLocal ) const;
+
+    // y := alpha H' x + beta y
+    void HermitianTransposeMapVector
+    ( Scalar alpha, const Vector<Scalar>& xLocal,
+      Scalar beta,        Vector<Scalar>& yLocal ) const;
+
+    // Y := alpha H' X
+    void HermitianTransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+                          DenseMatrix<Scalar>& YLocal ) const;
+
+    // Y := alpha H' X + beta Y
+    void HermitianTransposeMapMatrix
+    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
+      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
+private:
     /*
      * Private static functions
      */
@@ -181,13 +304,89 @@ private:
         ContextShell _shell;
     };
 
-    // HERE
-    /*
+    // This structure is still just a sketch. SplitQuasi2dHMatrix needs to be
+    // merged into DistQuasi2dHMatrix before the updates. 
     struct MapHMatrixContext
     {
-        // TODO
+        /*
+         * Different types of updates. Note that a low-rank matrix block can
+         * be updated with both low-rank and dense matrices.
+         */
+        struct DistLowRankUpdates
+        {
+            int currentRank;
+            DenseMatrix<Scalar> ULocal, VLocal;
+            DistLowRankUpdates() : currentRank(0) { }
+        };
+
+        struct SplitLowRankUpdates
+        {
+            int currentRank;
+            DenseMatrix<Scalar> D;
+        };
+
+        struct LowRankUpdates
+        {
+            int currentRank;
+            DenseMatrix<Scalar> U, V;
+            LowRankUpdates() : currentRank(0) { }
+        };
+
+        struct DenseUpdates
+        {
+            int numStored;
+            std::vector< DenseMatrix<Scalar> > DVec;
+            DenseUpdates() : numStored(0) { }
+        };
+
+        /*
+         * Structs for the different types of matrix blocks. Some store several
+         * types of updates.
+         */
+        struct NodeContext
+        {
+            std::vector<MapHMatrixContext*> children;
+            NodeContext();
+            ~NodeContext();
+            MapHMatrixContext& Child( int t, int s );
+            const MapHMatrixContext& Child( int t, int s ) const;
+
+            DistLowRankUpdates updates;
+        };
+
+        struct DistLowRankContext
+        {
+            DistLowRankUpdates updates;    
+        };
+
+        struct SplitLowRankContext
+        {
+            SplitLowRankUpdates updates;
+        };
+
+        struct LowRankContext
+        {
+            LowRankUpdates lowRankUpdates;
+            DenseUpdates denseUpdates;
+        };
+
+        /*
+         * Wrapper for storing different types of contexts.
+         */
+        struct ContextShell
+        {
+            ShellType type;
+            union Data
+            {
+                NodeContext* N;
+                //typename SplitQuasi2d::MapHMatrixContext* SH;
+                // TODO
+            } data;
+            ContextShell();
+            ~ContextShell();
+        };
+        ContextShell _shell;
     };
-    */
 
     /*
      * Private data
@@ -438,114 +637,6 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-
-public:
-    /*
-     * Public static member functions
-     */
-    static std::size_t PackedSizes
-    ( std::vector<std::size_t>& packedSizes,
-      const Quasi2d& H, const Subcomms& subcomms );
-
-    static std::size_t Pack
-    ( std::vector<byte*>& packedPieces, 
-      const Quasi2d& H, const Subcomms& subcomms );
-
-    static int ComputeLocalHeight
-    ( int p, int rank, const Quasi2d& H );
-
-    static int ComputeLocalWidth
-    ( int p, int rank, const Quasi2d& H );
-
-    static int ComputeFirstLocalRow
-    ( int p, int rank, const Quasi2d& H );
-
-    static int ComputeFirstLocalCol
-    ( int p, int rank, const Quasi2d& H );
-
-    static void ComputeLocalSizes
-    ( std::vector<int>& localSizes, const Quasi2d& H );
-
-    /*
-     * Public non-static member functions
-     */
-    DistQuasi2dHMatrix( const Subcomms& subcomms );
-    DistQuasi2dHMatrix
-    ( const Subcomms& subcomms, unsigned level, 
-      bool inSourceTeam, bool inTargetTeam, 
-      int localSourceOffset=0, int localTargetOffset=0 );
-    DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
-    ~DistQuasi2dHMatrix();
-
-    int LocalHeight() const;
-    int LocalWidth() const;
-
-    int FirstLocalRow() const;
-    int FirstLocalCol() const;
-
-    // Unpack this process's portion of the DistQuasi2dHMatrix
-    std::size_t Unpack
-    ( const byte* packedDistHMatrix, const Subcomms& subcomms );
-
-    // y := alpha H x
-    void MapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, 
-                          Vector<Scalar>& yLocal ) const;
-
-    // y := alpha H x + beta y
-    void MapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, 
-      Scalar beta,        Vector<Scalar>& yLocal ) const;
-
-    // Y := alpha H X
-    void MapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                          DenseMatrix<Scalar>& YLocal ) const;
-
-    // Y := alpha H X + beta Y
-    void MapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
-
-    // y := alpha H^T x
-    void TransposeMapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, 
-                          Vector<Scalar>& yLocal ) const;
-
-    // y := alpha H^T x + beta y
-    void TransposeMapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal, 
-      Scalar beta,        Vector<Scalar>& yLocal ) const;
-
-    // Y := alpha H^T X
-    void TransposeMapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                          DenseMatrix<Scalar>& YLocal ) const;
-
-    // Y := alpha H^T X + beta Y
-    void TransposeMapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
-
-    // y := alpha H' x
-    void HermitianTransposeMapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
-
-    // y := alpha H' x + beta y
-    void HermitianTransposeMapVector
-    ( Scalar alpha, const Vector<Scalar>& xLocal,
-      Scalar beta,        Vector<Scalar>& yLocal ) const;
-
-    // Y := alpha H' X
-    void HermitianTransposeMapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                          DenseMatrix<Scalar>& YLocal ) const;
-
-    // Y := alpha H' X + beta Y
-    void HermitianTransposeMapMatrix
-    ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-      Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
 };
 
 } // namespace psp
@@ -834,6 +925,81 @@ ContextShell::~ContextShell()
     case EMPTY: 
         break;
     }
+}
+
+/*
+ * Public structures member functions
+ */
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::Subcomms::Subcomms( MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("Subcomms::Subcomms");
+#endif
+    const int rank = mpi::CommRank( comm );
+    const int p = mpi::CommSize( comm );
+    if( !(p && !(p & (p-1))) )
+        throw std::logic_error("Must use a power of two number of processes");
+
+    // Simple (yet slow) method for computing the number of subcommunicators
+    unsigned numLevels = 1;
+    unsigned teamSize = p;
+    while( teamSize != 1 )
+    {
+        if( teamSize >= 4 )
+            teamSize >>= 2;
+        else // teamSize == 2
+            teamSize = 1;
+        ++numLevels;
+    }
+
+    _subcomms.resize( numLevels );
+    mpi::CommDup( comm, _subcomms[0] );
+    teamSize = p;
+    for( unsigned i=1; i<numLevels; ++i )
+    {
+        if( teamSize >= 4 )
+            teamSize >>= 2;
+        else
+            teamSize = 1;
+        const int color = rank/teamSize;
+        const int key = rank - color*teamSize;
+        mpi::CommSplit( comm, color, key, _subcomms[i] );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::Subcomms::~Subcomms()
+{
+#ifndef RELEASE
+    PushCallStack("Subcomms::~Subcomms");
+#endif
+    for( unsigned i=0; i<_subcomms.size(); ++i )
+        mpi::CommFree( _subcomms[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+inline unsigned
+DistQuasi2dHMatrix<Scalar,Conjugated>::Subcomms::NumLevels() const
+{
+    return _subcomms.size();
+}
+
+template<typename Scalar,bool Conjugated>
+inline MPI_Comm
+DistQuasi2dHMatrix<Scalar,Conjugated>::Subcomms::Subcomm
+( unsigned level ) const
+{
+    return _subcomms[std::min(level,(unsigned)_subcomms.size()-1)];
 }
 
 } // namespace psp

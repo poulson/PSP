@@ -27,13 +27,16 @@
 #include <cstring> // for std::memset and std::memcpy
 #include <vector> 
 
-#include "psp/blas.hpp"
-#include "psp/lapack.hpp"
-#include "psp/classes/vector.hpp"
-#include "psp/classes/dense_matrix.hpp"
-#include "psp/structs/low_rank_matrix.hpp"
-#include "psp/structs/sparse_matrix.hpp"
-#include "psp/classes/abstract_hmatrix.hpp"
+#include "psp/building_blocks/blas.hpp"
+#include "psp/building_blocks/lapack.hpp"
+
+#include "psp/building_blocks/dense_matrix.hpp"
+#include "psp/building_blocks/vector.hpp"
+
+#include "psp/building_blocks/low_rank_matrix.hpp"
+#include "psp/building_blocks/sparse_matrix.hpp"
+
+#include "psp/building_blocks/abstract_hmatrix.hpp"
 
 namespace psp {
 namespace hmatrix_tools {

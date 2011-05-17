@@ -21,7 +21,7 @@
 #ifndef PSP_QUASI2D_HMATRIX_HPP
 #define PSP_QUASI2D_HMATRIX_HPP 1
 
-#include "psp/classes/abstract_hmatrix.hpp"
+#include "psp/building_blocks/abstract_hmatrix.hpp"
 #include "psp/hmatrix_tools.hpp"
 
 namespace psp {

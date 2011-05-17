@@ -273,7 +273,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             const SplitDenseMatrix& SD = *shell.data.SD;
             DenseMatrix<Scalar>& Z = *context._shell.data.Z;
 
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
+            DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
             ( XLocal, _localSourceOffset, 0, this->_width, width );
             hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, Z );
@@ -2351,7 +2351,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
             for( int j=0; j<width; ++j )
             {
                 const Scalar* ZCol = Z.LockedBuffer(0,j);
-                Scalar* YCol = YLocal.Buffer(0,j);
+                Scalar* YCol = YLocal.Buffer(_localTargetOffset,j);
                 for( int i=0; i<localHeight; ++i )
                     YCol[i] += ZCol[i];
             }

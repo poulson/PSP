@@ -243,7 +243,7 @@ main( int argc, char* argv[] )
         }
 
         // Set up our subcommunicators and compute the packed sizes
-        psp::Subcomms subcomms( MPI_COMM_WORLD );
+        DistQuasi2d::Subcomms subcomms( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
         DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
         const std::size_t myMaxSize = 

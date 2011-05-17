@@ -21,10 +21,14 @@
 #ifndef PSP_SPLIT_QUASI2D_HMATRIX_HPP
 #define PSP_SPLIT_QUASI2D_HMATRIX_HPP 1
 
-#include "psp/classes/quasi2d_hmatrix.hpp"
+#include "psp/quasi2d_hmatrix.hpp"
 
 namespace psp {
 
+// This class is reasonably large yet is also tightly coupled with 
+// DistQuasi2dHMatrix. Ideally it would be a member class of DistQuasi2dHMatrix,
+// but that would greatly clutter the readability of the DistQuasi2dHMatrix
+// header file. For now, we will keep them separate.
 template<typename Scalar,bool Conjugated>
 class SplitQuasi2dHMatrix
 {
