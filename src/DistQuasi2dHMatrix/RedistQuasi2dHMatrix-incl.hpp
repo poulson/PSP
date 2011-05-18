@@ -434,7 +434,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             const int targetRank = targetRankOffset;
             if( sourceRank == targetRank )
             {
-                std::cout << "Packing NODE" << std::endl;
                 Write( headPointers[sourceRank], NODE );
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -444,7 +443,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                std::cout << "Packing SPLIT_NODE" << std::endl;
                 Write( headPointers[sourceRank], SPLIT_NODE );
                 Write( headPointers[targetRank], SPLIT_NODE );
                 for( int t=0; t<4; ++t )
@@ -458,7 +456,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         {
             // Recurse in 2x2 blocks:
             // top-left, top-right, bottom-left, bottom-right
-            std::cout << "Packing DIST_NODE" << std::endl;
             for( int i=0; i<teamSize; ++i )
                 Write( headPointers[sourceRankOffset+i], DIST_NODE );
             if( sourceRankOffset != targetRankOffset )
@@ -499,7 +496,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         {
             // Recurse in 2x2 blocks:
             // top-left, top-right, bottom-left, bottom-right
-            std::cout << "Packing DIST_NODE" << std::endl;
             for( int i=0; i<teamSize; ++i )
                 Write( headPointers[sourceRankOffset+i], DIST_NODE );
             if( sourceRankOffset != targetRankOffset )
@@ -559,7 +555,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             const int targetRank = targetRankOffset;
             if( sourceRank == targetRank )
             {
-                std::cout << "Packing LOW_RANK" << std::endl;
                 // Store a serial low-rank representation
                 byte** h = headPointers[sourceRank];
                 Write( h, LOW_RANK );
@@ -573,7 +568,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                std::cout << "Packing SPLIT_LOW_RANK" << std::endl;
                 // Store a split low-rank representation
                 byte** hSource = headPointers[sourceRank];
                 byte** hTarget = headPointers[targetRank];
@@ -598,7 +592,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
                 // NOTE: This should only happen when there is a weird
                 //       admissibility condition that allows diagonal blocks
                 //       to be low-rank.
-                std::cout << "Packing DIST_LOW_RANK" << std::endl;
 #ifndef RELEASE
                 std::cerr << "WARNING: Unlikely admissible case." << std::endl;
 #endif
@@ -624,7 +617,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                std::cout << "Packing DIST_LOW_RANK" << std::endl;
                 // Store a distributed split low-rank representation
 
                 // Store the source data
@@ -672,7 +664,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             const int targetRank = targetRankOffset;
             if( sourceRank == targetRank )
             {
-                std::cout << "Packing DENSE" << std::endl;
                 // Store a serial dense matrix
                 byte** h = headPointers[sourceRank];
                 Write( h, DENSE );
@@ -686,7 +677,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
             }
             else
             {
-                std::cout << "Packing SPLIT_DENSE" << std::endl;
                 // Store a split dense matrix
                 byte** hSource = headPointers[sourceRank];
                 byte** hTarget = headPointers[targetRank];
@@ -930,7 +920,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
     case DIST_NODE:
     { 
-        std::cout << "Unpacking DIST_NODE" << std::endl;
         shell.data.N = 
             new Node
             ( H._xSizeSource, H._xSizeTarget,
@@ -1089,7 +1078,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_NODE:
     {
-        std::cout << "Unpacking SPLIT_NODE" << std::endl;
         shell.data.N = 
             new Node
             ( H._xSizeSource, H._xSizeTarget,
@@ -1103,7 +1091,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 node.children[s+4*t] = 
                     new DistQuasi2dHMatrix<Scalar,Conjugated>
                     ( *H._subcomms, H._level+1, inSourceTeam, inTargetTeam,
-                      _localSourceOffset+sOffset, _localTargetOffset+tOffset );
+                      H._localSourceOffset+sOffset, 
+                      H._localTargetOffset+tOffset );
                 UnpackRecursion
                 ( head, node.Child(t,s), sourceRankOffset, targetRankOffset );
             }
@@ -1112,7 +1101,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case NODE:
     {
-        std::cout << "Unpacking NODE" << std::endl;
         shell.data.N = 
             new Node
             ( H._xSizeSource, H._xSizeTarget,
@@ -1126,7 +1114,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 node.children[s+4*t] = 
                     new DistQuasi2dHMatrix<Scalar,Conjugated>
                     ( *H._subcomms, H._level+1, inSourceTeam, inTargetTeam,
-                      _localSourceOffset+sOffset, _localTargetOffset+tOffset );
+                      H._localSourceOffset+sOffset, 
+                      H._localTargetOffset+tOffset );
                 UnpackRecursion
                 ( head, node.Child(t,s), sourceRankOffset, targetRankOffset );
             }
@@ -1135,7 +1124,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case DIST_LOW_RANK:
     {
-        std::cout << "Unpacking DIST_LOW_RANK" << std::endl;
         shell.data.DF = new DistLowRankMatrix;
         DistLowRankMatrix& DF = *shell.data.DF;
 
@@ -1162,7 +1150,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_LOW_RANK:
     {
-        std::cout << "Unpacking SPLIT_LOW_RANK" << std::endl;
         shell.data.SF = new SplitLowRankMatrix;
         SplitLowRankMatrix& SF = *shell.data.SF;
 
@@ -1187,7 +1174,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_DENSE:
     {
-        std::cout << "Unpacking SPLIT_DENSE" << std::endl;
         shell.data.SD = new SplitDenseMatrix;
         SplitDenseMatrix& SD = *shell.data.SD;
 
@@ -1207,7 +1193,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case LOW_RANK:
     {
-        std::cout << "Unpacking LOW_RANK" << std::endl;
         shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
         LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
 
@@ -1227,7 +1212,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case DENSE:
     {
-        std::cout << "Unpacking DENSE" << std::endl;
         shell.data.D = new DenseMatrix<Scalar>;
         DenseMatrix<Scalar>& D = *shell.data.D;
 
