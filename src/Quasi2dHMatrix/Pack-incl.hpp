@@ -88,28 +88,28 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     // Write out the abstract H-matrix information
-    *((int*)head)  = H._height;             head += sizeof(int);
-    *((int*)head)  = H._width;              head += sizeof(int);
-    *((int*)head)  = H._numLevels;          head += sizeof(int);
-    *((int*)head)  = H._maxRank;            head += sizeof(int);
-    *((int*)head)  = H._sourceOffset;       head += sizeof(int);
-    *((int*)head)  = H._targetOffset;       head += sizeof(int);
-    *((bool*)head) = H._symmetric;          head += sizeof(bool);
-    *((bool*)head) = H._stronglyAdmissible; head += sizeof(bool);
+    Write( head, H._height );
+    Write( head, H._width );
+    Write( head, H._numLevels );
+    Write( head, H._maxRank );
+    Write( head, H._sourceOffset );
+    Write( head, H._targetOffset );
+    Write( head, H._symmetric );
+    Write( head, H._stronglyAdmissible );
 
     // Write out the Quasi2dHMatrix-specific information
-    *((int*)head) = H._xSizeSource; head += sizeof(int);
-    *((int*)head) = H._xSizeTarget; head += sizeof(int);
-    *((int*)head) = H._ySizeSource; head += sizeof(int);
-    *((int*)head) = H._ySizeTarget; head += sizeof(int);
-    *((int*)head) = H._zSize;       head += sizeof(int);
-    *((int*)head) = H._xSource;     head += sizeof(int);
-    *((int*)head) = H._xTarget;     head += sizeof(int);
-    *((int*)head) = H._ySource;     head += sizeof(int);
-    *((int*)head) = H._yTarget;     head += sizeof(int);
+    Write( head, H._xSizeSource );
+    Write( head, H._xSizeTarget );
+    Write( head, H._ySizeSource );
+    Write( head, H._ySizeTarget );
+    Write( head, H._zSize );
+    Write( head, H._xSource );
+    Write( head, H._xTarget );
+    Write( head, H._ySource );
+    Write( head, H._yTarget );
 
     const Shell& shell = H._shell;
-    *((ShellType*)head) = shell.type; head += sizeof(ShellType);
+    Write( head, shell.type );
     switch( shell.type )
     {
     case NODE:
@@ -129,21 +129,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const int r = U.Width();
 
         // Write out the rank
-        *((int*)head) = r; head += sizeof(int);
+        Write( head, r );
 
         // Write out U
         for( int j=0; j<r; ++j )
-        {
-            std::memcpy( head, U.LockedBuffer(0,j), m*sizeof(Scalar) );
-            head += m*sizeof(Scalar);
-        }
+            Write( head, U.LockedBuffer(0,j), m );
 
         // Write out V
         for( int j=0; j<r; ++j )
-        {
-            std::memcpy( head, V.LockedBuffer(0,j), n*sizeof(Scalar) );
-            head += n*sizeof(Scalar);
-        }
+            Write( head, V.LockedBuffer(0,j), n );
 
         break;
     }
@@ -155,23 +149,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
         const MatrixType type = D.Type();
 
         // Write out the matrix type and data
-        *((MatrixType*)head) = type; head += sizeof(MatrixType);
+        Write( head, type );
         if( type == GENERAL )
-        {
             for( int j=0; j<n; ++j )
-            {
-                std::memcpy( head, D.LockedBuffer(0,j), m*sizeof(Scalar) );
-                head += m*sizeof(Scalar);
-            }
-        }
+                Write( head, D.LockedBuffer(0,j), m );
         else
-        {
             for( int j=0; j<n; ++j )
-            {
-                std::memcpy( head, D.LockedBuffer(j,j), (m-j)*sizeof(Scalar) );
-                head += (m-j)*sizeof(Scalar);
-            }
-        }
+                Write( head, D.LockedBuffer(j,j), m-j );
         break;
     }
     }
@@ -287,38 +271,32 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
     // Set the abstract H-matrix data
-    H._height             = *((int*)head);  head += sizeof(int);
-    H._width              = *((int*)head);  head += sizeof(int);
-    H._numLevels          = *((int*)head);  head += sizeof(int);
-    H._maxRank            = *((int*)head);  head += sizeof(int);
-    H._sourceOffset       = *((int*)head);  head += sizeof(int);
-    H._targetOffset       = *((int*)head);  head += sizeof(int);
-    H._symmetric          = *((bool*)head); head += sizeof(bool);
-    H._stronglyAdmissible = *((bool*)head); head += sizeof(bool);
+    H._height             = Read<int>( head );
+    H._width              = Read<int>( head );
+    H._numLevels          = Read<int>( head );
+    H._maxRank            = Read<int>( head );
+    H._sourceOffset       = Read<int>( head );
+    H._targetOffset       = Read<int>( head );
+    H._symmetric          = Read<bool>( head );
+    H._stronglyAdmissible = Read<bool>( head );
 
     // Set the Quasi2dHMatrix-specific information
-    H._xSizeSource = *((int*)head); head += sizeof(int);
-    H._xSizeTarget = *((int*)head); head += sizeof(int);
-    H._ySizeSource = *((int*)head); head += sizeof(int);
-    H._ySizeTarget = *((int*)head); head += sizeof(int);
-    H._zSize       = *((int*)head); head += sizeof(int);
-    H._xSource     = *((int*)head); head += sizeof(int);
-    H._xTarget     = *((int*)head); head += sizeof(int);
-    H._ySource     = *((int*)head); head += sizeof(int);
-    H._yTarget     = *((int*)head); head += sizeof(int);
+    H._xSizeSource = Read<int>( head );
+    H._xSizeTarget = Read<int>( head );
+    H._ySizeSource = Read<int>( head );
+    H._ySizeTarget = Read<int>( head );
+    H._zSize       = Read<int>( head );
+    H._xSource     = Read<int>( head );
+    H._xTarget     = Read<int>( head );
+    H._ySource     = Read<int>( head );
+    H._yTarget     = Read<int>( head );
 
     // If data has been allocated, delete it
     Shell& shell = H._shell;
-    switch( shell.type )
-    {
-    case NODE:           delete shell.data.N;          break;
-    case NODE_SYMMETRIC: delete shell.data.NS; break;
-    case LOW_RANK:       delete shell.data.F;             break;
-    case DENSE:          delete shell.data.D;             break;
-    }
+    shell.Clear();
 
     // Create this layer of the H-matrix from the packed information
-    shell.type = *((ShellType*)head); head += sizeof(ShellType);
+    shell.type = Read<ShellType>( head );
     switch( shell.type )
     {
     case NODE:
@@ -356,23 +334,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         const int n = H._width;
 
         // Read in the matrix rank
-        const int r = *((int*)head); head += sizeof(int);
+        const int r = Read<int>( head );
         U.SetType( GENERAL ); U.Resize( m, r );
         V.SetType( GENERAL ); V.Resize( n, r );
 
         // Read in U
         for( int j=0; j<r; ++j )
-        {
-            std::memcpy( U.Buffer(0,j), head, m*sizeof(Scalar) );
-            head += m*sizeof(Scalar);
-        }
+            Read( U.Buffer(0,j), head, m );
 
         // Read in V
         for( int j=0; j<r; ++j )
-        {
-            std::memcpy( V.Buffer(0,j), head, n*sizeof(Scalar) );
-            head += n*sizeof(Scalar);
-        }
+            Read( V.Buffer(0,j), head, n );
 
         break;
     }
@@ -382,28 +354,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         const int m = H._height;
         const int n = H._width;
 
-        const MatrixType type = *((MatrixType*)head); 
-        head += sizeof(MatrixType);
+        const MatrixType type = Read<MatrixType>( head );
         D.SetType( type ); 
         D.Resize( m, n );
 
         // Read in the matrix
         if( type == GENERAL )
-        {
             for( int j=0; j<n; ++j )
-            {
-                std::memcpy( D.Buffer(0,j), head, m*sizeof(Scalar) );
-                head += m*sizeof(Scalar);
-            }
-        }
+                Read( D.Buffer(0,j), head, m );
         else
-        {
             for( int j=0; j<n; ++j )
-            {
-                std::memcpy( D.Buffer(j,j), head, (m-j)*sizeof(Scalar) );
-                head += (m-j)*sizeof(Scalar);
-            }
-        }
+                Read( D.Buffer(j,j), head, m-j );
         break;
     }
 }

@@ -168,53 +168,57 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
 #endif
-    // Clear the context
-    switch( context._shell.type )
-    {
-    case DIST_NODE:
-        delete context._shell.data.DN; break;
-
-    case SPLIT_QUASI2D:
-        delete context._shell.data.SH; break;
-
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-        delete context._shell.data.Z; break;
-
-    case QUASI2D:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
-        break;
-    }
-
     const int width = XLocal.Width();
     const Shell& shell = this->_shell;
+    context.Clear();
     switch( shell.type )
     {
     case DIST_NODE:
     {
-        context._shell.type = DIST_NODE;
-        context._shell.data.DN = 
+        context.shell.type = DIST_NODE;
+        context.shell.data.DN = 
             new typename MapDenseMatrixContext::DistNodeContext();
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
-        const DistNode& node = *shell.data.DN;
+            *context.shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
+    case SPLIT_NODE:
+    {
+        context.shell.type = SPLIT_NODE;
+        context.shell.data.SN = 
+            new typename MapDenseMatrixContext::SplitNodeContext();
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.shell.data.SN;
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapMatrixPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        break;
+    }
+    case NODE:
+    {
+        context.shell.type = EMPTY;
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapMatrixPrecompute
+                ( context, alpha, XLocal, YLocal );
+        break;
+    }
     case DIST_LOW_RANK:
-        context._shell.type = DIST_LOW_RANK;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
+        context.shell.type = DIST_LOW_RANK;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
         if( _inSourceTeam )
         {
             // Form Z := alpha VLocal^[T/H] XLocal
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
@@ -224,31 +228,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
               (Scalar)0, Z.Buffer(),               Z.LDim() );
         }
         break;
-    case SPLIT_QUASI2D:
-    {
-        context._shell.type = SPLIT_QUASI2D;
-        context._shell.data.SH = 
-            new typename SplitQuasi2d::MapDenseMatrixContext();
-
-        const SplitQuasi2d& SH = *shell.data.SH;
-        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-            *context._shell.data.SH;
-
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView
-        ( XLocal, _localSourceOffset, 0, SH._width, width );
-        YLocalSub.View
-        ( YLocal, _localTargetOffset, 0, SH._height, width );
-        SH.MapMatrixPrecompute( splitContext, alpha, XLocalSub, YLocalSub );
-        break;
-    }
     case SPLIT_LOW_RANK:
-        context._shell.type = SPLIT_LOW_RANK;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
+        context.shell.type = SPLIT_LOW_RANK;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
         if( _inSourceTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
 
             DenseMatrix<Scalar> XLocalSub, YLocalSub;
             XLocalSub.LockedView
@@ -265,35 +251,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             }
         }
         break;
-    case SPLIT_DENSE:
-        context._shell.type = SPLIT_DENSE;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
-        if( _inSourceTeam )
-        {
-            const SplitDenseMatrix& SD = *shell.data.SD;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
-
-            DenseMatrix<Scalar> XLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, this->_width, width );
-            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, Z );
-        }
-        break;
-    case QUASI2D:
-    {
-        context._shell.type = QUASI2D;
-        // There is no communication required for this piece, so simply perform
-        // the entire update.
-        const Quasi2d& H = *shell.data.H;
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, H.Width(), width );
-        YLocalSub.View( YLocal, _localTargetOffset, 0, H.Height(), width );
-        H.MapMatrix( alpha, XLocalSub, (Scalar)1, YLocalSub );
-        break;
-    }
     case LOW_RANK:
     {
-        context._shell.type = LOW_RANK;
+        context.shell.type = EMPTY;
         // There is no communication required for this piece, so simply perform
         // the entire update.
         //
@@ -307,9 +267,23 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
+    case SPLIT_DENSE:
+        context.shell.type = SPLIT_DENSE;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
+        if( _inSourceTeam )
+        {
+            const SplitDenseMatrix& SD = *shell.data.SD;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
+
+            DenseMatrix<Scalar> XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localSourceOffset, 0, this->_width, width );
+            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, Z );
+        }
+        break;
     case DENSE:
     {
-        context._shell.type = DENSE;
+        context.shell.type = EMPTY;
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
@@ -321,7 +295,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         break;
     }
     case EMPTY:
-        context._shell.type = EMPTY;
+        context.shell.type = EMPTY;
         break;
     }
 #ifndef RELEASE
@@ -339,54 +313,59 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPrecompute");
 #endif
-    // Clear the context
-    switch( context._shell.type )
-    {
-    case DIST_NODE:
-        delete context._shell.data.DN; break;
-
-    case SPLIT_QUASI2D:
-        delete context._shell.data.SH; break;
-
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-        delete context._shell.data.Z; break;
-
-    case QUASI2D:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
-        break;
-    }
-
     const int width = XLocal.Width();
     const Shell& shell = this->_shell;
+    context.Clear();
     switch( shell.type )
     {
     case DIST_NODE:
     {
-        context._shell.type = DIST_NODE;
-        context._shell.data.DN = 
+        context.shell.type = DIST_NODE;
+        context.shell.data.DN = 
             new typename MapDenseMatrixContext::DistNodeContext();
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
 
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
+    case SPLIT_NODE:
+    {
+        context.shell.type = SPLIT_NODE;
+        context.shell.data.SN = 
+            new typename MapDenseMatrixContext::SplitNodeContext();
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.shell.data.SN;
+
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapMatrixPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        break;
+    }
+    case NODE:
+    {
+        context.shell.type = EMPTY;
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapMatrixPrecompute
+                ( context, alpha, XLocal, YLocal );
+        break;
+    }
     case DIST_LOW_RANK:
-        context._shell.type = DIST_LOW_RANK;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
+        context.shell.type = DIST_LOW_RANK;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
         if( _inTargetTeam )
         {
             // Form Z := alpha ULocal^T XLocal
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
             blas::Gemm
             ( 'T', 'N', DF.rank, width, DF.ULocal.Height(),
@@ -395,58 +374,22 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
               (Scalar)0, Z.Buffer(),               Z.LDim() );
         }
         break;
-    case SPLIT_QUASI2D:
-    {
-        context._shell.type = SPLIT_QUASI2D;
-        context._shell.data.SH = 
-            new typename SplitQuasi2d::MapDenseMatrixContext();
-
-        const SplitQuasi2d& SH = *shell.data.SH;
-        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-            *context._shell.data.SH;
-
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, SH._height, width );
-        YLocalSub.View( YLocal, _localSourceOffset, 0, SH._width, width );
-        SH.TransposeMapMatrixPrecompute
-        ( splitContext, alpha, XLocalSub, YLocalSub );
-        break;
-    }
     case SPLIT_LOW_RANK:
-        context._shell.type = SPLIT_LOW_RANK;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
+        context.shell.type = SPLIT_LOW_RANK;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
         if( _inTargetTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
             ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
             hmatrix_tools::MatrixTransposeMatrix( alpha, SF.D, XLocalSub, Z );
         }
         break;
-    case SPLIT_DENSE:
-        context._shell.type = SPLIT_DENSE;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
-        break;
-    case QUASI2D:
-    {
-        context._shell.type = QUASI2D;
-        // There is no communication required for this piece, so simply perform
-        // the entire update.
-        const Quasi2d& H = *shell.data.H;
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, H.Height(), width );
-        YLocalSub.View
-        ( YLocal, _localSourceOffset, 0, H.Width(), width );
-        H.TransposeMapMatrix( alpha, XLocalSub, (Scalar)1, YLocalSub );
-        break;
-    }
     case LOW_RANK:
     {
-        context._shell.type = LOW_RANK;
+        context.shell.type = EMPTY;
         // There is no communication required for this piece, so simply perform
         // the entire update.
         //
@@ -461,9 +404,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
         ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
+    case SPLIT_DENSE:
+        context.shell.type = SPLIT_DENSE;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
+        break;
     case DENSE:
     {
-        context._shell.type = DENSE;
+        context.shell.type = EMPTY;
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
@@ -477,7 +424,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
         break;
     }
     case EMPTY:
-        context._shell.type = EMPTY;
+        context.shell.type = EMPTY;
         break;
     }
 #ifndef RELEASE
@@ -496,54 +443,59 @@ HermitianTransposeMapMatrixPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
 #endif
-    // Clear the context
-    switch( context._shell.type )
-    {
-    case DIST_NODE:
-        delete context._shell.data.DN; break;
-
-    case SPLIT_QUASI2D:
-        delete context._shell.data.SH; break;
-
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-        delete context._shell.data.Z; break;
-
-    case QUASI2D:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
-        break;
-    }
-
     const int width = XLocal.Width();
     const Shell& shell = this->_shell;
+    context.Clear();
     switch( shell.type )
     {
     case DIST_NODE:
     {
-        context._shell.type = DIST_NODE;
-        context._shell.data.DN = 
+        context.shell.type = DIST_NODE;
+        context.shell.data.DN = 
             new typename MapDenseMatrixContext::DistNodeContext();
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
 
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).HermitianTransposeMapMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
+    case SPLIT_NODE:
+    {
+        context.shell.type = SPLIT_NODE;
+        context.shell.data.SN = 
+            new typename MapDenseMatrixContext::SplitNodeContext();
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.shell.data.SN;
+
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        break;
+    }
+    case NODE:
+    {
+        context.shell.type = EMPTY;
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                ( context, alpha, XLocal, YLocal );
+        break;
+    }
     case DIST_LOW_RANK:
-        context._shell.type = DIST_LOW_RANK;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
+        context.shell.type = DIST_LOW_RANK;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
         if( _inTargetTeam )
         {
             // Form Z := alpha ULocal^H XLocal
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
             blas::Gemm
             ( 'C', 'N', DF.rank, width, DF.ULocal.Height(), 
@@ -552,31 +504,13 @@ HermitianTransposeMapMatrixPrecompute
               (Scalar)0, Z.Buffer(),               Z.LDim() );
         }
         break;
-    case SPLIT_QUASI2D:
-    {
-        context._shell.type = SPLIT_QUASI2D;
-        context._shell.data.SH = 
-            new typename SplitQuasi2d::MapDenseMatrixContext();
-
-        const SplitQuasi2d& SH = *shell.data.SH;
-        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-            *context._shell.data.SH;
-
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, SH._height, width );
-        YLocalSub.View( YLocal, _localSourceOffset, 0, SH._width, width );
-        SH.HermitianTransposeMapMatrixPrecompute
-        ( splitContext, alpha, XLocalSub, YLocalSub );
-        break;
-    }
     case SPLIT_LOW_RANK:
-        context._shell.type = SPLIT_LOW_RANK;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
+        context.shell.type = SPLIT_LOW_RANK;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
         if( _inTargetTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
 
             DenseMatrix<Scalar> XLocalSub;
             XLocalSub.LockedView
@@ -585,27 +519,9 @@ HermitianTransposeMapMatrixPrecompute
             ( alpha, SF.D, XLocalSub, Z );
         }
         break;
-    case SPLIT_DENSE:
-        context._shell.type = SPLIT_DENSE;
-        context._shell.data.Z = new DenseMatrix<Scalar>();
-        break;
-    case QUASI2D:
-    {
-        context._shell.type = QUASI2D;
-        // There is no communication required for this piece, so simply perform
-        // the entire update.
-        const Quasi2d& H = *shell.data.H;
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, H.Height(), width );
-        YLocalSub.View( YLocal, _localSourceOffset, 0, H.Width(), width );
-        H.HermitianTransposeMapMatrix
-        ( alpha, XLocalSub, (Scalar)1, YLocalSub );
-        break;
-    }
     case LOW_RANK:
     {
-        context._shell.type = LOW_RANK;
+        context.shell.type = EMPTY;
         // There is no communication required for this piece, so simply perform
         // the entire update.
         //
@@ -620,9 +536,13 @@ HermitianTransposeMapMatrixPrecompute
         ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
+    case SPLIT_DENSE:
+        context.shell.type = SPLIT_DENSE;
+        context.shell.data.Z = new DenseMatrix<Scalar>();
+        break;
     case DENSE:
     {
-        context._shell.type = DENSE;
+        context.shell.type = EMPTY;
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const DenseMatrix<Scalar>& D = *shell.data.D;
@@ -635,7 +555,7 @@ HermitianTransposeMapMatrixPrecompute
         break;
     }
     case EMPTY:
-        context._shell.type = EMPTY;
+        context.shell.type = EMPTY;
         break;
     }
 #ifndef RELEASE
@@ -788,7 +708,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsCount
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixSummationsCount( sizes, width );
@@ -798,10 +718,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsCount
         if( _inSourceTeam )
             sizes[_level-1] += shell.data.DF->rank*width;
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -825,7 +745,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsCount
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixSummationsCount
@@ -836,10 +756,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsCount
         if( _inTargetTeam )
             sizes[_level-1] += shell.data.DF->rank*width;
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -864,9 +784,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsPack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixSummationsPack
@@ -877,7 +797,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsPack
         if( _inSourceTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             const int width = Z.Width();
             std::memcpy
             ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
@@ -885,10 +805,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsPack
             offsets[_level-1] += DF.rank*width;
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -913,9 +833,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsPack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixSummationsPack
@@ -926,7 +846,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsPack
         if( _inTargetTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             const int width = Z.Width();
             std::memcpy
             ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
@@ -934,10 +854,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsPack
             offsets[_level-1] += DF.rank*width;
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -962,9 +882,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsUnpack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixSummationsUnpack
@@ -975,7 +895,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsUnpack
         if( _inSourceTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             const int width = Z.Width();
             MPI_Comm team = _subcomms->Subcomm( _level );
             const int teamRank = mpi::CommRank( team );
@@ -988,10 +908,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsUnpack
             }
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1016,9 +936,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsUnpack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixSummationsUnpack
@@ -1029,7 +949,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsUnpack
         if( _inTargetTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             const int width = Z.Width();
             MPI_Comm team = _subcomms->Subcomm( _level );
             const int teamRank = mpi::CommRank( team );
@@ -1042,10 +962,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsUnpack
             }
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1059,7 +979,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
-( MapDenseMatrixContext& context ) const
+( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixNaiveSummations");
@@ -1069,21 +989,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixNaiveSummations
-                ( nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), width );
         break;
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
-            const int width = Z.Width();
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             MPI_Comm team = _subcomms->Subcomm( _level );
             int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
@@ -1099,10 +1018,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
             }
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1116,7 +1035,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveSummations
-( MapDenseMatrixContext& context ) const
+( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaiveSummations");
@@ -1126,21 +1045,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveSummations
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixNaiveSummations
-                ( nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), width );
         break;
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
-            const int width = Z.Width();
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             MPI_Comm team = _subcomms->Subcomm( _level );
             int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
@@ -1156,10 +1074,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveSummations
             }
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1174,14 +1092,14 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapMatrixNaiveSummations
-( MapDenseMatrixContext& context ) const
+( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
     PushCallStack
     ("DistQuasi2dHMatrix::HermitianTransposeMapMatrixNaiveSummations");
 #endif
     // The unconjugated version should be identical
-    TransposeMapMatrixNaiveSummations( context );
+    TransposeMapMatrixNaiveSummations( context, width );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1254,9 +1172,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
 
         MPI_Comm team = _subcomms->Subcomm( _level );
         const int teamSize = mpi::CommSize( team );
@@ -1399,13 +1317,26 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
         }
         break;
     }
+    case SPLIT_NODE:
+    {
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.shell.data.SN;
+
+        // This could all be combined into a single pass...
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapMatrixNaivePassData
+                ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        break;
+    }
     case DIST_LOW_RANK:
     {
         if( _inSourceTeam && _inTargetTeam )
             break;
 
         const DistLowRankMatrix& DF = *shell.data.DF;
-        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+        DenseMatrix<Scalar>& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
         MPI_Comm team = _subcomms->Subcomm( _level );
         const int teamRank = mpi::CommRank( team );
@@ -1426,21 +1357,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
         }
         break;
     }
-    case SPLIT_QUASI2D:
-    {
-        const SplitQuasi2d& SH = *shell.data.SH;
-        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-            *context._shell.data.SH;
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, SH._width, width );
-        YLocalSub.View( YLocal, _localTargetOffset, 0, SH._height, width );
-        SH.MapMatrixNaivePassData( splitContext, alpha, XLocalSub, YLocalSub );
-        break;
-    }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRankMatrix& SF = *shell.data.SF;
-        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+        DenseMatrix<Scalar>& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
         if( _inSourceTeam )
@@ -1457,7 +1377,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
     }
     case SPLIT_DENSE:
     {
-        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+        DenseMatrix<Scalar>& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
         if( _inSourceTeam )
@@ -1474,7 +1394,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
         }
         break;
     }
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1501,9 +1421,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
 
         MPI_Comm team = _subcomms->Subcomm( _level );
         const int teamSize = mpi::CommSize( team );
@@ -1646,13 +1566,26 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         }
         break;
     }
+    case SPLIT_NODE:
+    {
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.shell.data.SN;
+
+        // This could all be combined into a single pass...
+        const Node& node = *shell.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapMatrixNaivePassData
+                ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        break;
+    }
     case DIST_LOW_RANK:
     {
         if( _inSourceTeam && _inTargetTeam )
             break;
 
         const DistLowRankMatrix& DF = *shell.data.DF;
-        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+        DenseMatrix<Scalar>& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
         MPI_Comm team = _subcomms->Subcomm( _level );
         const int teamRank = mpi::CommRank( team );
@@ -1673,24 +1606,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         }
         break;
     }
-    case SPLIT_QUASI2D:
-    {
-        const SplitQuasi2d& SH = *shell.data.SH;
-        typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-            *context._shell.data.SH;
-        DenseMatrix<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, SH._height, width );
-        YLocalSub.View
-        ( YLocal, _localSourceOffset, 0, SH._width, width );
-        SH.TransposeMapMatrixNaivePassData
-        ( splitContext, alpha, XLocalSub, YLocalSub );
-        break;
-    }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRankMatrix& SF = *shell.data.SF;
-        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+        DenseMatrix<Scalar>& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
         if( _inTargetTeam )
@@ -1707,7 +1626,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     }
     case SPLIT_DENSE:
     {
-        DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+        DenseMatrix<Scalar>& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
         if( _inTargetTeam )
@@ -1744,7 +1663,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         }
         break;
     }
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1899,7 +1818,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsCount
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixBroadcastsCount( sizes, width );
@@ -1909,10 +1828,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsCount
         if( _inTargetTeam )
             sizes[_level-1] += shell.data.DF->rank*width;
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1936,7 +1855,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsCount
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixBroadcastsCount
@@ -1947,10 +1866,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsCount
         if( _inSourceTeam )
             sizes[_level-1] += shell.data.DF->rank*width;
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -1975,9 +1894,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixBroadcastsPack
@@ -1992,7 +1911,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
             if( teamRank == 0 )
             {
                 const DistLowRankMatrix& DF = *shell.data.DF;
-                const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+                const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
                 const int width = Z.Width();
                 std::memcpy
                 ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
@@ -2001,10 +1920,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
             }
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2029,9 +1948,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixBroadcastsPack
@@ -2046,7 +1965,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
             if( teamRank == 0 )
             {
                 const DistLowRankMatrix& DF = *shell.data.DF;
-                const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+                const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
                 const int width = Z.Width();
                 std::memcpy
                 ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
@@ -2055,10 +1974,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
             }
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2083,9 +2002,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixBroadcastsUnpack
@@ -2096,7 +2015,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
         if( _inTargetTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
             std::memcpy
             ( Z.Buffer(), &buffer[offsets[_level-1]], 
@@ -2104,10 +2023,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
             offsets[_level-1] += DF.rank*width;
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2132,9 +2051,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixBroadcastsUnpack
@@ -2145,7 +2064,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
         if( _inSourceTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
             std::memcpy
             ( Z.Buffer(), &buffer[offsets[_level-1]], 
@@ -2153,10 +2072,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
             offsets[_level-1] += DF.rank*width;
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2180,9 +2099,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixNaiveBroadcasts
@@ -2193,17 +2112,17 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
         if( _inTargetTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
 
             MPI_Comm team = _subcomms->Subcomm( _level );
             mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2227,9 +2146,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixNaiveBroadcasts
@@ -2240,17 +2159,17 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
         if( _inSourceTeam )
         {
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             Z.Resize( DF.rank, width, DF.rank );
 
             MPI_Comm team = _subcomms->Subcomm( _level );
             mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
         }
         break;
-    case SPLIT_QUASI2D:
+    case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2294,21 +2213,33 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapMatrixPostcompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
+    case SPLIT_NODE:
+        if( _inTargetTeam )
+        {
+            const Node& node = *shell.data.N;
+            typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+                *context.shell.data.SN;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MapMatrixPostcompute
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        }
+        break;
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
             // YLocal += ULocal Z 
             const DistLowRankMatrix& DF = *shell.data.DF;
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             blas::Gemm
             ( 'N', 'N', DF.ULocal.Height(), width, DF.rank,
               (Scalar)1, DF.ULocal.LockedBuffer(), DF.ULocal.LDim(),
@@ -2316,26 +2247,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
               (Scalar)1, YLocal.Buffer(),          YLocal.LDim() );
         }
         break;
-    case SPLIT_QUASI2D:
-        if( _inTargetTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-                *context._shell.data.SH;
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, this->_width, width );
-            YLocalSub.View
-            ( YLocal, _localTargetOffset, 0, this->_height, width );
-            SH.MapMatrixPostcompute
-            ( splitContext, alpha, XLocalSub, YLocalSub );
-        }
-        break;
     case SPLIT_LOW_RANK:
         if( _inTargetTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
             ( YLocal, _localTargetOffset, 0, SF.D.Height(), width );
@@ -2346,7 +2262,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
     case SPLIT_DENSE:
         if( _inTargetTeam )
         {
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             const int localHeight = this->_height;
             for( int j=0; j<width; ++j )
             {
@@ -2357,7 +2273,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
             }
         }
         break;
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2384,21 +2300,33 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMapMatrixPostcompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
+    case SPLIT_NODE:
+        if( _inSourceTeam )
+        {
+            const Node& node = *shell.data.N;
+            typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+                *context.shell.data.SN;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).TransposeMapMatrixPostcompute
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        }
+        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
             // YLocal += (VLocal^[T/H])^T Z 
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             if( Conjugated )
             {
                 // YLocal += conj(VLocal) Z
@@ -2422,26 +2350,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
             }
         }
         break;
-    case SPLIT_QUASI2D:
-        if( _inSourceTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-                *context._shell.data.SH;
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, this->_height, width );
-            YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, this->_width, width );
-            SH.TransposeMapMatrixPostcompute
-            ( splitContext, alpha, XLocalSub, YLocalSub );
-        }
-        break;
     case SPLIT_LOW_RANK:
         if( _inSourceTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
             ( YLocal, _localSourceOffset, 0, SF.D.Height(), width );
@@ -2465,7 +2378,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
         if( _inSourceTeam )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
             ( YLocal, _localSourceOffset, 0, SD.D.Width(), width );
@@ -2473,7 +2386,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
             ( alpha, SD.D, Z, (Scalar)1, YLocalSub );
         }
         break;
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:
@@ -2501,21 +2414,33 @@ HermitianTransposeMapMatrixPostcompute
     {
     case DIST_NODE:
     {
-        const DistNode& node = *shell.data.DN;
+        const Node& node = *shell.data.N;
         typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context._shell.data.DN;
+            *context.shell.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).HermitianTransposeMapMatrixPostcompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
+    case SPLIT_NODE:
+        if( _inSourceTeam )
+        {
+            const Node& node = *shell.data.N;
+            typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+                *context.shell.data.SN;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).HermitianTransposeMapMatrixPostcompute
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+        }
+        break;
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
             // YLocal += (VLocal^[T/H])^H Z
             const DistLowRankMatrix& DF = *shell.data.DF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             if( Conjugated )
             {
                 // YLocal += VLocal Z
@@ -2539,26 +2464,11 @@ HermitianTransposeMapMatrixPostcompute
             }
         }
         break;
-    case SPLIT_QUASI2D:
-        if( _inSourceTeam )
-        {
-            const SplitQuasi2d& SH = *shell.data.SH;
-            typename SplitQuasi2d::MapDenseMatrixContext& splitContext = 
-                *context._shell.data.SH;
-            DenseMatrix<Scalar> XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, this->_height, width );
-            YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, this->_width, width );
-            SH.HermitianTransposeMapMatrixPostcompute
-            ( splitContext, alpha, XLocalSub, YLocalSub );
-        }
-        break;
     case SPLIT_LOW_RANK:
         if( _inSourceTeam )
         {
             const SplitLowRankMatrix& SF = *shell.data.SF;
-            DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
             ( YLocal, _localSourceOffset, 0, SF.D.Height(), width );
@@ -2582,7 +2492,7 @@ HermitianTransposeMapMatrixPostcompute
         if( _inSourceTeam )
         {
             const SplitDenseMatrix& SD = *shell.data.SD;
-            const DenseMatrix<Scalar>& Z = *context._shell.data.Z;
+            const DenseMatrix<Scalar>& Z = *context.shell.data.Z;
             DenseMatrix<Scalar> YLocalSub;
             YLocalSub.View
             ( YLocal, _localSourceOffset, 0, SD.D.Width(), width );
@@ -2590,7 +2500,7 @@ HermitianTransposeMapMatrixPostcompute
             ( alpha, SD.D, Z, (Scalar)1, YLocalSub );
         }
         break;
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY:

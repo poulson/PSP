@@ -218,6 +218,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::~Quasi2dHMatrix()
 
 template<typename Scalar,bool Conjugated>
 void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Clear()
+{
+    _shell.Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
 ( const std::string& tag ) const
 {
@@ -283,16 +290,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
     _ySource = B.YSource();
     _yTarget = B.YTarget();
 
-    // Delete the old type 
-    switch( _shell.type )
-    {
-    case NODE:           delete _shell.data.N;          break;
-    case NODE_SYMMETRIC: delete _shell.data.NS; break;
-    case LOW_RANK:       delete _shell.data.F;             break;
-    case DENSE:          delete _shell.data.D;             break;
-    }
+    _shell.Clear();
     _shell.type = B._shell.type;
-
     switch( _shell.type )
     {
     case NODE:
@@ -395,16 +394,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ConjugateFrom
     _ySource = B.YSource();
     _yTarget = B.YTarget();
 
-    // Delete the old type 
-    switch( _shell.type )
-    {
-    case NODE:           delete _shell.data.N;          break;
-    case NODE_SYMMETRIC: delete _shell.data.NS; break;
-    case LOW_RANK:       delete _shell.data.F;             break;
-    case DENSE:          delete _shell.data.D;             break;
-    }
+    _shell.Clear();
     _shell.type = B._shell.type;
-
     switch( _shell.type )
     {
     case NODE:
@@ -461,17 +452,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeFrom
     _ySource = B.YTarget();
     _yTarget = B.YSource();
 
-    // Delete the old type
     Shell& shell = _shell;
-    switch( shell.type )
-    {
-    case NODE:           delete shell.data.N;          break;
-    case NODE_SYMMETRIC: delete shell.data.NS; break;
-    case LOW_RANK:       delete shell.data.F;             break;
-    case DENSE:          delete shell.data.D;             break;
-    }
+    shell.Clear();
     shell.type = B._shell.type;
-
     switch( shell.type )
     {
     case NODE:
@@ -551,17 +534,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
     _ySource = B.YTarget();
     _yTarget = B.YSource();
 
-    // Delete the old type
     Shell& shell = _shell;
-    switch( shell.type )
-    {
-    case NODE:           delete shell.data.N;          break;
-    case NODE_SYMMETRIC: delete shell.data.NS; break;
-    case LOW_RANK:       delete shell.data.F;             break;
-    case DENSE:          delete shell.data.D;             break;
-    }
+    shell.Clear();
     shell.type = B._shell.type;
-
     switch( B._shell.type )
     {
     case NODE:
@@ -834,15 +809,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::ImportLowRankMatrix");
 #endif
-    // Delete the old type
     Shell& shell = _shell;
-    switch( shell.type )
-    {
-    case NODE:           delete shell.data.N;          break;
-    case NODE_SYMMETRIC: delete shell.data.NS; break;
-    case LOW_RANK:       delete shell.data.F;             break;
-    case DENSE:          delete shell.data.D;             break;
-    }
+    shell.Clear();
 
     if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
     {
@@ -1011,15 +979,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::ImportSparseMatrix");
 #endif
-    // Delete the old type
     Shell& shell = _shell;
-    switch( shell.type )
-    {
-    case NODE:           delete shell.data.N;          break;
-    case NODE_SYMMETRIC: delete shell.data.NS; break;
-    case LOW_RANK:       delete shell.data.F;             break;
-    case DENSE:          delete shell.data.D;             break;
-    }
+    shell.Clear();
 
     if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
     {

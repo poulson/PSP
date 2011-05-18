@@ -22,6 +22,6 @@
 #define PSP_HPP 1
 
 #include "psp/building_blocks/environment.hpp"
-#include "psp/dist_quasi2d_hmatrix/dist_quasi2d_hmatrix.hpp"
+#include "psp/dist_quasi2d_hmatrix.hpp"
 
 #endif // PSP_HPP

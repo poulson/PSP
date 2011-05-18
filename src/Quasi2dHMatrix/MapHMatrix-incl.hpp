@@ -55,15 +55,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     C._xTarget = this->XTarget();
     C._yTarget = this->YTarget();
 
-    // Delete the old type
-    switch( C._shell.type )
-    {
-    case NODE:           delete C._shell.data.N;          break;
-    case NODE_SYMMETRIC: delete C._shell.data.NS; break;
-    case LOW_RANK:       delete C._shell.data.F;             break;
-    case DENSE:          delete C._shell.data.D;             break;
-    }
-
+    C._shell.Clear();
     if( C.Admissible() )
     {
         C._shell.type = LOW_RANK;

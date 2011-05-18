@@ -27,13 +27,11 @@
 namespace psp {
 
 // Forward declare friend classes
-template<typename Scalar,bool Conjugated> class SplitQuasi2dHMatrix;
 template<typename Scalar,bool Conjugated> class DistQuasi2dHMatrix;
 
 template<typename Scalar,bool Conjugated>
 class Quasi2dHMatrix : public AbstractHMatrix<Scalar>
 {
-    friend class SplitQuasi2dHMatrix<Scalar,Conjugated>;
     friend class DistQuasi2dHMatrix<Scalar,Conjugated>;
 private:
     /*
@@ -104,6 +102,7 @@ private:
         } data;
         Shell();
         ~Shell();
+        void Clear();
     };
 
     /*
@@ -200,6 +199,7 @@ public:
     Quasi2dHMatrix( const std::vector<byte>& packedHMatrix );
 
     ~Quasi2dHMatrix();
+    void Clear();
 
     // Routines useful for packing and unpacking the Quasi2dHMatrix to/from
     // a contiguous buffer.
@@ -527,6 +527,13 @@ template<typename Scalar,bool Conjugated>
 inline
 Quasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 {
+    Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+Quasi2dHMatrix<Scalar,Conjugated>::Shell::Clear()
+{
     switch( type )
     {
     case NODE:           delete data.N;  break;
@@ -534,6 +541,8 @@ Quasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
     case LOW_RANK:       delete data.F;  break;
     case DENSE:          delete data.D;  break;
     }
+    type = NODE;
+    data.N = 0;
 }
 
 } // namespace psp

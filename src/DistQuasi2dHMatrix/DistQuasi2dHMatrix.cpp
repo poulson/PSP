@@ -60,7 +60,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::~DistQuasi2dHMatrix()
-{ }
+{ 
+    Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Clear()
+{
+    _shell.Clear();
+}
 
 template<typename Scalar,bool Conjugated>
 int

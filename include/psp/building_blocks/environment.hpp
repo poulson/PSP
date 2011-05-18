@@ -23,6 +23,7 @@
 
 #include "mpi.h"
 #include <complex>
+#include <cstring>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -72,6 +73,20 @@ inline void Write( byte** head, const T& t )
 }
 
 template<typename T>
+inline void Write( byte*& head, const T* buffer, int n )
+{
+    std::memcpy( head, buffer, n*sizeof(T) );
+    head += n*sizeof(T);
+}
+
+template<typename T>
+inline void Write( byte** head, const T* buffer, int n )
+{
+    std::memcpy( *head, buffer, n*sizeof(T) );
+    *head += n*sizeof(T);
+}
+
+template<typename T>
 inline T Read( const byte*& head )
 {
     T retval = *((const T*)head);
@@ -85,6 +100,20 @@ inline T Read( const byte** head )
     T retval = *((const T*)*head);
     *head += sizeof(T);
     return retval;
+}
+
+template<typename T>
+inline void Read( T* writeHead, const byte*& readHead, int n )
+{
+    std::memcpy( writeHead, readHead, n*sizeof(T) );
+    readHead += n*sizeof(T);
+}
+
+template<typename T>
+inline void Read( T* writeHead, const byte** readHead, int n )
+{
+    std::memcpy( writeHead, *readHead, n*sizeof(T) );
+    *readHead += n*sizeof(T);
 }
 
 // For extracting the underlying real datatype, 

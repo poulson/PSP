@@ -23,17 +23,15 @@
 
 #include "psp/building_blocks/mpi.hpp"
 #include "psp/quasi2d_hmatrix.hpp"
-#include "psp/dist_quasi2d_hmatrix/split_quasi2d_hmatrix.hpp"
 
 namespace psp {
 
 template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
-    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
-    typedef SplitQuasi2dHMatrix<Scalar,Conjugated> SplitQuasi2d;
-
 public:
+    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
+
     /*
      * Public data structures
      */
@@ -85,6 +83,7 @@ public:
       int localSourceOffset=0, int localTargetOffset=0 );
     DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
     ~DistQuasi2dHMatrix();
+    void Clear();
 
     int LocalHeight() const;
     int LocalWidth() const;
@@ -202,7 +201,7 @@ private:
         DenseMatrix<Scalar> D;
     };
 
-    struct DistNode
+    struct Node
     {
         std::vector<DistQuasi2dHMatrix*> children;
         int xSourceSizes[2];
@@ -211,25 +210,28 @@ private:
         int xTargetSizes[2];
         int yTargetSizes[2];
         int targetSizes[4];
-        DistNode
+        Node
         ( int xSizeSource, int xSizeTarget,
           int ySizeSource, int ySizeTarget,
           int zSize );
-        ~DistNode();
+        ~Node();
         DistQuasi2dHMatrix& Child( int t, int s );
         const DistQuasi2dHMatrix& Child( int t, int s ) const;
     };
 
     enum ShellType 
     { 
-        DIST_NODE,           // recurse
-        DIST_LOW_RANK,       // each side is distributed
-        SPLIT_QUASI2D,       // split between two processes
-        SPLIT_LOW_RANK,      // each side is given to a different process
-        SPLIT_DENSE,         // split between two processes
-        QUASI2D,             // serial
-        LOW_RANK,            // serial
-        DENSE,               // serial
+        DIST_NODE,      // each side is distributed
+        SPLIT_NODE,     // each side is owned by a single process
+        NODE,           // serial
+
+        DIST_LOW_RANK,  // each side is distributed
+        SPLIT_LOW_RANK, // each side is given to a different process
+        LOW_RANK,       // serial
+
+        SPLIT_DENSE,    // split between two processes
+        DENSE,          // serial
+
         EMPTY
     };
 
@@ -238,18 +240,20 @@ private:
         ShellType type;
         union Data
         {
-            DistNode* DN;
+            Node* N;
+
             DistLowRankMatrix* DF;
-            SplitQuasi2d* SH;
             SplitLowRankMatrix* SF;
-            SplitDenseMatrix* SD;
-            Quasi2d* H;
             LowRankMatrix<Scalar,Conjugated>* F;
+
+            SplitDenseMatrix* SD;
             DenseMatrix<Scalar>* D;
+
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
         Shell();
         ~Shell();
+        void Clear();
     };
 
     struct MapVectorContext
@@ -262,20 +266,26 @@ private:
             MapVectorContext& Child( int t, int s );
             const MapVectorContext& Child( int t, int s ) const;
         };
+        // For now this will be the same as the DistNodeContext, but we will
+        // eventually have it combine all precompute data into a single buffer.
+        typedef DistNodeContext SplitNodeContext;
+
         struct ContextShell
         {
             ShellType type;
             union Data
             {
                 DistNodeContext* DN;
-                typename SplitQuasi2d::MapVectorContext* SH;
+                SplitNodeContext* SN;
                 Vector<Scalar>* z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
             } data;
             ContextShell();
             ~ContextShell();
+            void Clear();
         };
-        ContextShell _shell;
+        ContextShell shell;
+        void Clear();
     };
     
     struct MapDenseMatrixContext
@@ -288,20 +298,24 @@ private:
             MapDenseMatrixContext& Child( int t, int s );
             const MapDenseMatrixContext& Child( int t, int s ) const;
         };
+        typedef DistNodeContext SplitNodeContext;
+
         struct ContextShell
         {
             ShellType type;
             union Data
             {
-                DistNodeContext* DN; 
-                typename SplitQuasi2d::MapDenseMatrixContext* SH;
+                DistNodeContext* DN;
+                SplitNodeContext* SN;
                 DenseMatrix<Scalar>* Z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
             } data;
             ContextShell();
             ~ContextShell();
+            void Clear();
         };
-        ContextShell _shell;
+        ContextShell shell;
+        void Clear();
     };
 
     // This structure is still just a sketch. SplitQuasi2dHMatrix needs to be
@@ -379,13 +393,12 @@ private:
             union Data
             {
                 DistNodeContext* DN;
-                //typename SplitQuasi2d::MapHMatrixContext* SH;
                 // TODO
             } data;
             ContextShell();
             ~ContextShell();
         };
-        ContextShell _shell;
+        ContextShell shell;
     };
 
     /*
@@ -480,7 +493,7 @@ private:
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
     void MapMatrixNaiveSummations
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void MapMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
@@ -562,7 +575,7 @@ private:
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
     void TransposeMapMatrixNaiveSummations
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
@@ -620,7 +633,7 @@ private:
     void HermitianTransposeMapMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapMatrixNaiveSummations
-    ( MapDenseMatrixContext& context ) const;
+    ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
@@ -652,7 +665,7 @@ namespace psp {
  */
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::DistNode
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Node
 ( int xSizeSource, int xSizeTarget,
   int ySizeSource, int ySizeTarget,
   int zSize )
@@ -681,7 +694,7 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::DistNode
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::~DistNode()
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::~Node()
 {
     for( unsigned i=0; i<children.size(); ++i )
         delete children[i];
@@ -690,10 +703,10 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::~DistNode()
 
 template<typename Scalar,bool Conjugated>
 inline DistQuasi2dHMatrix<Scalar,Conjugated>&
-DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::Child( int t, int s )
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int t, int s )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::DistNode::Child");
+    PushCallStack("DistQuasi2dHMatrix::Node::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -707,10 +720,10 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::Child( int t, int s )
 
 template<typename Scalar,bool Conjugated>
 inline const DistQuasi2dHMatrix<Scalar,Conjugated>&
-DistQuasi2dHMatrix<Scalar,Conjugated>::DistNode::Child( int t, int s ) const
+DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int t, int s ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::DistNode::Child");
+    PushCallStack("DistQuasi2dHMatrix::Node::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -732,18 +745,30 @@ template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
 { 
+    Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Clear()
+{
     switch( type )
     {
-    case DIST_NODE:      delete data.DN; break;
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+        delete data.N; break;
+
     case DIST_LOW_RANK:  delete data.DF; break;
-    case SPLIT_QUASI2D:  delete data.SH; break;
     case SPLIT_LOW_RANK: delete data.SF; break;
-    case SPLIT_DENSE:    delete data.SD; break;
-    case QUASI2D:        delete data.H;  break;
     case LOW_RANK:       delete data.F;  break;
-    case DENSE:          delete data.D;  break;
+
+    case SPLIT_DENSE: delete data.SD; break;
+    case DENSE:       delete data.D;  break;
+
     case EMPTY: break;
     }
+    type = EMPTY;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -816,25 +841,41 @@ inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
 ContextShell::~ContextShell()
 {
+    Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
+ContextShell::Clear()
+{
     switch( type )
     {
     case DIST_NODE: 
         delete data.DN; break;
 
-    case SPLIT_QUASI2D: 
-        delete data.SH; break;
+    case SPLIT_NODE:
+        delete data.SN; break;
 
     case DIST_LOW_RANK:  
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
         delete data.z; break;
 
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY: 
         break;
     }
+    type = EMPTY;
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::Clear()
+{
+    shell.Clear();
 }
 
 template<typename Scalar,bool Conjugated>
@@ -908,25 +949,41 @@ inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
 ContextShell::~ContextShell()
 {
+    Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
+ContextShell::Clear()
+{
     switch( type )
     {
     case DIST_NODE: 
         delete data.DN; break;
 
-    case SPLIT_QUASI2D: 
-        delete data.SH; break;
+    case SPLIT_NODE:
+        delete data.SN; break;
 
     case DIST_LOW_RANK:  
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
         delete data.Z; break;
 
-    case QUASI2D:
+    case NODE:
     case LOW_RANK:
     case DENSE:
     case EMPTY: 
         break;
     }
+    type = EMPTY;
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::Clear()
+{
+    shell.Clear();
 }
 
 /*
