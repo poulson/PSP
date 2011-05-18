@@ -866,7 +866,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
     _localTargetOffset = 0;
 
     const byte* head = packedDistHMatrix;
-    UnpackRecursion( head, *this, 0, 0 );
+    this->UnpackRecursion( head, 0, 0 );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -876,54 +876,53 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
-( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
-  int sourceRankOffset, int targetRankOffset )
+( const byte*& head, int sourceRankOffset, int targetRankOffset )
 {
-    MPI_Comm team = H._subcomms->Subcomm( H._level );
-    const bool inSourceTeam = H._inSourceTeam;
-    const bool inTargetTeam = H._inTargetTeam;
+    MPI_Comm team = _subcomms->Subcomm( _level );
+    const bool inSourceTeam = _inSourceTeam;
+    const bool inTargetTeam = _inTargetTeam;
     if( !inSourceTeam && !inTargetTeam )
     {
-        H._shell.type = EMPTY;
+        _shell.type = EMPTY;
         return;
     }
-    H._rootOfOtherTeam = ( inSourceTeam ? targetRankOffset : sourceRankOffset );
+    _rootOfOtherTeam = ( inSourceTeam ? targetRankOffset : sourceRankOffset );
 
     // Read in the header information
-    H._height             = Read<int>( head );
-    H._width              = Read<int>( head );
-    H._numLevels          = Read<int>( head );
-    H._maxRank            = Read<int>( head );
-    H._sourceOffset       = Read<int>( head );
-    H._targetOffset       = Read<int>( head );
-    //H._type             = Read<MatrixType>( head );
-    H._stronglyAdmissible = Read<bool>( head );
-    H._xSizeSource        = Read<int>( head );
-    H._xSizeTarget        = Read<int>( head );
-    H._ySizeSource        = Read<int>( head );
-    H._ySizeTarget        = Read<int>( head );
-    H._zSize              = Read<int>( head );
-    H._xSource            = Read<int>( head );
-    H._xTarget            = Read<int>( head );
-    H._ySource            = Read<int>( head );
-    H._yTarget            = Read<int>( head );
+    this->_height             = Read<int>( head );
+    this->_width              = Read<int>( head );
+    this->_numLevels          = Read<int>( head );
+    this->_maxRank            = Read<int>( head );
+    this->_sourceOffset       = Read<int>( head );
+    this->_targetOffset       = Read<int>( head );
+    //this->_type             = Read<MatrixType>( head );
+    this->_stronglyAdmissible = Read<bool>( head );
+    _xSizeSource        = Read<int>( head );
+    _xSizeTarget        = Read<int>( head );
+    _ySizeSource        = Read<int>( head );
+    _ySizeTarget        = Read<int>( head );
+    _zSize              = Read<int>( head );
+    _xSource            = Read<int>( head );
+    _xTarget            = Read<int>( head );
+    _ySource            = Read<int>( head );
+    _yTarget            = Read<int>( head );
 
     // Delete the old shell
-    Shell& shell = H._shell;
+    Shell& shell = _shell;
     shell.Clear();
 
     // Read in the information for the new shell
     shell.type = Read<ShellType>( head );
-    const int m = H._height;
-    const int n = H._width;
+    const int m = this->_height;
+    const int n = this->_width;
     switch( shell.type )
     {
     case DIST_NODE:
     { 
         shell.data.N = 
             new Node
-            ( H._xSizeSource, H._xSizeTarget,
-              H._ySizeSource, H._ySizeTarget, H._zSize );
+            ( _xSizeSource, _xSizeTarget,
+              _ySizeSource, _ySizeTarget, _zSize );
         Node& node = *shell.data.N;
 
         const int teamSize = mpi::CommSize( team );
@@ -941,11 +940,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
-                    UnpackRecursion
-                    ( head, node.Child(t,s), sourceRoot, targetRoot );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRoot, targetRoot );
                 }
             }
             // Top-right block
@@ -958,11 +957,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
-                    UnpackRecursion
-                    ( head, node.Child(t,s), sourceRoot, targetRoot );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRoot, targetRoot );
                 }
             }
             // Bottom-left block
@@ -975,11 +974,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
-                    UnpackRecursion
-                    ( head, node.Child(t,s), sourceRoot, targetRoot );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRoot, targetRoot );
                 }
             }
             // Bottom-right block
@@ -992,11 +991,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
-                    UnpackRecursion
-                    ( head, node.Child(t,s), sourceRoot, targetRoot );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRoot, targetRoot );
                 }
             }
         }
@@ -1019,12 +1018,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 {
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inLeftSourceTeam, inTopTargetTeam,
                           node.sourceSizes[0]*s, node.targetSizes[0]*t );
-                    UnpackRecursion
-                    ( head, node.Child(t,s), 
-                      sourceRankOffset, targetRankOffset );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRankOffset, targetRankOffset );
                 }
             }
             // Top-right block
@@ -1034,12 +1032,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 {
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inRightSourceTeam, inTopTargetTeam,
                           node.sourceSizes[2]*(s-2), node.targetSizes[0]*t );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      sourceRankOffset+1, targetRankOffset );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRankOffset+1, targetRankOffset );
                 }
             }
             // Bottom-left block
@@ -1049,12 +1046,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 {
                     node.children[s+4*t] =
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inLeftSourceTeam, inBottomTargetTeam,
                           node.sourceSizes[0]*s, node.targetSizes[2]*(t-2) );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      sourceRankOffset, targetRankOffset+1 );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRankOffset, targetRankOffset+1 );
                 }
             }
             // Bottom-right block
@@ -1064,13 +1060,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 {
                     node.children[s+4*t] = 
                         new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *H._subcomms, H._level+1,
+                        ( *_subcomms, _level+1,
                           inRightSourceTeam, inBottomTargetTeam,
                           node.sourceSizes[2]*(s-2), 
                           node.targetSizes[2]*(t-2) );
-                    UnpackRecursion
-                    ( head, node.Child(t,s),
-                      sourceRankOffset+1, targetRankOffset+1 );
+                    node.Child(t,s).UnpackRecursion
+                    ( head, sourceRankOffset+1, targetRankOffset+1 );
                 }
             }
         }
@@ -1080,8 +1075,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
         shell.data.N = 
             new Node
-            ( H._xSizeSource, H._xSizeTarget,
-              H._ySizeSource, H._ySizeTarget, H._zSize );
+            ( _xSizeSource, _xSizeTarget,
+              _ySizeSource, _ySizeTarget, _zSize );
         Node& node = *shell.data.N;
 
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -1090,11 +1085,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
             {
                 node.children[s+4*t] = 
                     new DistQuasi2dHMatrix<Scalar,Conjugated>
-                    ( *H._subcomms, H._level+1, inSourceTeam, inTargetTeam,
-                      H._localSourceOffset+sOffset, 
-                      H._localTargetOffset+tOffset );
-                UnpackRecursion
-                ( head, node.Child(t,s), sourceRankOffset, targetRankOffset );
+                    ( *_subcomms, _level+1, inSourceTeam, inTargetTeam,
+                      _localSourceOffset+sOffset, 
+                      _localTargetOffset+tOffset );
+                node.Child(t,s).UnpackRecursion
+                ( head, sourceRankOffset, targetRankOffset );
             }
         }
         break;
@@ -1103,8 +1098,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
         shell.data.N = 
             new Node
-            ( H._xSizeSource, H._xSizeTarget,
-              H._ySizeSource, H._ySizeTarget, H._zSize );
+            ( _xSizeSource, _xSizeTarget,
+              _ySizeSource, _ySizeTarget, _zSize );
         Node& node = *shell.data.N;
 
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -1113,11 +1108,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
             {
                 node.children[s+4*t] = 
                     new DistQuasi2dHMatrix<Scalar,Conjugated>
-                    ( *H._subcomms, H._level+1, inSourceTeam, inTargetTeam,
-                      H._localSourceOffset+sOffset, 
-                      H._localTargetOffset+tOffset );
-                UnpackRecursion
-                ( head, node.Child(t,s), sourceRankOffset, targetRankOffset );
+                    ( *_subcomms, _level+1, inSourceTeam, inTargetTeam,
+                      _localSourceOffset+sOffset, 
+                      _localTargetOffset+tOffset );
+                node.Child(t,s).UnpackRecursion
+                ( head, sourceRankOffset, targetRankOffset );
             }
         }
         break;

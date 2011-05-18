@@ -131,8 +131,7 @@ private:
     void ImportSparseMatrix
     ( const SparseMatrix<Scalar>& S, int iOffset=0, int jOffset=0 );
 
-    void UnpackRecursion
-    ( const byte*& head, Quasi2dHMatrix<Scalar,Conjugated>& H );
+    void UnpackRecursion( const byte*& head );
 
     // y += alpha A x
     void UpdateVectorWithNodeSymmetric

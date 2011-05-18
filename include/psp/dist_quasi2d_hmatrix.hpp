@@ -434,8 +434,7 @@ private:
     DistQuasi2dHMatrix();
 
     void UnpackRecursion
-    ( const byte*& head, DistQuasi2dHMatrix<Scalar,Conjugated>& H,
-      int sourceRankOffset, int targetRankOffset );
+    ( const byte*& head, int sourceRankOffset, int targetRankOffset );
 
     void MapVectorPrecompute
     ( MapVectorContext& context,
