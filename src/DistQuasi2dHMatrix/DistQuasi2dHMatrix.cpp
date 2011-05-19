@@ -147,6 +147,49 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FirstLocalCol() const
     return firstLocalCol;
 }
 
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::Scale");
+#endif
+    const Shell& shell = this->_shell;
+    switch( shell.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                shell.data.N->Child(t,s).Scale( alpha );
+        break;
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+            hmatrix_tools::Scale( alpha, shell.data.DF->ULocal );
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inTargetTeam )
+            hmatrix_tools::Scale( alpha, shell.data.SF->D );
+        break;
+    case LOW_RANK:
+        hmatrix_tools::Scale( alpha, shell.data.F->U );
+        break;
+    case SPLIT_DENSE:
+        if( _inSourceTeam )
+            hmatrix_tools::Scale( alpha, shell.data.SD->D );
+        break;
+    case DENSE:
+        hmatrix_tools::Scale( alpha, *shell.data.D );
+        break;
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 template class psp::DistQuasi2dHMatrix<float,false>;
 template class psp::DistQuasi2dHMatrix<float,true>;
 template class psp::DistQuasi2dHMatrix<double,false>;

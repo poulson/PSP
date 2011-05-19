@@ -95,6 +95,9 @@ public:
     std::size_t Unpack
     ( const byte* packedDistHMatrix, const Subcomms& subcomms );
 
+    // A := alpha A
+    void Scale( Scalar alpha );
+
     // y := alpha H x
     void MapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal, 
@@ -114,6 +117,16 @@ public:
     void MapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
       Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
+    // C := alpha A B 
+    void MapMatrix
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
+    // C := alpha A B + beta C
+    void MapMatrix
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+      Scalar beta,        DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
     // y := alpha H^T x
     void TransposeMapVector
@@ -135,6 +148,16 @@ public:
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
       Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
 
+    // C := alpha A^T B
+    void TransposeMapMatrix
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
+    // C := alpha A^T B + beta C
+    void TransposeMapMatrix
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+      Scalar beta,        DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
     // y := alpha H' x
     void HermitianTransposeMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal,
@@ -154,6 +177,16 @@ public:
     void HermitianTransposeMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
       Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
+
+    // C := alpha A' B
+    void HermitianTransposeMapMatrix
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
+    // C := alpha A' B + beta C
+    void HermitianTransposeMapMatrix
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+      Scalar beta,        DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
 private:
     /*
@@ -318,8 +351,6 @@ private:
         void Clear();
     };
 
-    // This structure is still just a sketch. SplitQuasi2dHMatrix needs to be
-    // merged into DistQuasi2dHMatrix before the updates. 
     struct MapHMatrixContext
     {
         /*
@@ -353,6 +384,8 @@ private:
             DenseUpdates() : numStored(0) { }
         };
 
+        typedef DenseUpdates SplitDenseUpdates;
+
         /*
          * Structs for the different types of matrix blocks. Some store several
          * types of updates.
@@ -368,6 +401,28 @@ private:
             DistLowRankUpdates updates;
         };
 
+        struct SplitNodeContext
+        {
+            std::vector<MapHMatrixContext*> children;
+            SplitNodeContext();
+            ~SplitNodeContext();
+            MapHMatrixContext& Child( int t, int s );
+            const MapHMatrixContext& Child( int t, int s ) const;
+
+            SplitLowRankUpdates updates;
+        };
+
+        struct NodeContext
+        {
+            std::vector<MapHMatrixContext*> children;
+            NodeContext();
+            ~NodeContext();
+            MapHMatrixContext& Child( int t, int s );
+            const MapHMatrixContext& Child( int t, int s ) const;
+
+            LowRankUpdates updates;
+        };
+
         struct DistLowRankContext
         {
             DistLowRankUpdates updates;    
@@ -375,10 +430,23 @@ private:
 
         struct SplitLowRankContext
         {
-            SplitLowRankUpdates updates;
+            SplitLowRankUpdates lowRankUpdates;
+            SplitDenseUpdates denseUpdates;
         };
 
         struct LowRankContext
+        {
+            LowRankUpdates lowRankUpdates;
+            DenseUpdates denseUpdates;
+        };
+
+        struct SplitDenseContext
+        {
+            SplitLowRankUpdates lowRankUpdates;
+            SplitDenseUpdates denseUpdates;
+        };
+
+        struct DenseContext
         {
             LowRankUpdates lowRankUpdates;
             DenseUpdates denseUpdates;
@@ -393,7 +461,15 @@ private:
             union Data
             {
                 DistNodeContext* DN;
-                // TODO
+                SplitNodeContext* SN;
+                NodeContext* N;
+
+                DistLowRankContext* DF;
+                SplitLowRankContext* SF;
+                LowRankContext* F;
+
+                SplitDenseContext* SD;
+                DenseContext* D;
             } data;
             ContextShell();
             ~ContextShell();

@@ -236,15 +236,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
             Vector<Scalar> xLocalSub;
             xLocalSub.LockedView( xLocal, _localSourceOffset, SF.D.Height() );
             if( Conjugated )
-            {
                 hmatrix_tools::MatrixHermitianTransposeVector
                 ( alpha, SF.D, xLocalSub, z );
-            }
             else
-            {
                 hmatrix_tools::MatrixTransposeVector
                 ( alpha, SF.D, xLocalSub, z );
-            }
         }
         break;
     case LOW_RANK:
