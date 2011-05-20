@@ -28,7 +28,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
     PushCallStack("Quasi2dHMatrix::MapVector (y := H x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( this->_shell.type )
     {
     case NODE:
     {
@@ -88,7 +88,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
     PushCallStack("Quasi2dHMatrix::TransposeMapVector (y := H^T x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( this->_shell.type )
     {
     case NODE:
     {
@@ -152,7 +152,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( this->_shell.type )
     {
     case NODE:
     {
@@ -209,7 +209,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y, non-const)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( this->_shell.type )
     {
     case NODE:
     {

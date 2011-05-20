@@ -857,13 +857,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Unpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::Unpack");
 #endif
-    _subcomms = &subcomms;
-    _level = 0;
-    _inSourceTeam = true;
-    _inTargetTeam = true;
-    _rootOfOtherTeam = 0;
-    _localSourceOffset = 0;
-    _localTargetOffset = 0;
+    this->_subcomms = &subcomms;
+    this->_level = 0;
+    this->_inSourceTeam = true;
+    this->_inTargetTeam = true;
+    this->_rootOfOtherTeam = 0;
+    this->_localSourceOffset = 0;
+    this->_localTargetOffset = 0;
 
     const byte* head = packedDistHMatrix;
     this->UnpackRecursion( head, 0, 0 );
@@ -878,12 +878,12 @@ void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head, int sourceRankOffset, int targetRankOffset )
 {
-    MPI_Comm team = _subcomms->Subcomm( _level );
-    const bool inSourceTeam = _inSourceTeam;
-    const bool inTargetTeam = _inTargetTeam;
+    MPI_Comm team = this->_subcomms->Subcomm( this->_level );
+    const bool inSourceTeam = this->_inSourceTeam;
+    const bool inTargetTeam = this->_inTargetTeam;
     if( !inSourceTeam && !inTargetTeam )
     {
-        _shell.type = EMPTY;
+        this->_shell.type = EMPTY;
         return;
     }
     _rootOfOtherTeam = ( inSourceTeam ? targetRankOffset : sourceRankOffset );
@@ -897,18 +897,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     this->_targetOffset       = Read<int>( head );
     //this->_type             = Read<MatrixType>( head );
     this->_stronglyAdmissible = Read<bool>( head );
-    _xSizeSource        = Read<int>( head );
-    _xSizeTarget        = Read<int>( head );
-    _ySizeSource        = Read<int>( head );
-    _ySizeTarget        = Read<int>( head );
-    _zSize              = Read<int>( head );
-    _xSource            = Read<int>( head );
-    _xTarget            = Read<int>( head );
-    _ySource            = Read<int>( head );
-    _yTarget            = Read<int>( head );
+    this->_xSizeSource        = Read<int>( head );
+    this->_xSizeTarget        = Read<int>( head );
+    this->_ySizeSource        = Read<int>( head );
+    this->_ySizeTarget        = Read<int>( head );
+    this->_zSize              = Read<int>( head );
+    this->_xSource            = Read<int>( head );
+    this->_xTarget            = Read<int>( head );
+    this->_ySource            = Read<int>( head );
+    this->_yTarget            = Read<int>( head );
 
     // Delete the old shell
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     shell.Clear();
 
     // Read in the information for the new shell
@@ -921,8 +921,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     { 
         shell.data.N = 
             new Node
-            ( _xSizeSource, _xSizeTarget,
-              _ySizeSource, _ySizeTarget, _zSize );
+            ( this->_xSizeSource, this->_xSizeTarget,
+              this->_ySizeSource, this->_ySizeTarget, this->_zSize );
         Node& node = *shell.data.N;
 
         const int teamSize = mpi::CommSize( team );
@@ -939,8 +939,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     const int sourceRoot = sourceRankOffset + s*(teamSize/4);
 
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
                     node.Child(t,s).UnpackRecursion
@@ -956,8 +956,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     const int sourceRoot = sourceRankOffset + s*(teamSize/4);
 
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
                     node.Child(t,s).UnpackRecursion
@@ -973,8 +973,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     const int sourceRoot = sourceRankOffset + s*(teamSize/4);
 
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
                     node.Child(t,s).UnpackRecursion
@@ -990,8 +990,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                     const int sourceRoot = sourceRankOffset + s*(teamSize/4);
 
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inSourceTeam && (s==subteam),
                           inTargetTeam && (t==subteam) );
                     node.Child(t,s).UnpackRecursion
@@ -1017,8 +1017,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 for( int s=0; s<2; ++s )
                 {
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inLeftSourceTeam, inTopTargetTeam,
                           node.sourceSizes[0]*s, node.targetSizes[0]*t );
                     node.Child(t,s).UnpackRecursion
@@ -1031,8 +1031,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 for( int s=2; s<4; ++s )
                 {
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inRightSourceTeam, inTopTargetTeam,
                           node.sourceSizes[2]*(s-2), node.targetSizes[0]*t );
                     node.Child(t,s).UnpackRecursion
@@ -1045,8 +1045,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 for( int s=0; s<2; ++s )
                 {
                     node.children[s+4*t] =
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inLeftSourceTeam, inBottomTargetTeam,
                           node.sourceSizes[0]*s, node.targetSizes[2]*(t-2) );
                     node.Child(t,s).UnpackRecursion
@@ -1059,8 +1059,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 for( int s=2; s<4; ++s )
                 {
                     node.children[s+4*t] = 
-                        new DistQuasi2dHMatrix<Scalar,Conjugated>
-                        ( *_subcomms, _level+1,
+                        new DistQuasi2d
+                        ( *this->_subcomms, this->_level+1,
                           inRightSourceTeam, inBottomTargetTeam,
                           node.sourceSizes[2]*(s-2), 
                           node.targetSizes[2]*(t-2) );
@@ -1075,8 +1075,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
         shell.data.N = 
             new Node
-            ( _xSizeSource, _xSizeTarget,
-              _ySizeSource, _ySizeTarget, _zSize );
+            ( this->_xSizeSource, this->_xSizeTarget,
+              this->_ySizeSource, this->_ySizeTarget, this->_zSize );
         Node& node = *shell.data.N;
 
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -1084,10 +1084,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
                 node.children[s+4*t] = 
-                    new DistQuasi2dHMatrix<Scalar,Conjugated>
-                    ( *_subcomms, _level+1, inSourceTeam, inTargetTeam,
-                      _localSourceOffset+sOffset, 
-                      _localTargetOffset+tOffset );
+                    new DistQuasi2d
+                    ( *this->_subcomms, this->_level+1, 
+                      inSourceTeam, inTargetTeam,
+                      this->_localSourceOffset+sOffset, 
+                      this->_localTargetOffset+tOffset );
                 node.Child(t,s).UnpackRecursion
                 ( head, sourceRankOffset, targetRankOffset );
             }
@@ -1098,8 +1099,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
         shell.data.N = 
             new Node
-            ( _xSizeSource, _xSizeTarget,
-              _ySizeSource, _ySizeTarget, _zSize );
+            ( this->_xSizeSource, this->_xSizeTarget,
+              this->_ySizeSource, this->_ySizeTarget, this->_zSize );
         Node& node = *shell.data.N;
 
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -1107,10 +1108,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
             {
                 node.children[s+4*t] = 
-                    new DistQuasi2dHMatrix<Scalar,Conjugated>
-                    ( *_subcomms, _level+1, inSourceTeam, inTargetTeam,
-                      _localSourceOffset+sOffset, 
-                      _localTargetOffset+tOffset );
+                    new DistQuasi2d
+                    ( *this->_subcomms, this->_level+1, 
+                      inSourceTeam, inTargetTeam,
+                      this->_localSourceOffset+sOffset, 
+                      this->_localTargetOffset+tOffset );
                 node.Child(t,s).UnpackRecursion
                 ( head, sourceRankOffset, targetRankOffset );
             }
@@ -1119,8 +1121,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case DIST_LOW_RANK:
     {
-        shell.data.DF = new DistLowRankMatrix;
-        DistLowRankMatrix& DF = *shell.data.DF;
+        shell.data.DF = new DistLowRank;
+        DistLowRank& DF = *shell.data.DF;
 
         DF.rank = Read<int>( head );
         if( inSourceTeam )
@@ -1145,8 +1147,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_LOW_RANK:
     {
-        shell.data.SF = new SplitLowRankMatrix;
-        SplitLowRankMatrix& SF = *shell.data.SF;
+        shell.data.SF = new SplitLowRank;
+        SplitLowRank& SF = *shell.data.SF;
 
         SF.rank = Read<int>( head );
 
@@ -1169,8 +1171,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_DENSE:
     {
-        shell.data.SD = new SplitDenseMatrix;
-        SplitDenseMatrix& SD = *shell.data.SD;
+        shell.data.SD = new SplitDense;
+        SplitDense& SD = *shell.data.SD;
 
         if( inSourceTeam )
         {
@@ -1188,8 +1190,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case LOW_RANK:
     {
-        shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
-        LowRankMatrix<Scalar,Conjugated>& F = *shell.data.F;
+        shell.data.F = new LowRank;
+        LowRank& F = *shell.data.F;
 
         // Read in the rank
         const int r = Read<int>( head );
@@ -1207,8 +1209,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case DENSE:
     {
-        shell.data.D = new DenseMatrix<Scalar>;
-        DenseMatrix<Scalar>& D = *shell.data.D;
+        shell.data.D = new Dense;
+        Dense& D = *shell.data.D;
 
         const MatrixType type = Read<MatrixType>( head );
 

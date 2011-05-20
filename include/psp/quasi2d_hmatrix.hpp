@@ -370,6 +370,11 @@ public:
     ( int numIterations, 
       typename RealBase<Scalar>::type theta=1.5, 
       typename RealBase<Scalar>::type confidence=6 );
+    
+    // Create shortened names for convenience in implementations. 
+    typedef DenseMatrix<Scalar> Dense;
+    typedef LowRankMatrix<Scalar,Conjugated> LowRank;
+    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
 };
 
 } // namespace psp

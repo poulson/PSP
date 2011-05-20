@@ -231,12 +231,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::Print");
 #endif
-    DenseMatrix<Scalar> I( this->Width(), this->Width() );
+    Dense I( this->Width(), this->Width() );
     std::memset( I.Buffer(), 0, I.LDim()*I.Width() );
     for( int j=0; j<this->Width(); ++j )
         I.Set(j,j,(Scalar)1);
 
-    DenseMatrix<Scalar> HFull;
+    Dense HFull;
     this->MapMatrix( (Scalar)1, I, HFull );
     HFull.Print( tag );
 #ifndef RELEASE
@@ -280,55 +280,56 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::CopyFrom
     this->_targetOffset = B.TargetOffset();
     this->_symmetric = B.Symmetric();
     this->_stronglyAdmissible = B.StronglyAdmissible();
-    _xSizeSource = B.XSizeSource();
-    _xSizeTarget = B.XSizeTarget();
-    _ySizeSource = B.YSizeSource();
-    _ySizeTarget = B.YSizeTarget();
-    _zSize = B.ZSize();
-    _xSource = B.XSource();
-    _xTarget = B.XTarget();
-    _ySource = B.YSource();
-    _yTarget = B.YTarget();
+    this->_xSizeSource = B.XSizeSource();
+    this->_xSizeTarget = B.XSizeTarget();
+    this->_ySizeSource = B.YSizeSource();
+    this->_ySizeTarget = B.YSizeTarget();
+    this->_zSize = B.ZSize();
+    this->_xSource = B.XSource();
+    this->_xTarget = B.XTarget();
+    this->_ySource = B.YSource();
+    this->_yTarget = B.YTarget();
 
-    _shell.Clear();
-    _shell.type = B._shell.type;
+    this->_shell.Clear();
+    this->_shell.type = B._shell.type;
     switch( _shell.type )
     {
     case NODE:
     {
-        _shell.data.N = 
+        this->_shell.data.N = 
             new Node
-            ( _xSizeSource, _xSizeTarget,
-              _ySizeSource, _ySizeTarget, _zSize );
-        Node& nodeA = *_shell.data.N;
+            ( this->_xSizeSource, this->_xSizeTarget,
+              this->_ySizeSource, this->_ySizeTarget, this->_zSize );
+        Node& nodeA = *this->_shell.data.N;
         const Node& nodeB = *B._shell.data.N;
         for( int i=0; i<16; ++i )
         {
-            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i] = new Quasi2d;
             nodeA.children[i]->CopyFrom( *nodeB.children[i] );
         }
         break;
     }
     case NODE_SYMMETRIC:
     {
-        _shell.data.NS = 
-            new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
-        NodeSymmetric& nodeA = *_shell.data.NS;
+        this->_shell.data.NS = 
+            new NodeSymmetric
+            ( this->_xSizeSource, this->_ySizeSource, this->_zSize );
+        NodeSymmetric& nodeA = *this->_shell.data.NS;
         const NodeSymmetric& nodeB = *B._shell.data.NS;
         for( int i=0; i<10; ++i )
         {
-            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i] = new Quasi2d;
             nodeA.children[i]->CopyFrom( *nodeB.children[i] );
         }
         break;
     }
     case LOW_RANK:
-        _shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
-        hmatrix_tools::Copy( *B._shell.data.F, *_shell.data.F );
+        this->_shell.data.F = new LowRank;
+        hmatrix_tools::Copy( *B._shell.data.F, *this->_shell.data.F );
         break;
     case DENSE:
-        _shell.data.D = new DenseMatrix<Scalar>;
-        hmatrix_tools::Copy( *B._shell.data.D, *_shell.data.D );
+        this->_shell.data.D = new Dense;
+        hmatrix_tools::Copy( *B._shell.data.D, *this->_shell.data.D );
         break;
     }
 #ifndef RELEASE
@@ -344,22 +345,22 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Conjugate()
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::Conjugate");
 #endif
-    switch( _shell.type )
+    switch( this->_shell.type )
     {
     case NODE:
         for( int i=0; i<16; ++i )
-            _shell.data.N->children[i]->Conjugate();
+            this->_shell.data.N->children[i]->Conjugate();
         break;
     case NODE_SYMMETRIC:
         for( int i=0; i<10; ++i )
-            _shell.data.NS->children[i]->Conjugate();
+            this->_shell.data.NS->children[i]->Conjugate();
         break;
     case LOW_RANK:
-        hmatrix_tools::Conjugate( _shell.data.F->U );
-        hmatrix_tools::Conjugate( _shell.data.F->V );
+        hmatrix_tools::Conjugate( this->_shell.data.F->U );
+        hmatrix_tools::Conjugate( this->_shell.data.F->V );
         break;
     case DENSE:
-        hmatrix_tools::Conjugate( *_shell.data.D );
+        hmatrix_tools::Conjugate( *this->_shell.data.D );
         break;
     }
 #ifndef RELEASE
@@ -384,40 +385,40 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ConjugateFrom
     this->_targetOffset = B.TargetOffset();
     this->_symmetric = B.Symmetric();
     this->_stronglyAdmissible = B.StronglyAdmissible();
-    _xSizeSource = B.XSizeSource();
-    _xSizeTarget = B.XSizeTarget();
-    _ySizeSource = B.YSizeSource();
-    _ySizeTarget = B.YSizeTarget();
-    _zSize = B.ZSize();
-    _xSource = B.XSource();
-    _xTarget = B.XTarget();
-    _ySource = B.YSource();
-    _yTarget = B.YTarget();
+    this->_xSizeSource = B.XSizeSource();
+    this->_xSizeTarget = B.XSizeTarget();
+    this->_ySizeSource = B.YSizeSource();
+    this->_ySizeTarget = B.YSizeTarget();
+    this->_zSize = B.ZSize();
+    this->_xSource = B.XSource();
+    this->_xTarget = B.XTarget();
+    this->_ySource = B.YSource();
+    this->_yTarget = B.YTarget();
 
-    _shell.Clear();
-    _shell.type = B._shell.type;
-    switch( _shell.type )
+    this->_shell.Clear();
+    this->_shell.type = B._shell.type;
+    switch( this->_shell.type )
     {
     case NODE:
         for( int i=0; i<16; ++i )
         {
-            _shell.data.N->children[i]->ConjugateFrom
+            this->_shell.data.N->children[i]->ConjugateFrom
             ( *B._shell.data.N->children[i] );
         }
         break;
     case NODE_SYMMETRIC:
         for( int i=0; i<10; ++i )
         {
-            _shell.data.NS->children[i]->ConjugateFrom
+            this->_shell.data.NS->children[i]->ConjugateFrom
             ( *B._shell.data.NS->children[i] );
         }
         break;
     case LOW_RANK:
-        hmatrix_tools::Conjugate( B._shell.data.F->U, _shell.data.F->U );
-        hmatrix_tools::Conjugate( B._shell.data.F->V, _shell.data.F->V );
+        hmatrix_tools::Conjugate( B._shell.data.F->U, this->_shell.data.F->U );
+        hmatrix_tools::Conjugate( B._shell.data.F->V, this->_shell.data.F->V );
         break;
     case DENSE:
-        hmatrix_tools::Conjugate( *B._shell.data.D, *_shell.data.D );
+        hmatrix_tools::Conjugate( *B._shell.data.D, *this->_shell.data.D );
         break;
     }
 #ifndef RELEASE
@@ -442,17 +443,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeFrom
     this->_targetOffset = B.SourceOffset();
     this->_symmetric = B.Symmetric();
     this->_stronglyAdmissible = B.StronglyAdmissible();
-    _xSizeSource = B.XSizeTarget();
-    _xSizeTarget = B.XSizeSource();
-    _ySizeSource = B.YSizeTarget();
-    _ySizeTarget = B.YSizeSource();
-    _zSize = B.ZSize();
-    _xSource = B.XTarget();
-    _xTarget = B.XSource();
-    _ySource = B.YTarget();
-    _yTarget = B.YSource();
+    this->_xSizeSource = B.XSizeTarget();
+    this->_xSizeTarget = B.XSizeSource();
+    this->_ySizeSource = B.YSizeTarget();
+    this->_ySizeTarget = B.YSizeSource();
+    this->_zSize = B.ZSize();
+    this->_xSource = B.XTarget();
+    this->_xTarget = B.XSource();
+    this->_ySource = B.YTarget();
+    this->_yTarget = B.YSource();
 
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     shell.Clear();
     shell.type = B._shell.type;
     switch( shell.type )
@@ -461,16 +462,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeFrom
     {
         shell.data.N = 
             new Node
-            ( _xSizeSource, _xSizeTarget,
-              _ySizeSource, _ySizeTarget, _zSize );
+            ( this->_xSizeSource, this->_xSizeTarget,
+              this->_ySizeSource, this->_ySizeTarget, this->_zSize );
         Node& nodeA = *shell.data.N;
         const Node& nodeB = *B._shell.data.N;
         for( int t=0; t<4; ++t )
         {
             for( int s=0; s<4; ++s )
             {
-                nodeA.children[s+4*t] = 
-                    new Quasi2dHMatrix<Scalar,Conjugated>;
+                nodeA.children[s+4*t] = new Quasi2d;
                 nodeA.Child(t,s).TransposeFrom( nodeB.Child(s,t) );
             }
         }
@@ -479,25 +479,26 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeFrom
     case NODE_SYMMETRIC:
     {
         shell.data.NS = 
-            new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+            new NodeSymmetric
+            ( this->_xSizeSource, this->_ySizeSource, this->_zSize );
         NodeSymmetric& nodeA = *shell.data.NS;
         const NodeSymmetric& nodeB = *B._shell.data.NS;
         for( int i=0; i<10; ++i )
         {
-            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i] = new Quasi2d;
             nodeA.children[i]->CopyFrom( *nodeB.children[i] );
         }
         break;
     }
     case LOW_RANK:
     {
-        shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        shell.data.F = new LowRank;
         hmatrix_tools::Transpose( *B._shell.data.F, *shell.data.F );
         break;
     }
     case DENSE:
     {
-        shell.data.D = new DenseMatrix<Scalar>;
+        shell.data.D = new Dense;
         hmatrix_tools::Transpose( *B._shell.data.D, *shell.data.D );
         break;
     }
@@ -524,17 +525,17 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
     this->_targetOffset = B.SourceOffset();
     this->_symmetric = B.Symmetric();
     this->_stronglyAdmissible = B.StronglyAdmissible();
-    _xSizeSource = B.XSizeTarget();
-    _xSizeTarget = B.XSizeSource();
-    _ySizeSource = B.YSizeTarget();
-    _ySizeTarget = B.YSizeSource();
-    _zSize = B.ZSize();
-    _xSource = B.XTarget();
-    _xTarget = B.XSource();
-    _ySource = B.YTarget();
-    _yTarget = B.YSource();
+    this->_xSizeSource = B.XSizeTarget();
+    this->_xSizeTarget = B.XSizeSource();
+    this->_ySizeSource = B.YSizeTarget();
+    this->_ySizeTarget = B.YSizeSource();
+    this->_zSize = B.ZSize();
+    this->_xSource = B.XTarget();
+    this->_xTarget = B.XSource();
+    this->_ySource = B.YTarget();
+    this->_yTarget = B.YSource();
 
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     shell.Clear();
     shell.type = B._shell.type;
     switch( B._shell.type )
@@ -543,16 +544,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
     {
         shell.data.N = 
             new Node
-            ( _xSizeSource, _xSizeTarget,
-              _ySizeSource, _ySizeTarget, _zSize );
+            ( this->_xSizeSource, this->_xSizeTarget,
+              this->_ySizeSource, this->_ySizeTarget, this->_zSize );
         Node& nodeA = *shell.data.N;
         const Node& nodeB = *B._shell.data.N;
         for( int t=0; t<4; ++t )
         {
             for( int s=0; s<4; ++s )
             {
-                nodeA.children[s+4*t] = 
-                    new Quasi2dHMatrix<Scalar,Conjugated>;
+                nodeA.children[s+4*t] = new Quasi2d;
                 nodeA.Child(t,s).HermitianTransposeFrom( nodeB.Child(s,t) );
             }
         }
@@ -561,25 +561,26 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
     case NODE_SYMMETRIC:
     {
         shell.data.NS = 
-            new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+            new NodeSymmetric
+            ( this->_xSizeSource, this->_ySizeSource, this->_zSize );
         NodeSymmetric& nodeA = *shell.data.NS;
         const NodeSymmetric& nodeB = *B._shell.data.NS;
         for( int i=0; i<10; ++i )
         {
-            nodeA.children[i] = new Quasi2dHMatrix<Scalar,Conjugated>;
+            nodeA.children[i] = new Quasi2d;
             nodeA.children[i]->ConjugateFrom( *nodeB.children[i] );
         }
         break;
     }
     case LOW_RANK:
     {
-        shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        shell.data.F = new LowRank;
         hmatrix_tools::HermitianTranspose( *B._shell.data.F, *shell.data.F );
         break;
     }
     case DENSE:
     {
-        shell.data.D = new DenseMatrix<Scalar>;
+        shell.data.D = new Dense;
         hmatrix_tools::HermitianTranspose( *B._shell.data.D, *shell.data.D );
         break;
     }
@@ -597,7 +598,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::Scale");
 #endif
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
@@ -634,7 +635,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SetToIdentity()
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::SetToIdentity");
 #endif
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
@@ -672,7 +673,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SetToIdentity()
     }
     case DENSE:
     {
-        DenseMatrix<Scalar>& D = *shell.data.D;
+        Dense& D = *shell.data.D;
         hmatrix_tools::Scale( (Scalar)0, D );
         for( int j=0; j<D.Width(); ++j )
         {
@@ -698,7 +699,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::AddConstantToDiagonal
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::AddConstantToDiagonal");
 #endif
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
@@ -745,7 +746,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWith
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::UpdateWith");
 #endif
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:
@@ -787,7 +788,8 @@ template<typename Scalar,bool Conjugated>
 bool
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Admissible() const
 {
-    return Admissible( _xSource, _xTarget, _ySource, _yTarget );
+    return Admissible
+           ( this->_xSource, this->_xTarget, this->_ySource, this->_yTarget );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -809,13 +811,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::ImportLowRankMatrix");
 #endif
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     shell.Clear();
 
-    if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
+    if( Admissible( this->_xSource, this->_xTarget, 
+                    this->_ySource, this->_yTarget ) )
     {
         shell.type = LOW_RANK;
-        shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        shell.data.F = new LowRank;
         hmatrix_tools::Copy( F.U, shell.data.F->U );
         hmatrix_tools::Copy( F.V, shell.data.F->V );
     }
@@ -825,12 +828,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
         {
             shell.type = NODE_SYMMETRIC;
             shell.data.NS = 
-                new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+                new NodeSymmetric
+                ( this->_xSizeSource, this->_ySizeSource, this->_zSize );
             NodeSymmetric& node = *shell.data.NS;
 
             int child = 0;
             const int parentOffset = this->_targetOffset;
-            LowRankMatrix<Scalar,Conjugated> FSub;
+            LowRank FSub;
             for( int t=0,tOffset=0; t<4; tOffset+=node.sizes[t],++t )
             {
                 FSub.U.LockedView( F.U, tOffset, 0, node.sizes[t], F.Rank() );
@@ -841,15 +845,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
                     ( F.V, sOffset, 0, node.sizes[s], F.Rank() );
 
                     node.children[child++] = 
-                      new Quasi2dHMatrix
+                      new Quasi2d
                       ( FSub, 
                         this->_numLevels-1, this->_maxRank, 
                         this->_stronglyAdmissible,
                         node.xSizes[s&1], node.xSizes[t&1],
                         node.ySizes[s/2], node.ySizes[t/2],
-                        _zSize,
-                        2*_xSource+(s&1), 2*_xTarget+(t&1),
-                        2*_ySource+(s/2), 2*_yTarget+(t/2),
+                        this->_zSize,
+                        2*this->_xSource+(s&1), 2*this->_xTarget+(t&1),
+                        2*this->_ySource+(s/2), 2*this->_yTarget+(t/2),
                         sOffset+parentOffset, tOffset+parentOffset );
                 }
             }
@@ -859,11 +863,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
             shell.type = NODE;
             shell.data.N = 
                 new Node
-                ( _xSizeSource, _xSizeTarget,
-                  _ySizeSource, _ySizeTarget, _zSize );
+                ( this->_xSizeSource, this->_xSizeTarget,
+                  this->_ySizeSource, this->_ySizeTarget, this->_zSize );
             Node& node = *shell.data.N;
 
-            LowRankMatrix<Scalar,Conjugated> FSub;
+            LowRank FSub;
             const int parentSourceOffset = this->_sourceOffset;
             const int parentTargetOffset = this->_targetOffset;
             for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
@@ -877,15 +881,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
                     ( F.V, sOffset, 0, node.sourceSizes[s], F.Rank() );
 
                     node.children[s+4*t] = 
-                      new Quasi2dHMatrix
+                      new Quasi2d
                       ( FSub,
                         this->_numLevels-1, this->_maxRank,
                         this->_stronglyAdmissible,
                         node.xSourceSizes[s&1], node.xTargetSizes[t&1],
                         node.ySourceSizes[s/2], node.yTargetSizes[t/2],
-                        _zSize,
-                        2*_xSource+(s&1), 2*_xTarget+(t&1),
-                        2*_ySource+(s/2), 2*_yTarget+(t/2),
+                        this->_zSize,
+                        2*this->_xSource+(s&1), 2*this->_xTarget+(t&1),
+                        2*this->_ySource+(s/2), 2*this->_yTarget+(t/2),
                         sOffset+parentSourceOffset, 
                         tOffset+parentTargetOffset );
                 }
@@ -895,7 +899,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportLowRankMatrix
     else
     {
         shell.type = DENSE;
-        shell.data.D = new DenseMatrix<Scalar>( this->_height, this->_width );
+        shell.data.D = new Dense( this->_height, this->_width );
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Gemm
         ( 'N', option, this->_height, this->_width, F.Rank(),
@@ -917,8 +921,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::UpdateWithLowRankMatrix");
 #endif
-    Shell& shell = _shell;
-    if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
+    Shell& shell = this->_shell;
+    if( Admissible( this->_xSource, this->_xTarget, 
+                    this->_ySource, this->_yTarget ) )
     {
         hmatrix_tools::MatrixUpdateRounded
         ( this->MaxRank(), alpha, F, (Scalar)1, *shell.data.F );
@@ -928,7 +933,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
         if( this->_symmetric )
         {
             NodeSymmetric& node = *shell.data.NS;
-            LowRankMatrix<Scalar,Conjugated> FSub;
+            LowRank FSub;
             for( int t=0,tOffset=0; t<4; tOffset+=node.sizes[t],++t )
             {
                 FSub.U.LockedView( F.U, tOffset, 0, node.sizes[t], F.Rank() );
@@ -943,7 +948,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateWithLowRankMatrix
         else
         {
             Node& node = *shell.data.N;
-            LowRankMatrix<Scalar,Conjugated> FSub;
+            LowRank FSub;
             for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
             {
                 FSub.U.LockedView
@@ -979,13 +984,14 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::ImportSparseMatrix");
 #endif
-    Shell& shell = _shell;
+    Shell& shell = this->_shell;
     shell.Clear();
 
-    if( Admissible( _xSource, _xTarget, _ySource, _yTarget ) )
+    if( Admissible( this->_xSource, this->_xTarget, 
+                    this->_ySource, this->_yTarget ) )
     {
         shell.type = LOW_RANK;
-        shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
+        shell.data.F = new LowRank;
         hmatrix_tools::ConvertSubmatrix
         ( *shell.data.F, S, iOffset, jOffset, this->_height, this->_width );
     }
@@ -995,7 +1001,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
         {
             shell.type = NODE_SYMMETRIC;
             shell.data.NS = 
-                new NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+                new NodeSymmetric
+                ( this->_xSizeSource, this->_ySizeSource, this->_zSize );
             NodeSymmetric& node = *shell.data.NS;
 
             int child = 0;
@@ -1005,15 +1012,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
                 for( int s=0,sOffset=0; s<=t; sOffset+=node.sizes[s],++s )
                 {
                     node.children[child++] = 
-                      new Quasi2dHMatrix
+                      new Quasi2d
                       ( S, 
                         this->_numLevels-1, this->_maxRank,
                         this->_stronglyAdmissible,
                         node.xSizes[s&1], node.xSizes[t&1],
                         node.ySizes[s/2], node.ySizes[t/2],
-                        _zSize,
-                        2*_xSource+(s&1), 2*_xTarget+(t&1),
-                        2*_ySource+(s/2), 2*_yTarget+(t/2),
+                        this->_zSize,
+                        2*this->_xSource+(s&1), 2*this->_xTarget+(t&1),
+                        2*this->_ySource+(s/2), 2*this->_yTarget+(t/2),
                         sOffset+parentOffset, tOffset+parentOffset );
                 }
             }
@@ -1023,8 +1030,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
             shell.type = NODE;
             shell.data.N = 
                 new Node
-                ( _xSizeSource, _xSizeTarget,
-                  _ySizeSource, _ySizeTarget, _zSize );
+                ( this->_xSizeSource, this->_xSizeTarget,
+                  this->_ySizeSource, this->_ySizeTarget, this->_zSize );
             Node& node = *shell.data.N;
 
             const int parentSourceOffset = this->_sourceOffset;
@@ -1034,15 +1041,15 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
                 for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
                 {
                     node.children[s+4*t] = 
-                      new Quasi2dHMatrix
+                      new Quasi2d
                       ( S,
                         this->_numLevels-1, this->_maxRank,
                         this->_stronglyAdmissible,
                         node.xSourceSizes[s&1], node.xTargetSizes[t&1],
                         node.ySourceSizes[s/2], node.yTargetSizes[t/2],
-                        _zSize,
-                        2*_xSource+(s&1), 2*_xTarget+(t&1),
-                        2*_ySource+(s/2), 2*_yTarget+(t/2),
+                        this->_zSize,
+                        2*this->_xSource+(s&1), 2*this->_xTarget+(t&1),
+                        2*this->_ySource+(s/2), 2*this->_yTarget+(t/2),
                         sOffset+parentSourceOffset, 
                         tOffset+parentTargetOffset );
                 }
@@ -1052,7 +1059,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
     else
     {
         shell.type = DENSE;
-        shell.data.D = new DenseMatrix<Scalar>;
+        shell.data.D = new Dense;
         hmatrix_tools::ConvertSubmatrix
         ( *shell.data.D, S, iOffset, jOffset, this->_height, this->_width );
     }
@@ -1070,7 +1077,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateVectorWithNodeSymmetric
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::UpdateVectorWithNodeSymmetric");
 #endif
-    NodeSymmetric& node = *_shell.data.NS;
+    NodeSymmetric& node = *this->_shell.data.NS;
 
     // Loop over the 10 children in the lower triangle, summing in each row
     for( int t=0,tOffset=0; t<4; tOffset+=node.sizes[t],++t )
@@ -1123,12 +1130,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
     // Loop over the 10 children in the lower triangle, summing in each row
     for( int t=0,tOffset=0; t<4; tOffset+=node.sizes[t],++t )
     {
-        DenseMatrix<Scalar> CSub;
+        Dense CSub;
         CSub.View( C, tOffset, 0, node.sizes[t], C.Width() );
 
         for( int s=0,sOffset=0; s<=t; sOffset+=node.sizes[s],++s )
         {
-            DenseMatrix<Scalar> BSub;
+            Dense BSub;
             BSub.LockedView( B, sOffset, 0, node.sizes[s], B.Width() );
 
             node.Child(t,s).MapMatrix( alpha, BSub, (Scalar)1, CSub );
@@ -1139,13 +1146,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
     // each row
     for( int s=0,tOffset=0; s<4; tOffset+=node.sizes[s],++s )
     {
-        DenseMatrix<Scalar> CSub;
+        Dense CSub;
         CSub.View( C, tOffset, 0, node.sizes[s], C.Width() );
 
         for( int t=s+1,sOffset=tOffset+node.sizes[s]; t<4; 
              sOffset+=node.sizes[t],++t )
         {
-            DenseMatrix<Scalar> BSub;
+            Dense BSub;
             BSub.LockedView( B, sOffset, 0, node.sizes[t], B.Width() );
 
             node.Child(t,s).TransposeMapMatrix
@@ -1162,7 +1169,7 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
 ( std::ofstream& file ) const
 {
-    const Shell& shell = _shell;
+    const Shell& shell = this->_shell;
     switch( shell.type )
     {
     case NODE:

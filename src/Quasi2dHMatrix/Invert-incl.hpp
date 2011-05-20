@@ -31,19 +31,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
     if( this->IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
 #endif
-    switch( _shell.type )
+    switch( this->_shell.type )
     {
     case NODE:
     {
         // We will form the inverse in the original matrix, so we only need to
         // create a temporary matrix.
-        Quasi2dHMatrix<Scalar,Conjugated> B; 
+        Quasi2d B;
         B.CopyFrom( *this );
 
         // Initialize our soon-to-be inverse as the identity
         this->SetToIdentity();
 
-        Node& nodeA = *_shell.data.N;
+        Node& nodeA = *this->_shell.data.N;
         Node& nodeB = *B._shell.data.N;
 
         for( int l=0; l<4; ++l )
@@ -56,7 +56,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
             for( int j=0; j<l; ++j )
             {
                 // A_lj := A_ll A_lj
-                Quasi2dHMatrix<Scalar,Conjugated> C;
+                Quasi2d C;
                 C.CopyFrom( nodeA.Child(l,j) );
                 nodeA.Child(l,l).MapMatrix( (Scalar)1, C, nodeA.Child(l,j) );
             }
@@ -65,7 +65,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
             for( int j=l+1; j<4; ++j )
             {
                 // B_lj := A_ll B_lj
-                Quasi2dHMatrix<Scalar,Conjugated> C;
+                Quasi2d C;
                 C.CopyFrom( nodeB.Child(l,j) );
                 nodeA.Child(l,l).MapMatrix( (Scalar)1, C, nodeB.Child(l,j) );
             }
@@ -119,7 +119,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
         break;
     }
     case DENSE:
-        hmatrix_tools::Invert( *_shell.data.D );
+        hmatrix_tools::Invert( *this->_shell.data.D );
         break;
     case LOW_RANK:
     {
@@ -161,19 +161,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
     const Scalar alpha = ((Scalar)2) / (estimate*estimate);
 
     // Initialize X_0 := alpha A^H
-    Quasi2dHMatrix<Scalar,Conjugated> X;
+    Quasi2d X;
     X.HermitianTransposeFrom( *this );
     X.Scale( alpha );
 
     for( int k=0; k<numIterations; ++k )
     {
         // Form Z := 2I - X_k A
-        Quasi2dHMatrix<Scalar,Conjugated> Z;        
+        Quasi2d Z;
         X.MapMatrix( (Scalar)-1, *this, Z );
         Z.AddConstantToDiagonal( (Scalar)2 );
 
         // Form X_k+1 := Z X_k = (2I - X_k A) X_k
-        Quasi2dHMatrix<Scalar,Conjugated> XCopy;
+        Quasi2d XCopy;
         XCopy.CopyFrom( X );
         Z.MapMatrix( (Scalar)1, XCopy, X );
     }

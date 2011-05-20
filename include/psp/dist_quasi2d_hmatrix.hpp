@@ -30,7 +30,6 @@ template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
 public:
-    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
 
     /*
      * Public data structures
@@ -52,26 +51,27 @@ public:
      */
     static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
-      const Quasi2d& H, const Subcomms& subcomms );
+      const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
 
     static std::size_t Pack
     ( std::vector<byte*>& packedPieces, 
-      const Quasi2d& H, const Subcomms& subcomms );
+      const Quasi2dHMatrix<Scalar,Conjugated>& H, const Subcomms& subcomms );
 
     static int ComputeLocalHeight
-    ( int p, int rank, const Quasi2d& H );
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static int ComputeLocalWidth
-    ( int p, int rank, const Quasi2d& H );
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static int ComputeFirstLocalRow
-    ( int p, int rank, const Quasi2d& H );
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static int ComputeFirstLocalCol
-    ( int p, int rank, const Quasi2d& H );
+    ( int p, int rank, const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void ComputeLocalSizes
-    ( std::vector<int>& localSizes, const Quasi2d& H );
+    ( std::vector<int>& localSizes, 
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     /*
      * Public non-static member functions
@@ -196,13 +196,13 @@ private:
     ( std::vector<std::size_t>& packedSizes,
       const std::vector<int>& localSizes,
       int sourceRankOffset, int targetRankOffset, int teamSize,
-      const Quasi2d& H );
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void PackRecursion
     ( std::vector<byte**>& headPointers,
       const std::vector<int>& localSizes,
       int sourceRankOffset, int targetRankOffset, int teamSize,
-      const Quasi2d& H );
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
     static void ComputeLocalDimensionRecursion
     ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
@@ -425,7 +425,8 @@ private:
 
         struct DistLowRankContext
         {
-            DistLowRankUpdates updates;    
+            DenseMatrix<Scalar> Z; // for storing dot products of panels
+            MapDenseMatrixContext context;
         };
 
         struct SplitLowRankContext
@@ -438,6 +439,7 @@ private:
         {
             LowRankUpdates lowRankUpdates;
             DenseUpdates denseUpdates;
+            DenseMatrix<Scalar> Z;
         };
 
         struct SplitDenseContext
@@ -473,8 +475,10 @@ private:
             } data;
             ContextShell();
             ~ContextShell();
+            void Clear();
         };
         ContextShell shell;
+        void Clear();
     };
 
     /*
@@ -504,6 +508,8 @@ private:
     /*
      * Private non-static member functions
      */
+    bool Admissible() const;
+    bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
     
     // Ensure that the default constructor is not accessible, a communicator
     // must be supplied
@@ -593,6 +599,12 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
+
+    void MapMatrixPrecompute
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    // TODO...
 
     void TransposeMapVectorPrecompute
     ( MapVectorContext& context,
@@ -725,6 +737,15 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
+    
+    // Create shortened names for convenience in implementations.
+    typedef DenseMatrix<Scalar> Dense;
+    typedef LowRankMatrix<Scalar,Conjugated> LowRank;
+    typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
+    typedef SplitDenseMatrix SplitDense;
+    typedef SplitLowRankMatrix SplitLowRank;
+    typedef DistLowRankMatrix DistLowRank;
+    typedef DistQuasi2dHMatrix<Scalar,Conjugated> DistQuasi2d;
 };
 
 } // namespace psp
@@ -1057,6 +1078,119 @@ ContextShell::Clear()
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::Clear()
+{
+    shell.Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+DistNodeContext::DistNodeContext()
+: children(16)
+{
+    for( int i=0; i<16; ++i )
+        children[i] = new MapHMatrixContext();
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+DistNodeContext::~DistNodeContext()
+{
+    for( int i=0; i<16; ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+DistNodeContext::Child( int t, int s )
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapHMatrixContext::DistNodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const typename 
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+DistNodeContext::Child( int t, int s ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapHMatrixContext::DistNodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+ContextShell::ContextShell()
+: type(EMPTY), data()
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+ContextShell::~ContextShell()
+{
+    Clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+ContextShell::Clear()
+{
+    switch( type )
+    {
+    case DIST_NODE: 
+        delete data.DN; break;
+    case SPLIT_NODE:
+        delete data.SN; break;
+    case NODE:
+        delete data.N; break;
+
+    case DIST_LOW_RANK:  
+        delete data.DF; break;
+    case SPLIT_LOW_RANK:
+        delete data.SF;
+    case LOW_RANK:
+        delete data.F;
+
+    case SPLIT_DENSE:
+        delete data.SD; break;
+    case DENSE:
+        delete data.D; break;
+
+    case EMPTY: 
+        break;
+    }
+    type = EMPTY;
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::Clear()
 {
     shell.Clear();
 }
