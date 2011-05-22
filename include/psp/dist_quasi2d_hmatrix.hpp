@@ -30,7 +30,6 @@ template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMatrix
 {
 public:
-
     /*
      * Public data structures
      */
@@ -84,6 +83,9 @@ public:
     DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
     ~DistQuasi2dHMatrix();
     void Clear();
+
+    int Height() const;
+    int Width() const;
 
     int LocalHeight() const;
     int LocalWidth() const;
@@ -251,6 +253,7 @@ private:
         DistQuasi2dHMatrix& Child( int t, int s );
         const DistQuasi2dHMatrix& Child( int t, int s ) const;
     };
+    Node* NewNode() const;
 
     enum ShellType 
     { 
@@ -484,7 +487,6 @@ private:
     /*
      * Private data
      */
-    int _height, _width;
     int _numLevels;
     int _maxRank;
     int _sourceOffset, _targetOffset;
@@ -832,6 +834,15 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Node::Child( int t, int s ) const
 }
 
 template<typename Scalar,bool Conjugated>
+inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::Node*
+DistQuasi2dHMatrix<Scalar,Conjugated>::NewNode() const
+{
+    return 
+        new Node
+        ( _xSizeSource, _xSizeTarget, _ySizeSource, _ySizeTarget, _zSize );
+}
+
+template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
 : type(EMPTY), data() 
@@ -1144,6 +1155,123 @@ DistNodeContext::Child( int t, int s ) const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+SplitNodeContext::SplitNodeContext()
+: children(16)
+{
+    for( int i=0; i<16; ++i )
+        children[i] = new MapHMatrixContext();
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+SplitNodeContext::~SplitNodeContext()
+{
+    for( int i=0; i<16; ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+SplitNodeContext::Child( int t, int s )
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapHMatrixContext::SplitNodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const typename 
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+SplitNodeContext::Child( int t, int s ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapHMatrixContext::SplitNodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+NodeContext::NodeContext()
+: children(16)
+{
+    for( int i=0; i<16; ++i )
+        children[i] = new MapHMatrixContext();
+}
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+NodeContext::~NodeContext()
+{
+    for( int i=0; i<16; ++i )
+        delete children[i];
+    children.clear();
+}
+
+template<typename Scalar,bool Conjugated>
+inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+NodeContext::Child( int t, int s )
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapHMatrixContext::NodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+
+template<typename Scalar,bool Conjugated>
+inline const typename 
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
+NodeContext::Child( int t, int s ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::MapHMatrixContext::NodeContext::Child");
+    if( t < 0 || s < 0 )
+        throw std::logic_error("Indices must be non-negative");
+    if( t > 3 || s > 3 )
+        throw std::logic_error("Indices out of bounds");
+    if( children.size() != 16 )
+        throw std::logic_error("children array not yet set up");
+    PopCallStack();
+#endif
+    return *children[s+4*t];
+}
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
 ContextShell::ContextShell()
 : type(EMPTY), data()
 { }
@@ -1193,6 +1321,24 @@ inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::Clear()
 {
     shell.Clear();
+}
+
+/*
+ * Public member functions
+ */
+
+template<typename Scalar,bool Conjugated>
+inline int
+DistQuasi2dHMatrix<Scalar,Conjugated>::Height() const
+{
+    return _xSizeTarget*_ySizeTarget*_zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+DistQuasi2dHMatrix<Scalar,Conjugated>::Width() const
+{
+    return _xSizeSource*_ySizeSource*_zSize;
 }
 
 /*

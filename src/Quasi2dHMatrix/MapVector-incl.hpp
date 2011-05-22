@@ -28,7 +28,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
     PushCallStack("Quasi2dHMatrix::MapVector (y := H x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
@@ -72,7 +72,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::MapVector (y := H x)");
 #endif
-    y.Resize( this->_height );
+    y.Resize( Height() );
     MapVector( alpha, x, 0, y );
 #ifndef RELEASE
     PopCallStack();
@@ -88,7 +88,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
     PushCallStack("Quasi2dHMatrix::TransposeMapVector (y := H^T x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
@@ -135,7 +135,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::TransposeMapVector (y := H^T x)");
 #endif
-    y.Resize( this->_width );
+    y.Resize( Width() );
     TransposeMapVector( alpha, x, 0, y );
 #ifndef RELEASE
     PopCallStack();
@@ -152,7 +152,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
@@ -209,7 +209,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y, non-const)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
@@ -260,7 +260,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x)");
 #endif
-    y.Resize( this->_width );
+    y.Resize( Width() );
     HermitianTransposeMapVector( alpha, x, 0, y );
 #ifndef RELEASE
     PopCallStack();
@@ -277,7 +277,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     PushCallStack
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x, non-const)");
 #endif
-    y.Resize( this->_width );
+    y.Resize( Width() );
     HermitianTransposeMapVector( alpha, x, 0, y );
 #ifndef RELEASE
     PopCallStack();

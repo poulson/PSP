@@ -29,12 +29,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     PushCallStack("Quasi2dHMatrix::MapMatrix (D := H D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *this->_shell.data.N;
+        Node& node = *_shell.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
             Dense CSub;
@@ -56,11 +56,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixMatrix
-        ( alpha, *this->_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_shell.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixMatrix
-        ( alpha, *this->_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -78,7 +78,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     PushCallStack("Quasi2dHMatrix::MapMatrix (D := H D)");
 #endif
     C.SetType( GENERAL );
-    C.Resize( this->Height(), B.Width() );
+    C.Resize( Height(), B.Width() );
     MapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();
@@ -95,7 +95,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     PushCallStack("Quasi2dHMatrix::TransposeMapMatrix (D := H^T D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
@@ -123,11 +123,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixTransposeMatrix
-        ( alpha, *this->_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_shell.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixTransposeMatrix
-        ( alpha, *this->_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -145,7 +145,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     PushCallStack("Quasi2dHMatrix::TransposeMapMatrix (D := H^T D)");
 #endif
     C.SetType( GENERAL );
-    C.Resize( this->_width, B.Width() );
+    C.Resize( Width(), B.Width() );
     TransposeMapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();
@@ -163,12 +163,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *this->_shell.data.N;
+        Node& node = *_shell.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Dense CSub;
@@ -197,11 +197,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     }
     case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *this->_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_shell.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *this->_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -226,7 +226,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *this->_shell.data.N;
+        Node& node = *_shell.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Dense CSub;
@@ -253,11 +253,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *this->_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_shell.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *this->_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_shell.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -275,7 +275,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     PushCallStack("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D)");
 #endif
     C.SetType( GENERAL );
-    C.Resize( this->_width, B.Width() );
+    C.Resize( Width(), B.Width() );
     HermitianTransposeMapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();
@@ -294,7 +294,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D, non-const)");
 #endif
     C.SetType( GENERAL );
-    C.Resize( this->_width, B.Width() );
+    C.Resize( Width(), B.Width() );
     HermitianTransposeMapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();

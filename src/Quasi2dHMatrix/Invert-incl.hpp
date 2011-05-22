@@ -26,12 +26,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::DirectInvert");
-    if( this->Height() != this->Width() )
+    if( Height() != Width() )
         throw std::logic_error("Cannot invert non-square matrices");
-    if( this->IsLowRank() )
+    if( IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
 #endif
-    switch( this->_shell.type )
+    switch( _shell.type )
     {
     case NODE:
     {
@@ -41,9 +41,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
         B.CopyFrom( *this );
 
         // Initialize our soon-to-be inverse as the identity
-        this->SetToIdentity();
+        SetToIdentity();
 
-        Node& nodeA = *this->_shell.data.N;
+        Node& nodeA = *_shell.data.N;
         Node& nodeB = *B._shell.data.N;
 
         for( int l=0; l<4; ++l )
@@ -119,7 +119,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
         break;
     }
     case DENSE:
-        hmatrix_tools::Invert( *this->_shell.data.D );
+        hmatrix_tools::Invert( *_shell.data.D );
         break;
     case LOW_RANK:
     {
@@ -144,9 +144,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMatrix::SchulzInvert");
-    if( this->Height() != this->Width() )
+    if( Height() != Width() )
         throw std::logic_error("Cannot invert non-square matrices");
-    if( this->IsLowRank() )
+    if( IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
     if( theta <= 1 )
         throw std::logic_error("Theta must be > 1");
@@ -178,7 +178,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
         Z.MapMatrix( (Scalar)1, XCopy, X );
     }
 
-    this->CopyFrom( X );
+    CopyFrom( X );
 #ifndef RELEASE
     PopCallStack();
 #endif

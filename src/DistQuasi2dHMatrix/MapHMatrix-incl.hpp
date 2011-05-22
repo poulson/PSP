@@ -28,13 +28,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrix");
-    if( this->_width != B._height )
+    if( Width() != B.Height() )
         throw std::logic_error("Attempted nonconformal matrix-matrix multiply");
-    if( this->_numLevels != B._numLevels )
+    if( _numLevels != B._numLevels )
         throw std::logic_error("H-matrices must have same number of levels");
-    if( this->_zSize != B._zSize )
+    if( _zSize != B._zSize )
         throw std::logic_error("Mismatched z sizes");
-    if( this->_level != B._level )
+    if( _level != B._level )
         throw std::logic_error("Mismatched levels");
 #endif
     MapHMatrixContext context;
@@ -55,35 +55,32 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
 #endif
-    C._height = this->_height;
-    C._width = B._width;
-    C._numLevels = this->_numLevels;
-    C._maxRank = this->_maxRank;
-    C._sourceOffset = this->_sourceOffset;
-    C._targetOffset = this->_targetOffset;
-    C._stronglyAdmissible = 
-        ( this->_stronglyAdmissible || B._stronglyAdmissible );
+    C._numLevels = _numLevels;
+    C._maxRank = _maxRank;
+    C._sourceOffset = _sourceOffset;
+    C._targetOffset = _targetOffset;
+    C._stronglyAdmissible = ( _stronglyAdmissible || B._stronglyAdmissible );
 
     C._xSizeSource = B._xSizeSource;
     C._ySizeSource = B._ySizeSource;
-    C._xSizeTarget = this->_xSizeTarget;
-    C._ySizeTarget = this->_ySizeTarget;
-    C._zSize = this->_zSize;
+    C._xSizeTarget = _xSizeTarget;
+    C._ySizeTarget = _ySizeTarget;
+    C._zSize = _zSize;
     C._xSource = B._xSource;
     C._ySource = B._ySource;
-    C._xTarget = this->_xTarget;
-    C._yTarget = this->_yTarget;
+    C._xTarget = _xTarget;
+    C._yTarget = _yTarget;
 
-    C._subcomms = this->_subcomms;
-    C._level = this->_level;
+    C._subcomms = _subcomms;
+    C._level = _level;
     C._inSourceTeam = B._inSourceTeam;
-    C._inTargetTeam = this->_inTargetTeam;
+    C._inTargetTeam = _inTargetTeam;
     if( C._inSourceTeam && !C._inTargetTeam )
-        C._rootOfOtherTeam = this->_rootOfOtherTeam;
+        C._rootOfOtherTeam = _rootOfOtherTeam;
     else if( !C._inSourceTeam && C._inTargetTeam )
         C._rootOfOtherTeam = B._rootOfOtherTeam;
     C._localSourceOffset = B._localSourceOffset;
-    C._localTargetOffset = this->_localTargetOffset;
+    C._localTargetOffset = _localTargetOffset;
 
     C._shell.Clear();
     context.Clear();
@@ -103,15 +100,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             typename MapHMatrixContext::DistLowRankContext& DFContext = 
                 *context.shell.data.DF;
 
-            if( this->_shell.type == DIST_LOW_RANK && 
-                B._shell.type     == DIST_LOW_RANK )
+            if( _shell.type   == DIST_LOW_RANK && 
+                B._shell.type == DIST_LOW_RANK )
             {
                 // Form the local portion of A.V^[T/H] B.U in the product
                 // A.U (A.V^[T/H] B.U) B.V^[T/H]
-                const DistLowRank& FA = *this->_shell.data.DF;
+                const DistLowRank& FA = *_shell.data.DF;
                 const DistLowRank& FB = *B._shell.data.DF;
                 FC.rank = std::min( FA.rank, FB.rank );
-                if( this->_inSourceTeam )
+                if( _inSourceTeam )
                 {
 #ifndef RELEASE
                     if( !B._inTargetTeam )
@@ -127,14 +124,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                       (Scalar)0, Z.Buffer(),               Z.LDim() );
                 }
             }
-            else if( this->_shell.type == DIST_LOW_RANK &&
-                     B._shell.type     == DIST_NODE )
+            else if( _shell.type   == DIST_LOW_RANK &&
+                     B._shell.type == DIST_NODE )
             {
                 // Precompute what we can of B^[T/H] A.V in the product 
                 // A.U A.V^[T/H] B = A.U (B^[T/H] A.V)^[T/H]
-                const DistLowRank& FA = *this->_shell.data.DF;
+                const DistLowRank& FA = *_shell.data.DF;
                 FC.rank = FA.rank;
-                if( this->_inSourceTeam )
+                if( _inSourceTeam )
                 {
                     FC.VLocal.Resize
                     ( B.LocalWidth(), FA.rank, B.LocalWidth() );
@@ -147,24 +144,23 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                     B.TransposeMapMatrixPrecompute
                     ( DFContext.context, (Scalar)1, FA.VLocal, FC.VLocal );
             }
-            else if( this->_shell.type == DIST_NODE &&
-                     B._shell.type     == DIST_LOW_RANK )
+            else if( _shell.type   == DIST_NODE &&
+                     B._shell.type == DIST_LOW_RANK )
             {
                 // Precompute what we can of alpha A B.U in the product
                 // (alpha A B.U) B.V^[T/H]
                 const DistLowRank& FB = *B._shell.data.DF;
                 FC.rank = FB.rank;
-                if( this->_inSourceTeam )
+                if( _inSourceTeam )
                 {
-                    FC.ULocal.Resize
-                    ( this->LocalHeight(), FB.rank, this->LocalHeight() );
+                    FC.ULocal.Resize( LocalHeight(), FB.rank, LocalHeight() );
                     hmatrix_tools::Scale( (Scalar)0, FC.ULocal );
                 }
-                this->MapMatrixPrecompute
+                MapMatrixPrecompute
                 ( DFContext.context, alpha, FB.ULocal, FC.ULocal );
             }
-            else if( this->_shell.type == DIST_NODE &&
-                     B._shell.type     == DIST_NODE )
+            else if( _shell.type   == DIST_NODE &&
+                     B._shell.type == DIST_NODE )
             {
                 // TODO: Generate random vectors, Omega,  and precompute 
                 //       B Omega
@@ -188,48 +184,48 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                 typename MapHMatrixContext::LowRankContext& FContext = 
                     *context.shell.data.F;
 
-                if( this->_shell.type == LOW_RANK &&
-                    B._shell.type     == LOW_RANK )
+                if( _shell.type   == LOW_RANK &&
+                    B._shell.type == LOW_RANK )
                 {
                     /*
-                    const LowRank& FA = *this->_shell.data.F;
+                    const LowRank& FA = *_shell.data.F;
                     const LowRank& FB = *B._shell.data.F;
                     hmatrix_tools::MatrixMatrix
                     ( alpha, 
                     */
                 }
-                else if( this->_shell.type == LOW_RANK &&
-                         B._shell.type     == NODE )
+                else if( _shell.type   == LOW_RANK &&
+                         B._shell.type == NODE )
                 {
                     // TODO
                 }
-                else if( this->_shell.type == NODE &&
-                         B._shell.type     == LOW_RANK )
+                else if( _shell.type   == NODE &&
+                         B._shell.type == LOW_RANK )
                 {
                     // TODO
                 }
-                else if( this->_shell.type == NODE &&
-                         B._shell.type     == NODE )
+                else if( _shell.type   == NODE &&
+                         B._shell.type == NODE )
                 {
                     // TODO
                 }
-                else if( this->_shell.type == SPLIT_LOW_RANK &&
-                         B._shell.type     == SPLIT_LOW_RANK )
+                else if( _shell.type   == SPLIT_LOW_RANK &&
+                         B._shell.type == SPLIT_LOW_RANK )
                 {
                     // TODO
                 }
-                else if( this->_shell.type == SPLIT_LOW_RANK &&
-                         B._shell.type     == SPLIT_NODE )
+                else if( _shell.type   == SPLIT_LOW_RANK &&
+                         B._shell.type == SPLIT_NODE )
                 {
                     // TODO
                 }
-                else if( this->_shell.type == SPLIT_NODE &&
-                         B._shell.type     == SPLIT_LOW_RANK )
+                else if( _shell.type   == SPLIT_NODE &&
+                         B._shell.type == SPLIT_LOW_RANK )
                 {
                     // TODO
                 }
-                else if( this->_shell.type == SPLIT_NODE &&
-                         B._shell.type     == SPLIT_NODE )
+                else if( _shell.type   == SPLIT_NODE &&
+                         B._shell.type == SPLIT_NODE )
                 {
                     // TODO
                 }
@@ -251,19 +247,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         if( teamSize >= 4 )
         {
             C._shell.type = DIST_NODE;
-            C._shell.data.N = 
-                new Node
-                ( C._xSizeSource, C._xSizeTarget, 
-                  C._ySizeSource, C._ySizeTarget, C._zSize );
+            C._shell.data.N = C.NewNode();
             // TODO
         }
         else if( teamSize == 2 )
         {
             C._shell.type = DIST_NODE; 
-            C._shell.data.N = 
-                new Node
-                ( C._xSizeSource, C._xSizeTarget,
-                  C._ySizeSource, C._ySizeTarget, C._zSize );
+            C._shell.data.N = C.NewNode();
             // TODO
         }
         else // teamSize == 1
@@ -271,19 +261,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             if( C._sourceOffset == C._targetOffset )
             {
                 C._shell.type = NODE;
-                C._shell.data.N = 
-                    new Node
-                    ( C._xSizeSource, C._xSizeTarget,
-                      C._ySizeSource, C._ySizeTarget, C._zSize );
+                C._shell.data.N = C.NewNode();
                 // TODO
             }
             else
             {
                 C._shell.type = SPLIT_NODE;
-                C._shell.data.N = 
-                    new Node
-                    ( C._xSizeSource, C._xSizeTarget,
-                      C._ySizeSource, C._ySizeTarget, C._zSize );
+                C._shell.data.N = C.NewNode();
                 // TODO
             }
         }

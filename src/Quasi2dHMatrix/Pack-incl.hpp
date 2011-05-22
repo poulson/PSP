@@ -27,11 +27,7 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
 ( std::size_t& packedSize, const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
-    // Make space for the abstract H-matrix information
-    packedSize += 6*sizeof(int) + 2*sizeof(bool);
-
-    // Quasi2dHMatrix-specific information
-    packedSize += 9*sizeof(int);
+    packedSize += 13*sizeof(int) + 2*sizeof(bool);
 
     const Shell& shell = H._shell;
     packedSize += sizeof(ShellType);
@@ -43,10 +39,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
         break;
     case NODE_SYMMETRIC:
         for( int i=0; i<10; ++i )
-        {
-            PackedSizeRecursion
-            ( packedSize, *shell.data.NS->children[i] );
-        }
+            PackedSizeRecursion( packedSize, *shell.data.NS->children[i] );
         break;
     case LOW_RANK:
     {
@@ -87,9 +80,6 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H )
 {
-    // Write out the abstract H-matrix information
-    Write( head, H._height );
-    Write( head, H._width );
     Write( head, H._numLevels );
     Write( head, H._maxRank );
     Write( head, H._sourceOffset );
@@ -97,7 +87,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     Write( head, H._symmetric );
     Write( head, H._stronglyAdmissible );
 
-    // Write out the Quasi2dHMatrix-specific information
     Write( head, H._xSizeSource );
     Write( head, H._xSizeTarget );
     Write( head, H._ySizeSource );
@@ -238,7 +227,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
     PushCallStack("Quasi2dHMatrix::Unpack");
 #endif
     const byte* head = packedHMatrix;
-    this->UnpackRecursion( head );
+    UnpackRecursion( head );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -254,7 +243,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Unpack
     PushCallStack("Quasi2dHMatrix::Unpack");
 #endif
     const byte* head = &packedHMatrix[0];
-    this->UnpackRecursion( head );
+    UnpackRecursion( head );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -271,28 +260,26 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head )
 {
     // Set the abstract H-matrix data
-    this->_height             = Read<int>( head );
-    this->_width              = Read<int>( head );
-    this->_numLevels          = Read<int>( head );
-    this->_maxRank            = Read<int>( head );
-    this->_sourceOffset       = Read<int>( head );
-    this->_targetOffset       = Read<int>( head );
-    this->_symmetric          = Read<bool>( head );
-    this->_stronglyAdmissible = Read<bool>( head );
+    _numLevels          = Read<int>( head );
+    _maxRank            = Read<int>( head );
+    _sourceOffset       = Read<int>( head );
+    _targetOffset       = Read<int>( head );
+    _symmetric          = Read<bool>( head );
+    _stronglyAdmissible = Read<bool>( head );
 
     // Set the Quasi2dHMatrix-specific information
-    this->_xSizeSource = Read<int>( head );
-    this->_xSizeTarget = Read<int>( head );
-    this->_ySizeSource = Read<int>( head );
-    this->_ySizeTarget = Read<int>( head );
-    this->_zSize       = Read<int>( head );
-    this->_xSource     = Read<int>( head );
-    this->_xTarget     = Read<int>( head );
-    this->_ySource     = Read<int>( head );
-    this->_yTarget     = Read<int>( head );
+    _xSizeSource = Read<int>( head );
+    _xSizeTarget = Read<int>( head );
+    _ySizeSource = Read<int>( head );
+    _ySizeTarget = Read<int>( head );
+    _zSize       = Read<int>( head );
+    _xSource     = Read<int>( head );
+    _xTarget     = Read<int>( head );
+    _ySource     = Read<int>( head );
+    _yTarget     = Read<int>( head );
 
     // If data has been allocated, delete it
-    Shell& shell = this->_shell;
+    Shell& shell = _shell;
     shell.Clear();
 
     // Create this layer of the H-matrix from the packed information
@@ -301,9 +288,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     {
     case NODE:
     {
-        shell.data.N = 
-            new Node( this->_xSizeSource, this->_xSizeTarget,
-                      this->_ySizeSource, this->_ySizeTarget, this->_zSize );
+        shell.data.N = NewNode();
         Node& node = *shell.data.N;
         for( int i=0; i<16; ++i )
         {
@@ -314,9 +299,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case NODE_SYMMETRIC:
     {
-        shell.data.NS = 
-            new NodeSymmetric
-            ( this->_xSizeSource, this->_ySizeSource, this->_zSize );
+        shell.data.NS = NewNodeSymmetric();
         NodeSymmetric& node = *shell.data.NS;
         for( int i=0; i<10; ++i )
         {
@@ -330,8 +313,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         shell.data.F = new LowRank;
         Dense& U = shell.data.F->U;
         Dense& V = shell.data.F->V;
-        const int m = this->_height;
-        const int n = this->_width;
+        const int m = Height();
+        const int n = Width();
 
         // Read in the matrix rank
         const int r = Read<int>( head );
@@ -351,8 +334,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     case DENSE:
         shell.data.D = new Dense;
         Dense& D = *shell.data.D;
-        const int m = this->_height;
-        const int n = this->_width;
+        const int m = Height();
+        const int n = Width();
 
         const MatrixType type = Read<MatrixType>( head );
         D.SetType( type ); 

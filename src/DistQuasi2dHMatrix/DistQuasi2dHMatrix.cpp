@@ -21,7 +21,7 @@
 #include "psp.hpp"
 
 #include "./MapDenseMatrix-incl.hpp"
-#include "./MapHMatrix-incl.hpp"
+//#include "./MapHMatrix-incl.hpp"
 #include "./MapVector-incl.hpp"
 #include "./RedistQuasi2dHMatrix-incl.hpp"
 
@@ -32,7 +32,7 @@
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 ( const Subcomms& subcomms )
-: _height(0), _width(0), _numLevels(0), _maxRank(0), 
+: _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
@@ -48,7 +48,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 ( const Subcomms& subcomms, unsigned level, 
   bool inSourceTeam, bool inTargetTeam, 
   int localSourceOffset, int localTargetOffset )
-: _height(0), _width(0), _numLevels(0), _maxRank(0), 
+: _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),

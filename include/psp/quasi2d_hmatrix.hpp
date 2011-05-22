@@ -68,6 +68,7 @@ private:
         Quasi2dHMatrix& Child( int i, int j );
         const Quasi2dHMatrix& Child( int i, int j ) const;
     };
+    Node* NewNode() const;
 
     struct NodeSymmetric
     {
@@ -80,6 +81,7 @@ private:
         Quasi2dHMatrix& Child( int i, int j );
         const Quasi2dHMatrix& Child( int i, int j ) const;
     };
+    NodeSymmetric* NewNodeSymmetric() const;
 
     enum ShellType 
     { 
@@ -108,6 +110,12 @@ private:
     /*
      * Private member data
      */
+    int _numLevels;
+    int _maxRank;
+    int _sourceOffset, _targetOffset;
+    bool _symmetric;
+    bool _stronglyAdmissible;
+
     int _xSizeSource, _xSizeTarget;
     int _ySizeSource, _ySizeTarget;
     int _zSize;
@@ -199,6 +207,16 @@ public:
 
     ~Quasi2dHMatrix();
     void Clear();
+
+    // Fulfillments of AbstractHMatrix
+    virtual int Height() const;
+    virtual int Width() const;
+    virtual int NumLevels() const;
+    virtual int MaxRank() const;
+    virtual int SourceOffset() const;
+    virtual int TargetOffset() const;
+    virtual bool Symmetric() const;
+    virtual bool StronglyAdmissible() const;
 
     // Routines useful for packing and unpacking the Quasi2dHMatrix to/from
     // a contiguous buffer.
@@ -386,6 +404,62 @@ public:
 namespace psp {
 
 template<typename Scalar,bool Conjugated>
+inline int
+Quasi2dHMatrix<Scalar,Conjugated>::Height() const
+{
+    return _xSizeTarget*_ySizeTarget*_zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+Quasi2dHMatrix<Scalar,Conjugated>::Width() const
+{
+    return _xSizeSource*_ySizeSource*_zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+Quasi2dHMatrix<Scalar,Conjugated>::NumLevels() const
+{
+    return _numLevels;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+Quasi2dHMatrix<Scalar,Conjugated>::MaxRank() const
+{
+    return _maxRank;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+Quasi2dHMatrix<Scalar,Conjugated>::SourceOffset() const
+{
+    return _sourceOffset;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+Quasi2dHMatrix<Scalar,Conjugated>::TargetOffset() const
+{
+    return _targetOffset;
+}
+
+template<typename Scalar,bool Conjugated>
+inline bool
+Quasi2dHMatrix<Scalar,Conjugated>::Symmetric() const
+{
+    return _symmetric;
+}
+
+template<typename Scalar,bool Conjugated>
+inline bool
+Quasi2dHMatrix<Scalar,Conjugated>::StronglyAdmissible() const
+{
+    return _stronglyAdmissible;
+}
+
+template<typename Scalar,bool Conjugated>
 inline
 Quasi2dHMatrix<Scalar,Conjugated>::Node::Node
 ( int xSizeSource, int xSizeTarget,
@@ -458,6 +532,15 @@ Quasi2dHMatrix<Scalar,Conjugated>::Node::Child( int i, int j ) const
 }
 
 template<typename Scalar,bool Conjugated>
+inline typename Quasi2dHMatrix<Scalar,Conjugated>::Node*
+Quasi2dHMatrix<Scalar,Conjugated>::NewNode() const
+{
+    return 
+        new Quasi2d::Node
+        ( _xSizeSource, _xSizeTarget, _ySizeSource, _ySizeTarget, _zSize );
+}
+
+template<typename Scalar,bool Conjugated>
 inline
 Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::NodeSymmetric
 ( int xSize, int ySize, int zSize )
@@ -519,6 +602,13 @@ Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric::Child( int i, int j ) const
     PopCallStack();
 #endif
     return *children[(i*(i+1))/2 + j];
+}
+
+template<typename Scalar,bool Conjugated>
+inline typename Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric*
+Quasi2dHMatrix<Scalar,Conjugated>::NewNodeSymmetric() const
+{
+    return new Quasi2d::NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
 }
 
 template<typename Scalar,bool Conjugated>

@@ -169,7 +169,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     context.Clear();
     switch( shell.type )
     {
@@ -273,7 +273,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 
             Dense XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, this->_width, width );
+            ( XLocal, _localSourceOffset, 0, Width(), width );
             hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, Z );
         }
         break;
@@ -310,7 +310,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPrecompute");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     context.Clear();
     switch( shell.type )
     {
@@ -440,7 +440,7 @@ HermitianTransposeMapMatrixPrecompute
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     context.Clear();
     switch( shell.type )
     {
@@ -973,7 +973,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixNaiveSummations");
 #endif
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -1025,7 +1025,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveSummations
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaiveSummations");
 #endif
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -1148,7 +1148,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
     PushCallStack("DistQuasi2dHMatrix::MapMatrixNaivePassData");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -1361,7 +1361,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
             ( Z.LockedBuffer(), Z.Height()*width, _rootOfOtherTeam, 0, comm );
         else
         {
-            Z.Resize( this->_height, width, this->_height );
+            Z.Resize( Height(), width, Height() );
             mpi::Recv
             ( Z.Buffer(), Z.Height()*width, _rootOfOtherTeam, 0, comm );
         }
@@ -1389,7 +1389,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaivePassData");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -1594,6 +1594,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
     }
     case SPLIT_DENSE:
     {
+        const int height = Height();
         Dense& Z = *context.shell.data.Z;
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
@@ -1601,31 +1602,29 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         {
             Dense XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, this->_height, width );
+            ( XLocal, _localTargetOffset, 0, height, width );
             if( XLocalSub.LDim() != XLocalSub.Height() )
             {
                 // We must pack first
-                Z.Resize( this->_height, width, this->_height );
+                Z.Resize( height, width, height );
                 for( int j=0; j<width; ++j )
                     std::memcpy
                     ( Z.Buffer(0,j), XLocalSub.LockedBuffer(0,j), 
-                      this->_height*sizeof(Scalar) );
+                      height*sizeof(Scalar) );
                 mpi::Send
-                ( Z.LockedBuffer(), this->_height*width, 
-                  _rootOfOtherTeam, 0, comm );
+                ( Z.LockedBuffer(), height*width, _rootOfOtherTeam, 0, comm );
             }
             else
             {
                 mpi::Send
-                ( XLocalSub.LockedBuffer(), this->_height*width, 
+                ( XLocalSub.LockedBuffer(), height*width, 
                   _rootOfOtherTeam, 0, comm );
             }
         }
         else
         {
-            Z.Resize( this->_height, width, this->_height );
-            mpi::Recv
-            ( Z.Buffer(), this->_height*width, _rootOfOtherTeam, 0, comm );
+            Z.Resize( height, width, height );
+            mpi::Recv( Z.Buffer(), height*width, _rootOfOtherTeam, 0, comm );
         }
         break;
     }
@@ -2060,7 +2059,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixNaiveBroadcasts");
 #endif
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -2107,7 +2106,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaiveBroadcasts");
 #endif
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -2174,7 +2173,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPostcompute");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -2229,7 +2228,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
         if( _inTargetTeam )
         {
             const Dense& Z = *context.shell.data.Z;
-            const int localHeight = this->_height;
+            const int localHeight = Height();
             for( int j=0; j<width; ++j )
             {
                 const Scalar* ZCol = Z.LockedBuffer(0,j);
@@ -2261,7 +2260,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPostcompute");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
@@ -2375,7 +2374,7 @@ HermitianTransposeMapMatrixPostcompute
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPostcompute");
 #endif
     const int width = XLocal.Width();
-    const Shell& shell = this->_shell;
+    const Shell& shell = _shell;
     switch( shell.type )
     {
     case DIST_NODE:
