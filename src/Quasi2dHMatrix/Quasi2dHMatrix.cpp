@@ -118,6 +118,21 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix()
 // Create a square top-level H-matrix
 template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
+( int numLevels, int maxRank, bool symmetric, bool stronglyAdmissible,
+  int xSize, int ySize, int zSize )
+: _numLevels(numLevels),
+  _maxRank(maxRank),
+  _sourceOffset(0), _targetOffset(0),
+  _symmetric(symmetric), 
+  _stronglyAdmissible(stronglyAdmissible),
+  _xSizeSource(xSize), _xSizeTarget(xSize),
+  _ySizeSource(ySize), _ySizeTarget(ySize),
+  _zSize(zSize),
+  _xSource(0), _xTarget(0),
+  _ySource(0), _yTarget(0)
+{ }
+template<typename Scalar,bool Conjugated>
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
 ( const LowRankMatrix<Scalar,Conjugated>& F,
   int numLevels, int maxRank, bool stronglyAdmissible,
   int xSize, int ySize, int zSize )
@@ -166,6 +181,26 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
 }
 
 // Create a potentially non-square non-top-level H-matrix
+template<typename Scalar,bool Conjugated>
+psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
+( int numLevels, int maxRank, bool symmetric, bool stronglyAdmissible,
+  int xSizeSource, int xSizeTarget,
+  int ySizeSource, int ySizeTarget,
+  int zSize,
+  int xSource, int xTarget,
+  int ySource, int yTarget,
+  int sourceOffset, int targetOffset )
+: _numLevels(numLevels),
+  _maxRank(maxRank),
+  _sourceOffset(sourceOffset), _targetOffset(targetOffset),
+  _symmetric(symmetric),
+  _stronglyAdmissible(stronglyAdmissible),
+  _xSizeSource(xSizeSource), _xSizeTarget(xSizeTarget),
+  _ySizeSource(ySizeSource), _ySizeTarget(ySizeTarget),
+  _zSize(zSize),
+  _xSource(xSource), _xTarget(xTarget),
+  _ySource(ySource), _yTarget(yTarget)
+{ }
 template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMatrix<Scalar,Conjugated>::Quasi2dHMatrix
 ( const LowRankMatrix<Scalar,Conjugated>& F,
@@ -979,7 +1014,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
             NodeSymmetric& node = *shell.data.NS;
 
             int child = 0;
-            const int parentOffset = _targetOffset;
             for( int t=0,tOffset=0; t<4; tOffset+=node.sizes[t],++t )
             {
                 for( int s=0,sOffset=0; s<=t; sOffset+=node.sizes[s],++s )
@@ -994,7 +1028,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
                         _zSize,
                         2*_xSource+(s&1), 2*_xTarget+(t&1),
                         2*_ySource+(s/2), 2*_yTarget+(t/2),
-                        sOffset+parentOffset, tOffset+parentOffset );
+                        sOffset+_targetOffset, tOffset+_targetOffset );
                 }
             }
         }
@@ -1004,8 +1038,6 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
             shell.data.N = NewNode();
             Node& node = *shell.data.N;
 
-            const int parentSourceOffset = _sourceOffset;
-            const int parentTargetOffset = _targetOffset;
             for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
             {
                 for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
@@ -1013,15 +1045,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::ImportSparseMatrix
                     node.children[s+4*t] = 
                       new Quasi2d
                       ( S,
-                        _numLevels-1, _maxRank,
-                        _stronglyAdmissible,
+                        _numLevels-1, _maxRank, _stronglyAdmissible,
                         node.xSourceSizes[s&1], node.xTargetSizes[t&1],
                         node.ySourceSizes[s/2], node.yTargetSizes[t/2],
                         _zSize,
                         2*_xSource+(s&1), 2*_xTarget+(t&1),
                         2*_ySource+(s/2), 2*_yTarget+(t/2),
-                        sOffset+parentSourceOffset, 
-                        tOffset+parentTargetOffset );
+                        sOffset+_sourceOffset, tOffset+_targetOffset );
                 }
             }
         }

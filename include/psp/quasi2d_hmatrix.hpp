@@ -37,13 +37,6 @@ private:
     /*
      * Private static member functions
      */
-    static void PackedSizeRecursion
-    ( std::size_t& packedSize, 
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    static void PackRecursion
-    ( byte*& head, const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
     static void BuildMapOnQuadrant
     ( int* map, int& index, int level, int numLevels,
       int xSize, int ySize, int zSize, int thisXSize, int thisYSize );
@@ -126,6 +119,9 @@ private:
     /*
      * Private non-static member functions
      */
+    void PackedSizeRecursion( std::size_t& packedSize ) const;
+    void PackRecursion( byte*& head ) const;
+
     bool Admissible() const;
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
@@ -174,6 +170,9 @@ public:
     //     max(dist_x(A,B),dist_y(A,B)) > 1
     //
     Quasi2dHMatrix
+    ( int numLevels, int maxRank, bool symmetric, bool stronglyAdmissible,
+      int xSize, int ySize, int zSize );
+    Quasi2dHMatrix
     ( const LowRankMatrix<Scalar,Conjugated>& F,
       int numLevels, int maxRank, bool stronglyAdmissible,
       int xSize, int ySize, int zSize );
@@ -183,6 +182,14 @@ public:
       int xSize, int ySize, int zSize );
     
     // Create a potentially non-square non-top-level H-matrix
+    Quasi2dHMatrix
+    ( int numLevels, int maxRank, bool symmetric, bool stronglyAdmissible,
+      int xSizeSource, int xSizeTarget,
+      int ySizeSource, int ySizeTarget,
+      int zSize,
+      int xSource, int xTarget,
+      int ySource, int yTarget,
+      int sourceOffset, int targetOffset );
     Quasi2dHMatrix
     ( const LowRankMatrix<Scalar,Conjugated>& F,
       int numLevels, int maxRank, bool stronglyAdmissible,
