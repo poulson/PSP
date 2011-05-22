@@ -77,7 +77,11 @@ public:
      */
     DistQuasi2dHMatrix( const Subcomms& subcomms );
     DistQuasi2dHMatrix
-    ( const Subcomms& subcomms, unsigned level, 
+    ( int numLevels, int maxRank, bool stronglyAdmissible, 
+      int sourceOffset, int targetOffset,
+      int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
+      int zSize, int xSource, int xTarget, int ySource, int yTarget,
+      const Subcomms& subcomms, unsigned level, 
       bool inSourceTeam, bool inTargetTeam, 
       int localSourceOffset=0, int localTargetOffset=0 );
     DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );

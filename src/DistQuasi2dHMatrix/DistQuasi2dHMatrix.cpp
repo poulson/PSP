@@ -45,14 +45,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
-( const Subcomms& subcomms, unsigned level, 
+( int numLevels, int maxRank, bool stronglyAdmissible,
+  int sourceOffset, int targetOffset,
+  int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
+  int zSize, int xSource, int xTarget, int ySource, int yTarget,
+  const Subcomms& subcomms, unsigned level, 
   bool inSourceTeam, bool inTargetTeam, 
   int localSourceOffset, int localTargetOffset )
-: _numLevels(0), _maxRank(0), 
-  _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
-  _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
-  _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(level),
+: _numLevels(numLevels), _maxRank(maxRank), 
+  _sourceOffset(sourceOffset), _targetOffset(targetOffset), 
+  /*_symmetric(false),*/
+  _stronglyAdmissible(stronglyAdmissible), 
+  _xSizeSource(xSizeSource), _xSizeTarget(xSizeTarget),
+  _ySizeSource(ySizeSource), _ySizeTarget(ySizeTarget), _zSize(zSize), 
+  _xSource(xSource), _xTarget(xTarget),
+  _ySource(ySource), _yTarget(yTarget), _subcomms(&subcomms), _level(level),
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset)
 { 
