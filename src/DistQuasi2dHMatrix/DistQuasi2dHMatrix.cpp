@@ -21,7 +21,7 @@
 #include "psp.hpp"
 
 #include "./MapDenseMatrix-incl.hpp"
-//#include "./MapHMatrix-incl.hpp"
+#include "./MapHMatrix-incl.hpp"
 #include "./MapVector-incl.hpp"
 #include "./RedistQuasi2dHMatrix-incl.hpp"
 

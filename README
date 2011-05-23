@@ -1,27 +1,13 @@
 Note: The library is being rewritten using H-matrices for the padded panel 
       inverses, so it is will not be functional for a while.
 
-You can find instructions for obtaining a copy of petsc-dev here:
-http://www.mcs.anl.gov/petsc/petsc-2/developers/index.html
-
-The following configure flags were used in Ubuntu with BLAS/LAPACK in /usr/lib:
-
-    ./config/configure.py --with-clanguage=cxx --with-scalar-type=complex \
-      --with-blas-lapack-lib="[-L/usr/lib,-llapack,-lblas,-lgfortran]" \
-      --with-cxx=mpicxx --with-cc=mpicc --with-debugging=0 \
-      --with-fortran=0 --with-x=0 --with-c2html=0
-
-The above flags are far from optimal since it builds the debug version of PETSc.
-
-PSP can then be built using:
+PSP can usually be configured and built using:
 
     cd psp 
     mkdir build
     cd build
     cmake -DCMAKE_CXX_COMPILER=`which mpicxx` 
-      -DCMAKE_C_COMPILER=`which mpicc` \
-      -DPETSC_DIR=/path/to/top/of/petsc-dev \
-      -DPETSC_ARCH_SUBDIR=your-arch-subdirectory ..
+      -DCMAKE_C_COMPILER=`which mpicc` ..
     make
 
 If something other than the reference BLAS/LAPACK libs are desired for PSP, 

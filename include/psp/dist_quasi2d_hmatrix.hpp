@@ -606,11 +606,15 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
 
+    void MapMatrixInitialize
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapMatrixPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
-    // TODO...
+    // TODO
 
     void TransposeMapVectorPrecompute
     ( MapVectorContext& context,

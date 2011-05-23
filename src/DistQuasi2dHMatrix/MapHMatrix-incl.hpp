@@ -38,6 +38,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         throw std::logic_error("Mismatched levels");
 #endif
     MapHMatrixContext context;
+    MapMatrixInitialize( context, alpha, B, C );
     MapMatrixPrecompute( context, alpha, B, C );
     // TODO
 #ifndef RELEASE
@@ -47,13 +48,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixInitialize
 ( MapHMatrixContext& context,
   Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                       DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
+    PushCallStack("DistQuasi2dHMatrix::MapMatrixInitialize");
 #endif
     C._numLevels = _numLevels;
     C._maxRank = _maxRank;
@@ -92,173 +93,55 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         {
             C._shell.type = DIST_LOW_RANK;
             C._shell.data.DF = new DistLowRank;
-            DistLowRank& FC = *C._shell.data.DF;
 
             context.shell.type = DIST_LOW_RANK;
             context.shell.data.DF = 
                 new typename MapHMatrixContext::DistLowRankContext;
-            typename MapHMatrixContext::DistLowRankContext& DFContext = 
-                *context.shell.data.DF;
-
-            if( _shell.type   == DIST_LOW_RANK && 
-                B._shell.type == DIST_LOW_RANK )
-            {
-                // Form the local portion of A.V^[T/H] B.U in the product
-                // A.U (A.V^[T/H] B.U) B.V^[T/H]
-                const DistLowRank& FA = *_shell.data.DF;
-                const DistLowRank& FB = *B._shell.data.DF;
-                FC.rank = std::min( FA.rank, FB.rank );
-                if( _inSourceTeam )
-                {
-#ifndef RELEASE
-                    if( !B._inTargetTeam )
-                        throw std::logic_error("Mismatched distributions");
-#endif
-                    Dense& Z = DFContext.Z;
-                    Z.Resize( FA.rank, FB.rank, FA.rank );
-                    const char option = ( Conjugated ? 'C' : 'T' );
-                    blas::Gemm
-                    ( option, 'N', FA.rank, FB.rank, FA.VLocal.Height(),
-                      (Scalar)1, FA.VLocal.LockedBuffer(), FA.VLocal.LDim(),
-                                 FB.ULocal.LockedBuffer(), FB.ULocal.LDim(),
-                      (Scalar)0, Z.Buffer(),               Z.LDim() );
-                }
-            }
-            else if( _shell.type   == DIST_LOW_RANK &&
-                     B._shell.type == DIST_NODE )
-            {
-                // Precompute what we can of B^[T/H] A.V in the product 
-                // A.U A.V^[T/H] B = A.U (B^[T/H] A.V)^[T/H]
-                const DistLowRank& FA = *_shell.data.DF;
-                FC.rank = FA.rank;
-                if( _inSourceTeam )
-                {
-                    FC.VLocal.Resize
-                    ( B.LocalWidth(), FA.rank, B.LocalWidth() );
-                    hmatrix_tools::Scale( (Scalar)0, FC.VLocal );
-                }
-                if( Conjugated )
-                    B.HermitianTransposeMapMatrixPrecompute
-                    ( DFContext.context, (Scalar)1, FA.VLocal, FC.VLocal );
-                else
-                    B.TransposeMapMatrixPrecompute
-                    ( DFContext.context, (Scalar)1, FA.VLocal, FC.VLocal );
-            }
-            else if( _shell.type   == DIST_NODE &&
-                     B._shell.type == DIST_LOW_RANK )
-            {
-                // Precompute what we can of alpha A B.U in the product
-                // (alpha A B.U) B.V^[T/H]
-                const DistLowRank& FB = *B._shell.data.DF;
-                FC.rank = FB.rank;
-                if( _inSourceTeam )
-                {
-                    FC.ULocal.Resize( LocalHeight(), FB.rank, LocalHeight() );
-                    hmatrix_tools::Scale( (Scalar)0, FC.ULocal );
-                }
-                MapMatrixPrecompute
-                ( DFContext.context, alpha, FB.ULocal, FC.ULocal );
-            }
-            else if( _shell.type   == DIST_NODE &&
-                     B._shell.type == DIST_NODE )
-            {
-                // TODO: Generate random vectors, Omega,  and precompute 
-                //       B Omega
-            }
-#ifndef RELEASE
-            else
-                std::logic_error("Invalid H-matrix combination");
-#endif
         }
         else // teamSize == 1
         {
-            if( C._sourceOffset == C._targetOffset )
+            if( C._inSourceTeam && C._inTargetTeam )
             {
                 C._shell.type = LOW_RANK;    
                 C._shell.data.F = new LowRank;
-                LowRank& FC = *C._shell.data.F;
 
                 context.shell.type = LOW_RANK;
                 context.shell.data.F = 
                     new typename MapHMatrixContext::LowRankContext;
-                typename MapHMatrixContext::LowRankContext& FContext = 
-                    *context.shell.data.F;
-
-                if( _shell.type   == LOW_RANK &&
-                    B._shell.type == LOW_RANK )
-                {
-                    /*
-                    const LowRank& FA = *_shell.data.F;
-                    const LowRank& FB = *B._shell.data.F;
-                    hmatrix_tools::MatrixMatrix
-                    ( alpha, 
-                    */
-                }
-                else if( _shell.type   == LOW_RANK &&
-                         B._shell.type == NODE )
-                {
-                    // TODO
-                }
-                else if( _shell.type   == NODE &&
-                         B._shell.type == LOW_RANK )
-                {
-                    // TODO
-                }
-                else if( _shell.type   == NODE &&
-                         B._shell.type == NODE )
-                {
-                    // TODO
-                }
-                else if( _shell.type   == SPLIT_LOW_RANK &&
-                         B._shell.type == SPLIT_LOW_RANK )
-                {
-                    // TODO
-                }
-                else if( _shell.type   == SPLIT_LOW_RANK &&
-                         B._shell.type == SPLIT_NODE )
-                {
-                    // TODO
-                }
-                else if( _shell.type   == SPLIT_NODE &&
-                         B._shell.type == SPLIT_LOW_RANK )
-                {
-                    // TODO
-                }
-                else if( _shell.type   == SPLIT_NODE &&
-                         B._shell.type == SPLIT_NODE )
-                {
-                    // TODO
-                }
-#ifndef RELEASE
-                else
-                    throw std::logic_error("Invalid H-matrix combination");
-#endif
             }
             else
             {
                 C._shell.type = SPLIT_LOW_RANK;
                 C._shell.data.SF = new SplitLowRank;
-                // TODO
+
+                context.shell.type = SPLIT_LOW_RANK;
+                context.shell.data.SF = 
+                    new typename MapHMatrixContext::SplitLowRankContext;
             }
         }
     }
     else if( C._numLevels > 1 )
     {
-        if( teamSize >= 4 )
+        context.shell.type = NODE;
+        context.shell.data.N = new typename MapHMatrixContext::NodeContext;
+        typename MapHMatrixContext::NodeContext& nodeContext = 
+            *context.shell.data.N;
+
+        if( teamSize > 1 )
         {
             C._shell.type = DIST_NODE;
             C._shell.data.N = C.NewNode();
+
             // TODO
-        }
-        else if( teamSize == 2 )
-        {
-            C._shell.type = DIST_NODE; 
-            C._shell.data.N = C.NewNode();
-            // TODO
+            /*
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    // HERE
+            */
         }
         else // teamSize == 1
         {
-            if( C._sourceOffset == C._targetOffset )
+            if( C._inSourceTeam && C._inTargetTeam )
             {
                 C._shell.type = NODE;
                 C._shell.data.N = C.NewNode();
@@ -272,6 +155,43 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             }
         }
     }
+    else
+    {
+        if( C._inSourceTeam && C._inTargetTeam )
+        {
+            C._shell.type = DENSE;
+            C._shell.data.D = new Dense;
+
+            context.shell.type = DENSE;
+            context.shell.data.D = 
+                new typename MapHMatrixContext::DenseContext;
+        }
+        else
+        {
+            C._shell.type = SPLIT_DENSE;
+            C._shell.data.SD = new SplitDense;
+
+            context.shell.type = SPLIT_DENSE;
+            context.shell.data.SD = 
+                new typename MapHMatrixContext::SplitDenseContext;
+        }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
+( MapHMatrixContext& context,
+  Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                      DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
+#endif
+    // TODO
 #ifndef RELEASE
     PopCallStack();
 #endif
