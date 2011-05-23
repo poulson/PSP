@@ -543,7 +543,7 @@ inline typename Quasi2dHMatrix<Scalar,Conjugated>::Node*
 Quasi2dHMatrix<Scalar,Conjugated>::NewNode() const
 {
     return 
-        new Quasi2d::Node
+        new typename Quasi2d::Node
         ( _xSizeSource, _xSizeTarget, _ySizeSource, _ySizeTarget, _zSize );
 }
 
@@ -615,7 +615,9 @@ template<typename Scalar,bool Conjugated>
 inline typename Quasi2dHMatrix<Scalar,Conjugated>::NodeSymmetric*
 Quasi2dHMatrix<Scalar,Conjugated>::NewNodeSymmetric() const
 {
-    return new Quasi2d::NodeSymmetric( _xSizeSource, _ySizeSource, _zSize );
+    return 
+        new typename Quasi2d::NodeSymmetric
+        ( _xSizeSource, _ySizeSource, _zSize );
 }
 
 template<typename Scalar,bool Conjugated>
