@@ -35,68 +35,70 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     if( _zSize != B._zSize )
         throw std::logic_error("Mismatched z size");
 #endif
-    C._numLevels = _numLevels;
-    C._maxRank = _maxRank;
+    const Quasi2d& A = *this;
+
+    C._numLevels = A._numLevels;
+    C._maxRank = A._maxRank;
     C._sourceOffset = B._sourceOffset;
-    C._targetOffset = _targetOffset;
+    C._targetOffset = A._targetOffset;
     C._symmetric = false;
-    C._stronglyAdmissible = ( _stronglyAdmissible || B._stronglyAdmissible );
+    C._stronglyAdmissible = ( A._stronglyAdmissible || B._stronglyAdmissible );
 
     C._xSizeSource = B._xSizeSource;
     C._ySizeSource = B._ySizeSource;
-    C._xSizeTarget = _xSizeTarget;
-    C._ySizeTarget = _ySizeTarget;
-    C._zSize = _zSize;
+    C._xSizeTarget = A._xSizeTarget;
+    C._ySizeTarget = A._ySizeTarget;
+    C._zSize = A._zSize;
     C._xSource = B._xSource;
     C._ySource = B._ySource;
-    C._xTarget = _xTarget;
-    C._yTarget = _yTarget;
+    C._xTarget = A._xTarget;
+    C._yTarget = A._yTarget;
 
     C._shell.Clear();
     if( C.Admissible() )
     {
         C._shell.type = LOW_RANK;
         C._shell.data.F = new LowRankMatrix<Scalar,Conjugated>;
-        if( IsLowRank() && B.IsLowRank() )
+        if( A.IsLowRank() && B.IsLowRank() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.F, *C._shell.data.F );
-        else if( IsLowRank() && B.IsHierarchical() )
+            ( alpha, *A._shell.data.F, *B._shell.data.F, *C._shell.data.F );
+        else if( A.IsLowRank() && B.IsHierarchical() )
         {
-            hmatrix_tools::Copy( _shell.data.F->U, C._shell.data.F->U );
+            hmatrix_tools::Copy( A._shell.data.F->U, C._shell.data.F->U );
             if( Conjugated )
                 B.HermitianTransposeMapMatrix
-                ( Conj(alpha), _shell.data.F->V, C._shell.data.F->V );
+                ( Conj(alpha), A._shell.data.F->V, C._shell.data.F->V );
             else
                 B.TransposeMapMatrix
-                ( alpha, _shell.data.F->V, C._shell.data.F->V );
+                ( alpha, A._shell.data.F->V, C._shell.data.F->V );
         }
-        else if( IsLowRank() && B.IsDense() )
+        else if( A.IsLowRank() && B.IsDense() )
         {
-            hmatrix_tools::Copy( _shell.data.F->U, C._shell.data.F->U );
+            hmatrix_tools::Copy( A._shell.data.F->U, C._shell.data.F->U );
             if( Conjugated )
                 hmatrix_tools::MatrixHermitianTransposeMatrix
-                ( Conj(alpha), *B._shell.data.D, _shell.data.F->V, 
+                ( Conj(alpha), *B._shell.data.D, A._shell.data.F->V, 
                   C._shell.data.F->V );
             else
                 hmatrix_tools::MatrixTransposeMatrix
-                ( alpha, *B._shell.data.D, _shell.data.F->V,
+                ( alpha, *B._shell.data.D, A._shell.data.F->V,
                   C._shell.data.F->V );
         }
-        else if( IsHierarchical() && B.IsLowRank() )
+        else if( A.IsHierarchical() && B.IsLowRank() )
         {
             // C.F.U := alpha A B.F.U
             MapMatrix( alpha, B._shell.data.F->U, C._shell.data.F->U );
             // C.F.V := B.F.V
             hmatrix_tools::Copy( B._shell.data.F->V, C._shell.data.F->V );
         }
-        else if( IsHierarchical() && B.IsHierarchical() )
+        else if( A.IsHierarchical() && B.IsHierarchical() )
         {
             // C.F := alpha H H
             const int oversampling = 4; // lift this definition
             hmatrix_tools::MatrixMatrix
             ( oversampling, alpha, *this, B, *C._shell.data.F );
         }
-        else if( this->IsDense() && B.IsLowRank() )
+        else if( A.IsDense() && B.IsLowRank() )
         {
             // C.F.U := alpha A B.F.U
             hmatrix_tools::MatrixMatrix
@@ -105,10 +107,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // C.F.V := B.F.V
             hmatrix_tools::Copy( B._shell.data.F->V, C._shell.data.F->V );
         }
-        else if( IsDense() && B.IsDense() )
+        else if( A.IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( C.MaxRank(),
-              alpha, *_shell.data.D, *B._shell.data.D, *C._shell.data.F );
+              alpha, *A._shell.data.D, *B._shell.data.D, *C._shell.data.F );
 #ifndef RELEASE
         else
             std::logic_error("Invalid H-matrix combination");
