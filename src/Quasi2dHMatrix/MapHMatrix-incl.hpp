@@ -102,7 +102,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // C.F.U := alpha A B.F.U
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.D, 
+            ( alpha, *A._shell.data.D, 
               B._shell.data.F->U, C._shell.data.F->U );
             // C.F.V := B.F.V
             hmatrix_tools::Copy( B._shell.data.F->V, C._shell.data.F->V );
@@ -134,7 +134,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // Form W := alpha A B
             LowRank W;
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.F, W );
+            ( alpha, *A._shell.data.F, *B._shell.data.F, W );
 
             // Form C :~= W
             C.ImportLowRankMatrix( W );
@@ -143,13 +143,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // Form W := alpha A B
             LowRank W;
-            hmatrix_tools::Copy( _shell.data.F->U, W.U );
+            hmatrix_tools::Copy( A._shell.data.F->U, W.U );
             if( Conjugated )
                 B.HermitianTransposeMapMatrix
-                ( Conj(alpha), _shell.data.F->V, W.V );
+                ( Conj(alpha), A._shell.data.F->V, W.V );
             else
                 B.TransposeMapMatrix
-                ( alpha, _shell.data.F->V, W.V );
+                ( alpha, A._shell.data.F->V, W.V );
 
             // Form C :=~ W
             C.ImportLowRankMatrix( W );
@@ -170,7 +170,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             if( Symmetric() || B.Symmetric() )
                 throw std::logic_error("Unsupported h-matrix multipy case.");
 #endif
-            const Node& nodeA = *_shell.data.N;
+            const Node& nodeA = *A._shell.data.N;
             const Node& nodeB = *B._shell.data.N;
             Node& nodeC = *C._shell.data.N;
 
@@ -204,16 +204,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 
         if( IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.D, *B._shell.data.D, *C._shell.data.D );
+            ( alpha, *A._shell.data.D, *B._shell.data.D, *C._shell.data.D );
         else if( IsDense() && B.IsLowRank() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.D, *B._shell.data.F, *C._shell.data.D );
+            ( alpha, *A._shell.data.D, *B._shell.data.F, *C._shell.data.D );
         else if( IsLowRank() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.D, *C._shell.data.D );
+            ( alpha, *A._shell.data.F, *B._shell.data.D, *C._shell.data.D );
         else /* both low-rank */
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.F, *C._shell.data.D );
+            ( alpha, *A._shell.data.F, *B._shell.data.F, *C._shell.data.D );
     }
 #ifndef RELEASE
     PopCallStack();
@@ -239,6 +239,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     if( C.Symmetric() )
         throw std::logic_error("Symmetric updates not yet supported.");
 #endif
+    const Quasi2d& A = *this;
     if( C.Admissible() )
     {
         if( IsLowRank() && B.IsLowRank() )
@@ -246,7 +247,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // W := alpha A.F B.F
             LowRank W;
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.F, W );
+            ( alpha, *A._shell.data.F, *B._shell.data.F, W );
 
             // C.F :~= W + beta C.F
             hmatrix_tools::MatrixUpdateRounded
@@ -256,13 +257,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // W := alpha A.F B
             LowRank W;
-            hmatrix_tools::Copy( _shell.data.F->U, W.U );
+            hmatrix_tools::Copy( A._shell.data.F->U, W.U );
             if( Conjugated )
                 B.HermitianTransposeMapMatrix
-                ( Conj(alpha), _shell.data.F->V, W.V );
+                ( Conj(alpha), A._shell.data.F->V, W.V );
             else
                 B.TransposeMapMatrix
-                ( alpha, _shell.data.F->V, W.V );
+                ( alpha, A._shell.data.F->V, W.V );
 
             // C.F :~= W + beta C.F
             hmatrix_tools::MatrixUpdateRounded
@@ -272,13 +273,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // W := alpha A.F B.D
             LowRank W;
-            hmatrix_tools::Copy( _shell.data.F->U, W.U );
+            hmatrix_tools::Copy( A._shell.data.F->U, W.U );
             if( Conjugated )
                 hmatrix_tools::MatrixHermitianTransposeMatrix
-                ( Conj(alpha), *B._shell.data.D, _shell.data.F->V, W.V );
+                ( Conj(alpha), *B._shell.data.D, A._shell.data.F->V, W.V );
             else
                 hmatrix_tools::MatrixTransposeMatrix
-                ( alpha, *B._shell.data.D, _shell.data.F->V, W.V );
+                ( alpha, *B._shell.data.D, A._shell.data.F->V, W.V );
 
             // C.F :~= W + beta C.F
             hmatrix_tools::MatrixUpdateRounded
@@ -312,7 +313,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // W := alpha A.D B.F
             LowRank W;
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.D, B._shell.data.F->U, W.U );
+            ( alpha, *A._shell.data.D, B._shell.data.F->U, W.U );
             hmatrix_tools::Copy( B._shell.data.F->V, W.V );
 
             // C.F :=~ W + beta C.F
@@ -322,7 +323,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         else if( IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( C.MaxRank(),
-              alpha, *_shell.data.D, *B._shell.data.D, beta, *C._shell.data.F );
+              alpha, *A._shell.data.D, *B._shell.data.D, 
+              beta, *C._shell.data.F );
 #ifndef RELEASE
         else
             std::logic_error("Invalid H-matrix combination.");
@@ -340,7 +342,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // Form W := alpha A B 
             LowRank W;
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.F, W );
+            ( alpha, *A._shell.data.F, *B._shell.data.F, W );
 
             // C :~= W + beta C
             C.Scale( beta );
@@ -350,13 +352,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             // Form W := alpha A B
             LowRank W;
-            hmatrix_tools::Copy( _shell.data.F->U, W.U );
+            hmatrix_tools::Copy( A._shell.data.F->U, W.U );
             if( Conjugated )
                 B.HermitianTransposeMapMatrix
-                ( Conj(alpha), _shell.data.F->V, W.V );
+                ( Conj(alpha), A._shell.data.F->V, W.V );
             else
                 B.TransposeMapMatrix
-                ( alpha, _shell.data.F->V, W.V );
+                ( alpha, A._shell.data.F->V, W.V );
 
             // C :~= W + beta C
             C.Scale( beta );
@@ -379,7 +381,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
                 throw std::logic_error("Unsupported h-matrix multipy case.");
             else 
             {
-                const Node& nodeA = *_shell.data.N;
+                const Node& nodeA = *A._shell.data.N;
                 const Node& nodeB = *B._shell.data.N;
                 Node& nodeC = *C._shell.data.N;
 
@@ -409,19 +411,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 #endif
         if( IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.D, *B._shell.data.D, 
+            ( alpha, *A._shell.data.D, *B._shell.data.D, 
               beta, *C._shell.data.D );
         else if( IsDense() && B.IsLowRank() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.D, *B._shell.data.F, 
+            ( alpha, *A._shell.data.D, *B._shell.data.F, 
               beta, *C._shell.data.D );
         else if( IsLowRank() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.D, 
+            ( alpha, *A._shell.data.F, *B._shell.data.D, 
               beta, *C._shell.data.D );
         else /* both low-rank */
             hmatrix_tools::MatrixMatrix
-            ( alpha, *_shell.data.F, *B._shell.data.F, 
+            ( alpha, *A._shell.data.F, *B._shell.data.F, 
               beta, *C._shell.data.D );
     }
 #ifndef RELEASE

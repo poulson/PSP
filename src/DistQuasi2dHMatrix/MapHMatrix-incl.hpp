@@ -381,9 +381,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case DIST_LOW_RANK:
     {
+        /*
         DistLowRank& DFC = *C._shell.data.DF;
         typename MapHMatrixContext::DistLowRankContext& DFCContext = 
             *context.shell.data.DF;
+        */
 
         // Allow for distributed {H,F}
         if( A._shell.type == DIST_NODE &&
@@ -414,9 +416,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case SPLIT_LOW_RANK:
     {
+        /*
         SplitLowRank& SFC = *C._shell.data.SF;
         typename MapHMatrixContext::SplitLowRankContext& SFCContext = 
             *context.shell.data.SF;
+        */
 
         // Allow for split/serial {H,F,D} where at least one is split and 
         // recall that D and H cannot occur at the same level.
@@ -533,9 +537,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case LOW_RANK:
     {
+        /*
         LowRank& FC = *C._shell.data.F;
         typename MapHMatrixContext::LowRankContext& FCContext = 
             *context.shell.data.F;
+        */
 
         // Allow for split/serial {H,F,D} where either none or both is split and
         // recall that D and H cannot occur at the same level.
@@ -617,9 +623,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case SPLIT_DENSE:
     {
+        /*
         SplitDense& SDC = *C._shell.data.SD;
         typename MapHMatrixContext::SplitDenseContext& SDCContext = 
             *context.shell.data.SD;
+        */
 
         // Allow for split/serial {F,D}, where at least one must be split
         if( A._shell.type == SPLIT_LOW_RANK &&
@@ -690,9 +698,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case DENSE:
     {
+        /*
         Dense& DC = *C._shell.data.D;
         typename MapHMatrixContext::DenseContext& DCContext = 
             *context.shell.data.D;
+        */
 
         // Allow for {F,D} where either none or both are split
         if( A._shell.type == SPLIT_LOW_RANK &&
