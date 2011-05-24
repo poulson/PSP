@@ -366,29 +366,24 @@ private:
          */
         struct DistLowRankUpdates
         {
-            int currentRank;
-            DenseMatrix<Scalar> ULocal, VLocal;
-            DistLowRankUpdates() : currentRank(0) { }
+            std::vector< DenseMatrix<Scalar>* > ULocalList;
+            std::vector< DenseMatrix<Scalar>* > VLocalList;
         };
 
         struct SplitLowRankUpdates
         {
-            int currentRank;
-            DenseMatrix<Scalar> D;
+            std::vector< DenseMatrix<Scalar>* > DList;
         };
 
         struct LowRankUpdates
         {
-            int currentRank;
-            DenseMatrix<Scalar> U, V;
-            LowRankUpdates() : currentRank(0) { }
+            std::vector< DenseMatrix<Scalar>* > UList;
+            std::vector< DenseMatrix<Scalar>* > VList;
         };
 
         struct DenseUpdates
         {
-            int numStored;
-            std::vector< DenseMatrix<Scalar> > DVec;
-            DenseUpdates() : numStored(0) { }
+            std::vector< DenseMatrix<Scalar> > DList;
         };
 
         typedef DenseUpdates SplitDenseUpdates;
@@ -609,7 +604,8 @@ private:
     void MapMatrixPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C,
+      int update=0 ) const;
     // TODO
 
     void TransposeMapVectorPrecompute

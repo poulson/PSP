@@ -52,13 +52,16 @@ void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 ( MapHMatrixContext& context,
   Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                      DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
+                      DistQuasi2dHMatrix<Scalar,Conjugated>& C,
+  int update=0 ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
 #endif
     const DistQuasi2d& A = *this;
 
+    // HERE
+    // TODO: Reconsider this
     if( !A._inTargetTeam && !B._inSourceTeam )
     {
         C._shell.type = EMPTY;
@@ -68,7 +71,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 
     MPI_Comm team = A._subcomms->Subcomm( A._level );
     const int teamSize = mpi::CommSize( team );
-    if( C._shell.type == EMPTY  )
+    if( update == 0 )
     {
         context.Clear();
 
