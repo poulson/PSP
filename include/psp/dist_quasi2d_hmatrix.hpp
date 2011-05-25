@@ -545,6 +545,8 @@ private:
     void UnpackRecursion
     ( const byte*& head, int sourceRankOffset, int targetRankOffset );
 
+    void MapVectorInitialize
+    ( MapVectorContext& context ) const;
     void MapVectorPrecompute
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal, 
@@ -586,6 +588,8 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
+    void MapMatrixInitialize
+    ( MapDenseMatrixContext& context ) const;
     void MapMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
@@ -633,6 +637,8 @@ private:
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     // TODO
 
+    void TransposeMapVectorInitialize
+    ( MapVectorContext& context ) const;
     void TransposeMapVectorPrecompute
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
@@ -674,6 +680,8 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
+    void TransposeMapMatrixInitialize
+    ( MapDenseMatrixContext& context ) const;
     void TransposeMapMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
@@ -715,6 +723,8 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
 
+    void HermitianTransposeMapVectorInitialize
+    ( MapVectorContext& context ) const;
     void HermitianTransposeMapVectorPrecompute
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
@@ -740,6 +750,8 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
+    void HermitianTransposeMapMatrixInitialize
+    ( MapDenseMatrixContext& context ) const;
     void HermitianTransposeMapMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,

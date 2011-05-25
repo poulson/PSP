@@ -132,8 +132,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         {
             context.shell.type = NODE;
             context.shell.data.N = new typename MapHMatrixContext::NodeContext;
-            typename MapHMatrixContext::NodeContext& nodeContext = 
-                *context.shell.data.N;
             if( teamSize > 1 )
             {
                 C._shell.type = DIST_NODE;
@@ -198,18 +196,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._shell.type == DIST_NODE &&
                  B._shell.type == DIST_LOW_RANK )
         {
-            // TODO: Ensure that we can separately initialize the context even
-            //       if we don't call the precompute.
+            const int key = A._sourceOffset;
+            if( A._inSourceTeam || A._inTargetTeam )
+            {
+                distNodeContext.denseContextMap[key] = 
+                    new MapDenseMatrixContext;
+                A.MapMatrixInitialize( *distNodeContext.denseContextMap[key] );
+            }
             if( A._inSourceTeam )
             {
                 const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
-
-                const int key = A._sourceOffset;
-                distNodeContext.denseContextMap[key] = new MapDenseMatrixContext;
                 distNodeContext.ULocalMap[key] = 
                     new DenseMatrix<Scalar>( C.LocalHeight(), ULocalB.Width() );
-
-                MapMatrixPrecompute
+                A.MapMatrixPrecompute
                 ( *distNodeContext.denseContextMap[key],
                   alpha, ULocalB, *distNodeContext.ULocalMap[key] );
             }
@@ -217,16 +216,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._shell.type == DIST_LOW_RANK &&
                  B._shell.type == DIST_NODE )
         {
+            const int key = A._sourceOffset;
+            if( A._inSourceTeam || A._inTargetTeam )
+            {
+                distNodeContext.denseContextMap[key] = 
+                    new MapDenseMatrixContext;
+                B.HermitianTransposeMapMatrixInitialize
+                ( *distNodeContext.denseContextMap[key] );
+            }
             if( A._inSourceTeam )
             {
                 const DenseMatrix<Scalar>& VLocalA = A._shell.data.DF->VLocal;
-
-                const int key = A._sourceOffset;
-                distNodeContext.denseContextMap[key] = new MapDenseMatrixContext;
                 distNodeContext.VLocalMap[key] = 
                     new DenseMatrix<Scalar>( C.LocalWidth(), VLocalA.Width() );
-
-                HermitianTransposeMapMatrixPrecompute
+                B.HermitianTransposeMapMatrixPrecompute
                 ( *distNodeContext.denseContextMap[key],
                   (Scalar)1, VLocalA, *distNodeContext.VLocalMap[key] );
             }
