@@ -396,6 +396,7 @@ private:
             // For low-rank updates
             MemoryMap<int,MapDenseMatrixContext> denseContextMap;
             MemoryMap<int,DenseMatrix<Scalar> > ULocalMap, VLocalMap;
+            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
         };
 
         struct SplitNodeContext

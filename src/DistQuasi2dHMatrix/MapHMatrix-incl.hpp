@@ -198,26 +198,59 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._shell.type == DIST_NODE &&
                  B._shell.type == DIST_LOW_RANK )
         {
-            const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
+            // TODO: Ensure that we can separately initialize the context even
+            //       if we don't call the precompute.
+            if( A._inSourceTeam )
+            {
+                const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
 
-            const int key = A._sourceOffset;
-            distNodeContext.denseContextMap[key] = new MapDenseMatrixContext;
-            distNodeContext.ULocalMap[key] = 
-                new DenseMatrix<Scalar>( C.LocalHeight(), ULocalB.Width() );
+                const int key = A._sourceOffset;
+                distNodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                distNodeContext.ULocalMap[key] = 
+                    new DenseMatrix<Scalar>( C.LocalHeight(), ULocalB.Width() );
 
-            MapMatrixPrecompute
-            ( *distNodeContext.denseContextMap[key],
-              alpha, ULocalB, *distNodeContext.ULocalMap[key] );
+                MapMatrixPrecompute
+                ( *distNodeContext.denseContextMap[key],
+                  alpha, ULocalB, *distNodeContext.ULocalMap[key] );
+            }
         }
         else if( A._shell.type == DIST_LOW_RANK &&
                  B._shell.type == DIST_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense 
+            if( A._inSourceTeam )
+            {
+                const DenseMatrix<Scalar>& VLocalA = A._shell.data.DF->VLocal;
+
+                const int key = A._sourceOffset;
+                distNodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                distNodeContext.VLocalMap[key] = 
+                    new DenseMatrix<Scalar>( C.LocalWidth(), VLocalA.Width() );
+
+                HermitianTransposeMapMatrixPrecompute
+                ( *distNodeContext.denseContextMap[key],
+                  (Scalar)1, VLocalA, *distNodeContext.VLocalMap[key] );
+            }
         }
         else if( A._shell.type == DIST_LOW_RANK &&
                  B._shell.type == DIST_LOW_RANK )
         {
-            // TODO: Local multiply into context
+            if( A._inSourceTeam )
+            {
+                const DenseMatrix<Scalar>& VLocalA = A._shell.data.DF->VLocal;
+                const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
+
+                const int key = A._sourceOffset;
+                distNodeContext.ZMap[key] = 
+                    new DenseMatrix<Scalar>( VLocalA.Width(), ULocalB.Width() );
+                DenseMatrix<Scalar>& Z = *distNodeContext.ZMap[key];
+
+                const char option = ( Conjugated ? 'C' : 'T' );
+                blas::Gemm
+                ( option, 'N', Z.Height(), Z.Width(), VLocalA.Height(),
+                  (Scalar)1, VLocalA.LockedBuffer(), VLocalA.LDim(),
+                             ULocalB.LockedBuffer(), ULocalB.LDim(),
+                  (Scalar)0, Z.Buffer(),             Z.LDim() );
+            }
         }
 #ifndef RELEASE
         else
