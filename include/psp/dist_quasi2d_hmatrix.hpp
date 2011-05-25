@@ -360,33 +360,26 @@ private:
 
     struct MapHMatrixContext
     {
-        /*
-         * Different types of updates. Note that a low-rank matrix block can
-         * be updated with both low-rank and dense matrices.
-         */
-        struct DistLowRankUpdates
+        template<typename T1,typename T2>
+        class MemoryMap 
         {
-            std::vector< DenseMatrix<Scalar>* > ULocalList;
-            std::vector< DenseMatrix<Scalar>* > VLocalList;
-        };
+        private:
+            std::map<T1,T2*> _map;
+        public:
+            // NOTE: Insertion with the same key without manual deletion
+            //       will cause a memory leak.
+            T2*& operator[]( T1 key )
+            {
+                return _map[key];
+            }
 
-        struct SplitLowRankUpdates
-        {
-            std::vector< DenseMatrix<Scalar>* > DList;
+            ~MemoryMap()
+            {
+                typename std::map<T1,T2*>::iterator it;
+                for( it=_map.begin(); it!=_map.end(); it++ )
+                    delete (*it).second;
+            }
         };
-
-        struct LowRankUpdates
-        {
-            std::vector< DenseMatrix<Scalar>* > UList;
-            std::vector< DenseMatrix<Scalar>* > VList;
-        };
-
-        struct DenseUpdates
-        {
-            std::vector< DenseMatrix<Scalar> > DList;
-        };
-
-        typedef DenseUpdates SplitDenseUpdates;
 
         /*
          * Structs for the different types of matrix blocks. Some store several
@@ -400,7 +393,9 @@ private:
             MapHMatrixContext& Child( int t, int s );
             const MapHMatrixContext& Child( int t, int s ) const;
 
-            DistLowRankUpdates updates;
+            // For low-rank updates
+            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
+            MemoryMap<int,DenseMatrix<Scalar> > ULocalMap, VLocalMap;
         };
 
         struct SplitNodeContext
@@ -411,7 +406,9 @@ private:
             MapHMatrixContext& Child( int t, int s );
             const MapHMatrixContext& Child( int t, int s ) const;
 
-            SplitLowRankUpdates updates;
+            // For low-rank updates
+            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
+            MemoryMap<int,DenseMatrix<Scalar> > UOrVMap;
         };
 
         struct NodeContext
@@ -422,38 +419,66 @@ private:
             MapHMatrixContext& Child( int t, int s );
             const MapHMatrixContext& Child( int t, int s ) const;
 
-            LowRankUpdates updates;
+            // For low-rank updates
+            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
+            MemoryMap<int,DenseMatrix<Scalar> > UMap, VMap;
         };
 
         struct DistLowRankContext
         {
-            DenseMatrix<Scalar> Z; // for storing dot products of panels
-            MapDenseMatrixContext context;
+            // For low-rank updates
+            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
+            MemoryMap<int,DenseMatrix<Scalar> > ULocalMap, VLocalMap;
+
+            // For temporary inner products
+            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
         };
 
         struct SplitLowRankContext
         {
-            SplitLowRankUpdates lowRankUpdates;
-            SplitDenseUpdates denseUpdates;
+            // For low-rank updates
+            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
+            MemoryMap<int,DenseMatrix<Scalar> > UOrVMap;
+
+            // For dense updates
+            MemoryMap<int,DenseMatrix<Scalar> > DMap;
         };
 
         struct LowRankContext
         {
-            LowRankUpdates lowRankUpdates;
-            DenseUpdates denseUpdates;
-            DenseMatrix<Scalar> Z;
+            // For low-rank updates
+            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
+            MemoryMap<int,DenseMatrix<Scalar> > UMap, VMap;
+
+            // For dense updates
+            MemoryMap<int,DenseMatrix<Scalar> > DMap;
+
+            // For temporary inner products
+            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
         };
 
         struct SplitDenseContext
         {
-            SplitLowRankUpdates lowRankUpdates;
-            SplitDenseUpdates denseUpdates;
+            // For low-rank updates
+            MemoryMap<int,DenseMatrix<Scalar> > UOrVMap;
+
+            // For dense updates
+            MemoryMap<int,DenseMatrix<Scalar> > DMap;
+
+            // For temporary inner products
+            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
         };
 
         struct DenseContext
         {
-            LowRankUpdates lowRankUpdates;
-            DenseUpdates denseUpdates;
+            // For low-rank updates
+            MemoryMap<int,DenseMatrix<Scalar> > UMap, VMap;
+
+            // For dense updates
+            MemoryMap<int,DenseMatrix<Scalar> > DMap;
+
+            // For temporary inner products
+            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
         };
 
         /*
@@ -604,8 +629,7 @@ private:
     void MapMatrixPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                          DistQuasi2dHMatrix<Scalar,Conjugated>& C,
-      int update=0 ) const;
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     // TODO
 
     void TransposeMapVectorPrecompute
@@ -885,7 +909,7 @@ DistNodeContext::DistNodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
-        children[i] = new MapVectorContext();
+        children[i] = new MapVectorContext;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -992,7 +1016,7 @@ DistNodeContext::DistNodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
-        children[i] = new MapDenseMatrixContext();
+        children[i] = new MapDenseMatrixContext;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1100,7 +1124,7 @@ DistNodeContext::DistNodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
-        children[i] = new MapHMatrixContext();
+        children[i] = new MapHMatrixContext;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1159,7 +1183,7 @@ SplitNodeContext::SplitNodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
-        children[i] = new MapHMatrixContext();
+        children[i] = new MapHMatrixContext;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1218,7 +1242,7 @@ NodeContext::NodeContext()
 : children(16)
 {
     for( int i=0; i<16; ++i )
-        children[i] = new MapHMatrixContext();
+        children[i] = new MapHMatrixContext;
 }
 
 template<typename Scalar,bool Conjugated>

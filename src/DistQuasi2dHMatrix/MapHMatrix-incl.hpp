@@ -52,16 +52,13 @@ void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 ( MapHMatrixContext& context,
   Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                      DistQuasi2dHMatrix<Scalar,Conjugated>& C,
-  int update=0 ) const
+                      DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
 #endif
     const DistQuasi2d& A = *this;
 
-    // HERE
-    // TODO: Reconsider this
     if( !A._inTargetTeam && !B._inSourceTeam )
     {
         C._shell.type = EMPTY;
@@ -71,13 +68,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 
     MPI_Comm team = A._subcomms->Subcomm( A._level );
     const int teamSize = mpi::CommSize( team );
-    if( update == 0 )
+    if( context.shell.type == EMPTY )
     {
-        context.Clear();
-
         C._numLevels = A._numLevels;
         C._maxRank = A._maxRank;
-        C._sourceOffset = A._sourceOffset;
+        C._sourceOffset = B._sourceOffset;
         C._targetOffset = A._targetOffset;
         C._stronglyAdmissible = 
             ( A._stronglyAdmissible || B._stronglyAdmissible );
@@ -184,7 +179,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     case DIST_NODE:
     {
         Node& nodeC = *C._shell.data.N;
-        typename MapHMatrixContext::DistNodeContext& nodeContext = 
+        typename MapHMatrixContext::DistNodeContext& distNodeContext = 
             *context.shell.data.DN;
 
         // Allow for distributed {H,F}
@@ -197,13 +192,22 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
                         nodeA.Child(t,r).MapMatrixPrecompute
-                        ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
-                          nodeC.Child(t,s) );
+                        ( distNodeContext.Child(t,s), 
+                          alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
         }
         else if( A._shell.type == DIST_NODE &&
                  B._shell.type == DIST_LOW_RANK )
         {
-            // TODO: MapMatrixPrecompute for dense
+            const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
+
+            const int key = A._sourceOffset;
+            distNodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+            distNodeContext.ULocalMap[key] = 
+                new DenseMatrix<Scalar>( C.LocalHeight(), ULocalB.Width() );
+
+            MapMatrixPrecompute
+            ( *distNodeContext.denseContextMap[key],
+              alpha, ULocalB, *distNodeContext.ULocalMap[key] );
         }
         else if( A._shell.type == DIST_LOW_RANK &&
                  B._shell.type == DIST_NODE )

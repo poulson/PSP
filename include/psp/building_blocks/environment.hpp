@@ -26,6 +26,7 @@
 #include <cstring>
 #include <iostream>
 #include <fstream>
+#include <map>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
