@@ -42,8 +42,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     C.Clear();
 
     MapHMatrixContext context;
-    MapMatrixPrecompute( context, alpha, B, C );
-    // TODO
+    MapHMatrixMainPrecompute( context, alpha, B, C );
+    /*
+    MapHMatrixMainPassData( context, alpha, B, C );
+    MapHMatrixMainPostcompute( context, alpha, B, C );
+    MapHMatrixFHHPrecompute( context, alpha, B, C );
+    MapHMatrixFHHPassData( context, alpha, B, C );
+    MapHMatrixFHHPostcompute( context, alpha, B, C );
+    MapHMatrixFHHFinalize( context, alpha, B, C );
+    MapHMatrixRoundedAddition( context, alpha, B, C );
+    */
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -51,13 +59,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
 ( MapHMatrixContext& context,
   Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                       DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
+    PushCallStack("DistQuasi2dHMatrix::MapHMatrixMainPrecompute");
 #endif
     const DistQuasi2d& A = *this;
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
@@ -191,7 +199,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
-                        nodeA.Child(t,r).MapMatrixPrecompute
+                        nodeA.Child(t,r).MapHMatrixMainPrecompute
                         ( distNodeContext.Child(t,s), 
                           alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
         }
@@ -210,7 +218,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                 const DenseMatrix<Scalar>& ULocalB = B._block.data.DF->ULocal;
                 distNodeContext.ULocalMap[key] = 
                     new DenseMatrix<Scalar>( C.LocalHeight(), ULocalB.Width() );
-                A.MapMatrixPrecompute
+                A.MapDenseMatrixPrecompute
                 ( *distNodeContext.denseContextMap[key],
                   alpha, ULocalB, *distNodeContext.ULocalMap[key] );
             }
@@ -231,7 +239,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                 const DenseMatrix<Scalar>& VLocalA = A._block.data.DF->VLocal;
                 distNodeContext.VLocalMap[key] = 
                     new DenseMatrix<Scalar>( C.LocalWidth(), VLocalA.Width() );
-                B.HermitianTransposeMapMatrixPrecompute
+                B.HermitianTransposeMapDenseMatrixPrecompute
                 ( *distNodeContext.denseContextMap[key],
                   (Scalar)1, VLocalA, *distNodeContext.VLocalMap[key] );
             }
@@ -278,7 +286,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
-                        nodeA.Child(t,r).MapMatrixPrecompute
+                        nodeA.Child(t,r).MapHMatrixMainPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
@@ -290,19 +298,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
-                        nodeA.Child(t,r).MapMatrixPrecompute
+                        nodeA.Child(t,r).MapHMatrixMainPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
         else if( A._block.type == SPLIT_NODE &&
                  B._block.type == SPLIT_LOW_RANK )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute 
         }
         else if( A._block.type == SPLIT_NODE &&
                  B._block.type == LOW_RANK )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute
         }
         else if( A._block.type == NODE &&
                  B._block.type == SPLIT_NODE )
@@ -312,7 +320,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
-                        nodeA.Child(t,r).MapMatrixPrecompute
+                        nodeA.Child(t,r).MapHMatrixMainPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
@@ -324,7 +332,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == SPLIT_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute 
         }
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == NODE )
@@ -344,7 +352,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == LOW_RANK &&
                  B._block.type == SPLIT_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute 
         }
         else if( A._block.type == LOW_RANK &&
                  B._block.type == SPLIT_LOW_RANK )
@@ -372,7 +380,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
-                        nodeA.Child(t,r).MapMatrixPrecompute
+                        nodeA.Child(t,r).MapHMatrixMainPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
@@ -389,7 +397,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
-                        nodeA.Child(t,r).MapMatrixPrecompute
+                        nodeA.Child(t,r).MapDenseMatrixPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
@@ -401,7 +409,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == SPLIT_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute 
         }
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == SPLIT_LOW_RANK )
@@ -441,12 +449,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == DIST_NODE &&
                  B._block.type == DIST_LOW_RANK )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute
         }
         else if( A._block.type == DIST_LOW_RANK &&
                  B._block.type == DIST_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute 
         }
         else if( A._block.type == DIST_LOW_RANK &&
                  B._block.type == DIST_LOW_RANK )
@@ -482,12 +490,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == SPLIT_NODE &&
                  B._block.type == SPLIT_LOW_RANK )
         {
-            // TODO: Start MapMatrixPrecompute for dense
+            // TODO: Start MapDenseMatrixPrecompute
         }
         else if( A._block.type == SPLIT_NODE &&
                  B._block.type == LOW_RANK )
         {
-            // TODO: Start MapMatrixPrecompute for dense
+            // TODO: Start MapDenseMatrixPrecompute
         }
         else if( A._block.type == NODE &&
                  B._block.type == SPLIT_NODE )
@@ -502,7 +510,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == SPLIT_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense 
+            // TODO: MapDenseMatrixPrecompute
         }
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == NODE )
@@ -532,7 +540,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == LOW_RANK &&
                  B._block.type == SPLIT_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute
         }
         else if( A._block.type == LOW_RANK &&
                  B._block.type == SPLIT_LOW_RANK )
@@ -598,7 +606,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == SPLIT_NODE &&
                  B._block.type == SPLIT_LOW_RANK )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute 
         }
         else if( A._block.type == NODE &&
                  B._block.type == NODE )
@@ -613,7 +621,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == SPLIT_NODE )
         {
-            // TODO: MapMatrixPrecompute for dense
+            // TODO: MapDenseMatrixPrecompute
         }
         else if( A._block.type == SPLIT_LOW_RANK &&
                  B._block.type == SPLIT_LOW_RANK )

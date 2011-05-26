@@ -79,18 +79,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     hmatrix_tools::Scale( beta, YLocal );
 
     MapDenseMatrixContext context;
-    MapMatrixInitialize( context );
-    MapMatrixPrecompute( context, alpha, XLocal, YLocal );
+    MapDenseMatrixInitialize( context );
+    MapDenseMatrixPrecompute( context, alpha, XLocal, YLocal );
 
-    MapMatrixSummations( context, XLocal.Width() );
-    //MapMatrixNaiveSummations( context, XLocal.Width() );
+    MapDenseMatrixSummations( context, XLocal.Width() );
+    //MapDenseMatrixNaiveSummations( context, XLocal.Width() );
 
-    MapMatrixPassData( context, alpha, XLocal, YLocal );
+    MapDenseMatrixPassData( context, alpha, XLocal, YLocal );
 
-    MapMatrixBroadcasts( context, XLocal.Width() );
-    //MapMatrixNaiveBroadcasts( context, XLocal.Width() );
+    MapDenseMatrixBroadcasts( context, XLocal.Width() );
+    //MapDenseMatrixNaiveBroadcasts( context, XLocal.Width() );
 
-    MapMatrixPostcompute( context, alpha, XLocal, YLocal );
+    MapDenseMatrixPostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -108,18 +108,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     hmatrix_tools::Scale( beta, YLocal );
 
     MapDenseMatrixContext context;
-    TransposeMapMatrixInitialize( context );
-    TransposeMapMatrixPrecompute( context, alpha, XLocal, YLocal );
+    TransposeMapDenseMatrixInitialize( context );
+    TransposeMapDenseMatrixPrecompute( context, alpha, XLocal, YLocal );
 
-    TransposeMapMatrixSummations( context, XLocal.Width() );
-    //TransposeMapMatrixNaiveSummations( context, XLocal.Width() );
+    TransposeMapDenseMatrixSummations( context, XLocal.Width() );
+    //TransposeMapDenseMatrixNaiveSummations( context, XLocal.Width() );
 
-    TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
+    TransposeMapDenseMatrixPassData( context, alpha, XLocal, YLocal );
 
-    TransposeMapMatrixBroadcasts( context, XLocal.Width() );
-    //TransposeMapMatrixNaiveBroadcasts( context, XLocal.Width() );
+    TransposeMapDenseMatrixBroadcasts( context, XLocal.Width() );
+    //TransposeMapDenseMatrixNaiveBroadcasts( context, XLocal.Width() );
 
-    TransposeMapMatrixPostcompute( context, alpha, XLocal, YLocal );
+    TransposeMapDenseMatrixPostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -137,18 +137,22 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     hmatrix_tools::Scale( beta, YLocal );
 
     MapDenseMatrixContext context;
-    HermitianTransposeMapMatrixInitialize( context );
-    HermitianTransposeMapMatrixPrecompute( context, alpha, XLocal, YLocal );
+    HermitianTransposeMapDenseMatrixInitialize( context );
+    HermitianTransposeMapDenseMatrixPrecompute
+    ( context, alpha, XLocal, YLocal );
 
-    HermitianTransposeMapMatrixSummations( context, XLocal.Width() );
-    //HermitianTransposeMapMatrixNaiveSummations( context, XLocal.Width() );
+    HermitianTransposeMapDenseMatrixSummations( context, XLocal.Width() );
+    //HermitianTransposeMapDenseMatrixNaiveSummations
+    //( context, XLocal.Width() );
 
-    HermitianTransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
+    HermitianTransposeMapDenseMatrixPassData( context, alpha, XLocal, YLocal );
 
-    HermitianTransposeMapMatrixBroadcasts( context, XLocal.Width() );
-    //HermitianTransposeMapMatrixNaiveBroadcasts( context, XLocal.Width() );
+    HermitianTransposeMapDenseMatrixBroadcasts( context, XLocal.Width() );
+    //HermitianTransposeMapDenseMatrixNaiveBroadcasts
+    //( context, XLocal.Width() );
 
-    HermitianTransposeMapMatrixPostcompute( context, alpha, XLocal, YLocal );
+    HermitianTransposeMapDenseMatrixPostcompute
+    ( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -160,11 +164,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixInitialize
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixInitialize
 ( MapDenseMatrixContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixInitialize");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixInitialize");
 #endif
     context.Clear();
     switch( _block.type )
@@ -180,7 +184,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixInitialize
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixInitialize( nodeContext.Child(t,s) );
+                node.Child(t,s).MapDenseMatrixInitialize
+                ( nodeContext.Child(t,s) );
         break;
     }
     case SPLIT_NODE:
@@ -194,7 +199,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixInitialize
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixInitialize( nodeContext.Child(t,s) );
+                node.Child(t,s).MapDenseMatrixInitialize
+                ( nodeContext.Child(t,s) );
         break;
     }
     case DIST_LOW_RANK:
@@ -221,14 +227,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixInitialize
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixInitialize
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixInitialize
 ( MapDenseMatrixContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixInitialize");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixInitialize");
 #endif
     // The non-transposed initialization is identical
-    MapMatrixInitialize( context );
+    MapDenseMatrixInitialize( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -237,14 +243,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixInitialize
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixInitialize
+HermitianTransposeMapDenseMatrixInitialize
 ( MapDenseMatrixContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixInitialize");
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixInitialize");
 #endif
     // The non-transposed initialization is identical
-    MapMatrixInitialize( context );
+    MapDenseMatrixInitialize( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -252,13 +259,13 @@ HermitianTransposeMapMatrixInitialize
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPrecompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixPrecompute");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -270,7 +277,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixPrecompute
+                node.Child(t,s).MapDenseMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -281,7 +288,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixPrecompute
+                node.Child(t,s).MapDenseMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -290,7 +297,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixPrecompute
+                node.Child(t,s).MapDenseMatrixPrecompute
                 ( context, alpha, XLocal, YLocal );
         break;
     }
@@ -376,13 +383,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPrecompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPrecompute");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixPrecompute");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -394,7 +401,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixPrecompute
+                node.Child(t,s).TransposeMapDenseMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -405,7 +412,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixPrecompute
+                node.Child(t,s).TransposeMapDenseMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -414,7 +421,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixPrecompute
+                node.Child(t,s).TransposeMapDenseMatrixPrecompute
                 ( context, alpha, XLocal, YLocal );
         break;
     }
@@ -487,13 +494,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixPrecompute
+HermitianTransposeMapDenseMatrixPrecompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPrecompute");
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixPrecompute");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -505,7 +513,7 @@ HermitianTransposeMapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                node.Child(t,s).HermitianTransposeMapDenseMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -516,7 +524,7 @@ HermitianTransposeMapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                node.Child(t,s).HermitianTransposeMapDenseMatrixPrecompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -525,7 +533,7 @@ HermitianTransposeMapMatrixPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapMatrixPrecompute
+                node.Child(t,s).HermitianTransposeMapDenseMatrixPrecompute
                 ( context, alpha, XLocal, YLocal );
         break;
     }
@@ -598,11 +606,11 @@ HermitianTransposeMapMatrixPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummations
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummations
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixSummations");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixSummations");
 #endif
     // Compute the message sizes for each reduce 
     // (the first and last comms are unneeded)
@@ -610,7 +618,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    MapMatrixSummationsCount( sizes, width );
+    MapDenseMatrixSummationsCount( sizes, width );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -621,7 +629,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummations
     for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numReduces*sizeof(int) );
-    MapMatrixSummationsPack( buffer, offsets, context );
+    MapDenseMatrixSummationsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -644,7 +652,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    MapMatrixSummationsUnpack( buffer, offsets, context );
+    MapDenseMatrixSummationsUnpack( buffer, offsets, context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -652,11 +660,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummations
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixSummations
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixSummations");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixSummations");
 #endif
     // Compute the message sizes for each reduce 
     // (the first and last comms are unneeded)
@@ -664,7 +672,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    TransposeMapMatrixSummationsCount( sizes, width );
+    TransposeMapDenseMatrixSummationsCount( sizes, width );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -675,7 +683,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummations
     for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numReduces*sizeof(int) );
-    TransposeMapMatrixSummationsPack( buffer, offsets, context );
+    TransposeMapDenseMatrixSummationsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -698,7 +706,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    TransposeMapMatrixSummationsUnpack( buffer, offsets, context );
+    TransposeMapDenseMatrixSummationsUnpack( buffer, offsets, context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -707,369 +715,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixSummations
-( MapDenseMatrixContext& context, int width ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixSummations");
-#endif
-    // This unconjugated version is identical
-    TransposeMapMatrixSummations( context, width );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsCount
-( std::vector<int>& sizes, int width ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixSummationsCount");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixSummationsCount
-                ( sizes, width );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank*width;
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsCount
-( std::vector<int>& sizes, int width ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixSummationsCount");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixSummationsCount
-                ( sizes, width );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank*width;
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MapDenseMatrixContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixSummationsPack");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixSummationsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            const Dense& Z = *context.block.data.Z;
-            const int width = Z.Width();
-            std::memcpy
-            ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-              DF.rank*width*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*width;
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MapDenseMatrixContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixSummationsPack");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixSummationsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            const Dense& Z = *context.block.data.Z;
-            const int width = Z.Width();
-            std::memcpy
-            ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-              DF.rank*width*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*width;
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MapDenseMatrixContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixSummationsUnpack");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixSummationsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            const int width = Z.Width();
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                std::memcpy
-                ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                  DF.rank*width*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MapDenseMatrixContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixSummationsUnpack");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixSummationsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            const int width = Z.Width();
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                std::memcpy
-                ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                  DF.rank*width*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveSummations
-( MapDenseMatrixContext& context, int width ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixNaiveSummations");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixNaiveSummations
-                ( nodeContext.Child(t,s), width );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                  DF.rank*width, 0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveSummations
-( MapDenseMatrixContext& context, int width ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaiveSummations");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixNaiveSummations
-                ( nodeContext.Child(t,s), width );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                  DF.rank*width, 0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixNaiveSummations
+HermitianTransposeMapDenseMatrixSummations
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapMatrixNaiveSummations");
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixSummations");
 #endif
-    // The unconjugated version should be identical
-    TransposeMapMatrixNaiveSummations( context, width );
+    // This unconjugated version is identical
+    TransposeMapDenseMatrixSummations( context, width );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1077,13 +731,373 @@ HermitianTransposeMapMatrixNaiveSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummationsCount
+( std::vector<int>& sizes, int width ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixSummationsCount");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapDenseMatrixSummationsCount
+                ( sizes, width );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+            sizes[_level-1] += _block.data.DF->rank*width;
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixSummationsCount
+( std::vector<int>& sizes, int width ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixSummationsCount");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapDenseMatrixSummationsCount
+                ( sizes, width );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+            sizes[_level-1] += _block.data.DF->rank*width;
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummationsPack
+( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  MapDenseMatrixContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixSummationsPack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapDenseMatrixSummationsPack
+                ( buffer, offsets, nodeContext.Child(t,s) );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            const Dense& Z = *context.block.data.Z;
+            const int width = Z.Width();
+            std::memcpy
+            ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+              DF.rank*width*sizeof(Scalar) );
+            offsets[_level-1] += DF.rank*width;
+        }
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixSummationsPack
+( std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  MapDenseMatrixContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixSummationsPack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapDenseMatrixSummationsPack
+                ( buffer, offsets, nodeContext.Child(t,s) );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            const Dense& Z = *context.block.data.Z;
+            const int width = Z.Width();
+            std::memcpy
+            ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+              DF.rank*width*sizeof(Scalar) );
+            offsets[_level-1] += DF.rank*width;
+        }
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummationsUnpack
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  MapDenseMatrixContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixSummationsUnpack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapDenseMatrixSummationsUnpack
+                ( buffer, offsets, nodeContext.Child(t,s) );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            const int width = Z.Width();
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                  DF.rank*width*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*width;
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixSummationsUnpack
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  MapDenseMatrixContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::TransposeMapDenseMatrixSummationsUnpack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapDenseMatrixSummationsUnpack
+                ( buffer, offsets, nodeContext.Child(t,s) );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            const int width = Z.Width();
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                  DF.rank*width*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*width;
+            }
+        }
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixNaiveSummations
+( MapDenseMatrixContext& context, int width ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixNaiveSummations");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapDenseMatrixNaiveSummations
+                ( nodeContext.Child(t,s), width );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+                mpi::Reduce
+                ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
+                  DF.rank*width, 0, MPI_SUM, team );
+            else
+                mpi::Reduce
+                ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+        }
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixNaiveSummations
+( MapDenseMatrixContext& context, int width ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixNaiveSummations");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapDenseMatrixNaiveSummations
+                ( nodeContext.Child(t,s), width );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+                mpi::Reduce
+                ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
+                  DF.rank*width, 0, MPI_SUM, team );
+            else
+                mpi::Reduce
+                ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+        }
+        break;
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapDenseMatrixNaiveSummations
+( MapDenseMatrixContext& context, int width ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixNaiveSummations");
+#endif
+    // The unconjugated version should be identical
+    TransposeMapDenseMatrixNaiveSummations( context, width );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPassData");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixPassData");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -1104,7 +1118,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
                 // Take care of the top-left quadrant within our subteams
                 for( int t=0; t<2; ++t )
                     for( int s=0; s<2; ++s )
-                        node.Child(t,s).MapMatrixPassData
+                        node.Child(t,s).MapDenseMatrixPassData
                         ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             else
@@ -1112,18 +1126,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
                 // Take care of the bottom-right quadrant within our subteams
                 for( int t=2; t<4; ++t )
                     for( int s=2; s<4; ++s )
-                        node.Child(t,s).MapMatrixPassData
+                        node.Child(t,s).MapDenseMatrixPassData
                         ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             // Top-right quadrant
             for( int t=0; t<2; ++t )
                 for( int s=2; s<4; ++s )
-                    node.Child(t,s).MapMatrixPassData
+                    node.Child(t,s).MapDenseMatrixPassData
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             // Bottom-left quadrant
             for( int t=2; t<4; ++t )
                 for( int s=0; s<2; ++s )
-                    node.Child(t,s).MapMatrixPassData
+                    node.Child(t,s).MapDenseMatrixPassData
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         else // teamSize >= 4
@@ -1133,82 +1147,82 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).MapMatrixPassData
+                node.Child(0,0).MapDenseMatrixPassData
                 ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(0,1).MapMatrixPassData
+                node.Child(0,1).MapDenseMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MapMatrixPassData
+                node.Child(1,0).MapDenseMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(0,2).MapMatrixPassData
+                node.Child(0,2).MapDenseMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).MapMatrixPassData
+                node.Child(2,0).MapDenseMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(0,3).MapMatrixPassData
+                node.Child(0,3).MapDenseMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).MapMatrixPassData
+                node.Child(3,0).MapDenseMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).MapMatrixPassData
+                node.Child(1,1).MapDenseMatrixPassData
                 ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,1).MapMatrixPassData
+                node.Child(0,1).MapDenseMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MapMatrixPassData
+                node.Child(1,0).MapDenseMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(1,3).MapMatrixPassData
+                node.Child(1,3).MapDenseMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).MapMatrixPassData
+                node.Child(3,1).MapDenseMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(1,2).MapMatrixPassData
+                node.Child(1,2).MapDenseMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).MapMatrixPassData
+                node.Child(2,1).MapDenseMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).MapMatrixPassData
+                node.Child(2,2).MapDenseMatrixPassData
                 ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(2,3).MapMatrixPassData
+                node.Child(2,3).MapDenseMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MapMatrixPassData
+                node.Child(3,2).MapDenseMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,2).MapMatrixPassData
+                node.Child(0,2).MapDenseMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).MapMatrixPassData
+                node.Child(2,0).MapDenseMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,2).MapMatrixPassData
+                node.Child(1,2).MapDenseMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).MapMatrixPassData
+                node.Child(2,1).MapDenseMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).MapMatrixPassData
+                node.Child(3,3).MapDenseMatrixPassData
                 ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(2,3).MapMatrixPassData
+                node.Child(2,3).MapDenseMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MapMatrixPassData
+                node.Child(3,2).MapDenseMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,3).MapMatrixPassData
+                node.Child(1,3).MapDenseMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).MapMatrixPassData
+                node.Child(3,1).MapDenseMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,3).MapMatrixPassData
+                node.Child(0,3).MapDenseMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).MapMatrixPassData
+                node.Child(3,0).MapDenseMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             default:
@@ -1237,7 +1251,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
             byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).MapMatrixPassDataSplitNodePack
+                    node.Child(t,s).MapDenseMatrixPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s) );
             mpi::Send( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
         }
@@ -1247,7 +1261,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).MapMatrixPassDataSplitNodeUnpack
+                    node.Child(t,s).MapDenseMatrixPassDataSplitNodeUnpack
                     ( head, nodeContext.Child(t,s), width );
         }
         break;
@@ -1319,11 +1333,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassDataSplitNodePack
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassDataSplitNodePack
 ( byte*& head, const MapDenseMatrixContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPassDataSplitNodePack");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixPassDataSplitNodePack");
     if( !_inSourceTeam )
         throw std::logic_error("Calling process should be in source team");
 #endif
@@ -1336,7 +1350,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassDataSplitNodePack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixPassDataSplitNodePack
+                node.Child(t,s).MapDenseMatrixPassDataSplitNodePack
                 ( head, nodeContext.Child(t,s) );
         break;
     }
@@ -1365,11 +1379,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassDataSplitNodePack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassDataSplitNodeUnpack
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+MapDenseMatrixPassDataSplitNodeUnpack
 ( const byte*& head, MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPassDataSplitNodeUnpack");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixPassDataSplitNodeUnpack");
     if( !_inTargetTeam )
         throw std::logic_error("Calling process should be in target team");
 #endif
@@ -1382,7 +1397,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassDataSplitNodeUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixPassDataSplitNodeUnpack
+                node.Child(t,s).MapDenseMatrixPassDataSplitNodeUnpack
                 ( head, nodeContext.Child(t,s), width );
         break;
     }
@@ -1414,13 +1429,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassDataSplitNodeUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPassData");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixPassData");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -1441,7 +1456,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
                 // Take care of the top-left quadrant within our subteams
                 for( int t=0; t<2; ++t )
                     for( int s=0; s<2; ++s )
-                        node.Child(t,s).TransposeMapMatrixPassData
+                        node.Child(t,s).TransposeMapDenseMatrixPassData
                         ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             else
@@ -1449,18 +1464,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
                 // Take care of the bottom-right quadrant within our subteams
                 for( int t=2; t<4; ++t )
                     for( int s=2; s<4; ++s )
-                        node.Child(t,s).TransposeMapMatrixPassData
+                        node.Child(t,s).TransposeMapDenseMatrixPassData
                         ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             // Top-right quadrant
             for( int t=0; t<2; ++t )
                 for( int s=2; s<4; ++s )
-                    node.Child(t,s).TransposeMapMatrixPassData
+                    node.Child(t,s).TransposeMapDenseMatrixPassData
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             // Bottom-left quadrant
             for( int t=2; t<4; ++t )
                 for( int s=0; s<2; ++s )
-                    node.Child(t,s).TransposeMapMatrixPassData
+                    node.Child(t,s).TransposeMapDenseMatrixPassData
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         else // teamSize >= 4
@@ -1470,82 +1485,82 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).TransposeMapMatrixPassData
+                node.Child(0,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(0,1).TransposeMapMatrixPassData
+                node.Child(0,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).TransposeMapMatrixPassData
+                node.Child(1,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(0,2).TransposeMapMatrixPassData
+                node.Child(0,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).TransposeMapMatrixPassData
+                node.Child(2,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(0,3).TransposeMapMatrixPassData
+                node.Child(0,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).TransposeMapMatrixPassData
+                node.Child(3,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).TransposeMapMatrixPassData
+                node.Child(1,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,1).TransposeMapMatrixPassData
+                node.Child(0,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).TransposeMapMatrixPassData
+                node.Child(1,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(1,3).TransposeMapMatrixPassData
+                node.Child(1,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal ); 
-                node.Child(3,1).TransposeMapMatrixPassData
+                node.Child(3,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(1,2).TransposeMapMatrixPassData
+                node.Child(1,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).TransposeMapMatrixPassData
+                node.Child(2,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).TransposeMapMatrixPassData
+                node.Child(2,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(2,3).TransposeMapMatrixPassData
+                node.Child(2,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).TransposeMapMatrixPassData
+                node.Child(3,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,2).TransposeMapMatrixPassData
+                node.Child(0,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).TransposeMapMatrixPassData
+                node.Child(2,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,2).TransposeMapMatrixPassData
+                node.Child(1,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).TransposeMapMatrixPassData
+                node.Child(2,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).TransposeMapMatrixPassData
+                node.Child(3,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(2,3).TransposeMapMatrixPassData
+                node.Child(2,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).TransposeMapMatrixPassData
+                node.Child(3,2).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,3).TransposeMapMatrixPassData
+                node.Child(1,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).TransposeMapMatrixPassData
+                node.Child(3,1).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,3).TransposeMapMatrixPassData
+                node.Child(0,3).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).TransposeMapMatrixPassData
+                node.Child(3,0).TransposeMapDenseMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             default:
@@ -1575,7 +1590,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
             byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).TransposeMapMatrixPassDataSplitNodePack
+                    node.Child(t,s).TransposeMapDenseMatrixPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s), XLocal );
             mpi::Send( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
         }
@@ -1585,7 +1600,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).TransposeMapMatrixPassDataSplitNodeUnpack
+                    node.Child(t,s).
+                    TransposeMapDenseMatrixPassDataSplitNodeUnpack
                     ( head, nodeContext.Child(t,s), width );
         }
         break;
@@ -1678,13 +1694,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-TransposeMapMatrixPassDataSplitNodePack
+TransposeMapDenseMatrixPassDataSplitNodePack
 ( byte*& head, const MapDenseMatrixContext& context,
   const DenseMatrix<Scalar>& XLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::TransposeMapMatrixPassDataSplitNodePack");
+    ("DistQuasi2dHMatrix::TransposeMapDenseMatrixPassDataSplitNodePack");
     if( !_inTargetTeam )
         throw std::logic_error("Calling process should be in target team");
 #endif
@@ -1697,7 +1713,7 @@ TransposeMapMatrixPassDataSplitNodePack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixPassDataSplitNodePack
+                node.Child(t,s).TransposeMapDenseMatrixPassDataSplitNodePack
                 ( head, nodeContext.Child(t,s), XLocal );
         break;
     }
@@ -1729,12 +1745,12 @@ TransposeMapMatrixPassDataSplitNodePack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-TransposeMapMatrixPassDataSplitNodeUnpack
+TransposeMapDenseMatrixPassDataSplitNodeUnpack
 ( const byte*& head, MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::TransposeMapMatrixPassDataSplitNodeUnpack");
+    ("DistQuasi2dHMatrix::TransposeMapDenseMatrixPassDataSplitNodeUnpack");
     if( !_inSourceTeam )
         throw std::logic_error("Calling process should be in source team");
 #endif
@@ -1747,7 +1763,7 @@ TransposeMapMatrixPassDataSplitNodeUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixPassDataSplitNodeUnpack
+                node.Child(t,s).TransposeMapDenseMatrixPassDataSplitNodeUnpack
                 ( head, nodeContext.Child(t,s), width );
         break;
     }
@@ -1780,17 +1796,17 @@ TransposeMapMatrixPassDataSplitNodeUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixPassData
+HermitianTransposeMapDenseMatrixPassData
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPassData");
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixPassData");
 #endif
     // The unconjugated version should be identical
-    TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
+    TransposeMapDenseMatrixPassData( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1798,11 +1814,11 @@ HermitianTransposeMapMatrixPassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcasts
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixBroadcasts
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixBroadcasts");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixBroadcasts");
 #endif
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
@@ -1810,7 +1826,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcasts
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    MapMatrixBroadcastsCount( sizes, width );
+    MapDenseMatrixBroadcastsCount( sizes, width );
 
     // Pack all of the data to be broadcasted into a single buffer
     // (only roots of subcommunicators contribute)
@@ -1822,7 +1838,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcasts
     for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numBroadcasts*sizeof(int) );
-    MapMatrixBroadcastsPack( buffer, offsets, context );
+    MapDenseMatrixBroadcastsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1838,7 +1854,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcasts
     }
 
     // Unpack the broadcasted buffers 
-    MapMatrixBroadcastsUnpack( buffer, offsets, context, width );
+    MapDenseMatrixBroadcastsUnpack( buffer, offsets, context, width );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1846,11 +1862,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcasts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcasts
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixBroadcasts
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixBroadcasts");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixBroadcasts");
 #endif
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
@@ -1858,7 +1874,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcasts
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    TransposeMapMatrixBroadcastsCount( sizes, width );
+    TransposeMapDenseMatrixBroadcastsCount( sizes, width );
 
     // Pack all of the data to be broadcasted into a single buffer
     // (only roots of subcommunicators contribute)
@@ -1870,7 +1886,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcasts
     for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
         offsets[i] = offset;
     std::memset( &offsets[0], 0, numBroadcasts*sizeof(int) );
-    TransposeMapMatrixBroadcastsPack( buffer, offsets, context );
+    TransposeMapDenseMatrixBroadcastsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1886,7 +1902,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcasts
     }
 
     // Unpack the broadcasted buffers 
-    TransposeMapMatrixBroadcastsUnpack( buffer, offsets, context, width );
+    TransposeMapDenseMatrixBroadcastsUnpack( buffer, offsets, context, width );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1895,14 +1911,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixBroadcasts
+HermitianTransposeMapDenseMatrixBroadcasts
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixBroadcasts");
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMapMatrixBroadcasts( context, width );
+    TransposeMapDenseMatrixBroadcasts( context, width );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1910,11 +1927,11 @@ HermitianTransposeMapMatrixBroadcasts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsCount
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixBroadcastsCount
 ( std::vector<int>& sizes, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixBroadcastsCount");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixBroadcastsCount");
 #endif
     switch( _block.type )
     {
@@ -1923,7 +1940,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixBroadcastsCount( sizes, width );
+                node.Child(t,s).MapDenseMatrixBroadcastsCount( sizes, width );
         break;
     }
     case DIST_LOW_RANK:
@@ -1941,11 +1958,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsCount
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixBroadcastsCount
 ( std::vector<int>& sizes, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixBroadcastsCount");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixBroadcastsCount");
 #endif
     switch( _block.type )
     {
@@ -1954,7 +1972,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixBroadcastsCount
+                node.Child(t,s).TransposeMapDenseMatrixBroadcastsCount
                 ( sizes, width );
         break;
     }
@@ -1973,12 +1991,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixBroadcastsPack
 ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
   MapDenseMatrixContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixBroadcastsPack");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixBroadcastsPack");
 #endif
     switch( _block.type )
     {
@@ -1989,7 +2007,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixBroadcastsPack
+                node.Child(t,s).MapDenseMatrixBroadcastsPack
                 ( buffer, offsets, nodeContext.Child(t,s) ); 
         break;
     }
@@ -2021,12 +2039,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixBroadcastsPack
 ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
   MapDenseMatrixContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixBroadcastsPack");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixBroadcastsPack");
 #endif
     switch( _block.type )
     {
@@ -2037,7 +2056,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixBroadcastsPack
+                node.Child(t,s).TransposeMapDenseMatrixBroadcastsPack
                 ( buffer, offsets, nodeContext.Child(t,s) );
         break;
     }
@@ -2069,12 +2088,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixBroadcastsUnpack
 ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
   MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixBroadcastsUnpack");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixBroadcastsUnpack");
 #endif
     switch( _block.type )
     {
@@ -2085,7 +2104,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixBroadcastsUnpack
+                node.Child(t,s).MapDenseMatrixBroadcastsUnpack
                 ( buffer, offsets, nodeContext.Child(t,s), width );
         break;
     }
@@ -2112,12 +2131,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixBroadcastsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixBroadcastsUnpack
 ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
   MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixBroadcastsPack");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixBroadcastsPack");
 #endif
     switch( _block.type )
     {
@@ -2128,7 +2148,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixBroadcastsUnpack
+                node.Child(t,s).TransposeMapDenseMatrixBroadcastsUnpack
                 ( buffer, offsets, nodeContext.Child(t,s), width );
         break;
     }
@@ -2155,11 +2175,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixBroadcastsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixNaiveBroadcasts
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixNaiveBroadcasts");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixNaiveBroadcasts");
 #endif
     switch( _block.type )
     {
@@ -2170,7 +2190,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixNaiveBroadcasts
+                node.Child(t,s).MapDenseMatrixNaiveBroadcasts
                 ( nodeContext.Child(t,s), width );
         break;
     }
@@ -2196,11 +2216,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaiveBroadcasts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixNaiveBroadcasts
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaiveBroadcasts");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixNaiveBroadcasts");
 #endif
     switch( _block.type )
     {
@@ -2211,7 +2232,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixNaiveBroadcasts
+                node.Child(t,s).TransposeMapDenseMatrixNaiveBroadcasts
                 ( nodeContext.Child(t,s), width );
         break;
     }
@@ -2238,15 +2259,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaiveBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixNaiveBroadcasts
+HermitianTransposeMapDenseMatrixNaiveBroadcasts
 ( MapDenseMatrixContext& context, int width ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapMatrixNaiveBroadcasts");
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixNaiveBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMapMatrixNaiveBroadcasts( context, width );
+    TransposeMapDenseMatrixNaiveBroadcasts( context, width );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2254,13 +2275,13 @@ HermitianTransposeMapMatrixNaiveBroadcasts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPostcompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixPostcompute");
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixPostcompute");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -2272,7 +2293,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixPostcompute
+                node.Child(t,s).MapDenseMatrixPostcompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -2284,7 +2305,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
                 *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).MapMatrixPostcompute
+                    node.Child(t,s).MapDenseMatrixPostcompute
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         break;
@@ -2338,13 +2359,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPostcompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPostcompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPostcompute");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapDenseMatrixPostcompute");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -2356,7 +2377,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixPostcompute
+                node.Child(t,s).TransposeMapDenseMatrixPostcompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -2368,7 +2389,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
                 *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).TransposeMapMatrixPostcompute
+                    node.Child(t,s).TransposeMapDenseMatrixPostcompute
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         break;
@@ -2449,13 +2470,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPostcompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixPostcompute
+HermitianTransposeMapDenseMatrixPostcompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPostcompute");
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixPostcompute");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -2467,7 +2489,7 @@ HermitianTransposeMapMatrixPostcompute
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapMatrixPostcompute
+                node.Child(t,s).HermitianTransposeMapDenseMatrixPostcompute
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -2479,7 +2501,7 @@ HermitianTransposeMapMatrixPostcompute
                 *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).HermitianTransposeMapMatrixPostcompute
+                    node.Child(t,s).HermitianTransposeMapDenseMatrixPostcompute
                     ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         break;

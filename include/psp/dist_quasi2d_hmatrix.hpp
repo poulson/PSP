@@ -654,54 +654,81 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
-    void MapMatrixInitialize
+    void MapDenseMatrixInitialize
     ( MapDenseMatrixContext& context ) const;
-    void MapMatrixPrecompute
+    void MapDenseMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
-    void MapMatrixSummations
+    void MapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void MapMatrixSummationsCount
+    void MapDenseMatrixSummationsCount
     ( std::vector<int>& sizes, int width ) const;
-    void MapMatrixSummationsPack
+    void MapDenseMatrixSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
-    void MapMatrixSummationsUnpack
+    void MapDenseMatrixSummationsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
-    void MapMatrixNaiveSummations
+    void MapDenseMatrixNaiveSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void MapMatrixPassData
+    void MapDenseMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
-    void MapMatrixPassDataSplitNodePack
+    void MapDenseMatrixPassDataSplitNodePack
     ( byte*& head, const MapDenseMatrixContext& context ) const;
-    void MapMatrixPassDataSplitNodeUnpack
+    void MapDenseMatrixPassDataSplitNodeUnpack
     ( const byte*& head, MapDenseMatrixContext& context, int width ) const;
-    void MapMatrixBroadcasts
+    void MapDenseMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void MapMatrixBroadcastsCount
+    void MapDenseMatrixBroadcastsCount
     ( std::vector<int>& sizes, int width ) const;
-    void MapMatrixBroadcastsPack
+    void MapDenseMatrixBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
-    void MapMatrixBroadcastsUnpack
+    void MapDenseMatrixBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context, int width ) const;
-    void MapMatrixNaiveBroadcasts
+    void MapDenseMatrixNaiveBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void MapMatrixPostcompute
+    void MapDenseMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
 
-    void MapMatrixPrecompute
+    void MapHMatrixMainPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
-    // TODO
+    void MapHMatrixMainPassData
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixMainPostcompute
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixFHHPrecompute
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixFHHPassData
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixFHHPostcompute
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixFHHFinalize
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixRoundedAddition
+    ( MapHMatrixContext& context,
+      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
     void TransposeMapVectorInitialize
     ( MapVectorContext& context ) const;
@@ -749,46 +776,46 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
-    void TransposeMapMatrixInitialize
+    void TransposeMapDenseMatrixInitialize
     ( MapDenseMatrixContext& context ) const;
-    void TransposeMapMatrixPrecompute
+    void TransposeMapDenseMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void TransposeMapMatrixSummations
+    void TransposeMapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void TransposeMapMatrixSummationsCount
+    void TransposeMapDenseMatrixSummationsCount
     ( std::vector<int>& sizes, int width ) const;
-    void TransposeMapMatrixSummationsPack
+    void TransposeMapDenseMatrixSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
-    void TransposeMapMatrixSummationsUnpack
+    void TransposeMapDenseMatrixSummationsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
-    void TransposeMapMatrixNaiveSummations
+    void TransposeMapDenseMatrixNaiveSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void TransposeMapMatrixPassData
+    void TransposeMapDenseMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void TransposeMapMatrixPassDataSplitNodePack
+    void TransposeMapDenseMatrixPassDataSplitNodePack
     ( byte*& head, const MapDenseMatrixContext& context,
       const DenseMatrix<Scalar>& XLocal ) const;
-    void TransposeMapMatrixPassDataSplitNodeUnpack
+    void TransposeMapDenseMatrixPassDataSplitNodeUnpack
     ( const byte*& head, MapDenseMatrixContext& context, int width ) const;
-    void TransposeMapMatrixBroadcasts
+    void TransposeMapDenseMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void TransposeMapMatrixBroadcastsCount
+    void TransposeMapDenseMatrixBroadcastsCount
     ( std::vector<int>& sizes, int width ) const;
-    void TransposeMapMatrixBroadcastsPack
+    void TransposeMapDenseMatrixBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context ) const;
-    void TransposeMapMatrixBroadcastsUnpack
+    void TransposeMapDenseMatrixBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       MapDenseMatrixContext& context, int width ) const;
-    void TransposeMapMatrixNaiveBroadcasts
+    void TransposeMapDenseMatrixNaiveBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void TransposeMapMatrixPostcompute
+    void TransposeMapDenseMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
@@ -816,25 +843,25 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
-    void HermitianTransposeMapMatrixInitialize
+    void HermitianTransposeMapDenseMatrixInitialize
     ( MapDenseMatrixContext& context ) const;
-    void HermitianTransposeMapMatrixPrecompute
+    void HermitianTransposeMapDenseMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void HermitianTransposeMapMatrixSummations
+    void HermitianTransposeMapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapMatrixNaiveSummations
+    void HermitianTransposeMapDenseMatrixNaiveSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapMatrixPassData
+    void HermitianTransposeMapDenseMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void HermitianTransposeMapMatrixBroadcasts
+    void HermitianTransposeMapDenseMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapMatrixNaiveBroadcasts
+    void HermitianTransposeMapDenseMatrixNaiveBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapMatrixPostcompute
+    void HermitianTransposeMapDenseMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
