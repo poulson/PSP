@@ -20,6 +20,7 @@
 */
 #include "psp.hpp"
 
+#include "./Ghost-incl.hpp"
 #include "./MapDenseMatrix-incl.hpp"
 //#include "./MapHMatrix-incl.hpp"
 #include "./MapVector-incl.hpp"
@@ -208,10 +209,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
             _block.data.DFG->rank = 0;
     case SPLIT_LOW_RANK_GHOST:
         if( alpha == (Scalar)0 )
-            _block.data.SFG->rank == 0;
+            _block.data.SFG->rank = 0;
     case LOW_RANK_GHOST:
         if( alpha == (Scalar)0 )
-            _block.data.FG->rank == 0;
+            _block.data.FG->rank = 0;
 
     case SPLIT_DENSE:
         if( _inSourceTeam )

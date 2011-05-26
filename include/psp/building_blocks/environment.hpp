@@ -22,11 +22,13 @@
 #define PSP_ENVIRONMENT_HPP 1
 
 #include "mpi.h"
+#include <algorithm>
 #include <complex>
 #include <cstring>
 #include <iostream>
 #include <fstream>
 #include <map>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <utility>

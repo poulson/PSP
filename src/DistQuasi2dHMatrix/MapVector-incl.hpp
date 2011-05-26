@@ -218,6 +218,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorInitialize
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -380,6 +381,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case EMPTY:
         break;
     }
@@ -492,6 +494,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case EMPTY:
         break;
     }
@@ -607,6 +610,7 @@ HermitianTransposeMapVectorPrecompute
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case EMPTY:
         break;
     }
@@ -769,6 +773,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsCount
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -813,6 +818,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsCount
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -868,6 +874,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsPack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -923,6 +930,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsPack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -983,6 +991,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsUnpack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -1043,6 +1052,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsUnpack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -1103,6 +1113,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSummations
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -1163,6 +1174,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -1486,6 +1498,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaivePassData
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -1737,6 +1750,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaivePassData
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -1909,6 +1923,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsCount
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -1953,6 +1968,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsCount
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2013,6 +2029,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsPack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2073,6 +2090,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsPack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2128,6 +2146,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsUnpack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2183,6 +2202,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsUnpack
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2236,6 +2256,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveBroadcasts
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2289,6 +2310,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case SPLIT_NODE:
     case SPLIT_LOW_RANK:
     case SPLIT_DENSE:
@@ -2398,6 +2420,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -2516,6 +2539,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -2634,6 +2658,7 @@ HermitianTransposeMapVectorPostcompute
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:

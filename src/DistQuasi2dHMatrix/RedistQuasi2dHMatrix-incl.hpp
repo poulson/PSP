@@ -1266,6 +1266,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case EMPTY:
 #ifndef RELEASE
         throw std::logic_error("Should not need to unpack empty submatrix");

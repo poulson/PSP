@@ -101,6 +101,12 @@ public:
     std::size_t Unpack
     ( const byte* packedDistHMatrix, const Subcomms& subcomms );
 
+    // Union the structure known in each block row and column at each level.
+    void FormGhostNodes();
+
+    // Return to the minimal local structure
+    void PruneGhostNodes();
+
     // A := alpha A
     void Scale( Scalar alpha );
 
@@ -196,30 +202,6 @@ public:
 
 private:
     /*
-     * Private static functions
-     */
-    static void PackedSizesRecursion
-    ( std::vector<std::size_t>& packedSizes,
-      const std::vector<int>& localSizes,
-      int sourceRankOffset, int targetRankOffset, int teamSize,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    static void PackRecursion
-    ( std::vector<byte**>& headPointers,
-      const std::vector<int>& localSizes,
-      int sourceRankOffset, int targetRankOffset, int teamSize,
-      const Quasi2dHMatrix<Scalar,Conjugated>& H );
-
-    static void ComputeLocalDimensionRecursion
-    ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
-
-    static void ComputeFirstLocalIndexRecursion
-    ( int& firstLocalIndex, int p, int rank, int xSize, int ySize, int zSize );
-
-    static void ComputeLocalSizesRecursion
-    ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );
-
-    /*
      * Private data structures
      */
 
@@ -232,7 +214,7 @@ private:
     struct DistLowRankMatrixGhost
     {
         int rank;
-        int sourceTeamRoot, targetTeamRoot;
+        int sourceRoot, targetRoot;
     };
 
     struct SplitLowRankMatrix
@@ -244,7 +226,7 @@ private:
     struct SplitLowRankMatrixGhost
     {
         int rank;
-        int sourceTeamOwner, targetTeamOwner;
+        int sourceOwner, targetOwner;
     };
 
     struct LowRankMatrixGhost
@@ -260,7 +242,7 @@ private:
 
     struct SplitDenseMatrixGhost
     {
-        int sourceTeamOwner, targetTeamOwner;
+        int sourceOwner, targetOwner;
     };
 
     struct DenseMatrixGhost
@@ -289,8 +271,14 @@ private:
 
     struct NodeGhost : public Node
     {
-        int sourceTeamRoot, targetTeamRoot;    
+        int sourceRoot, targetRoot;    
+        NodeGhost
+        ( int xSizeSource, int xSizeTarget,
+          int ySizeSource, int ySizeTarget,
+          int zSize,
+          int sRoot, int tRoot );
     };
+    NodeGhost* NewNodeGhost( int sRoot, int tRoot ) const;
 
     enum BlockType 
     { 
@@ -341,6 +329,12 @@ private:
         Block();
         ~Block();
         void Clear();
+    };
+
+    struct BlockId
+    {
+        int level;
+        int sourceOffset, targetOffset;
     };
 
     struct MapVectorContext
@@ -557,27 +551,28 @@ private:
     };
 
     /*
-     * Private data
+     * Private static functions
      */
-    int _numLevels;
-    int _maxRank;
-    int _sourceOffset, _targetOffset;
-    bool _stronglyAdmissible;
+    static void PackedSizesRecursion
+    ( std::vector<std::size_t>& packedSizes,
+      const std::vector<int>& localSizes,
+      int sourceRankOffset, int targetRankOffset, int teamSize,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    int _xSizeSource, _xSizeTarget;
-    int _ySizeSource, _ySizeTarget;
-    int _zSize;
-    int _xSource, _xTarget;
-    int _ySource, _yTarget;
-    Block _block;
+    static void PackRecursion
+    ( std::vector<byte**>& headPointers,
+      const std::vector<int>& localSizes,
+      int sourceRankOffset, int targetRankOffset, int teamSize,
+      const Quasi2dHMatrix<Scalar,Conjugated>& H );
 
-    const Subcomms* _subcomms;
-    unsigned _level;
-    bool _inSourceTeam;
-    bool _inTargetTeam;
-    int _rootOfOtherTeam; // only applies if in only source or target team
-    int _localSourceOffset;
-    int _localTargetOffset;
+    static void ComputeLocalDimensionRecursion
+    ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
+
+    static void ComputeFirstLocalIndexRecursion
+    ( int& firstLocalIndex, int p, int rank, int xSize, int ySize, int zSize );
+
+    static void ComputeLocalSizesRecursion
+    ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );
 
     /*
      * Private non-static member functions
@@ -591,6 +586,16 @@ private:
 
     void UnpackRecursion
     ( const byte*& head, int sourceRankOffset, int targetRankOffset );
+
+    void FillStructureRecursion
+    ( std::vector< std::set<int> >& sourceStructure,
+      std::vector< std::set<int> >& targetStructure ) const;
+
+    void FindGhostNodesRecursion
+    ( std::vector< std::vector<BlockId> >& blockIds,
+      const std::vector< std::set<int> >& sourceStructure,
+      const std::vector< std::set<int> >& targetStructure,
+      int sourceRoot, int targetRoot );
 
     void MapVectorInitialize
     ( MapVectorContext& context ) const;
@@ -823,14 +828,42 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    
+
+    /*
+     * Private data
+     */
+    int _numLevels;
+    int _maxRank;
+    int _sourceOffset, _targetOffset;
+    bool _stronglyAdmissible;
+
+    int _xSizeSource, _xSizeTarget;
+    int _ySizeSource, _ySizeTarget;
+    int _zSize;
+    int _xSource, _xTarget;
+    int _ySource, _yTarget;
+    Block _block;
+
+    const Subcomms* _subcomms;
+    unsigned _level;
+    bool _inSourceTeam;
+    bool _inTargetTeam;
+    int _rootOfOtherTeam; // only applies if in only source or target team
+    int _localSourceOffset;
+    int _localTargetOffset;
+
     // Create shortened names for convenience in implementations.
     typedef DenseMatrix<Scalar> Dense;
+    typedef DenseMatrixGhost DenseGhost;
     typedef LowRankMatrix<Scalar,Conjugated> LowRank;
+    typedef LowRankMatrixGhost LowRankGhost;
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
     typedef SplitDenseMatrix SplitDense;
+    typedef SplitDenseMatrixGhost SplitDenseGhost;
     typedef SplitLowRankMatrix SplitLowRank;
+    typedef SplitLowRankMatrixGhost SplitLowRankGhost;
     typedef DistLowRankMatrix DistLowRank;
+    typedef DistLowRankMatrixGhost DistLowRankGhost;
     typedef DistQuasi2dHMatrix<Scalar,Conjugated> DistQuasi2d;
 };
 
@@ -925,6 +958,29 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NewNode() const
         new Node
         ( _xSizeSource, _xSizeTarget, _ySizeSource, _ySizeTarget, _zSize );
 }
+
+template<typename Scalar,bool Conjugated>
+inline
+DistQuasi2dHMatrix<Scalar,Conjugated>::NodeGhost::NodeGhost
+( int xSizeSource, int xSizeTarget,
+  int ySizeSource, int ySizeTarget,
+  int zSize,
+  int sRoot, int tRoot )
+: Node(xSizeSource,xSizeTarget,ySizeSource,ySizeTarget,zSize),
+  sourceRoot(sRoot), targetRoot(tRoot)
+{ }
+
+template<typename Scalar,bool Conjugated>
+inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::NodeGhost*
+DistQuasi2dHMatrix<Scalar,Conjugated>::NewNodeGhost( int sRoot, int tRoot ) 
+const
+{
+    return 
+        new NodeGhost
+        ( _xSizeSource, _xSizeTarget, _ySizeSource, _ySizeTarget, _zSize,
+          sRoot, tRoot );
+}
+
 
 template<typename Scalar,bool Conjugated>
 inline
@@ -1404,36 +1460,38 @@ ContextBlock::Clear()
     switch( type )
     {
     case DIST_NODE: 
+    case DIST_NODE_GHOST:
         delete data.DN; break;
+
     case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
         delete data.SN; break;
+
     case NODE:
+    case NODE_GHOST:
         delete data.N; break;
 
     case DIST_LOW_RANK:  
+    case DIST_LOW_RANK_GHOST:
         delete data.DF; break;
+
     case SPLIT_LOW_RANK:
+    case SPLIT_LOW_RANK_GHOST:
         delete data.SF;
+
     case LOW_RANK:
+    case LOW_RANK_GHOST:
         delete data.F;
 
     case SPLIT_DENSE:
+    case SPLIT_DENSE_GHOST:
         delete data.SD; break;
+
     case DENSE:
+    case DENSE_GHOST:
         delete data.D; break;
 
     case EMPTY: 
-        break;
-
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-        throw std::logic_error("Have not yet handled ghosts");
         break;
     }
     type = EMPTY;
