@@ -50,7 +50,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizes
     for( unsigned i=0; i<p; ++i )
         packedSizes[i] += headerSize;
 
-    // Recurse on this shell to compute the packed sizes
+    // Recurse on this block to compute the packed sizes
     PackedSizesRecursion( packedSizes, localSizes, 0, 0, p, H );
     std::size_t totalSize = 0;
     for( unsigned i=0; i<p; ++i )
@@ -225,15 +225,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
 
     for( int i=0; i<teamSize; ++i )
-        packedSizes[sourceRankOffset+i] += sizeof(ShellType);
+        packedSizes[sourceRankOffset+i] += sizeof(BlockType);
     if( sourceRankOffset != targetRankOffset )
         for( int i=0; i<teamSize; ++i )
-            packedSizes[targetRankOffset+i] += sizeof(ShellType);
+            packedSizes[targetRankOffset+i] += sizeof(BlockType);
 
-    const typename Quasi2d::Shell& shell = H._shell;
+    const typename Quasi2d::Block& block = H._block;
     const int m = H.Height();
     const int n = H.Width();
-    switch( shell.type )
+    switch( block.type )
     {
     case Quasi2d::NODE:
     {
@@ -245,7 +245,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                 for( int s=0; s<4; ++s )
                     PackedSizesRecursion
                     ( packedSizes, localSizes, sourceRank, targetRank, 1,
-                      shell.data.N->Child(t,s) );
+                      block.data.N->Child(t,s) );
         }
         else if( teamSize == 2 )
         {
@@ -256,7 +256,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                     PackedSizesRecursion
                     ( packedSizes, localSizes,
                       sourceRankOffset+s/2, targetRankOffset+t/2, 1,
-                      shell.data.N->Child(t,s) );
+                      block.data.N->Child(t,s) );
         }
         else // team Size >= 4
         {
@@ -269,7 +269,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
                     ( packedSizes, localSizes,
                       sourceRankOffset+newTeamSize*s,
                       targetRankOffset+newTeamSize*t, newTeamSize,
-                      shell.data.N->Child(t,s) );
+                      block.data.N->Child(t,s) );
         }
         break;
     }
@@ -282,7 +282,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     }
     case Quasi2d::LOW_RANK:
     {
-        const int r = shell.data.F->Rank();
+        const int r = block.data.F->Rank();
         if( teamSize == 1 )
         {
             const int sourceRank = sourceRankOffset;
@@ -343,7 +343,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackedSizesRecursion
     }
     case Quasi2d::DENSE:
     {
-        const DenseMatrix<Scalar>& D = *shell.data.D;
+        const DenseMatrix<Scalar>& D = *block.data.D;
         const MatrixType type = D.Type();
 
         if( teamSize == 1 )
@@ -390,14 +390,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 {
     typedef Quasi2dHMatrix<Scalar,Conjugated> Quasi2d;
 
-    const typename Quasi2d::Shell& shell = H._shell;
+    const typename Quasi2d::Block& block = H._block;
     const int m = H.Height();
     const int n = H.Width();
-    switch( shell.type )
+    switch( block.type )
     {
     case Quasi2d::NODE:
     {
-        const typename Quasi2d::Node& node = *shell.data.N;
+        const typename Quasi2d::Node& node = *block.data.N;
         if( teamSize == 1 )
         {
             const int sourceRank = sourceRankOffset;
@@ -516,8 +516,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     }
     case Quasi2d::LOW_RANK:
     {
-        const DenseMatrix<Scalar>& U = shell.data.F->U;
-        const DenseMatrix<Scalar>& V = shell.data.F->V;
+        const DenseMatrix<Scalar>& U = block.data.F->U;
+        const DenseMatrix<Scalar>& V = block.data.F->V;
         const int r = U.Width();
         if( teamSize == 1 )
         {
@@ -626,7 +626,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     }
     case Quasi2d::DENSE:
     {
-        const DenseMatrix<Scalar>& D = *shell.data.D;
+        const DenseMatrix<Scalar>& D = *block.data.D;
         const MatrixType type = D.Type();
         if( teamSize == 1 )
         {
@@ -871,25 +871,22 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     const bool inTargetTeam = _inTargetTeam;
     if( !inSourceTeam && !inTargetTeam )
     {
-        _shell.type = EMPTY;
+        _block.type = EMPTY;
         return;
     }
     _rootOfOtherTeam = ( inSourceTeam ? targetRankOffset : sourceRankOffset );
 
-    // Delete the old shell
-    Shell& shell = _shell;
-    shell.Clear();
-
-    // Read in the information for the new shell
-    shell.type = Read<ShellType>( head );
+    // Read in the information for the new block
+    _block.Clear();
+    _block.type = Read<BlockType>( head );
     const int m = Height();
     const int n = Width();
-    switch( shell.type )
+    switch( _block.type )
     {
     case DIST_NODE:
     { 
-        shell.data.N = NewNode();
-        Node& node = *shell.data.N;
+        _block.data.N = NewNode();
+        Node& node = *_block.data.N;
 
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
@@ -1103,8 +1100,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_NODE:
     {
-        shell.data.N = NewNode();
-        Node& node = *shell.data.N;
+        _block.data.N = NewNode();
+        Node& node = *_block.data.N;
 
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
@@ -1131,8 +1128,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case NODE:
     {
-        shell.data.N = NewNode();
-        Node& node = *shell.data.N;
+        _block.data.N = NewNode();
+        Node& node = *_block.data.N;
 
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
@@ -1159,8 +1156,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case DIST_LOW_RANK:
     {
-        shell.data.DF = new DistLowRank;
-        DistLowRank& DF = *shell.data.DF;
+        _block.data.DF = new DistLowRank;
+        DistLowRank& DF = *_block.data.DF;
 
         DF.rank = Read<int>( head );
         if( inSourceTeam )
@@ -1185,8 +1182,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_LOW_RANK:
     {
-        shell.data.SF = new SplitLowRank;
-        SplitLowRank& SF = *shell.data.SF;
+        _block.data.SF = new SplitLowRank;
+        SplitLowRank& SF = *_block.data.SF;
 
         SF.rank = Read<int>( head );
 
@@ -1209,8 +1206,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case SPLIT_DENSE:
     {
-        shell.data.SD = new SplitDense;
-        SplitDense& SD = *shell.data.SD;
+        _block.data.SD = new SplitDense;
+        SplitDense& SD = *_block.data.SD;
 
         if( inSourceTeam )
         {
@@ -1228,8 +1225,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case LOW_RANK:
     {
-        shell.data.F = new LowRank;
-        LowRank& F = *shell.data.F;
+        _block.data.F = new LowRank;
+        LowRank& F = *_block.data.F;
 
         // Read in the rank
         const int r = Read<int>( head );
@@ -1247,8 +1244,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case DENSE:
     {
-        shell.data.D = new Dense;
-        Dense& D = *shell.data.D;
+        _block.data.D = new Dense;
+        Dense& D = *_block.data.D;
 
         const MatrixType type = Read<MatrixType>( head );
 
@@ -1262,6 +1259,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 Read( D.Buffer(j,j), head, m-j );
         break;
     }
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    case SPLIT_DENSE_GHOST:
     case EMPTY:
 #ifndef RELEASE
         throw std::logic_error("Should not need to unpack empty submatrix");

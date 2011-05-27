@@ -21,7 +21,7 @@
 #include "psp.hpp"
 
 #include "./MapDenseMatrix-incl.hpp"
-#include "./MapHMatrix-incl.hpp"
+//#include "./MapHMatrix-incl.hpp"
 #include "./MapVector-incl.hpp"
 #include "./RedistQuasi2dHMatrix-incl.hpp"
 
@@ -40,7 +40,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _inSourceTeam(true), _inTargetTeam(true), _rootOfOtherTeam(0),
   _localSourceOffset(0), _localTargetOffset(0)
 { 
-    _shell.type = EMPTY;
+    _block.type = EMPTY;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -63,7 +63,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset)
 { 
-    _shell.type = EMPTY;
+    _block.type = EMPTY;
 }
 
 template<typename Scalar,bool Conjugated>
@@ -76,7 +76,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Clear()
 {
-    _shell.Clear();
+    _block.Clear();
 }
 
 template<typename Scalar,bool Conjugated>
@@ -162,54 +162,70 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::Scale");
 #endif
-    const Shell& shell = this->_shell;
-    switch( shell.type )
+    switch( _block.type )
     {
     case DIST_NODE:
     case SPLIT_NODE:
     case NODE:
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                shell.data.N->Child(t,s).Scale( alpha );
+                _block.data.N->Child(t,s).Scale( alpha );
         break;
+
     case DIST_LOW_RANK:
         if( alpha == (Scalar)0 )
         {
-            shell.data.DF->rank = 0;
+            _block.data.DF->rank = 0;
             if( _inTargetTeam )
             {
-                Dense& ULocal = shell.data.DF->ULocal;
+                Dense& ULocal = _block.data.DF->ULocal;
                 ULocal.Resize( ULocal.Height(), 0, ULocal.Height() );
             }
             if( _inSourceTeam )
             {
-                Dense& VLocal = shell.data.DF->VLocal;
+                Dense& VLocal = _block.data.DF->VLocal;
                 VLocal.Resize( VLocal.Height(), 0, VLocal.Height() );
             }
         }
         else if( _inTargetTeam )
-            hmatrix_tools::Scale( alpha, shell.data.DF->ULocal );
+            hmatrix_tools::Scale( alpha, _block.data.DF->ULocal );
         break;
     case SPLIT_LOW_RANK:
         if( alpha == (Scalar)0 )
         {
-            shell.data.SF->rank = 0;
-            Dense& D = shell.data.SF->D;
+            _block.data.SF->rank = 0;
+            Dense& D = _block.data.SF->D;
             D.Resize( D.Height(), 0, D.Height() );
         }
         else if( _inTargetTeam )
-            hmatrix_tools::Scale( alpha, shell.data.SF->D );
+            hmatrix_tools::Scale( alpha, _block.data.SF->D );
         break;
     case LOW_RANK:
-        hmatrix_tools::Scale( alpha, *shell.data.F );
+        hmatrix_tools::Scale( alpha, *_block.data.F );
         break;
+    case DIST_LOW_RANK_GHOST:
+        if( alpha == (Scalar)0 )
+            _block.data.DFG->rank = 0;
+    case SPLIT_LOW_RANK_GHOST:
+        if( alpha == (Scalar)0 )
+            _block.data.SFG->rank == 0;
+    case LOW_RANK_GHOST:
+        if( alpha == (Scalar)0 )
+            _block.data.FG->rank == 0;
+
     case SPLIT_DENSE:
         if( _inSourceTeam )
-            hmatrix_tools::Scale( alpha, shell.data.SD->D );
+            hmatrix_tools::Scale( alpha, _block.data.SD->D );
         break;
     case DENSE:
-        hmatrix_tools::Scale( alpha, *shell.data.D );
+        hmatrix_tools::Scale( alpha, *_block.data.D );
         break;
+
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case EMPTY:
         break;
     }
@@ -225,8 +241,7 @@ template<typename Scalar,bool Conjugated>
 bool
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Admissible() const
 {
-    return Admissible
-           ( this->_xSource, this->_xTarget, this->_ySource, this->_yTarget );
+    return Admissible( _xSource, _xTarget, _ySource, _yTarget );
 }
 
 template<typename Scalar,bool Conjugated>
@@ -234,7 +249,7 @@ bool
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Admissible
 ( int xSource, int xTarget, int ySource, int yTarget ) const
 {
-    if( this->_stronglyAdmissible )
+    if( _stronglyAdmissible )
         return std::max(std::abs(xSource-xTarget),std::abs(ySource-yTarget))>1;
     else
         return xSource != xTarget || ySource != yTarget;

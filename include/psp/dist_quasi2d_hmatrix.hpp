@@ -229,15 +229,43 @@ private:
         DenseMatrix<Scalar> ULocal, VLocal;
     };
 
+    struct DistLowRankMatrixGhost
+    {
+        int rank;
+        int sourceTeamRoot, targetTeamRoot;
+    };
+
     struct SplitLowRankMatrix
     {
         int rank;
         DenseMatrix<Scalar> D;
     };
 
+    struct SplitLowRankMatrixGhost
+    {
+        int rank;
+        int sourceTeamOwner, targetTeamOwner;
+    };
+
+    struct LowRankMatrixGhost
+    {
+        int rank;
+        int owner;
+    };
+
     struct SplitDenseMatrix
     {
         DenseMatrix<Scalar> D;
+    };
+
+    struct SplitDenseMatrixGhost
+    {
+        int sourceTeamOwner, targetTeamOwner;
+    };
+
+    struct DenseMatrixGhost
+    {
+        int owner;
     };
 
     struct Node
@@ -259,40 +287,59 @@ private:
     };
     Node* NewNode() const;
 
-    enum ShellType 
+    struct NodeGhost : public Node
+    {
+        int sourceTeamRoot, targetTeamRoot;    
+    };
+
+    enum BlockType 
     { 
-        DIST_NODE,      // each side is distributed
-        SPLIT_NODE,     // each side is owned by a single process
-        NODE,           // serial
+        DIST_NODE,        // each side is distributed
+        DIST_NODE_GHOST,  //
+        SPLIT_NODE,       // each side is owned by a single process
+        SPLIT_NODE_GHOST, // 
+        NODE,             // serial
+        NODE_GHOST,       //
 
-        DIST_LOW_RANK,  // each side is distributed
-        SPLIT_LOW_RANK, // each side is given to a different process
-        LOW_RANK,       // serial
+        DIST_LOW_RANK,        // each side is distributed
+        DIST_LOW_RANK_GHOST,  //
+        SPLIT_LOW_RANK,       // each side is given to a different process
+        SPLIT_LOW_RANK_GHOST, //
+        LOW_RANK,             // serial
+        LOW_RANK_GHOST,       //
 
-        SPLIT_DENSE,    // split between two processes
-        DENSE,          // serial
+        SPLIT_DENSE,       // split between two processes
+        SPLIT_DENSE_GHOST, //
+        DENSE,             // serial
+        DENSE_GHOST,       //
 
         EMPTY
     };
 
-    struct Shell
+    struct Block
     {
-        ShellType type;
+        BlockType type;
         union Data
         {
             Node* N;
+            NodeGhost* NG;
 
             DistLowRankMatrix* DF;
+            DistLowRankMatrixGhost* DFG;
             SplitLowRankMatrix* SF;
+            SplitLowRankMatrixGhost* SFG;
             LowRankMatrix<Scalar,Conjugated>* F;
+            LowRankMatrixGhost* FG;
 
             SplitDenseMatrix* SD;
+            SplitDenseMatrixGhost* SDG;
             DenseMatrix<Scalar>* D;
+            DenseMatrixGhost* DG;
 
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
-        Shell();
-        ~Shell();
+        Block();
+        ~Block();
         void Clear();
     };
 
@@ -310,9 +357,9 @@ private:
         // eventually have it combine all precompute data into a single buffer.
         typedef DistNodeContext SplitNodeContext;
 
-        struct ContextShell
+        struct ContextBlock
         {
-            ShellType type;
+            BlockType type;
             union Data
             {
                 DistNodeContext* DN;
@@ -320,11 +367,11 @@ private:
                 Vector<Scalar>* z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
             } data;
-            ContextShell();
-            ~ContextShell();
+            ContextBlock();
+            ~ContextBlock();
             void Clear();
         };
-        ContextShell shell;
+        ContextBlock block;
         void Clear();
     };
     
@@ -340,9 +387,9 @@ private:
         };
         typedef DistNodeContext SplitNodeContext;
 
-        struct ContextShell
+        struct ContextBlock
         {
-            ShellType type;
+            BlockType type;
             union Data
             {
                 DistNodeContext* DN;
@@ -350,11 +397,11 @@ private:
                 DenseMatrix<Scalar>* Z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
             } data;
-            ContextShell();
-            ~ContextShell();
+            ContextBlock();
+            ~ContextBlock();
             void Clear();
         };
-        ContextShell shell;
+        ContextBlock block;
         void Clear();
     };
 
@@ -485,9 +532,9 @@ private:
         /*
          * Wrapper for storing different types of contexts.
          */
-        struct ContextShell
+        struct ContextBlock
         {
-            ShellType type;
+            BlockType type;
             union Data
             {
                 DistNodeContext* DN;
@@ -501,11 +548,11 @@ private:
                 SplitDenseContext* SD;
                 DenseContext* D;
             } data;
-            ContextShell();
-            ~ContextShell();
+            ContextBlock();
+            ~ContextBlock();
             void Clear();
         };
-        ContextShell shell;
+        ContextBlock block;
         void Clear();
     };
 
@@ -522,7 +569,7 @@ private:
     int _zSize;
     int _xSource, _xTarget;
     int _ySource, _yTarget;
-    Shell _shell;
+    Block _block;
 
     const Subcomms* _subcomms;
     unsigned _level;
@@ -881,20 +928,20 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NewNode() const
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
+DistQuasi2dHMatrix<Scalar,Conjugated>::Block::Block()
 : type(EMPTY), data() 
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
+DistQuasi2dHMatrix<Scalar,Conjugated>::Block::~Block()
 { 
     Clear();
 }
 
 template<typename Scalar,bool Conjugated>
 inline void
-DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Clear()
+DistQuasi2dHMatrix<Scalar,Conjugated>::Block::Clear()
 {
     switch( type )
     {
@@ -903,12 +950,24 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Shell::Clear()
     case NODE:
         delete data.N; break;
 
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+        delete data.NG; break;
+
     case DIST_LOW_RANK:  delete data.DF; break;
     case SPLIT_LOW_RANK: delete data.SF; break;
     case LOW_RANK:       delete data.F;  break;
 
+    case DIST_LOW_RANK_GHOST:  delete data.DFG; break;
+    case SPLIT_LOW_RANK_GHOST: delete data.SFG; break;
+    case LOW_RANK_GHOST:       delete data.FG;  break;
+
     case SPLIT_DENSE: delete data.SD; break;
     case DENSE:       delete data.D;  break;
+
+    case SPLIT_DENSE_GHOST: delete data.SDG; break;
+    case DENSE_GHOST:       delete data.DG;  break;
 
     case EMPTY: break;
     }
@@ -976,14 +1035,14 @@ DistNodeContext::Child( int t, int s ) const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-ContextShell::ContextShell()
+ContextBlock::ContextBlock()
 : type(EMPTY), data()
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-ContextShell::~ContextShell()
+ContextBlock::~ContextBlock()
 {
     Clear();
 }
@@ -991,7 +1050,7 @@ ContextShell::~ContextShell()
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::
-ContextShell::Clear()
+ContextBlock::Clear()
 {
     switch( type )
     {
@@ -1006,6 +1065,14 @@ ContextShell::Clear()
     case SPLIT_DENSE:
         delete data.z; break;
 
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -1019,7 +1086,7 @@ template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorContext::Clear()
 {
-    shell.Clear();
+    block.Clear();
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1084,14 +1151,14 @@ DistNodeContext::Child( int t, int s ) const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-ContextShell::ContextShell()
+ContextBlock::ContextBlock()
 : type(EMPTY), data()
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-ContextShell::~ContextShell()
+ContextBlock::~ContextBlock()
 {
     Clear();
 }
@@ -1099,7 +1166,7 @@ ContextShell::~ContextShell()
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::
-ContextShell::Clear()
+ContextBlock::Clear()
 {
     switch( type )
     {
@@ -1114,6 +1181,14 @@ ContextShell::Clear()
     case SPLIT_DENSE:
         delete data.Z; break;
 
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
     case NODE:
     case LOW_RANK:
     case DENSE:
@@ -1127,7 +1202,7 @@ template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::Clear()
 {
-    shell.Clear();
+    block.Clear();
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1309,14 +1384,14 @@ NodeContext::Child( int t, int s ) const
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-ContextShell::ContextShell()
+ContextBlock::ContextBlock()
 : type(EMPTY), data()
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-ContextShell::~ContextShell()
+ContextBlock::~ContextBlock()
 {
     Clear();
 }
@@ -1324,7 +1399,7 @@ ContextShell::~ContextShell()
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-ContextShell::Clear()
+ContextBlock::Clear()
 {
     switch( type )
     {
@@ -1349,6 +1424,17 @@ ContextShell::Clear()
 
     case EMPTY: 
         break;
+
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
+        throw std::logic_error("Have not yet handled ghosts");
+        break;
     }
     type = EMPTY;
 }
@@ -1357,7 +1443,7 @@ template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::Clear()
 {
-    shell.Clear();
+    block.Clear();
 }
 
 /*

@@ -40,6 +40,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     C.Clear();
 
     MapHMatrixContext context;
+    //MapMatrixFillGhosts( context, alpha, B, C );
     MapMatrixPrecompute( context, alpha, B, C );
     // TODO
 #ifndef RELEASE
@@ -59,16 +60,17 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
 #endif
     const DistQuasi2d& A = *this;
 
-    if( !A._inTargetTeam && !B._inSourceTeam )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
-        C._shell.type = EMPTY;
-        context.shell.type = EMPTY;
+        C._block.type = EMPTY;
+        context.block.type = EMPTY;
         return;
     }
 
+    // HERE...need to branch depending on which matrices are ghosts
     MPI_Comm team = A._subcomms->Subcomm( A._level );
     const int teamSize = mpi::CommSize( team );
-    if( context.shell.type == EMPTY )
+    if( context.block.type == EMPTY )
     {
         C._numLevels = A._numLevels;
         C._maxRank = A._maxRank;
@@ -102,52 +104,52 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         {
             if( teamSize > 1 )
             {
-                C._shell.type = DIST_LOW_RANK;
-                C._shell.data.DF = new DistLowRank;
-                context.shell.type = DIST_LOW_RANK;
-                context.shell.data.DF = 
+                C._block.type = DIST_LOW_RANK;
+                C._block.data.DF = new DistLowRank;
+                context.block.type = DIST_LOW_RANK;
+                context.block.data.DF = 
                     new typename MapHMatrixContext::DistLowRankContext;
             }
             else // teamSize == 1
             {
                 if( C._inSourceTeam && C._inTargetTeam )
                 {
-                    C._shell.type = LOW_RANK;    
-                    C._shell.data.F = new LowRank;
-                    context.shell.type = LOW_RANK;
-                    context.shell.data.F = 
+                    C._block.type = LOW_RANK;    
+                    C._block.data.F = new LowRank;
+                    context.block.type = LOW_RANK;
+                    context.block.data.F = 
                         new typename MapHMatrixContext::LowRankContext;
                 }
                 else
                 {
-                    C._shell.type = SPLIT_LOW_RANK;
-                    C._shell.data.SF = new SplitLowRank;
-                    context.shell.type = SPLIT_LOW_RANK;
-                    context.shell.data.SF = 
+                    C._block.type = SPLIT_LOW_RANK;
+                    C._block.data.SF = new SplitLowRank;
+                    context.block.type = SPLIT_LOW_RANK;
+                    context.block.data.SF = 
                         new typename MapHMatrixContext::SplitLowRankContext;
                 }
             }
         }
         else if( C._numLevels > 1 )
         {
-            context.shell.type = NODE;
-            context.shell.data.N = new typename MapHMatrixContext::NodeContext;
+            context.block.type = NODE;
+            context.block.data.N = new typename MapHMatrixContext::NodeContext;
             if( teamSize > 1 )
             {
-                C._shell.type = DIST_NODE;
-                C._shell.data.N = C.NewNode();
+                C._block.type = DIST_NODE;
+                C._block.data.N = C.NewNode();
             }
             else // teamSize == 1
             {
                 if( C._inSourceTeam && C._inTargetTeam )
                 {
-                    C._shell.type = NODE;
-                    C._shell.data.N = C.NewNode();
+                    C._block.type = NODE;
+                    C._block.data.N = C.NewNode();
                 }
                 else
                 {
-                    C._shell.type = SPLIT_NODE;
-                    C._shell.data.N = C.NewNode();
+                    C._block.type = SPLIT_NODE;
+                    C._block.data.N = C.NewNode();
                 }
             }
         }
@@ -155,37 +157,37 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         {
             if( C._inSourceTeam && C._inTargetTeam )
             {
-                C._shell.type = DENSE;
-                C._shell.data.D = new Dense;
-                context.shell.type = DENSE;
-                context.shell.data.D = 
+                C._block.type = DENSE;
+                C._block.data.D = new Dense;
+                context.block.type = DENSE;
+                context.block.data.D = 
                     new typename MapHMatrixContext::DenseContext;
             }
             else
             {
-                C._shell.type = SPLIT_DENSE;
-                C._shell.data.SD = new SplitDense;
-                context.shell.type = SPLIT_DENSE;
-                context.shell.data.SD = 
+                C._block.type = SPLIT_DENSE;
+                C._block.data.SD = new SplitDense;
+                context.block.type = SPLIT_DENSE;
+                context.block.data.SD = 
                     new typename MapHMatrixContext::SplitDenseContext;
             }
         }
     }
 
-    switch( C._shell.type )
+    switch( C._block.type )
     {
     case DIST_NODE:
     {
-        Node& nodeC = *C._shell.data.N;
+        Node& nodeC = *C._block.data.N;
         typename MapHMatrixContext::DistNodeContext& distNodeContext = 
-            *context.shell.data.DN;
+            *context.block.data.DN;
 
         // Allow for distributed {H,F}
-        if( A._shell.type == DIST_NODE &&
-            B._shell.type == DIST_NODE )
+        if( A._block.type == DIST_NODE &&
+            B._block.type == DIST_NODE )
         {
-            const Node& nodeA = *A._shell.data.N;
-            const Node& nodeB = *B._shell.data.N;
+            const Node& nodeA = *A._block.data.N;
+            const Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
@@ -193,8 +195,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                         ( distNodeContext.Child(t,s), 
                           alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
         }
-        else if( A._shell.type == DIST_NODE &&
-                 B._shell.type == DIST_LOW_RANK )
+        else if( A._block.type == DIST_NODE &&
+                 B._block.type == DIST_LOW_RANK )
         {
             const int key = A._sourceOffset;
             if( A._inSourceTeam || A._inTargetTeam )
@@ -205,7 +207,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             }
             if( A._inSourceTeam )
             {
-                const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
+                const DenseMatrix<Scalar>& ULocalB = B._block.data.DF->ULocal;
                 distNodeContext.ULocalMap[key] = 
                     new DenseMatrix<Scalar>( C.LocalHeight(), ULocalB.Width() );
                 A.MapMatrixPrecompute
@@ -213,8 +215,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                   alpha, ULocalB, *distNodeContext.ULocalMap[key] );
             }
         }
-        else if( A._shell.type == DIST_LOW_RANK &&
-                 B._shell.type == DIST_NODE )
+        else if( A._block.type == DIST_LOW_RANK &&
+                 B._block.type == DIST_NODE )
         {
             const int key = A._sourceOffset;
             if( A._inSourceTeam || A._inTargetTeam )
@@ -226,7 +228,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
             }
             if( A._inSourceTeam )
             {
-                const DenseMatrix<Scalar>& VLocalA = A._shell.data.DF->VLocal;
+                const DenseMatrix<Scalar>& VLocalA = A._block.data.DF->VLocal;
                 distNodeContext.VLocalMap[key] = 
                     new DenseMatrix<Scalar>( C.LocalWidth(), VLocalA.Width() );
                 B.HermitianTransposeMapMatrixPrecompute
@@ -234,13 +236,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                   (Scalar)1, VLocalA, *distNodeContext.VLocalMap[key] );
             }
         }
-        else if( A._shell.type == DIST_LOW_RANK &&
-                 B._shell.type == DIST_LOW_RANK )
+        else if( A._block.type == DIST_LOW_RANK &&
+                 B._block.type == DIST_LOW_RANK )
         {
             if( A._inSourceTeam )
             {
-                const DenseMatrix<Scalar>& VLocalA = A._shell.data.DF->VLocal;
-                const DenseMatrix<Scalar>& ULocalB = B._shell.data.DF->ULocal;
+                const DenseMatrix<Scalar>& VLocalA = A._block.data.DF->VLocal;
+                const DenseMatrix<Scalar>& ULocalB = B._block.data.DF->ULocal;
 
                 const int key = A._sourceOffset;
                 distNodeContext.ZMap[key] = 
@@ -263,16 +265,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case SPLIT_NODE:
     {
-        Node& nodeC = *C._shell.data.N;
+        Node& nodeC = *C._block.data.N;
         typename MapHMatrixContext::SplitNodeContext& nodeContext = 
-            *context.shell.data.SN;
+            *context.block.data.SN;
 
         // Allow for split/serial {H,F}, where at least one is split
-        if( A._shell.type == SPLIT_NODE &&
-            B._shell.type == SPLIT_NODE )
+        if( A._block.type == SPLIT_NODE &&
+            B._block.type == SPLIT_NODE )
         {
-            const Node& nodeA = *A._shell.data.N;
-            const Node& nodeB = *B._shell.data.N;
+            const Node& nodeA = *A._block.data.N;
+            const Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
@@ -280,11 +282,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == NODE )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == NODE )
         {
-            const Node& nodeA = *A._shell.data.N;
-            const Node& nodeB = *B._shell.data.N;
+            const Node& nodeA = *A._block.data.N;
+            const Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
@@ -292,21 +294,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == NODE &&
+                 B._block.type == SPLIT_NODE )
         {
-            const Node& nodeA = *A._shell.data.N;
-            const Node& nodeB = *B._shell.data.N;
+            const Node& nodeA = *A._block.data.N;
+            const Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
@@ -314,38 +316,38 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == NODE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local H-matrix multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == NODE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == NODE )
         {
             // TODO: Local H-matrix multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
@@ -357,16 +359,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     }
     case NODE:
     {
-        Node& nodeC = *C._shell.data.N;
+        Node& nodeC = *C._block.data.N;
         typename MapHMatrixContext::NodeContext& nodeContext = 
-            *context.shell.data.N;
+            *context.block.data.N;
 
         // Allow for split/serial {H,F}, where either none or both are split
-        if( A._shell.type == SPLIT_NODE &&
-            B._shell.type == SPLIT_NODE )
+        if( A._block.type == SPLIT_NODE &&
+            B._block.type == SPLIT_NODE )
         {
-            const Node& nodeA = *A._shell.data.N;
-            const Node& nodeB = *B._shell.data.N;
+            const Node& nodeA = *A._block.data.N;
+            const Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
@@ -374,16 +376,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == NODE )
+        else if( A._block.type == NODE &&
+                 B._block.type == NODE )
         {
-            const Node& nodeA = *A._shell.data.N;
-            const Node& nodeB = *B._shell.data.N;
+            const Node& nodeA = *A._block.data.N;
+            const Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     for( int r=0; r<4; ++r )
@@ -391,28 +393,28 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
                         ( nodeContext.Child(t,s), alpha, nodeB.Child(r,s),
                           nodeC.Child(t,s) );
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == NODE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == NODE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == NODE )
         {
             // TODO: Local H-matrix multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
@@ -425,29 +427,29 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     case DIST_LOW_RANK:
     {
         /*
-        DistLowRank& DFC = *C._shell.data.DF;
+        DistLowRank& DFC = *C._block.data.DF;
         typename MapHMatrixContext::DistLowRankContext& DFCContext = 
-            *context.shell.data.DF;
+            *context.block.data.DF;
         */
 
         // Allow for distributed {H,F}
-        if( A._shell.type == DIST_NODE &&
-            B._shell.type == DIST_NODE )
+        if( A._block.type == DIST_NODE &&
+            B._block.type == DIST_NODE )
         {
             // TODO: Start the randomized low-rank discovery
         }
-        else if( A._shell.type == DIST_NODE &&
-                 B._shell.type == DIST_LOW_RANK )
+        else if( A._block.type == DIST_NODE &&
+                 B._block.type == DIST_LOW_RANK )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == DIST_LOW_RANK &&
-                 B._shell.type == DIST_NODE )
+        else if( A._block.type == DIST_LOW_RANK &&
+                 B._block.type == DIST_NODE )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == DIST_LOW_RANK &&
-                 B._shell.type == DIST_LOW_RANK )
+        else if( A._block.type == DIST_LOW_RANK &&
+                 B._block.type == DIST_LOW_RANK )
         {
             // TODO: Local multiply
         }
@@ -460,115 +462,115 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     case SPLIT_LOW_RANK:
     {
         /*
-        SplitLowRank& SFC = *C._shell.data.SF;
+        SplitLowRank& SFC = *C._block.data.SF;
         typename MapHMatrixContext::SplitLowRankContext& SFCContext = 
-            *context.shell.data.SF;
+            *context.block.data.SF;
         */
 
         // Allow for split/serial {H,F,D} where at least one is split and 
         // recall that D and H cannot occur at the same level.
-        if( A._shell.type == SPLIT_NODE &&
-            B._shell.type == SPLIT_NODE )
+        if( A._block.type == SPLIT_NODE &&
+            B._block.type == SPLIT_NODE )
         {
             // TODO: Start randomized low-rank discovery
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == NODE )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == NODE )
         {
             // TODO: Start MapMatrixPrecompute
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Start MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Start MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == NODE &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: Start MapMatrixPrecompute
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == NODE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: MapMatrixPrecompute for dense 
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == NODE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == NODE )
         {
             // TODO: Local multiply 
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == DENSE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == DENSE &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
@@ -581,80 +583,80 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     case LOW_RANK:
     {
         /*
-        LowRank& FC = *C._shell.data.F;
+        LowRank& FC = *C._block.data.F;
         typename MapHMatrixContext::LowRankContext& FCContext = 
-            *context.shell.data.F;
+            *context.block.data.F;
         */
 
         // Allow for split/serial {H,F,D} where either none or both is split and
         // recall that D and H cannot occur at the same level.
-        if( A._shell.type == SPLIT_NODE &&
-            B._shell.type == SPLIT_NODE )
+        if( A._block.type == SPLIT_NODE &&
+            B._block.type == SPLIT_NODE )
         {
             // TODO: Start randomized low-rank discovery
         }
-        else if( A._shell.type == SPLIT_NODE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_NODE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == NODE )
+        else if( A._block.type == NODE &&
+                 B._block.type == NODE )
         {
             // TODO: Randomized low-rank discovery
         }
-        else if( A._shell.type == NODE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == NODE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local H-matrix multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_NODE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_NODE )
         {
             // TODO: MapMatrixPrecompute for dense
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == NODE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == NODE )
         {
             // TODO: Local H-matrix multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiplies
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == DENSE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == DENSE &&
+                 B._block.type == DENSE )
         {
             // TODO: Local truncated SVD
         }
@@ -667,69 +669,69 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     case SPLIT_DENSE:
     {
         /*
-        SplitDense& SDC = *C._shell.data.SD;
+        SplitDense& SDC = *C._block.data.SD;
         typename MapHMatrixContext::SplitDenseContext& SDCContext = 
-            *context.shell.data.SD;
+            *context.block.data.SD;
         */
 
         // Allow for split/serial {F,D}, where at least one must be split
-        if( A._shell.type == SPLIT_LOW_RANK &&
-            B._shell.type == SPLIT_LOW_RANK )
+        if( A._block.type == SPLIT_LOW_RANK &&
+            B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == DENSE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == DENSE &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
@@ -742,49 +744,49 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     case DENSE:
     {
         /*
-        Dense& DC = *C._shell.data.D;
+        Dense& DC = *C._block.data.D;
         typename MapHMatrixContext::DenseContext& DCContext = 
-            *context.shell.data.D;
+            *context.block.data.D;
         */
 
         // Allow for {F,D} where either none or both are split
-        if( A._shell.type == SPLIT_LOW_RANK &&
-            B._shell.type == SPLIT_LOW_RANK )
+        if( A._block.type == SPLIT_LOW_RANK &&
+            B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_LOW_RANK &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_LOW_RANK &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiplies
         }
-        else if( A._shell.type == LOW_RANK &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == LOW_RANK &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiplies
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_LOW_RANK )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == SPLIT_DENSE &&
-                 B._shell.type == SPLIT_DENSE )
+        else if( A._block.type == SPLIT_DENSE &&
+                 B._block.type == SPLIT_DENSE )
         {
             // TODO: Nothing...
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == LOW_RANK )
+        else if( A._block.type == DENSE &&
+                 B._block.type == LOW_RANK )
         {
             // TODO: Local multiply
         }
-        else if( A._shell.type == DENSE &&
-                 B._shell.type == DENSE )
+        else if( A._block.type == DENSE &&
+                 B._block.type == DENSE )
         {
             // TODO: Local multiply
         }

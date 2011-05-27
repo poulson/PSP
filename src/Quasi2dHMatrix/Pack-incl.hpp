@@ -199,24 +199,23 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
 ( std::size_t& packedSize ) const
 {
-    const Shell& shell = _shell;
-    packedSize += sizeof(ShellType);
-    switch( shell.type )
+    packedSize += sizeof(BlockType);
+    switch( _block.type )
     {
     case NODE:
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                shell.data.N->Child(t,s).PackedSizeRecursion( packedSize );
+                _block.data.N->Child(t,s).PackedSizeRecursion( packedSize );
         break;
     case NODE_SYMMETRIC:
         for( int t=0; t<4; ++t )
             for( int s=0; s<=t; ++s )
-                shell.data.NS->Child(t,s).PackedSizeRecursion( packedSize );
+                _block.data.NS->Child(t,s).PackedSizeRecursion( packedSize );
         break;
     case LOW_RANK:
     {
-        const Dense& U = shell.data.F->U;
-        const Dense& V = shell.data.F->V;
+        const Dense& U = _block.data.F->U;
+        const Dense& V = _block.data.F->V;
         const int m = U.Height();
         const int n = V.Height();
         const int r = U.Width();
@@ -231,7 +230,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackedSizeRecursion
     }
     case DENSE:
     {
-        const Dense& D = *shell.data.D;
+        const Dense& D = *_block.data.D;
         const int m = D.Height();
         const int n = D.Width();
         const MatrixType type = D.Type();
@@ -252,24 +251,23 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
 ( byte*& head ) const
 {
-    const Shell& shell = _shell;
-    Write( head, shell.type );
-    switch( shell.type )
+    Write( head, _block.type );
+    switch( _block.type )
     {
     case NODE:
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                shell.data.N->Child(t,s).PackRecursion( head );
+                _block.data.N->Child(t,s).PackRecursion( head );
         break;
     case NODE_SYMMETRIC:
         for( int t=0; t<4; ++t )
             for( int s=0; s<=t; ++s )
-                shell.data.NS->Child(t,s).PackRecursion( head );
+                _block.data.NS->Child(t,s).PackRecursion( head );
         break;
     case LOW_RANK:
     {
-        const Dense& U = shell.data.F->U;
-        const Dense& V = shell.data.F->V;
+        const Dense& U = _block.data.F->U;
+        const Dense& V = _block.data.F->V;
         const int m = U.Height();
         const int n = V.Height();
         const int r = U.Width();
@@ -289,7 +287,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::PackRecursion
     }
     case DENSE:
     {
-        const Dense& D = *shell.data.D;
+        const Dense& D = *_block.data.D;
         const int m = D.Height();
         const int n = D.Width();
         const MatrixType type = D.Type();
@@ -313,18 +311,14 @@ void
 psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head )
 {
-    // If data has been allocated, delete it
-    Shell& shell = _shell;
-    shell.Clear();
-
-    // Create this layer of the H-matrix from the packed information
-    shell.type = Read<ShellType>( head );
-    switch( shell.type )
+    _block.Clear();
+    _block.type = Read<BlockType>( head );
+    switch( _block.type )
     {
     case NODE:
     {
-        shell.data.N = NewNode();
-        Node& node = *shell.data.N;
+        _block.data.N = NewNode();
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
             for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
@@ -345,8 +339,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case NODE_SYMMETRIC:
     {
-        shell.data.NS = NewNodeSymmetric();
-        NodeSymmetric& node = *shell.data.NS;
+        _block.data.NS = NewNodeSymmetric();
+        NodeSymmetric& node = *_block.data.NS;
         int child = 0;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sizes[t],++t )
         {
@@ -368,9 +362,9 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
     }
     case LOW_RANK:
     {
-        shell.data.F = new LowRank;
-        Dense& U = shell.data.F->U;
-        Dense& V = shell.data.F->V;
+        _block.data.F = new LowRank;
+        Dense& U = _block.data.F->U;
+        Dense& V = _block.data.F->V;
         const int m = Height();
         const int n = Width();
 
@@ -390,8 +384,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
         break;
     }
     case DENSE:
-        shell.data.D = new Dense;
-        Dense& D = *shell.data.D;
+        _block.data.D = new Dense;
+        Dense& D = *_block.data.D;
         const int m = Height();
         const int n = Width();
 

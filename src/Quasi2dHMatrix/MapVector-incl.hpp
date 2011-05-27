@@ -28,12 +28,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
     PushCallStack("Quasi2dHMatrix::MapVector (y := H x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
             Vector<Scalar> ySub;
@@ -53,10 +53,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapVector
         UpdateVectorWithNodeSymmetric( alpha, x, y );
         break;
     case LOW_RANK:
-        hmatrix_tools::MatrixVector( alpha, *_shell.data.F, x, (Scalar)1, y );
+        hmatrix_tools::MatrixVector( alpha, *_block.data.F, x, (Scalar)1, y );
         break;
     case DENSE:
-        hmatrix_tools::MatrixVector( alpha, *_shell.data.D, x, (Scalar)1, y );
+        hmatrix_tools::MatrixVector( alpha, *_block.data.D, x, (Scalar)1, y );
         break;
     }
 #ifndef RELEASE
@@ -88,12 +88,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
     PushCallStack("Quasi2dHMatrix::TransposeMapVector (y := H^T x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Vector<Scalar> ySub;
@@ -115,11 +115,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixTransposeVector
-        ( alpha, *_shell.data.F, x, (Scalar)1, y );
+        ( alpha, *_block.data.F, x, (Scalar)1, y );
         break;
     case DENSE:
         hmatrix_tools::MatrixTransposeVector
-        ( alpha, *_shell.data.D, x, (Scalar)1, y );
+        ( alpha, *_block.data.D, x, (Scalar)1, y );
         break;
     }
 #ifndef RELEASE
@@ -152,12 +152,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Vector<Scalar> ySub;
@@ -185,11 +185,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     }
     case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.data.F, x, (Scalar)1, y );
+        ( alpha, *_block.data.F, x, (Scalar)1, y );
         break;
     case DENSE:
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.data.D, x, (Scalar)1, y );
+        ( alpha, *_block.data.D, x, (Scalar)1, y );
         break;
     }
 #ifndef RELEASE
@@ -209,12 +209,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
     ("Quasi2dHMatrix::HermitianTransposeMapVector (y := H^H x + y, non-const)");
 #endif
     hmatrix_tools::Scale( beta, y );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Vector<Scalar> ySub;
@@ -240,11 +240,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.data.F, x, (Scalar)1, y );
+        ( alpha, *_block.data.F, x, (Scalar)1, y );
         break;
     case DENSE:
         hmatrix_tools::MatrixHermitianTransposeVector
-        ( alpha, *_shell.data.D, x, (Scalar)1, y );
+        ( alpha, *_block.data.D, x, (Scalar)1, y );
         break;
     }
 #ifndef RELEASE

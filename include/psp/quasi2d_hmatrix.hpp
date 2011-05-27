@@ -76,7 +76,7 @@ private:
     };
     NodeSymmetric* NewNodeSymmetric() const;
 
-    enum ShellType 
+    enum BlockType 
     { 
         NODE, 
         NODE_SYMMETRIC, 
@@ -84,9 +84,9 @@ private:
         DENSE 
     };
 
-    struct Shell
+    struct Block
     {
-        ShellType type;
+        BlockType type;
         union Data
         {
             Node* N;
@@ -95,8 +95,8 @@ private:
             DenseMatrix<Scalar>* D;
             Data() { std::memset( this, 0, sizeof(Data) ); }
         } data;
-        Shell();
-        ~Shell();
+        Block();
+        ~Block();
         void Clear();
     };
 
@@ -114,7 +114,7 @@ private:
     int _zSize;
     int _xSource, _xTarget;
     int _ySource, _yTarget;
-    Shell _shell;
+    Block _block;
 
     /*
      * Private non-static member functions
@@ -245,10 +245,10 @@ public:
     int XTarget() const { return _xTarget; }
     int YTarget() const { return _yTarget; }
 
-    bool IsDense() const { return _shell.type == DENSE; }
+    bool IsDense() const { return _block.type == DENSE; }
     bool IsHierarchical() const
-    { return _shell.type == NODE || _shell.type == NODE_SYMMETRIC; }
-    bool IsLowRank() const { return _shell.type == LOW_RANK; }
+    { return _block.type == NODE || _block.type == NODE_SYMMETRIC; }
+    bool IsLowRank() const { return _block.type == LOW_RANK; }
 
     // Write a representation of the H-matrix structure to file. It can be
     // visualized with util/PlotHStructure.m
@@ -622,20 +622,20 @@ Quasi2dHMatrix<Scalar,Conjugated>::NewNodeSymmetric() const
 
 template<typename Scalar,bool Conjugated>
 inline
-Quasi2dHMatrix<Scalar,Conjugated>::Shell::Shell()
+Quasi2dHMatrix<Scalar,Conjugated>::Block::Block()
 : type(NODE), data() 
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
-Quasi2dHMatrix<Scalar,Conjugated>::Shell::~Shell()
+Quasi2dHMatrix<Scalar,Conjugated>::Block::~Block()
 {
     Clear();
 }
 
 template<typename Scalar,bool Conjugated>
 inline void
-Quasi2dHMatrix<Scalar,Conjugated>::Shell::Clear()
+Quasi2dHMatrix<Scalar,Conjugated>::Block::Clear()
 {
     switch( type )
     {

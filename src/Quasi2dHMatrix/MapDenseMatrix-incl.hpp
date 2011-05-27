@@ -29,12 +29,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     PushCallStack("Quasi2dHMatrix::MapMatrix (D := H D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
             Dense CSub;
@@ -56,11 +56,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixMatrix
-        ( alpha, *_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_block.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixMatrix
-        ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_block.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -95,12 +95,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     PushCallStack("Quasi2dHMatrix::TransposeMapMatrix (D := H^T D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Dense CSub;
@@ -123,11 +123,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixTransposeMatrix
-        ( alpha, *_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_block.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixTransposeMatrix
-        ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_block.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -163,12 +163,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Dense CSub;
@@ -197,11 +197,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     }
     case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_block.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_block.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE
@@ -221,12 +221,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D, non-const)");
 #endif
     hmatrix_tools::Scale( beta, C );
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
         // Loop over all 16 children, summing in each row
-        Node& node = *_shell.data.N;
+        Node& node = *_block.data.N;
         for( int t=0,tOffset=0; t<4; tOffset+=node.sourceSizes[t],++t )
         {
             Dense CSub;
@@ -253,11 +253,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         break;
     case LOW_RANK:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.data.F, B, (Scalar)1, C );
+        ( alpha, *_block.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
         hmatrix_tools::MatrixHermitianTransposeMatrix
-        ( alpha, *_shell.data.D, B, (Scalar)1, C );
+        ( alpha, *_block.data.D, B, (Scalar)1, C );
         break;
     }
 #ifndef RELEASE

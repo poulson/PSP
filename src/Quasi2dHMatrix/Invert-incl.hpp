@@ -31,7 +31,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
     if( IsLowRank() )
         throw std::logic_error("Cannot invert low-rank matrices");
 #endif
-    switch( _shell.type )
+    switch( _block.type )
     {
     case NODE:
     {
@@ -43,8 +43,8 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
         // Initialize our soon-to-be inverse as the identity
         SetToIdentity();
 
-        Node& nodeA = *_shell.data.N;
-        Node& nodeB = *B._shell.data.N;
+        Node& nodeA = *_block.data.N;
+        Node& nodeB = *B._block.data.N;
 
         for( int l=0; l<4; ++l )
         {
@@ -119,7 +119,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::DirectInvert()
         break;
     }
     case DENSE:
-        hmatrix_tools::Invert( *_shell.data.D );
+        hmatrix_tools::Invert( *_block.data.D );
         break;
     case LOW_RANK:
     {
