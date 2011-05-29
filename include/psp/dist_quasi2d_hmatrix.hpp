@@ -602,6 +602,9 @@ private:
       const std::vector< std::set<int> >& targetStructure,
       int sourceRoot, int targetRoot );
 
+    void GetRank( const BlockId& blockId, int& rank ) const;
+    void SetGhostRank( const BlockId& blockId, const int rank );
+
     void MapVectorInitialize
     ( MapVectorContext& context ) const;
     void MapVectorPrecompute

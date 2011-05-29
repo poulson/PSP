@@ -78,12 +78,40 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FormGhostNodes()
         std::memcpy
         ( &recvBlockIds[i][0], &recvBuf[recvDispls[i]], recvCounts[i] );
 
-    // TODO: Pack all ranks according to blockIds
+    for( int i=0; i<commSize; ++i )
+    {
+        const int numRecvBlocks = recvCounts[i] / sizeof(BlockId);
+        for( int j=0; j<numRecvBlocks; ++j )
+            GetRank
+            ( recvBlockIds[i][j], 
+              *((int*)&recvBuf[recvDispls[i]+j*sizeof(int)]) );
+    }
 
-    // TODO: Send and receive all ranks
+    // Prepare for sending/recving the ranks. Switch the send/recv buffers
+    // since we're going in the opposite direction now and they are sufficiently
+    // large.
+    for( int i=0; i<commSize; ++i )
+        sendCounts[i] = numRecvBlocks[i]*sizeof(int);
+    sendDispls[0] = 0;
+    for( int i=1; i<commSize; ++i )
+        sendDispls[i] = sendDispls[i-1] + sendCounts[i-1];
+    for( int i=0; i<commSize; ++i )
+        recvCounts[i] = numSendBlocks[i]*sizeof(int);
+    recvDispls[0] = 0;
+    for( int i=1; i<commSize; ++i )
+        recvDispls[i] = recvDispls[i-1] + recvCounts[i-1]; 
+    mpi::AllToAllV
+    ( &recvBuf[0], &sendCounts[0], &sendDispls[0],
+      &sendBuf[0], &recvCounts[0], &recvDispls[0], comm );
 
-    // TODO: Unpack all ranks
-
+    for( int i=0; i<commSize; ++i )
+    {
+        const int numRecvRanks = recvCounts[i] / sizeof(int);
+        for( int j=0; j<numRecvRanks; ++j )
+            SetGhostRank
+            ( sendBlockIds[i][j], 
+              *((int*)&sendBuf[recvDispls[i]+j*sizeof(int)]) );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -424,4 +452,114 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
     PopCallStack();
 #endif
 }
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::GetRank
+( const BlockId& blockId, int& rank ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::GetRank");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE: 
+    case SPLIT_NODE:
+    case NODE:
+    {
+        const Node& node = *_block.data.N;
+        int t=0,tOffset=_targetOffset;
+        for(; t<4; tOffset+=node.targetSizes[t],++t )
+            if( tOffset+node.targetSizes[t] > blockId.targetOffset )
+                break;
+        int s=0,sOffset=_sourceOffset;
+        for(; s<4; sOffset+=node.sourceSizes[s],++s )
+            if( sOffset+node.sourceSizes[s] > blockId.sourceOffset )
+                break;
+        node.Child(t,s).GetRank( blockId, rank );
+        break;
+    }
+    case DIST_LOW_RANK:
+        rank = _block.data.DF->rank;
+        break;
+    case SPLIT_LOW_RANK:
+        rank = _block.data.SF->rank;
+        break;
+    case LOW_RANK:
+        rank = _block.data.F->Rank();
+        break;
+
+    case SPLIT_DENSE:
+    case DENSE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
+#ifndef RELEASE
+        throw std::logic_error("Invalid logic in GetRank");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::SetGhostRank
+( const BlockId& blockId, const int rank ) 
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::SetGhostRank");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE: 
+    {
+        Node& node = *_block.data.N;
+        int t=0,tOffset=_targetOffset;
+        for(; t<4; tOffset+=node.targetSizes[t],++t )
+            if( tOffset+node.targetSizes[t] > blockId.targetOffset )
+                break;
+        int s=0,sOffset=_sourceOffset;
+        for(; s<4; sOffset+=node.sourceSizes[s],++s )
+            if( sOffset+node.sourceSizes[s] > blockId.sourceOffset )
+                break;
+        node.Child(t,s).SetGhostRank( blockId, rank );
+        break;
+    }
+    case DIST_LOW_RANK_GHOST:
+        _block.data.DFG->rank = rank;
+        break;
+    case SPLIT_LOW_RANK_GHOST:
+        _block.data.SFG->rank = rank;
+        break;
+    case LOW_RANK_GHOST:
+        _block.data.FG->rank = rank;
+        break;
+
+    case SPLIT_NODE:
+    case NODE:
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+    case SPLIT_DENSE:
+    case DENSE:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
+#ifndef RELEASE
+        throw std::logic_error("Invalid logic in SetGhostRank");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 
