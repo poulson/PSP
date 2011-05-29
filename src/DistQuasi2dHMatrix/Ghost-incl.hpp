@@ -35,14 +35,55 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FormGhostNodes()
     MPI_Comm comm = _subcomms->Subcomm( 0 );
     const int commSize = mpi::CommSize( comm );
 
-    std::vector< std::vector<BlockId> > blockIds( commSize );
-    FindGhostNodesRecursion( blockIds, sourceStructure, targetStructure, 0, 0 );
+    // Fill in the local ghosted structure (but without the ghosts' ranks)
+    std::vector< std::vector<BlockId> > sendBlockIds( commSize );
+    FindGhostNodesRecursion
+    ( sendBlockIds, sourceStructure, targetStructure, 0, 0 );
 
-    // TODO: Perform AllToAll to send number of blockIds to each process
-    // TODO: Send and receive all blockIds
+    // Have every process let every other process know how many blockIds
+    // they will be sending for the rank requests
+    std::vector<int> numSendBlocks( commSize ), numRecvBlocks( commSize );
+    for( int i=0; i<commSize; ++i )
+        numSendBlocks[i] = sendBlockIds[i].size();
+    mpi::AllToAll( &numSendBlocks[0], 1, &numRecvBlocks[0], 1, comm );
+
+    // Set up the send/recv counts/displacement index vectors for the AllToAllV
+    std::vector<int> sendCounts( commSize ), sendDispls( commSize ),
+                     recvCounts( commSize ), recvDispls( commSize );
+    for( int i=0; i<commSize; ++i )
+        sendCounts[i] = numSendBlocks[i]*sizeof(BlockId);
+    sendDispls[0] = 0;
+    for( int i=1; i<commSize; ++i )
+        sendDispls[i] = sendDispls[i-1] + sendCounts[i-1];
+    const int totalSendCount = sendDispls[commSize-1] + sendCounts[commSize-1];
+    for( int i=0; i<commSize; ++i )
+        recvCounts[i] = numRecvBlocks[i]*sizeof(BlockId);
+    recvDispls[0] = 0;
+    for( int i=1; i<commSize; ++i )
+        recvDispls[i] = recvDispls[i-1] + recvCounts[i-1];
+    const int totalRecvCount = recvDispls[commSize-1] + recvCounts[commSize-1];
+
+    // Pack and perform the AllToAllV, then unpack
+    std::vector<byte> sendBuf( totalSendCount ), recvBuf( totalRecvCount );
+    for( int i=0; i<commSize; ++i )
+        std::memcpy
+        ( &sendBuf[sendDispls[i]], &sendBlockIds[i][0], sendCounts[i] );
+    mpi::AllToAllV
+    ( &sendBuf[0], &sendCounts[0], &sendDispls[0],
+      &recvBuf[0], &recvCounts[0], &recvDispls[0], comm );
+    std::vector< std::vector<BlockId> > recvBlockIds( commSize );
+    for( int i=0; i<commSize; ++i )
+        recvBlockIds[i].resize( numRecvBlocks[i] );
+    for( int i=0; i<commSize; ++i )
+        std::memcpy
+        ( &recvBlockIds[i][0], &recvBuf[recvDispls[i]], recvCounts[i] );
+
     // TODO: Pack all ranks according to blockIds
+
     // TODO: Send and receive all ranks
+
     // TODO: Unpack all ranks
+
 #ifndef RELEASE
     PopCallStack();
 #endif
