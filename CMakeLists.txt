@@ -265,7 +265,7 @@ if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
   set(QUASI2D_TESTS Invert LowRankConstructor Pack)
-  set(DIST_QUASI2D_TESTS Pack)
+  set(DIST_QUASI2D_TESTS Ghost Pack)
 endif(BUILD_TESTS)
 
 # Create a dummy library in order to be able to force the math libraries

@@ -22,7 +22,7 @@
 
 void Usage()
 {
-    std::cout << "Pack <xSize> <ySize> <zSize> <numLevels> "
+    std::cout << "Ghost <xSize> <ySize> <zSize> <numLevels> "
                  "<strongly admissible?> <r> <print?> <print structure?>" 
               << std::endl;
 }
@@ -195,68 +195,6 @@ main( int argc, char* argv[] )
                 H.WriteStructure("H_serial_structure");
         }
 
-        // Invert the H-matrix
-        if( rank == 0 )
-        {
-            std::cout << "Inverting H-matrices...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double invertStartTime = psp::mpi::WallTime();
-        H.DirectInvert();
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double invertStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << invertStopTime-invertStartTime
-                      << " seconds." << std::endl;
-            if( print )
-                H.Print("inv(H)");
-            if( printStructure )
-                H.WriteStructure("invH_serial_structure");
-        }
-
-        // Store the result of a serial hmat-mat
-        if( rank == 0 )
-        {
-            std::cout << "Y := H X...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double hmatMatStartTime = psp::mpi::WallTime();
-        psp::DenseMatrix<Scalar> X( n, 30 );
-        for( int j=0; j<X.Width(); ++j )
-            for( int i=0; i<n; ++i )
-                X.Set( i, j, i+j );
-        psp::DenseMatrix<Scalar> Y;
-        H.MapMatrix( (Scalar)1, X, Y );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double hmatMatStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << hmatMatStopTime-hmatMatStartTime 
-                      << " seconds." << std::endl;
-        }
-        
-        // Store the result of a serial hmat-trans-mat
-        if( rank == 0 )
-        {
-            std::cout << "Z := H' X...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double hmatHermTransMatStartTime = psp::mpi::WallTime();
-        psp::DenseMatrix<Scalar> Z;
-        H.HermitianTransposeMapMatrix( (Scalar)1, X, Z );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double hmatHermTransMatStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " 
-                      << hmatHermTransMatStopTime-hmatHermTransMatStartTime 
-                      << " seconds." << std::endl;
-        }
-
         // Set up our subcommunicators and compute the packed sizes
         DistQuasi2d::Subcomms subcomms( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
@@ -338,104 +276,24 @@ main( int argc, char* argv[] )
         if( printStructure )
             distH.WriteLocalStructure("distH_structure");
 
-        // Apply the distributed H-matrix
+        // Form the ghost nodes
         if( rank == 0 )
         {
-            std::cout << "Distributed Y := H X...";
+            std::cout << "Forming ghost nodes...";
             std::cout.flush();
         }
-        psp::DenseMatrix<Scalar> XLocal;
-        XLocal.LockedView
-        ( X, distH.FirstLocalCol(), 0, distH.LocalWidth(), X.Width() );
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distHmatMatStartTime = psp::mpi::WallTime();
-        psp::DenseMatrix<Scalar> YLocal;
-        distH.MapMatrix( (Scalar)1, XLocal, YLocal );
+        double ghostStartTime = psp::mpi::WallTime();
+        distH.FormGhostNodes();
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distHmatMatStopTime = psp::mpi::WallTime();
+        double ghostStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
-            std::cout << "done: " << distHmatMatStopTime-distHmatMatStartTime
+            std::cout << "done: " << ghostStopTime-ghostStartTime
                       << " seconds." << std::endl;
         }
-
-        // Measure how close our result is to the serial results
-        if( rank == 0 )
-        {
-            std::cout << "Comparing serial and distributed results...";
-            std::cout.flush();
-        }
-        psp::DenseMatrix<Scalar> YLocalTruth;
-        YLocalTruth.View
-        ( Y, distH.FirstLocalRow(), 0, distH.LocalHeight(), X.Width() );
-        for( int j=0; j<YLocal.Width(); ++j )
-        {
-            for( int i=0; i<YLocal.Height(); ++i )
-            {
-                if( std::abs(YLocalTruth.Get(i,j)-YLocal.Get(i,j)) > 1e-8 )
-                {
-                    std::ostringstream ss;
-                    ss << "Answer differed at local index (" 
-                        << i << "," << j << "), truth was "
-                       << YLocalTruth.Get(i,j) << ", computed was "
-                       << YLocal.Get(i,j) << std::endl;
-                    throw std::logic_error( ss.str().c_str() );
-                }
-            }
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        if( rank == 0 )
-            std::cout << "done" << std::endl;
-        
-        // Apply the Hermitian-transposed distributed H-matrix
-        if( rank == 0 )
-        {
-            std::cout << "Distributed Z := H' X...";
-            std::cout.flush();
-        }
-        XLocal.LockedView
-        ( X, distH.FirstLocalRow(), 0, distH.LocalHeight(), X.Width() );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distHmatHermTransMatStartTime = psp::mpi::WallTime();
-        psp::DenseMatrix<Scalar> ZLocal;
-        distH.HermitianTransposeMapMatrix( (Scalar)1, XLocal, ZLocal );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distHmatHermTransMatStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " 
-                      << distHmatHermTransMatStopTime-
-                         distHmatHermTransMatStartTime
-                      << " seconds." << std::endl;
-        }
-
-        // Measure how close our result is to the serial results
-        if( rank == 0 )
-        {
-            std::cout << "Comparing serial and distributed results...";
-            std::cout.flush();
-        }
-        psp::DenseMatrix<Scalar> ZLocalTruth;
-        ZLocalTruth.View
-        ( Z, distH.FirstLocalCol(), 0, distH.LocalWidth(), X.Width() );
-        for( int j=0; j<ZLocal.Width(); ++j )
-        {
-            for( int i=0; i<ZLocal.Height(); ++i )
-            {
-                if( std::abs(ZLocalTruth.Get(i,j)-ZLocal.Get(i,j)) > 1e-8 )
-                {
-                    std::ostringstream ss;
-                    ss << "Answer differed at local index (" 
-                        << i << "," << j << "), truth was "
-                       << ZLocalTruth.Get(i,j) << ", computed was "
-                       << ZLocal.Get(i,j) << std::endl;
-                    throw std::logic_error( ss.str().c_str() );
-                }
-            }
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        if( rank == 0 )
-            std::cout << "done" << std::endl;
+        if( printStructure )
+            distH.WriteLocalStructure("distH_ghosted_structure");
     }
     catch( std::exception& e )
     {

@@ -97,6 +97,9 @@ public:
     int FirstLocalRow() const;
     int FirstLocalCol() const;
 
+    // Print out the structure of the tree that we're aware of
+    void WriteLocalStructure( const std::string& basename ) const;
+
     // Unpack this process's portion of the DistQuasi2dHMatrix
     std::size_t Unpack
     ( const byte* packedDistHMatrix, const Subcomms& subcomms );
@@ -579,6 +582,8 @@ private:
      */
     bool Admissible() const;
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
+
+    void WriteLocalStructureRecursion( std::ofstream& file ) const;
     
     // Ensure that the default constructor is not accessible, a communicator
     // must be supplied

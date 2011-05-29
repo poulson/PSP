@@ -310,7 +310,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
         else if( _numLevels > 1 )
         {
             _block.data.NG = NewNodeGhost( sourceRoot, targetRoot );
-            NodeGhost& nodeGhost = *_block.data.NG;
+            NodeGhost& node = *_block.data.NG;
+
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+                for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+                    node.children[s+4*t] = 
+                        new DistQuasi2d
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[s/2], node.yTargetSizes[t/2],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource+(s/2), 2*_yTarget+(t/2),
+                          *_subcomms, _level+1, false, false );
+
             if( teamSize >= 2 )
             {
                 _block.type = DIST_NODE_GHOST;
@@ -318,7 +332,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
                 {
                     for( int t=0; t<4; ++t )
                         for( int s=0; s<4; ++s )
-                            nodeGhost.Child(t,s).FindGhostNodesRecursion
+                            node.Child(t,s).FindGhostNodesRecursion
                             ( blockIds, sourceStructure, targetStructure,
                               sourceRoot+s*teamSize/4, 
                               targetRoot+t*teamSize/4 );
@@ -327,7 +341,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
                 {
                     for( int t=0; t<4; ++t ) 
                         for( int s=0; s<4; ++s )
-                            nodeGhost.Child(t,s).FindGhostNodesRecursion
+                            node.Child(t,s).FindGhostNodesRecursion
                             ( blockIds, sourceStructure, targetStructure,
                               sourceRoot+s/2, targetRoot+t/2 );
                 }
@@ -341,7 +355,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
                 
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
-                        nodeGhost.Child(t,s).FindGhostNodesRecursion
+                        node.Child(t,s).FindGhostNodesRecursion
                         ( blockIds, sourceStructure, targetStructure,
                           sourceRoot, targetRoot );
             }

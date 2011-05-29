@@ -256,6 +256,89 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Admissible
         return xSource != xTarget || ySource != yTarget;
 }
 
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructure
+( const std::string& basename ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::WriteLocalStructure");
+#endif
+    MPI_Comm comm = _subcomms->Subcomm( 0 );
+    const int commRank = mpi::CommRank( comm );
+
+    std::ostringstream os;
+    os << basename << "-" << commRank;
+    std::ofstream file( os.str().c_str() );
+    WriteLocalStructureRecursion( file );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+//----------------------------------------------------------------------------//
+// Private non-static routines                                                //
+//----------------------------------------------------------------------------//
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructureRecursion
+( std::ofstream& file ) const
+{
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        file << "1 " 
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).WriteLocalStructureRecursion( file );
+        break;
+    }
+
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    {
+        file << "1 "
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
+        const NodeGhost& nodeGhost = *_block.data.NG;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                nodeGhost.Child(t,s).WriteLocalStructureRecursion( file );
+        break;
+    }
+
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK:
+    case LOW_RANK_GHOST:
+        file << "5 "
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
+        break;
+
+    case SPLIT_DENSE:
+    case SPLIT_DENSE_GHOST:
+    case DENSE:
+    case DENSE_GHOST:
+        file << "20 "
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
+        break;
+
+    case EMPTY:
+        break;
+    }
+}
+
 template class psp::DistQuasi2dHMatrix<float,false>;
 template class psp::DistQuasi2dHMatrix<float,true>;
 template class psp::DistQuasi2dHMatrix<double,false>;

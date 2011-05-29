@@ -1173,20 +1173,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
     case NODE:
     {
         file << "1 " 
-             << TargetOffset() << " " << SourceOffset() << " "
-             << TargetSize() << " " << SourceSize() 
-             << std::endl;
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
         const Node& node = *_block.data.N;
-        for( unsigned child=0; child<node.children.size(); ++child )
-            node.children[child]->WriteStructureRecursion( file );
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).WriteStructureRecursion( file );
         break;
     }
     case NODE_SYMMETRIC:
     {
         file << "1 " 
-             << TargetOffset() << " " << SourceOffset() << " "
-             << TargetSize() << " " << SourceSize() 
-             << std::endl;
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
         const NodeSymmetric& node = *_block.data.NS;
         for( unsigned child=0; child<node.children.size(); ++child )
             node.children[child]->WriteStructureRecursion( file );
@@ -1194,15 +1193,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
     }
     case LOW_RANK:
         file << "5 " 
-             << TargetOffset() << " " << SourceOffset() << " "
-             << TargetSize() << " " << SourceSize() 
-             << std::endl;
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
         break;
     case DENSE:
         file << "20 " 
-             << TargetOffset() << " " << SourceOffset() << " "
-             << TargetSize() << " " << SourceSize() 
-             << std::endl;
+             << _targetOffset << " " << _sourceOffset << " "
+             << Height() << " " << Width() << "\n";
         break;
     }
 }

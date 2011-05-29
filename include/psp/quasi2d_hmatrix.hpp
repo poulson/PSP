@@ -238,8 +238,6 @@ public:
     int YSizeSource() const { return _ySizeSource; }
     int YSizeTarget() const { return _ySizeTarget; }
     int ZSize() const { return _zSize; }
-    int SourceSize() const { return _xSizeSource*_ySizeSource*_zSize; }
-    int TargetSize() const { return _xSizeTarget*_ySizeTarget*_zSize; }
     int XSource() const { return _xSource; }
     int YSource() const { return _ySource; }
     int XTarget() const { return _xTarget; }
