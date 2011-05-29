@@ -97,6 +97,8 @@ public:
     int FirstLocalRow() const;
     int FirstLocalCol() const;
 
+    void RequireRoot() const;
+
     // Print out the structure of the tree that we're aware of
     void WriteLocalStructure( const std::string& basename ) const;
 
@@ -109,6 +111,8 @@ public:
 
     // Return to the minimal local structure
     void PruneGhostNodes();
+
+    bool Ghosted() const;
 
     // A := alpha A
     void Scale( Scalar alpha );

@@ -158,6 +158,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FirstLocalCol() const
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::RequireRoot() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::RequireRoot");
+#endif
+    if( _level != 0 )
+        throw std::logic_error("Not a root H-matrix as required.");
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
 {
 #ifndef RELEASE

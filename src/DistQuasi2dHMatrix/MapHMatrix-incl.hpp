@@ -37,10 +37,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     if( _level != B._level )
         throw std::logic_error("Mismatched levels");
 #endif
+    if( !A.Ghosted() || !B.Ghosted() )
+        throw std::logic_error("A and B must have their ghost nodes");
     C.Clear();
 
     MapHMatrixContext context;
-    //MapMatrixFillGhosts( context, alpha, B, C );
     MapMatrixPrecompute( context, alpha, B, C );
     // TODO
 #ifndef RELEASE

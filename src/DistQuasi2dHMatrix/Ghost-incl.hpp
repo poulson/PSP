@@ -20,12 +20,71 @@
 */
 
 template<typename Scalar,bool Conjugated>
+bool
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Ghosted() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::Ghosted");
+#endif
+    RequireRoot();
+
+    bool ghosted = false;
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        MPI_Comm comm = _subcomms->Subcomm( 0 );
+        const int commSize = mpi::CommSize( comm );
+        const int commRank = mpi::CommRank( comm );
+
+        const Node& node = *_block.data.N;
+        if( commSize >= 4 )
+        {
+            const int subteam = commRank / (commSize/4);
+            ghosted = !(node.Child(3-subteam,3-subteam)._block.type == EMPTY);
+        }
+        else // commSize == 2
+            ghosted = !(node.Child(2-commRank,2-commRank)._block.type == EMPTY);
+        break;
+    }
+
+    case SPLIT_NODE:
+    case NODE:
+        ghosted = true; 
+        break;
+
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+    case SPLIT_DENSE:
+    case DENSE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
+    case EMPTY:
+        throw std::logic_error("Nonsensical top-level block type");
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return ghosted;
+}
+
+template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FormGhostNodes()
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::FormGhostNodes");
 #endif
+    RequireRoot();
+
     // Each level will have a set of source/target offsets where the structure
     // is known.
     std::vector< std::set<int> > 
@@ -317,8 +376,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
     case LOW_RANK:
     case SPLIT_DENSE:
     case DENSE:
-        break;
-
     case DIST_NODE_GHOST:
     case SPLIT_NODE_GHOST:
     case NODE_GHOST:
@@ -327,9 +384,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
     case LOW_RANK_GHOST:
     case SPLIT_DENSE_GHOST:
     case DENSE_GHOST:
-#ifndef RELEASE
-        throw std::logic_error("Already filled in some ghost blocks");
-#endif
         break;
 
     case EMPTY:
