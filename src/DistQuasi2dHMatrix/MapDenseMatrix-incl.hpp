@@ -85,8 +85,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     MapMatrixSummations( context, XLocal.Width() );
     //MapMatrixNaiveSummations( context, XLocal.Width() );
 
-    //MapMatrixPassData( context, alpha, XLocal, YLocal );
-    MapMatrixNaivePassData( context, alpha, XLocal, YLocal );
+    MapMatrixPassData( context, alpha, XLocal, YLocal );
 
     MapMatrixBroadcasts( context, XLocal.Width() );
     //MapMatrixNaiveBroadcasts( context, XLocal.Width() );
@@ -115,8 +114,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     TransposeMapMatrixSummations( context, XLocal.Width() );
     //TransposeMapMatrixNaiveSummations( context, XLocal.Width() );
 
-    //TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
-    TransposeMapMatrixNaivePassData( context, alpha, XLocal, YLocal );
+    TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
 
     TransposeMapMatrixBroadcasts( context, XLocal.Width() );
     //TransposeMapMatrixNaiveBroadcasts( context, XLocal.Width() );
@@ -145,8 +143,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
     HermitianTransposeMapMatrixSummations( context, XLocal.Width() );
     //HermitianTransposeMapMatrixNaiveSummations( context, XLocal.Width() );
 
-    //HermitianTransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
-    HermitianTransposeMapMatrixNaivePassData( context, alpha, XLocal, YLocal );
+    HermitianTransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
 
     HermitianTransposeMapMatrixBroadcasts( context, XLocal.Width() );
     //HermitianTransposeMapMatrixNaiveBroadcasts( context, XLocal.Width() );
@@ -1228,63 +1225,12 @@ HermitianTransposeMapMatrixNaiveSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPassData
-( MapDenseMatrixContext& context, 
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPassData");
-#endif
-    // TODO: Implement AllToAll redistribution
-    throw std::logic_error("Non-naive version not yet written");
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
-( MapDenseMatrixContext& context,
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                      DenseMatrix<Scalar>& YLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPassData");
-#endif
-    // TODO: Implement AllToAll redistribution
-    throw std::logic_error("Non-naive version not yet written");
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrixPassData
-( MapDenseMatrixContext& context,
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                      DenseMatrix<Scalar>& YLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPassData");
-#endif
-    // The unconjugated version should be identical
-    TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
-( MapDenseMatrixContext& context,
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                      DenseMatrix<Scalar>& YLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapMatrixNaivePassData");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -1303,46 +1249,29 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
             if( teamRank == 0 )     
             {
                 // Take care of the top-left quadrant within our subteams
-                node.Child(0,0).MapMatrixNaivePassData
-                ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
-                node.Child(0,1).MapMatrixNaivePassData
-                ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MapMatrixNaivePassData
-                ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
-                node.Child(1,1).MapMatrixNaivePassData
-                ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
+                for( int t=0; t<2; ++t )
+                    for( int s=0; s<2; ++s )
+                        node.Child(t,s).MapMatrixPassData
+                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             else
             {
                 // Take care of the bottom-right quadrant within our subteams
-                node.Child(2,2).MapMatrixNaivePassData
-                ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
-                node.Child(2,3).MapMatrixNaivePassData
-                ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MapMatrixNaivePassData
-                ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
-                node.Child(3,3).MapMatrixNaivePassData
-                ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
+                for( int t=2; t<4; ++t )
+                    for( int s=2; s<4; ++s )
+                        node.Child(t,s).MapMatrixPassData
+                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             // Top-right quadrant
-            node.Child(0,2).MapMatrixNaivePassData
-            ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-            node.Child(0,3).MapMatrixNaivePassData
-            ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-            node.Child(1,2).MapMatrixNaivePassData
-            ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-            node.Child(1,3).MapMatrixNaivePassData
-            ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-
+            for( int t=0; t<2; ++t )
+                for( int s=2; s<4; ++s )
+                    node.Child(t,s).MapMatrixPassData
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             // Bottom-left quadrant
-            node.Child(2,0).MapMatrixNaivePassData
-            ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
-            node.Child(2,1).MapMatrixNaivePassData
-            ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
-            node.Child(3,0).MapMatrixNaivePassData
-            ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
-            node.Child(3,1).MapMatrixNaivePassData
-            ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
+            for( int t=2; t<4; ++t )
+                for( int s=0; s<2; ++s )
+                    node.Child(t,s).MapMatrixPassData
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         else // teamSize >= 4
         {
@@ -1351,82 +1280,82 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).MapMatrixNaivePassData
+                node.Child(0,0).MapMatrixPassData
                 ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(0,1).MapMatrixNaivePassData
+                node.Child(0,1).MapMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MapMatrixNaivePassData
+                node.Child(1,0).MapMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(0,2).MapMatrixNaivePassData
+                node.Child(0,2).MapMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).MapMatrixNaivePassData
+                node.Child(2,0).MapMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(0,3).MapMatrixNaivePassData
+                node.Child(0,3).MapMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).MapMatrixNaivePassData
+                node.Child(3,0).MapMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).MapMatrixNaivePassData
+                node.Child(1,1).MapMatrixPassData
                 ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,1).MapMatrixNaivePassData
+                node.Child(0,1).MapMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MapMatrixNaivePassData
+                node.Child(1,0).MapMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(1,3).MapMatrixNaivePassData
+                node.Child(1,3).MapMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).MapMatrixNaivePassData
+                node.Child(3,1).MapMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(1,2).MapMatrixNaivePassData
+                node.Child(1,2).MapMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).MapMatrixNaivePassData
+                node.Child(2,1).MapMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).MapMatrixNaivePassData
+                node.Child(2,2).MapMatrixPassData
                 ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(2,3).MapMatrixNaivePassData
+                node.Child(2,3).MapMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MapMatrixNaivePassData
+                node.Child(3,2).MapMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,2).MapMatrixNaivePassData
+                node.Child(0,2).MapMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).MapMatrixNaivePassData
+                node.Child(2,0).MapMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,2).MapMatrixNaivePassData
+                node.Child(1,2).MapMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).MapMatrixNaivePassData
+                node.Child(2,1).MapMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).MapMatrixNaivePassData
+                node.Child(3,3).MapMatrixPassData
                 ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(2,3).MapMatrixNaivePassData
+                node.Child(2,3).MapMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MapMatrixNaivePassData
+                node.Child(3,2).MapMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,3).MapMatrixNaivePassData
+                node.Child(1,3).MapMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).MapMatrixNaivePassData
+                node.Child(3,1).MapMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,3).MapMatrixNaivePassData
+                node.Child(0,3).MapMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).MapMatrixNaivePassData
+                node.Child(3,0).MapMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             default:
@@ -1445,7 +1374,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapMatrixNaivePassData
+                node.Child(t,s).MapMatrixPassData
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -1527,13 +1456,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixNaivePassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixPassData
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixNaivePassData");
+    PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrixPassData");
 #endif
     const int width = XLocal.Width();
     switch( _block.type )
@@ -1552,46 +1481,29 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
             if( teamRank == 0 )     
             {
                 // Take care of the top-left quadrant within our subteams
-                node.Child(0,0).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
-                node.Child(0,1).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
-                node.Child(1,1).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
+                for( int t=0; t<2; ++t )
+                    for( int s=0; s<2; ++s )
+                        node.Child(t,s).TransposeMapMatrixPassData
+                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             else
             {
                 // Take care of the bottom-right quadrant within our subteams
-                node.Child(2,2).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
-                node.Child(2,3).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
-                node.Child(3,3).TransposeMapMatrixNaivePassData
-                ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
+                for( int t=2; t<4; ++t )
+                    for( int s=2; s<4; ++s )
+                        node.Child(t,s).TransposeMapMatrixPassData
+                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             }
             // Top-right quadrant
-            node.Child(0,2).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-            node.Child(0,3).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-            node.Child(1,2).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-            node.Child(1,3).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-
+            for( int t=0; t<2; ++t )
+                for( int s=2; s<4; ++s )
+                    node.Child(t,s).TransposeMapMatrixPassData
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
             // Bottom-left quadrant
-            node.Child(2,0).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
-            node.Child(2,1).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
-            node.Child(3,0).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
-            node.Child(3,1).TransposeMapMatrixNaivePassData
-            ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
+            for( int t=2; t<4; ++t )
+                for( int s=0; s<2; ++s )
+                    node.Child(t,s).TransposeMapMatrixPassData
+                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         }
         else // teamSize >= 4
         {
@@ -1600,82 +1512,82 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).TransposeMapMatrixNaivePassData
+                node.Child(0,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(0,1).TransposeMapMatrixNaivePassData
+                node.Child(0,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).TransposeMapMatrixNaivePassData
+                node.Child(1,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(0,2).TransposeMapMatrixNaivePassData
+                node.Child(0,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).TransposeMapMatrixNaivePassData
+                node.Child(2,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(0,3).TransposeMapMatrixNaivePassData
+                node.Child(0,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).TransposeMapMatrixNaivePassData
+                node.Child(3,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).TransposeMapMatrixNaivePassData
+                node.Child(1,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,1).TransposeMapMatrixNaivePassData
+                node.Child(0,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).TransposeMapMatrixNaivePassData
+                node.Child(1,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(1,3).TransposeMapMatrixNaivePassData
+                node.Child(1,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal ); 
-                node.Child(3,1).TransposeMapMatrixNaivePassData
+                node.Child(3,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(1,2).TransposeMapMatrixNaivePassData
+                node.Child(1,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).TransposeMapMatrixNaivePassData
+                node.Child(2,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).TransposeMapMatrixNaivePassData
+                node.Child(2,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
                 // Interact with subteam 3
-                node.Child(2,3).TransposeMapMatrixNaivePassData
+                node.Child(2,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).TransposeMapMatrixNaivePassData
+                node.Child(3,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,2).TransposeMapMatrixNaivePassData
+                node.Child(0,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).TransposeMapMatrixNaivePassData
+                node.Child(2,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,2).TransposeMapMatrixNaivePassData
+                node.Child(1,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).TransposeMapMatrixNaivePassData
+                node.Child(2,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).TransposeMapMatrixNaivePassData
+                node.Child(3,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
                 // Interact with subteam 2
-                node.Child(2,3).TransposeMapMatrixNaivePassData
+                node.Child(2,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).TransposeMapMatrixNaivePassData
+                node.Child(3,2).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
                 // Interact with subteam 1
-                node.Child(1,3).TransposeMapMatrixNaivePassData
+                node.Child(1,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).TransposeMapMatrixNaivePassData
+                node.Child(3,1).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
                 // Interact with subteam 0
-                node.Child(0,3).TransposeMapMatrixNaivePassData
+                node.Child(0,3).TransposeMapMatrixPassData
                 ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).TransposeMapMatrixNaivePassData
+                node.Child(3,0).TransposeMapMatrixPassData
                 ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
                 break;
             default:
@@ -1694,7 +1606,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapMatrixNaivePassData
+                node.Child(t,s).TransposeMapMatrixPassData
                 ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
         break;
     }
@@ -1797,17 +1709,17 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrixNaivePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapMatrixNaivePassData
+HermitianTransposeMapMatrixPassData
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                       DenseMatrix<Scalar>& YLocal ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapMatrixNaivePassData");
+    ("DistQuasi2dHMatrix::HermitianTransposeMapMatrixPassData");
 #endif
     // The unconjugated version should be identical
-    TransposeMapMatrixNaivePassData( context, alpha, XLocal, YLocal );
+    TransposeMapMatrixPassData( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif

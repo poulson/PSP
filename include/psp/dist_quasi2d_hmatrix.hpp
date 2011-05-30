@@ -631,10 +631,6 @@ private:
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void MapVectorNaivePassData
-    ( MapVectorContext& context,
-      Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
     void MapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void MapVectorBroadcastsCount
@@ -671,10 +667,6 @@ private:
     void MapMatrixNaiveSummations
     ( MapDenseMatrixContext& context, int width ) const;
     void MapMatrixPassData
-    ( MapDenseMatrixContext& context,
-      Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
-                          DenseMatrix<Scalar>& YLocal ) const;
-    void MapMatrixNaivePassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
@@ -723,10 +715,6 @@ private:
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void TransposeMapVectorNaivePassData
-    ( MapVectorContext& context,
-      Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
     void TransposeMapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void TransposeMapVectorBroadcastsCount
@@ -766,10 +754,6 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void TransposeMapMatrixNaivePassData
-    ( MapDenseMatrixContext& context,
-      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                          DenseMatrix<Scalar>& YLocal ) const;
     void TransposeMapMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixBroadcastsCount
@@ -801,10 +785,6 @@ private:
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void HermitianTransposeMapVectorNaivePassData
-    ( MapVectorContext& context,
-      Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
     void HermitianTransposeMapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void HermitianTransposeMapVectorNaiveBroadcasts
@@ -825,10 +805,6 @@ private:
     void HermitianTransposeMapMatrixNaiveSummations
     ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapMatrixPassData
-    ( MapDenseMatrixContext& context,
-      Scalar alpha, const DenseMatrix<Scalar>& XLocal,
-                          DenseMatrix<Scalar>& YLocal ) const;
-    void HermitianTransposeMapMatrixNaivePassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;

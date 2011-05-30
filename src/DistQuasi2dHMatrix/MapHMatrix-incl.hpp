@@ -60,7 +60,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
     PushCallStack("DistQuasi2dHMatrix::MapMatrixPrecompute");
 #endif
     const DistQuasi2d& A = *this;
-
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
         C._block.type = EMPTY;
@@ -68,7 +67,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrixPrecompute
         return;
     }
 
-    // HERE...need to branch depending on which matrices are ghosts
+    // HERE...need to branch depending on which blocks are ghosts
     MPI_Comm team = A._subcomms->Subcomm( A._level );
     const int teamSize = mpi::CommSize( team );
     if( context.block.type == EMPTY )
