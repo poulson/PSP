@@ -1259,15 +1259,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::UnpackRecursion
                 Read( D.Buffer(j,j), head, m-j );
         break;
     }
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    default:
 #ifndef RELEASE
         throw std::logic_error("Should not need to unpack empty submatrix");
 #endif

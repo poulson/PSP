@@ -208,18 +208,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorInitialize
         context.block.data.z = new Vector<Scalar>();
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         context.block.type = EMPTY;
         break;
     }
@@ -371,15 +360,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
         break;
     }
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -484,15 +465,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
         break;
     }
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -600,15 +573,7 @@ HermitianTransposeMapVectorPrecompute
         break;
     }
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -763,21 +728,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsCount
             sizes[_level-1] += _block.data.DF->rank;
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -808,21 +759,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsCount
             sizes[_level-1] += _block.data.DF->rank;
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -864,21 +801,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsPack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -920,21 +843,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsPack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -981,21 +890,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorSummationsUnpack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1042,21 +937,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummationsUnpack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1103,21 +984,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSummations
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1164,21 +1031,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1348,15 +1201,35 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData
     }
     case SPLIT_NODE:
     {
+        const Node& node = *_block.data.N;
         typename MapVectorContext::SplitNodeContext& nodeContext = 
             *context.block.data.SN;
 
-        // This could all be combined in a single pass...
-        const Node& node = *_block.data.N;
+        std::size_t bufferSize = 0;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MapVectorPassData
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                node.Child(t,s).MapVectorPassDataSplitNodeCount( bufferSize );
+        std::vector<byte> buffer( bufferSize );
+
+        MPI_Comm comm = _subcomms->Subcomm(0);
+        if( _inSourceTeam )
+        {
+            byte* head = &buffer[0];
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MapVectorPassDataSplitNodePack
+                    ( head, nodeContext.Child(t,s) );
+            mpi::Send( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+        }
+        else
+        {
+            mpi::Recv( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+            const byte* head = &buffer[0];
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MapVectorPassDataSplitNodeUnpack
+                    ( head, nodeContext.Child(t,s) );
+        }
         break;
     }
     case DIST_LOW_RANK:
@@ -1420,19 +1293,136 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData
         }
         break;
     }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassDataSplitNodeCount
+( std::size_t& bufferSize ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorPassDataSplitNodeCount");
+#endif
+    switch( _block.type )
+    {
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorPassDataSplitNodeCount( bufferSize );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+        bufferSize += _block.data.SF->rank*sizeof(Scalar);
+        break;
+    case SPLIT_DENSE:
+        bufferSize += Height()*sizeof(Scalar);
+        break;
+    default:
+#ifndef RELEASE
+        throw std::logic_error("This should be impossible");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassDataSplitNodePack
+( byte*& head, const MapVectorContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorPassDataSplitNodePack");
+    if( !_inSourceTeam )
+        throw std::logic_error("Calling process should be in source team");
+#endif
+    switch( _block.type )
+    {
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        const typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorPassDataSplitNodePack
+                ( head, nodeContext.Child(t,s) );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const Vector<Scalar>& z = *context.block.data.z;
+        Write( head, z.LockedBuffer(), z.Height() );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const Vector<Scalar>& z = *context.block.data.z;
+        Write( head, z.LockedBuffer(), z.Height() );
+        break;
+    }
+    default:
+#ifndef RELEASE
+        throw std::logic_error("This should be impossible");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassDataSplitNodeUnpack
+( const byte*& head, MapVectorContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapVectorPassDataSplitNodeUnpack");
+    if( !_inTargetTeam )
+        throw std::logic_error("Calling process should be in target team");
+#endif
+    switch( _block.type )
+    {
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapVectorPassDataSplitNodeUnpack
+                ( head, nodeContext.Child(t,s) );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( _block.data.SF->rank );
+        Read( z.Buffer(), head, z.Height() );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( Height() );
+        Read( z.Buffer(), head, z.Height() );
+        break;
+    }
+    default:
+#ifndef RELEASE
+        throw std::logic_error("This should be impossible");
+#endif
         break;
     }
 #ifndef RELEASE
@@ -1584,15 +1574,36 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
     }
     case SPLIT_NODE:
     {
+        const Node& node = *_block.data.N;
         typename MapVectorContext::SplitNodeContext& nodeContext = 
             *context.block.data.SN;
 
-        // This could all be combined into a single pass...
-        const Node& node = *_block.data.N;
+        std::size_t bufferSize = 0;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapVectorPassData
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                node.Child(t,s).TransposeMapVectorPassDataSplitNodeCount
+                ( bufferSize );
+        std::vector<byte> buffer( bufferSize );
+
+        MPI_Comm comm = _subcomms->Subcomm(0);
+        if( _inTargetTeam )
+        {
+            byte* head = &buffer[0];
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).TransposeMapVectorPassDataSplitNodePack
+                    ( head, nodeContext.Child(t,s), xLocal );
+            mpi::Send( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+        }
+        else
+        {
+            mpi::Recv( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+            const byte* head = &buffer[0];
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).TransposeMapVectorPassDataSplitNodeUnpack
+                    ( head, nodeContext.Child(t,s) );
+        }
         break;
     }
     case DIST_LOW_RANK:
@@ -1656,18 +1667,141 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
         break;
     }
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapVectorPassDataSplitNodeCount
+( std::size_t& bufferSize ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::TransposeMapVectorPassDataSplitNodeCount");
+#endif
+    switch( _block.type )
+    {
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapVectorPassDataSplitNodeCount
+                ( bufferSize );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+        bufferSize += _block.data.SF->rank*sizeof(Scalar);
+        break;
+    case SPLIT_DENSE:
+        bufferSize += Height()*sizeof(Scalar);
+        break;
+    default:
+#ifndef RELEASE
+        throw std::logic_error("This should be impossible");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapVectorPassDataSplitNodePack
+( byte*& head, const MapVectorContext& context,
+  const Vector<Scalar>& xLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::TransposeMapVectorPassDataSplitNodePack");
+    if( !_inTargetTeam )
+        throw std::logic_error("Calling process should be in target team");
+#endif
+    switch( _block.type )
+    {
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        const typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapVectorPassDataSplitNodePack
+                ( head, nodeContext.Child(t,s), xLocal );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const Vector<Scalar>& z = *context.block.data.z;
+        Write( head, z.LockedBuffer(), z.Height() );
+        break;
+    }
+    case SPLIT_DENSE:
+        Write( head, xLocal.LockedBuffer(_localTargetOffset), Height() );
+        break;
+    default:
+#ifndef RELEASE
+        throw std::logic_error("This should be impossible");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapVectorPassDataSplitNodeUnpack
+( const byte*& head, MapVectorContext& context ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::TransposeMapVectorPassDataSplitNodeUnpack");
+    if( !_inSourceTeam )
+        throw std::logic_error("Calling process should be in source team");
+#endif
+    switch( _block.type )
+    {
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MapVectorContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapVectorPassDataSplitNodeUnpack
+                ( head, nodeContext.Child(t,s) );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( _block.data.SF->rank );
+        Read( z.Buffer(), head, z.Height() );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( Height() );
+        Read( z.Buffer(), head, z.Height() );
+        break;
+    }
+    default:
+#ifndef RELEASE
+        throw std::logic_error("This should be impossible");
+#endif
         break;
     }
 #ifndef RELEASE
@@ -1829,21 +1963,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsCount
             sizes[_level-1] += _block.data.DF->rank;
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1874,21 +1994,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsCount
             sizes[_level-1] += _block.data.DF->rank;
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1935,21 +2041,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsPack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1996,21 +2088,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsPack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2052,21 +2130,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorBroadcastsUnpack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2108,21 +2172,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcastsUnpack
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2162,21 +2212,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveBroadcasts
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2216,21 +2252,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case SPLIT_NODE:
-    case SPLIT_LOW_RANK:
-    case SPLIT_DENSE:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2326,18 +2348,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPostcompute
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2445,18 +2456,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -2564,18 +2564,7 @@ HermitianTransposeMapVectorPostcompute
         }
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE

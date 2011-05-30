@@ -235,13 +235,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Scale( Scalar alpha )
     case DENSE:
         hmatrix_tools::Scale( alpha, *_block.data.D );
         break;
-
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    
+    default:
         break;
     }
 #ifndef RELEASE

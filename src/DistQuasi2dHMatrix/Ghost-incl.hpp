@@ -53,20 +53,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Ghosted() const
         ghosted = true; 
         break;
 
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case LOW_RANK:
-    case SPLIT_DENSE:
-    case DENSE:
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    default:
         throw std::logic_error("Nonsensical top-level block type");
         break;
     }
@@ -207,12 +194,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::PruneGhostNodes()
         break;
     }
 
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case LOW_RANK:
-    case SPLIT_DENSE:
-    case DENSE:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -306,15 +288,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FillStructureRecursion
         targetStructure[_level].insert( _targetOffset );
         break;
 
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-    case EMPTY:
+    default:
         break;
     }
 #ifndef RELEASE
@@ -370,21 +344,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
                   sourceRoot, targetRoot );
         break;
     }
-
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case LOW_RANK:
-    case SPLIT_DENSE:
-    case DENSE:
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
-        break;
 
     case EMPTY:
     {
@@ -501,6 +460,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
         }
         break;
     }
+    
+    default:
+        break;
     }
 #ifndef RELEASE
     PopCallStack();
@@ -543,16 +505,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::GetRank
         rank = _block.data.F->Rank();
         break;
 
-    case SPLIT_DENSE:
-    case DENSE:
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    case DIST_LOW_RANK_GHOST:
-    case SPLIT_LOW_RANK_GHOST:
-    case LOW_RANK_GHOST:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
+    default:
 #ifndef RELEASE
         throw std::logic_error("Invalid logic in GetRank");
 #endif
@@ -597,15 +550,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::SetGhostRank
         _block.data.FG->rank = rank;
         break;
 
-    case SPLIT_NODE:
-    case NODE:
-    case DIST_LOW_RANK:
-    case SPLIT_LOW_RANK:
-    case LOW_RANK:
-    case SPLIT_DENSE:
-    case DENSE:
-    case SPLIT_DENSE_GHOST:
-    case DENSE_GHOST:
+    default:
 #ifndef RELEASE
         throw std::logic_error("Invalid logic in SetGhostRank");
 #endif
@@ -615,5 +560,4 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::SetGhostRank
     PopCallStack();
 #endif
 }
-
 

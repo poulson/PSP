@@ -631,6 +631,12 @@ private:
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
+    void MapVectorPassDataSplitNodeCount
+    ( std::size_t& bufferSize ) const;
+    void MapVectorPassDataSplitNodePack
+    ( byte*& head, const MapVectorContext& context ) const;
+    void MapVectorPassDataSplitNodeUnpack
+    ( const byte*& head, MapVectorContext& context ) const;
     void MapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void MapVectorBroadcastsCount
@@ -670,6 +676,10 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
+    void MapMatrixPassDataSplitNodePack
+    ( byte*& head, const MapDenseMatrixContext& context ) const;
+    void MapMatrixPassDataSplitNodeUnpack
+    ( const byte*& head, MapDenseMatrixContext& context, int width ) const;
     void MapMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
     void MapMatrixBroadcastsCount
@@ -715,6 +725,13 @@ private:
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
+    void TransposeMapVectorPassDataSplitNodeCount
+    ( std::size_t& bufferSize ) const;
+    void TransposeMapVectorPassDataSplitNodePack
+    ( byte*& head, const MapVectorContext& context,
+      const Vector<Scalar>& xLocal ) const;
+    void TransposeMapVectorPassDataSplitNodeUnpack
+    ( const byte*& head, MapVectorContext& context ) const;
     void TransposeMapVectorBroadcasts
     ( MapVectorContext& context ) const;
     void TransposeMapVectorBroadcastsCount
@@ -754,6 +771,11 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
+    void TransposeMapMatrixPassDataSplitNodePack
+    ( byte*& head, const MapDenseMatrixContext& context,
+      const DenseMatrix<Scalar>& XLocal ) const;
+    void TransposeMapMatrixPassDataSplitNodeUnpack
+    ( const byte*& head, MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapMatrixBroadcastsCount
