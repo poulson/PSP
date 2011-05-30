@@ -697,6 +697,9 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
 
+    void MapHMatrixFillMemberData
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
