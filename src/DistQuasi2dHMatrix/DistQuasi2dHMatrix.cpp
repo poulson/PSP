@@ -22,7 +22,7 @@
 
 #include "./Ghost-incl.hpp"
 #include "./MapDenseMatrix-incl.hpp"
-//#include "./MapHMatrix-incl.hpp"
+#include "./MapHMatrix-incl.hpp"
 #include "./MapVector-incl.hpp"
 #include "./RedistQuasi2dHMatrix-incl.hpp"
 
@@ -288,6 +288,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructure
 //----------------------------------------------------------------------------//
 // Private non-static routines                                                //
 //----------------------------------------------------------------------------//
+
+template<typename Scalar,bool Conjugated>
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix()
+: _numLevels(0), _maxRank(0), 
+  _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
+  _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
+  _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
+  _ySource(0), _yTarget(0), _subcomms(0), _level(0),
+  _inSourceTeam(true), _inTargetTeam(true), _rootOfOtherTeam(0),
+  _localSourceOffset(0), _localTargetOffset(0)
+{ 
+    _block.type = EMPTY;
+}
+
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructureRecursion

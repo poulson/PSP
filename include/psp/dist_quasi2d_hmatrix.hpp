@@ -589,8 +589,8 @@ private:
 
     void WriteLocalStructureRecursion( std::ofstream& file ) const;
     
-    // Ensure that the default constructor is not accessible, a communicator
-    // must be supplied
+    // This default constructure is purposely not publically accessible
+    // because many routines are not functional without _subcomms set.
     DistQuasi2dHMatrix();
 
     void UnpackRecursion
@@ -698,8 +698,8 @@ private:
                           DenseMatrix<Scalar>& YLocal ) const;
 
     void MapHMatrixFillMemberData
-    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    ( const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+            DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
