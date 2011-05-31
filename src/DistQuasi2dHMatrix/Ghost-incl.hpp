@@ -364,8 +364,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
             {
                 _block.type = DIST_LOW_RANK_GHOST;
                 _block.data.DFG = new DistLowRankGhost;
-                _block.data.DFG->sourceRoot = sourceRoot;
-                _block.data.DFG->targetRoot = targetRoot;
             }
             else // teamSize == 1
             {
@@ -373,14 +371,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
                 {
                     _block.type = LOW_RANK_GHOST;
                     _block.data.FG = new LowRankGhost;
-                    _block.data.FG->owner = sourceRoot;
                 }
                 else
                 {
                     _block.type = SPLIT_LOW_RANK_GHOST;
                     _block.data.SFG = new SplitLowRankGhost;
-                    _block.data.SFG->sourceOwner = sourceRoot;
-                    _block.data.SFG->targetOwner = targetRoot;
                 }
             }
             BlockId id;
@@ -391,8 +386,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
         }
         else if( _numLevels > 1 )
         {
-            _block.data.NG = NewNodeGhost( sourceRoot, targetRoot );
-            NodeGhost& node = *_block.data.NG;
+            _block.data.N = NewNode();
+            Node& node = *_block.data.N;
 
             for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
                 for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
@@ -405,7 +400,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+(s/2), 2*_yTarget+(t/2),
-                          *_subcomms, _level+1, false, false );
+                          *_subcomms, _level+1, false, false, 
+                          sourceRoot, targetRoot );
 
             if( teamSize >= 2 )
             {
@@ -448,14 +444,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FindGhostNodesRecursion
             {
                 _block.type = DENSE_GHOST;
                 _block.data.DG = new DenseGhost;
-                _block.data.DG->owner = sourceRoot;
             }
             else
             {
                 _block.type = SPLIT_DENSE_GHOST;
                 _block.data.SDG = new SplitDenseGhost;
-                _block.data.SDG->sourceOwner = sourceRoot;
-                _block.data.SDG->targetOwner = targetRoot;
             }
         }
         break;

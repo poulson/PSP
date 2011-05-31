@@ -83,6 +83,7 @@ public:
       int zSize, int xSource, int xTarget, int ySource, int yTarget,
       const Subcomms& subcomms, unsigned level, 
       bool inSourceTeam, bool inTargetTeam, 
+      int sourceRoot, int targetRoot,
       int localSourceOffset=0, int localTargetOffset=0 );
     DistQuasi2dHMatrix( const byte* packedPiece, const Subcomms& subcomms );
     ~DistQuasi2dHMatrix();
@@ -221,7 +222,6 @@ private:
     struct DistLowRankMatrixGhost
     {
         int rank;
-        int sourceRoot, targetRoot;
     };
 
     struct SplitLowRankMatrix
@@ -233,13 +233,11 @@ private:
     struct SplitLowRankMatrixGhost
     {
         int rank;
-        int sourceOwner, targetOwner;
     };
 
     struct LowRankMatrixGhost
     {
         int rank;
-        int owner;
     };
 
     struct SplitDenseMatrix
@@ -249,12 +247,12 @@ private:
 
     struct SplitDenseMatrixGhost
     {
-        int sourceOwner, targetOwner;
+
     };
 
     struct DenseMatrixGhost
     {
-        int owner;
+
     };
 
     struct Node
@@ -275,17 +273,6 @@ private:
         const DistQuasi2dHMatrix& Child( int t, int s ) const;
     };
     Node* NewNode() const;
-
-    struct NodeGhost : public Node
-    {
-        int sourceRoot, targetRoot;    
-        NodeGhost
-        ( int xSizeSource, int xSizeTarget,
-          int ySizeSource, int ySizeTarget,
-          int zSize,
-          int sRoot, int tRoot );
-    };
-    NodeGhost* NewNodeGhost( int sRoot, int tRoot ) const;
 
     enum BlockType 
     { 
@@ -317,7 +304,6 @@ private:
         union Data
         {
             Node* N;
-            NodeGhost* NG;
 
             DistLowRankMatrix* DF;
             DistLowRankMatrixGhost* DFG;
@@ -593,8 +579,7 @@ private:
     // because many routines are not functional without _subcomms set.
     DistQuasi2dHMatrix();
 
-    void UnpackRecursion
-    ( const byte*& head, int sourceRankOffset, int targetRankOffset );
+    void UnpackRecursion( const byte*& head );
 
     void FillStructureRecursion
     ( std::vector< std::set<int> >& sourceStructure,
@@ -886,11 +871,9 @@ private:
 
     const Subcomms* _subcomms;
     unsigned _level;
-    bool _inSourceTeam;
-    bool _inTargetTeam;
-    int _rootOfOtherTeam; // only applies if in only source or target team
-    int _localSourceOffset;
-    int _localTargetOffset;
+    bool _inSourceTeam, _inTargetTeam;
+    int _sourceRoot, _targetRoot;
+    int _localSourceOffset, _localTargetOffset;
 
     // Create shortened names for convenience in implementations.
     typedef DenseMatrix<Scalar> Dense;
@@ -1001,29 +984,6 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::NewNode() const
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::NodeGhost::NodeGhost
-( int xSizeSource, int xSizeTarget,
-  int ySizeSource, int ySizeTarget,
-  int zSize,
-  int sRoot, int tRoot )
-: Node(xSizeSource,xSizeTarget,ySizeSource,ySizeTarget,zSize),
-  sourceRoot(sRoot), targetRoot(tRoot)
-{ }
-
-template<typename Scalar,bool Conjugated>
-inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::NodeGhost*
-DistQuasi2dHMatrix<Scalar,Conjugated>::NewNodeGhost( int sRoot, int tRoot ) 
-const
-{
-    return 
-        new NodeGhost
-        ( _xSizeSource, _xSizeTarget, _ySizeSource, _ySizeTarget, _zSize,
-          sRoot, tRoot );
-}
-
-
-template<typename Scalar,bool Conjugated>
-inline
 DistQuasi2dHMatrix<Scalar,Conjugated>::Block::Block()
 : type(EMPTY), data() 
 { }
@@ -1042,14 +1002,12 @@ DistQuasi2dHMatrix<Scalar,Conjugated>::Block::Clear()
     switch( type )
     {
     case DIST_NODE:
-    case SPLIT_NODE:
-    case NODE:
-        delete data.N; break;
-
     case DIST_NODE_GHOST:
+    case SPLIT_NODE:
     case SPLIT_NODE_GHOST:
+    case NODE:
     case NODE_GHOST:
-        delete data.NG; break;
+        delete data.N; break;
 
     case DIST_LOW_RANK:  delete data.DF; break;
     case SPLIT_LOW_RANK: delete data.SF; break;

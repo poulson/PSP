@@ -1253,11 +1253,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MapDenseMatrixPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s) );
-            mpi::Send( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+            mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
         }
         else
         {
-            mpi::Recv( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+            mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
@@ -1280,12 +1280,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
         {
             if( _inSourceTeam )
                 mpi::Send
-                ( Z.LockedBuffer(), DF.rank*width, _rootOfOtherTeam, 0, comm );
+                ( Z.LockedBuffer(), DF.rank*width, _targetRoot, 0, comm );
             else
             {
                 Z.Resize( DF.rank, width, DF.rank );
-                mpi::Recv
-                ( Z.Buffer(), DF.rank*width, _rootOfOtherTeam, 0, comm );
+                mpi::Recv( Z.Buffer(), DF.rank*width, _sourceRoot, 0, comm );
             }
         }
         break;
@@ -1297,12 +1296,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
         if( _inSourceTeam )
-            mpi::Send
-            ( Z.LockedBuffer(), SF.rank*width, _rootOfOtherTeam, 0, comm );
+            mpi::Send( Z.LockedBuffer(), SF.rank*width, _targetRoot, 0, comm );
         else
         {
             Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( Z.Buffer(), SF.rank*width, _rootOfOtherTeam, 0, comm );
+            mpi::Recv( Z.Buffer(), SF.rank*width, _sourceRoot, 0, comm );
         }
         break;
     }
@@ -1313,12 +1311,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
 
         if( _inSourceTeam )
             mpi::Send
-            ( Z.LockedBuffer(), Z.Height()*width, _rootOfOtherTeam, 0, comm );
+            ( Z.LockedBuffer(), Z.Height()*width, _targetRoot, 0, comm );
         else
         {
             Z.Resize( Height(), width, Height() );
             mpi::Recv
-            ( Z.Buffer(), Z.Height()*width, _rootOfOtherTeam, 0, comm );
+            ( Z.Buffer(), Z.Height()*width, _sourceRoot, 0, comm );
         }
         break;
     }
@@ -1592,11 +1590,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).TransposeMapDenseMatrixPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s), XLocal );
-            mpi::Send( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+            mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
         }
         else
         {
-            mpi::Recv( &buffer[0], bufferSize, _rootOfOtherTeam, 0, comm );
+            mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
@@ -1620,12 +1618,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
         {
             if( _inTargetTeam )
                 mpi::Send
-                ( Z.LockedBuffer(), DF.rank*width, _rootOfOtherTeam, 0, comm );
+                ( Z.LockedBuffer(), DF.rank*width, _sourceRoot, 0, comm );
             else
             {
                 Z.Resize( DF.rank, width, DF.rank );
-                mpi::Recv
-                ( Z.Buffer(), DF.rank*width, _rootOfOtherTeam, 0, comm );
+                mpi::Recv( Z.Buffer(), DF.rank*width, _targetRoot, 0, comm );
             }
         }
         break;
@@ -1637,12 +1634,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
         MPI_Comm comm = _subcomms->Subcomm( 0 );
 
         if( _inTargetTeam )
-            mpi::Send
-            ( Z.LockedBuffer(), SF.rank*width, _rootOfOtherTeam, 0, comm );
+            mpi::Send( Z.LockedBuffer(), SF.rank*width, _sourceRoot, 0, comm );
         else
         {
             Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( Z.Buffer(), SF.rank*width, _rootOfOtherTeam, 0, comm );
+            mpi::Recv( Z.Buffer(), SF.rank*width, _targetRoot, 0, comm );
         }
         break;
     }
@@ -1666,19 +1662,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
                     ( Z.Buffer(0,j), XLocalSub.LockedBuffer(0,j), 
                       height*sizeof(Scalar) );
                 mpi::Send
-                ( Z.LockedBuffer(), height*width, _rootOfOtherTeam, 0, comm );
+                ( Z.LockedBuffer(), height*width, _sourceRoot, 0, comm );
             }
             else
             {
                 mpi::Send
                 ( XLocalSub.LockedBuffer(), height*width, 
-                  _rootOfOtherTeam, 0, comm );
+                  _sourceRoot, 0, comm );
             }
         }
         else
         {
             Z.Resize( height, width, height );
-            mpi::Recv( Z.Buffer(), height*width, _rootOfOtherTeam, 0, comm );
+            mpi::Recv( Z.Buffer(), height*width, _targetRoot, 0, comm );
         }
         break;
     }

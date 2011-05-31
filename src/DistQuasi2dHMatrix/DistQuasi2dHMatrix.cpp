@@ -38,7 +38,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0),
-  _inSourceTeam(true), _inTargetTeam(true), _rootOfOtherTeam(0),
+  _inSourceTeam(true), _inTargetTeam(true), 
+  _sourceRoot(0), _targetRoot(0),
   _localSourceOffset(0), _localTargetOffset(0)
 { 
     _block.type = EMPTY;
@@ -52,6 +53,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   int zSize, int xSource, int xTarget, int ySource, int yTarget,
   const Subcomms& subcomms, unsigned level, 
   bool inSourceTeam, bool inTargetTeam, 
+  int sourceRoot, int targetRoot,
   int localSourceOffset, int localTargetOffset )
 : _numLevels(numLevels), _maxRank(maxRank), 
   _sourceOffset(sourceOffset), _targetOffset(targetOffset), 
@@ -62,6 +64,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _xSource(xSource), _xTarget(xTarget),
   _ySource(ySource), _yTarget(yTarget), _subcomms(&subcomms), _level(level),
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
+  _sourceRoot(sourceRoot), _targetRoot(targetRoot),
   _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset)
 { 
     _block.type = EMPTY;
@@ -296,7 +299,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix()
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _subcomms(0), _level(0),
-  _inSourceTeam(true), _inTargetTeam(true), _rootOfOtherTeam(0),
+  _inSourceTeam(true), _inTargetTeam(true), 
+  _sourceRoot(0), _targetRoot(0),
   _localSourceOffset(0), _localTargetOffset(0)
 { 
     _block.type = EMPTY;
@@ -310,8 +314,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructureRecursion
     switch( _block.type )
     {
     case DIST_NODE:
+    case DIST_NODE_GHOST:
     case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
     case NODE:
+    case NODE_GHOST:
     {
         file << "1 " 
              << _targetOffset << " " << _sourceOffset << " "
@@ -320,20 +327,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructureRecursion
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).WriteLocalStructureRecursion( file );
-        break;
-    }
-
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    {
-        file << "1 "
-             << _targetOffset << " " << _sourceOffset << " "
-             << Height() << " " << Width() << "\n";
-        const NodeGhost& nodeGhost = *_block.data.NG;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                nodeGhost.Child(t,s).WriteLocalStructureRecursion( file );
         break;
     }
 
