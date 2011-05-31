@@ -293,22 +293,43 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 if( C._inSourceTeam || C._inTargetTeam )
                 {
-                    // TODO
+                    C._block.type = DENSE;
+                    C._block.data.D = new Dense;
+                    Dense& D = *C._block.data.D;
+                    D.Resize( C.Height(), C.Width(), C.Height() );
+                    context.block.type = DENSE;
+                    context.block.data.D = 
+                        new typename MapHMatrixContext::DenseContext;
                 }
                 else
                 {
-                    // TODO
+                    C._block.type = DENSE_GHOST;
+                    C._block.data.DG = new DenseGhost;
+                    context.block.type = DENSE_GHOST;
+                    context.block.data.D = 
+                        new typename MapHMatrixContext::DenseContext;
                 }
             }
             else
             {
                 if( C._inSourceTeam || C._inTargetTeam )
                 {
-                    // TODO
+                    C._block.type = SPLIT_DENSE;
+                    C._block.data.SD = new SplitDense;
+                    SplitDense& SD = *C._block.data.SD;
+                    if( C._inSourceTeam )
+                        SD.D.Resize( C.Height(), C.Width() );
+                    context.block.type = SPLIT_DENSE;
+                    context.block.data.SD = 
+                        new typename MapHMatrixContext::SplitDenseContext;
                 }
                 else
                 {
-                    // TODO
+                    C._block.type = SPLIT_DENSE_GHOST;
+                    C._block.data.SDG = new SplitDenseGhost;
+                    context.block.type = SPLIT_DENSE_GHOST;
+                    context.block.data.SD = 
+                        new typename MapHMatrixContext::SplitDenseContext;
                 }
             }
         }

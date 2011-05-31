@@ -254,7 +254,7 @@ configure_file(
 
 # Grab all of the .c, .cpp, .h, and .hpp PSP files
 file(GLOB_RECURSE PSP_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
-     "src/*.c" "src/*.cpp")
+     "src/*.c" "src/*.cpp" "src/*-incl.hpp")
 file(GLOB_RECURSE PSP_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
      "include/*.h" "include/*.hpp")
 set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
