@@ -121,6 +121,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     if( newC )
         MapHMatrixFillMemberData( B, C );
     const bool inC = ( C._inSourceTeam || C._inTargetTeam );
+    const bool admissibleC = C.Admissible();
 
     MPI_Comm team = A._subcomms->Subcomm( A._level );
     const int teamSize = mpi::CommSize( team );
@@ -130,7 +131,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( C.Admissible() )
+            if( admissibleC )
             {
                 if( newC )
                 {
@@ -138,17 +139,24 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     {
                         C._block.type = DIST_LOW_RANK;
                         C._block.data.DF = new DistLowRank;
-                        C._block.data.DF->rank = 0;
+                        DistLowRank& DF = *C._block.data.DF;
+                        DF.rank = 0;
+                        if( C._inTargetTeam )
+                            DF.ULocal.Resize( C.LocalHeight(), 0 );
+                        if( C._inSourceTeam )
+                            DF.VLocal.Resize( C.LocalWidth(), 0 );
+                        context.block.type = DIST_LOW_RANK;
                     }
                     else // we're in the middle team
                     {
                         C._block.type = DIST_LOW_RANK_GHOST;
                         C._block.data.DFG = new DistLowRankGhost;
-                        C._block.data.DF->rank = 0;
-                        C._block.data.DFG->sourceRoot = B._rootOfOtherTeam;
-                        C._block.data.DFG->targetRoot = A._rootOfOtherTeam;
+                        DistLowRankGhost& DFG = *C._block.data.DFG;
+                        DFG.rank = 0;
+                        DFG.sourceRoot = B._rootOfOtherTeam;
+                        DFG.targetRoot = A._rootOfOtherTeam;
+                        context.block.type = DIST_LOW_RANK_GHOST;
                     }
-                    context.block.type = DIST_LOW_RANK;
                     context.block.data.DF = 
                         new typename MapHMatrixContext::DistLowRankContext;
                 }
@@ -164,6 +172,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                         C._block.data.N = C.NewNode();
                         for( int j=0; j<16; ++j )
                             C._block.data.N->children[j] = new DistQuasi2d;
+                        context.block.type = DIST_NODE;
                     }
                     else // we're in the middle team
                     {
@@ -173,8 +182,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                             ( B._rootOfOtherTeam, A._rootOfOtherTeam );
                         for( int j=0; j<16; ++j )
                             C._block.data.NG->children[j] = new DistQuasi2d;
+                        context.block.type = DIST_NODE_GHOST;
                     }
-                    context.block.type = DIST_NODE;
                     context.block.data.DN = 
                         new typename MapHMatrixContext::DistNodeContext;
                 }
@@ -183,13 +192,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         case DIST_NODE_GHOST:
             // We must be in the left team
-            if( C.Admissible() )
+            if( admissibleC )
             {
                 if( newC )
                 {
                     C._block.type = DIST_LOW_RANK;
                     C._block.data.DF = new DistLowRank;
-                    C._block.data.DF->rank = 0;
+                    DistLowRank& DF = *C._block.data.DF;
+                    DF.rank = 0;
+                    if( C._inTargetTeam )
+                        DF.ULocal.Resize( C.LocalHeight(), 0 );
+                    if( C._inSourceTeam )
+                        DF.VLocal.Resize( C.LocalWidth(), 0 );
                     context.block.type = DIST_LOW_RANK;
                     context.block.data.DF = 
                         new typename MapHMatrixContext::DistLowRankContext;
@@ -212,7 +226,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             break;
         case DIST_LOW_RANK:
-            if( C.Admissible() )
+            if( admissibleC )
             {
                 if( newC )
                 {
@@ -220,17 +234,24 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     {
                         C._block.type = DIST_LOW_RANK;
                         C._block.data.DF = new DistLowRank;
-                        C._block.data.DF->rank = 0;
+                        DistLowRank& DF = *C._block.data.DF;
+                        DF.rank = 0;
+                        if( C._inTargetTeam )
+                            DF.ULocal.Resize( C.LocalHeight(), 0 );
+                        if( C._inSourceTeam )
+                            DF.VLocal.Resize( C.LocalWidth(), 0 );
+                        context.block.type = DIST_LOW_RANK;
                     }
                     else // we're in the middle team
                     {
                         C._block.type = DIST_LOW_RANK_GHOST;
                         C._block.data.DFG = new DistLowRankGhost;
-                        C._block.data.DFG->rank = 0;
-                        C._block.data.DFG->sourceRoot = B._rootOfOtherTeam;
-                        C._block.data.DFG->targetRoot = A._rootOfOtherTeam;
+                        DistLowRankGhost& DFG = *C._block.data.DFG;
+                        DFG.rank = 0;
+                        DFG.sourceRoot = B._rootOfOtherTeam;
+                        DFG.targetRoot = A._rootOfOtherTeam;
+                        context.block.type = DIST_LOW_RANK_GHOST;
                     }
-                    context.block.type = DIST_LOW_RANK;
                     context.block.data.DF = 
                         new typename MapHMatrixContext::DistLowRankContext;
                 }
@@ -246,6 +267,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                         C._block.data.N = C.NewNode();
                         for( int j=0; j<16; ++j )
                             C._block.data.N->children[j] = new DistQuasi2d;
+                        context.block.type = DIST_NODE;
                     }
                     else // we're in the middle team
                     {
@@ -255,8 +277,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                             ( B._rootOfOtherTeam, A._rootOfOtherTeam );
                         for( int j=0; j<16; ++j )
                             C._block.data.NG->children[j] = new DistQuasi2d;
+                        context.block.type = DIST_NODE_GHOST;
                     }
-                    context.block.type = DIST_NODE;
                     context.block.data.DN = 
                         new typename MapHMatrixContext::DistNodeContext;
                 }
@@ -265,13 +287,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         case DIST_LOW_RANK_GHOST:
             // We must be in the left team    
-            if( C.Admissible() ) 
+            if( admissibleC ) 
             {
                 if( newC ) 
                 {
                     C._block.type = DIST_LOW_RANK;
                     C._block.data.DF = new DistLowRank;
-                    C._block.data.DF->rank = 0;
+                    DistLowRank& DF = *C._block.data.DF;
+                    DF.rank = 0;
+                    if( C._inTargetTeam )
+                        DF.ULocal.Resize( C.LocalHeight(), 0 );
+                    if( C._inSourceTeam )
+                        DF.VLocal.Resize( C.LocalWidth(), 0 );
                     context.block.type = DIST_LOW_RANK;
                     context.block.data.DF = 
                         new typename MapHMatrixContext::DistLowRankContext;
@@ -304,9 +331,75 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         switch( B._block.type )
         {
         case DIST_NODE:
-            // HERE
+            // We must be in the right team
+            if( admissibleC )
+            {
+                if( newC )
+                {
+                    C._block.type = DIST_LOW_RANK;                    
+                    C._block.data.DF = new DistLowRank;
+                    DistLowRank& DF = *C._block.data.DF;
+                    DF.rank = 0;
+                    if( C._inTargetTeam )
+                        DF.ULocal.Resize( C.LocalHeight(), 0 );
+                    if( C._inSourceTeam )
+                        DF.VLocal.Resize( C.LocalWidth(), 0 );
+                    context.block.type = DIST_LOW_RANK;
+                    context.block.data.DF =
+                        new typename MapHMatrixContext::DistLowRankContext;
+                }
+                // TODO: Start F += H H
+            }
+            else
+            {
+                if( newC )
+                {
+                    C._block.type = DIST_NODE;
+                    C._block.data.N = C.NewNode();
+                    for( int j=0; j<16; ++j )
+                        C._block.data.N->children[j] = new DistQuasi2d;
+                    context.block.type = DIST_NODE;
+                    context.block.data.DN = 
+                        new typename MapHMatrixContext::DistNodeContext;
+                }
+                // TODO: Start H += H H
+            }
+            break;
         case DIST_LOW_RANK:
-
+            // We must be in the right team
+            if( admissibleC )
+            {
+                if( newC )
+                {
+                    C._block.type = DIST_LOW_RANK;
+                    C._block.data.DF = new DistLowRank;
+                    DistLowRank& DF = *C._block.data.DF;
+                    DF.rank = 0;
+                    if( C._inTargetTeam )
+                        DF.ULocal.Resize( C.LocalHeight(), 0 );
+                    if( C._inSourceTeam )
+                        DF.VLocal.Resize( C.LocalWidth(), 0 );
+                    context.block.type = DIST_LOW_RANK;
+                    context.block.data.DF =
+                        new typename MapHMatrixContext::DistLowRankContext;
+                }
+                // TODO: Start F += H F
+            }
+            else
+            {
+                if( newC )
+                {
+                    C._block.type = DIST_NODE;
+                    C._block.data.N = C.NewNode();
+                    for( int j=0; j<16; ++j )
+                        C._block.data.N->children[j] = new DistQuasi2d;
+                    context.block.type = DIST_NODE;
+                    context.block.data.DN = 
+                        new typename MapHMatrixContext::DistNodeContext;
+                }
+                // TODO: Start H += H F
+            }
+            break;
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -318,14 +411,216 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         switch( B._block.type )
         {
         case SPLIT_NODE:
+            // We must be the middle process or both the left and right process
+            if( admissibleC )
+            {
+                if( newC )
+                {
+                    if( inC )
+                    {
+                        C._block.type = LOW_RANK;
+                        C._block.data.F = new LowRank;
+                        LowRank& F = *C._block.data.F;
+                        F.U.Resize( C.Height(), 0 );
+                        F.V.Resize( C.Width(), 0 );
+                        context.block.type = LOW_RANK;
+                        context.block.data.F = 
+                            new typename MapHMatrixContext::LowRankContext;
+                    }
+                    else
+                    {
+                        if( A._rootOfOtherTeam == B._rootOfOtherTeam )
+                        {
+                            C._block.type = LOW_RANK_GHOST;
+                            C._block.data.FG = new LowRankGhost;
+                            LowRankGhost& FG = *C._block.data.FG;
+                            FG.rank = 0;
+                            FG.owner = A._rootOfOtherTeam;
+                            context.block.type = LOW_RANK_GHOST;
+                            context.block.data.F = 
+                                new typename MapHMatrixContext::LowRankContext;
+                        }
+                        else
+                        {
+                            C._block.type = SPLIT_LOW_RANK_GHOST;
+                            C._block.data.SFG = new SplitLowRankGhost;
+                            SplitLowRankGhost& SFG = *C._block.data.SFG;
+                            SFG.rank = 0;
+                            SFG.sourceOwner = B._rootOfOtherTeam;
+                            SFG.targetOwner = A._rootOfOtherTeam;
+                            context.block.type = SPLIT_LOW_RANK_GHOST;
+                            context.block.data.SF = 
+                                new typename 
+                                MapHMatrixContext::SplitLowRankContext;
+                        }
+                    }
+                }
+                // TODO: Start F += H H
+            }
+            else
+            {
+                if( newC )
+                {
+                    if( inC )
+                    {
+                        C._block.type = NODE;
+                        C._block.data.N = C.NewNode();
+                        for( int j=0; j<16; ++j )
+                            C._block.data.N->children[j] = new DistQuasi2d;
+                        context.block.type = NODE;
+                        context.block.data.N = 
+                            new typename MapHMatrixContext::NodeContext;
+                    }
+                    else
+                    {
+                        if( A._rootOfOtherTeam == B._rootOfOtherTeam )
+                        {
+                            C._block.type = NODE_GHOST;
+                            C._block.data.NG = 
+                                C.NewNodeGhost
+                                ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                            for( int j=0; j<16; ++j )
+                                C._block.data.NG->children[j] = new DistQuasi2d;
+                            context.block.type = NODE_GHOST;
+                            context.block.data.N = 
+                                new typename MapHMatrixContext::NodeContext;
+                        }
+                        else
+                        {
+                            C._block.type = SPLIT_NODE_GHOST;
+                            C._block.data.NG = 
+                                C.NewNodeGhost
+                                ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                            for( int j=0; j<16; ++j )
+                                C._block.data.NG->children[j] = new DistQuasi2d;
+                            context.block.type = SPLIT_NODE_GHOST;
+                            context.block.data.SN = 
+                                new typename MapHMatrixContext::SplitNodeContext;
+                        }
+                    }
+                }
+                // TODO: Start H += H H
+            }
+            break;
         case SPLIT_NODE_GHOST:
+            // We must be in the left team
+            if( admissibleC )
+            {
+                if( newC )
+                {
+                    C._block.type = SPLIT_LOW_RANK;
+                    C._block.data.SF = new SplitLowRank;
+                    SplitLowRank& SF = *C._block.data.SF;
+                    SF.rank = 0;
+                    if( C._inTargetTeam )
+                        SF.D.Resize( C.Height(), 0 );
+                    else
+                        SF.D.Resize( C.Width(), 0 );
+                    context.block.type = SPLIT_LOW_RANK;
+                    context.block.data.SF =
+                        new typename MapHMatrixContext::SplitLowRankContext;
+                }
+                // TODO: Start F += H H
+            }
+            else
+            {
+                if( newC )
+                {
+                    C._block.type = SPLIT_NODE;
+                    C._block.data.N = C.NewNode();
+                    for( int j=0; j<16; ++j )
+                        C._block.data.N->children[j] = new DistQuasi2d;
+                    context.block.type = SPLIT_NODE;
+                    context.block.data.SN = 
+                        new typename MapHMatrixContext::SplitNodeContext;
+                }
+                // TODO: Start H += H H
+            }
+            break;
         case NODE:
+            // We must be in the middle and right teams
+            if( admissibleC )
+            {
+                if( newC )
+                {
+                    C._block.type = SPLIT_LOW_RANK;
+                    C._block.data.SF = new SplitLowRank;
+                    SplitLowRank& SF = *C._block.data.SF;
+                    SF.rank = 0;
+                    if( C._inTargetTeam )
+                        SF.D.Resize( C.Height(), 0 );
+                    else
+                        SF.D.Resize( C.Width(), 0 );
+                    context.block.type = SPLIT_LOW_RANK;
+                    context.block.data.SF = 
+                        new typename MapHMatrixContext::SplitLowRankContext;
+                }
+                // TODO: Start F += H H
+            }
+            else
+            {
+                if( newC )
+                {
+                    C._block.type = SPLIT_NODE;
+                    C._block.data.N = C.NewNode();
+                    for( int j=0; j<16; ++j )
+                        C._block.data.N->children[j] = new DistQuasi2d;
+                    context.block.type = SPLIT_NODE;
+                    context.block.data.SN = 
+                        new typename MapHMatrixContext::SplitNodeContext;
+                }
+                // TODO: Start H += H H
+            }
+            break;
         case NODE_GHOST:
+            // We must be in the left team
+            if( admissibleC )
+            {
+                if( newC )
+                {
+                    C._block.type = SPLIT_LOW_RANK;
+                    C._block.data.SF = new SplitLowRank;
+                    SplitLowRank& SF = *C._block.data.SF;
+                    SF.rank = 0;
+                    if( C._inTargetTeam )
+                        SF.D.Resize( C.Height(), 0 );
+                    else
+                        SF.D.Resize( C.Width(), 0 );
+                    context.block.type = SPLIT_LOW_RANK;
+                    context.block.data.SF = 
+                        new typename MapHMatrixContext::SplitLowRankContext;
+                }
+                // TODO: Start F += H H
+            }
+            else
+            {
+                if( newC )
+                {
+                    C._block.type = SPLIT_NODE;
+                    C._block.data.N = C.NewNode();
+                    for( int j=0; j<16; ++j )
+                        C._block.data.N->children[j] = new DistQuasi2d;
+                    context.block.type = SPLIT_NODE;
+                    context.block.data.SN = 
+                        new typename MapHMatrixContext::SplitNodeContext;
+                }
+                // TODO: Start H += H H
+            }
+            break;
         case SPLIT_LOW_RANK:
+            // We are either the middle process or both the left and right
+            if( admissibleC )
+            {
+                // HERE
+            }
+            else
+            {
+
+            }
+            break;
         case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK:
         case LOW_RANK_GHOST:
-        
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -539,5 +834,4 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     PopCallStack();
 #endif
 }
-
 

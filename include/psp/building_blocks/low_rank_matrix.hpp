@@ -38,8 +38,7 @@ template<typename Scalar,bool Conjugated>
 struct LowRankMatrix
 {
     // If Conjugated == true, then A = U V^H, otherwise, A = U V^T. 
-    DenseMatrix<Scalar> U;
-    DenseMatrix<Scalar> V;
+    DenseMatrix<Scalar> U, V;
 
     int Height() const { return U.Height(); }
     int Width() const { return V.Height(); }
