@@ -170,8 +170,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     {
                         C._block.type = DIST_NODE;
                         C._block.data.N = C.NewNode();
+                        Node& node = *C._block.data.N;
                         for( int j=0; j<16; ++j )
-                            C._block.data.N->children[j] = new DistQuasi2d;
+                            node.children[j] = new DistQuasi2d;
                         context.block.type = DIST_NODE;
                     }
                     else // we're in the middle team
@@ -180,8 +181,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                         C._block.data.NG = 
                             C.NewNodeGhost
                             ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                        NodeGhost& node = *C._block.data.NG;
                         for( int j=0; j<16; ++j )
-                            C._block.data.NG->children[j] = new DistQuasi2d;
+                            node.children[j] = new DistQuasi2d;
                         context.block.type = DIST_NODE_GHOST;
                     }
                     context.block.data.DN = 
@@ -216,8 +218,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = DIST_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = DIST_NODE;
                     context.block.data.DN = 
                         new typename MapHMatrixContext::DistNodeContext;
@@ -265,8 +268,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     {
                         C._block.type = DIST_NODE;
                         C._block.data.N = C.NewNode();
+                        Node& node = *C._block.data.N;
                         for( int j=0; j<16; ++j )
-                            C._block.data.N->children[j] = new DistQuasi2d;
+                            node.children[j] = new DistQuasi2d;
                         context.block.type = DIST_NODE;
                     }
                     else // we're in the middle team
@@ -275,8 +279,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                         C._block.data.NG = 
                             C.NewNodeGhost
                             ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                        NodeGhost& node = *C._block.data.NG;
                         for( int j=0; j<16; ++j )
-                            C._block.data.NG->children[j] = new DistQuasi2d;
+                            node.children[j] = new DistQuasi2d;
                         context.block.type = DIST_NODE_GHOST;
                     }
                     context.block.data.DN = 
@@ -311,8 +316,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = DIST_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = DIST_NODE;
                     context.block.data.DN = 
                         new typename MapHMatrixContext::DistNodeContext;
@@ -356,8 +362,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = DIST_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = DIST_NODE;
                     context.block.data.DN = 
                         new typename MapHMatrixContext::DistNodeContext;
@@ -391,8 +398,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = DIST_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = DIST_NODE;
                     context.block.data.DN = 
                         new typename MapHMatrixContext::DistNodeContext;
@@ -465,8 +473,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     {
                         C._block.type = NODE;
                         C._block.data.N = C.NewNode();
+                        Node& node = *C._block.data.N;
                         for( int j=0; j<16; ++j )
-                            C._block.data.N->children[j] = new DistQuasi2d;
+                            node.children[j] = new DistQuasi2d;
                         context.block.type = NODE;
                         context.block.data.N = 
                             new typename MapHMatrixContext::NodeContext;
@@ -479,8 +488,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                             C._block.data.NG = 
                                 C.NewNodeGhost
                                 ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                            NodeGhost& node = *C._block.data.NG;
                             for( int j=0; j<16; ++j )
-                                C._block.data.NG->children[j] = new DistQuasi2d;
+                                node.children[j] = new DistQuasi2d;
                             context.block.type = NODE_GHOST;
                             context.block.data.N = 
                                 new typename MapHMatrixContext::NodeContext;
@@ -491,8 +501,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                             C._block.data.NG = 
                                 C.NewNodeGhost
                                 ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                            NodeGhost& node = *C._block.data.NG;
                             for( int j=0; j<16; ++j )
-                                C._block.data.NG->children[j] = new DistQuasi2d;
+                                node.children[j] = new DistQuasi2d;
                             context.block.type = SPLIT_NODE_GHOST;
                             context.block.data.SN = 
                                 new typename MapHMatrixContext::SplitNodeContext;
@@ -528,8 +539,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = SPLIT_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = SPLIT_NODE;
                     context.block.data.SN = 
                         new typename MapHMatrixContext::SplitNodeContext;
@@ -563,8 +575,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = SPLIT_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = SPLIT_NODE;
                     context.block.data.SN = 
                         new typename MapHMatrixContext::SplitNodeContext;
@@ -598,8 +611,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 {
                     C._block.type = SPLIT_NODE;
                     C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
-                        C._block.data.N->children[j] = new DistQuasi2d;
+                        node.children[j] = new DistQuasi2d;
                     context.block.type = SPLIT_NODE;
                     context.block.data.SN = 
                         new typename MapHMatrixContext::SplitNodeContext;
@@ -611,11 +625,93 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // We are either the middle process or both the left and right
             if( admissibleC )
             {
-                // HERE
+                if( inC )
+                {
+                    C._block.type = LOW_RANK;
+                    C._block.data.F = new LowRank;
+                    LowRank& F = *C._block.data.F;
+                    F.U.Resize( C.Height(), 0 );
+                    F.V.Resize( C.Width(), 0 );
+                    context.block.type = LOW_RANK;
+                    context.block.data.F = 
+                        new typename MapHMatrixContext::LowRankContext;
+                }
+                else
+                {
+                    if( A._rootOfOtherTeam == B._rootOfOtherTeam )
+                    {
+                        C._block.type = LOW_RANK_GHOST;
+                        C._block.data.FG = new LowRankGhost;
+                        LowRankGhost& FG = *C._block.data.FG;
+                        FG.rank = 0;
+                        FG.owner = A._rootOfOtherTeam;
+                        context.block.type = LOW_RANK_GHOST;
+                        context.block.data.F = 
+                            new typename MapHMatrixContext::LowRankContext;
+                    }
+                    else
+                    {
+                        C._block.type = SPLIT_LOW_RANK_GHOST;
+                        C._block.data.SFG = new SplitLowRankGhost;
+                        SplitLowRankGhost& SFG = *C._block.data.SFG;
+                        SFG.rank = 0;
+                        SFG.sourceOwner = B._rootOfOtherTeam;
+                        SFG.targetOwner = A._rootOfOtherTeam;
+                        context.block.type = SPLIT_LOW_RANK_GHOST;
+                        context.block.data.SF = 
+                            new typename MapHMatrixContext::SplitLowRankContext;
+                    }
+                }
+                // TODO: Start F += H F
             }
             else
             {
-
+                if( newC )
+                {
+                    if( inC )
+                    {
+                        C._block.type = NODE;
+                        C._block.data.N = C.NewNode();
+                        Node& node = *C._block.data.N;
+                        for( int j=0; j<16; ++j )
+                            node.children[j] = new DistQuasi2d;
+                        context.block.type = NODE;
+                        context.block.data.N = 
+                            new typename MapHMatrixContext::NodeContext;
+                    }
+                    else
+                    {
+                        if( A._rootOfOtherTeam == B._rootOfOtherTeam )
+                        {
+                            C._block.type = NODE_GHOST;
+                            C._block.data.NG = 
+                                C.NewNodeGhost
+                                ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                            NodeGhost& node = *C._block.data.NG;
+                            for( int j=0; j<16; ++j )
+                                node.children[j] = new DistQuasi2d;
+                            context.block.type = NODE_GHOST;
+                            context.block.data.N = 
+                                new typename MapHMatrixContext::NodeContext;
+                        }
+                        else
+                        {
+                            C._block.type = SPLIT_NODE_GHOST;
+                            C._block.data.NG = 
+                                C.NewNodeGhost
+                                ( B._rootOfOtherTeam, A._rootOfOtherTeam );
+                            NodeGhost& node = *C._block.data.NG;
+                            for( int j=0; j<16; ++j )
+                                node.children[j] = new DistQuasi2d;
+                            context.block.type = SPLIT_NODE_GHOST;
+                            context.block.data.SN = 
+                                new typename 
+                                MapHMatrixContext::SplitNodeContext;
+                        }
+                    }
+                }
+                // TODO: Start H += H F
+                // HERE
             }
             break;
         case SPLIT_LOW_RANK_GHOST:
