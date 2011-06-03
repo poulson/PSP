@@ -30,6 +30,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <stack>
 #include <stdexcept>
 #include <utility>
 #include <vector>
