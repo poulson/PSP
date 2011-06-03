@@ -24,15 +24,17 @@ namespace {
 
 psp::ExpandedUInt64 lcgValue;
 
-// Manually import Knuth's multiplication constant, 6364136223846793005
+// Manually import Knuth's multiplication constant, 6364136223846793005,
+// and his additive constant, 1442695040888963407
 const psp::ExpandedUInt64 lcgMultValue = { 32557U, 19605U, 62509U, 22609U }; 
-
-// Manually import Knuth's additive constant, 1442695040888963407
 const psp::ExpandedUInt64 lcgAddValue = { 33103U, 63335U, 31614U, 5125U };
+
+psp::ExpandedUInt64 teamMultValue, teamAddValue, myLcgValue;
 
 } // anonymous namespace
 
-psp::UInt32 psp::Log2( UInt32 a )
+// Return floor( log2(x) )
+psp::UInt32 psp::Log2( UInt32 x )
 {
     static const psp::UInt32 MultiplyDeBruijnBitPosition[32] = 
     {
@@ -40,15 +42,16 @@ psp::UInt32 psp::Log2( UInt32 a )
       8U, 12U, 20U, 28U, 15U, 17U, 24U, 7U, 19U, 27U, 23U, 6U, 26U, 5U, 4U, 31U
     };
 
-    a |= a >> 1;
-    a |= a >> 2;
-    a |= a >> 4;
-    a |= a >> 8;
-    a |= a >> 16;
-    return MultiplyDeBruijnBitPosition[(UInt32)(a*0x07C4ACDDU)>>27];
+    x |= x >> 1;
+    x |= x >> 2;
+    x |= x >> 4;
+    x |= x >> 8;
+    x |= x >> 16;
+    return MultiplyDeBruijnBitPosition[(UInt32)(x*0x07C4ACDDU)>>27];
 }
 
-psp::UInt32 psp::Log2PowerOfTwo( UInt32 a )
+// Return log2(x), where x is a power of 2
+psp::UInt32 psp::Log2PowerOfTwo( UInt32 x )
 {
     static const int MultiplyDeBruijnBitPosition2[32] = 
     {
@@ -57,40 +60,92 @@ psp::UInt32 psp::Log2PowerOfTwo( UInt32 a )
       9U
     };
 
-    return MultiplyDeBruijnBitPosition[(UInt32)(a*0x077CB531U)>>27];
+    return MultiplyDeBruijnBitPosition[(UInt32)(x*0x077CB531U)>>27];
+}
+
+// x := x/2
+void psp::Halve( ExpandedUInt64& x )
+{
+    x[0] >>= 1;
+    x[0] |= ((x[1]&1) << 16);
+    x[1] >>= 1;
+    x[1] |= ((x[2]&1) << 16);
+    x[2] >>= 1;
+    x[2] |= ((x[3]&1) << 16);
+    x[3] >>= 1;
+    // The 16th bit of x[3] must be zero since we require the 17th and above
+    // to have been zero upon entry.
+}
+
+// Return x^n with O(log2(n)) work. This is the "Right-to-left binary method for
+// exponentiation" from Knuth's 'Seminumerical Algorithms' volume of TAOCP.
+psp::ExpandedUInt64 psp::IntegerPowerWith64BitMod
+( ExpandedUInt64 x, ExpandedUInt64 n )
+{
+    ExpandedUInt64 N=n, Z=x, Y={1U,0U,0U,0U};
+    while( 1 )
+    {
+        Halve( N );
+        Y = MultiplyWith64BitMod( Z, Y );
+        if( N[0]==0 && N[1]==0 && N[2]==0 && N[3]==0 )
+            break;
+        Z = MultiplyWith64BitMod( Z, Z );
+    }
+    return Y;
 }
 
 void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
 {
-    const UInt32 P = psp::NextPowerOfTwo( commSize );
-    const UInt32 log2P = Log2PowerOfTwo( P );
-    const UInt32 log2Period = 64U - log2P;
+    // Compute a^rank and a^commSize in O(log2(commSize)) work.
+    const ExpandedUInt64 myMultValue = 
+        IntegerPowerWith64BitMod( ::lcgMultValue, Expand(rank) );
+    ::teamMultValue = 
+        IntegerPowerWith64BitMod( ::lcgMultValue, Expand(commSize) );
 
-    ExpandedUInt32 period;
-    if( log2Period < 48U ) // 32 <= log2Period < 48
+    // Compute (a^rank-1)/(a-1) and (a^commSize-1)/(a-1) in O(commSize) work.
+    // This could almost certainly be optimized, but its execution time is 
+    // probably ignorable.
+    ExpandedUInt64 Y, one={1U,0U,0U,0U};
+    Y = one;
+    for( int j=0; j<rank; ++j )
     {
-        period[0] = 0U;    
-        period[1] = 0U;
-        period[2] = 1U << (log2Period-32U);
-        period[3] = 0U;
+        Y = MultWith64BitMod( Y, ::lcgMultValue );
+        Y = AddWith64BitMod( Y, one );
     }
-    else // 48 <= log2Period <= 64
+    const ExpandedUInt64 myAddValue = Y;
+    for( int j=rank; j<commSize; ++j )
     {
-        period[0] = 0U;
-        period[1] = 0U;
-        period[2] = 0U;
-        period[3] = 1U << (log2Period-48U);
+        Y = MultWith64BitMod( Y, ::lcgMultValue );
+        Y = AddWith64BitMod( Y, one );
     }
-    ExpandedUInt32 myOffset = MultiplyWith64BitMod( period, Expand(rank) );
-    ExpandedUInt32 myStart = AddWith64BitMod( myOffset, Expand(globalSeed) );
-    
-    // Compute the first term in our recurrence, using the formula
-    //
-    // U_n = a^n U_0 + ((a^n - 1)/(a - 1)) c mod m,
-    //
-    // where we force U_0 = 0. Our main computation is then to find 
-    // a^n mod m using recursive exponential doubling mod m.
-    throw std::logic_error("Routine not finished");
-    // HERE
+    ::teamAddValue = Y;
+
+    // Set our local value equal to 
+    //     X_rank := a^rank X_0 + (a^rank-1)/(a-1) c mod 2^64
+    // where X_0 is 'globalSeed'.
+    ::myLcgValue = Expand( globalSeed );
+    Lcg( myMultValue, myAddValue, ::myLcgValue );
 }
+
+// Return a uniform sample from [0,2^64)
+psp::UInt64 psp::ParallelLcg()
+{
+    Lcg( ::teamMultValue, ::teamAddValue, ::myLcgValue ); 
+    return Expand( ::myLcgValue );
+}
+
+// TODO: Figure out how to convert UInt64 into sample form [0,1].
+/*
+template<>
+float psp::ParallelUniform<float>()
+{
+
+}
+
+template<>
+double psp::ParallelUniform<double>()
+{
+
+}
+*/
 

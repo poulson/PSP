@@ -52,9 +52,13 @@ ExpandedUInt64 AddWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b );
 // Multiply two expanded UInt64's mod 2^64
 ExpandedUInt64 MultiplyWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b );
 
-void SeedParallelLcg( UInt32 rank, UInt32 commSize );
-ExpandedUInt64 CurrentLcgValue();
-ExpandedUInt64 NextLcgValue();
+void Lcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X );
+void SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed );
+UInt64 ParallelLcg();
+
+template<typename R> R psp::ParallelUniform();
+template<> float psp::ParallelUniform<float>();
+template<> double psp::ParallelUniform<double>();
 
 } // namespace psp
 
@@ -62,7 +66,7 @@ ExpandedUInt64 NextLcgValue();
 // Header implementations                                                     //
 //----------------------------------------------------------------------------//
 
-inline UInt32
+inline psp::UInt32
 psp::NextPowerOfTwo( UInt32 a )
 {
     --a;
@@ -77,19 +81,19 @@ psp::NextPowerOfTwo( UInt32 a )
     return a;
 }
 
-inline UInt32
+inline psp::UInt32
 psp::Lower16Bits( UInt32 a )
 {
     return a & 0xFFFF;
 }
 
-inline UInt32
+inline psp::UInt32
 psp::Upper16Bits( UInt32 a )
 {
     return (a >> 16) & 0xFFFF;
 }
 
-inline ExpandedUInt64
+inline psp::ExpandedUInt64
 psp::Expand( UInt32 a )
 {
     ExpandedUInt64 b;
@@ -99,7 +103,7 @@ psp::Expand( UInt32 a )
     b[3] = 0U;
 }
 
-inline ExpandedUInt64
+inline psp::ExpandedUInt64
 psp::Expand( UInt64 a )
 {
     ExpandedUInt64 b;
@@ -111,7 +115,7 @@ psp::Expand( UInt64 a )
     return b;
 }
 
-inline UInt64
+inline psp::UInt64
 psp::Deflate( ExpandedUInt64 a )
 {
     UInt64 b;
@@ -156,7 +160,7 @@ psp::CarryUpper16Bits( ExpandedUInt64& c )
 //
 // NOTE: k (mod 2^n) may be quickly computed using k & (2^n - 1),
 //       and 2^16-1 = 65535 = 0xFFFF.
-inline ExpandedUInt64 
+inline psp::ExpandedUInt64 
 psp::MultiplyWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b )
 {
     UInt32 temp;
@@ -200,7 +204,7 @@ psp::MultiplyWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b )
     return c;
 }
 
-inline ExpandedUInt64 
+inline psp::ExpandedUInt64 
 psp::AddWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b )
 {
     ExpandedUInt64 c;
@@ -211,6 +215,13 @@ psp::AddWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b )
 
     CarryUpper16Bits( c );
     return c;
+}
+
+inline void
+psp::Lcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X )
+{
+    X = MultWith64BitMod( a, X );
+    X = AddWith64BitMod( c, X );
 }
 
 #endif // PSP_RANDOM_HPP
