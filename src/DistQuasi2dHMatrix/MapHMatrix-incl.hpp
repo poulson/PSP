@@ -60,9 +60,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixFillMemberData
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUpC
 ( const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-        DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
+        DistQuasi2dHMatrix<Scalar,Conjugated>& C,
+        MapHMatrixContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapHMatrixFillMemberData");
@@ -93,6 +94,220 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixFillMemberData
     C._targetRoot = A._targetRoot;
     C._localSourceOffset = B._localSourceOffset;
     C._localTargetOffset = A._localTargetOffset;
+    
+    MPI_Comm team = _subcomms->Subcomm( _level );
+    const int teamSize = mpi::CommSize( team );
+    if( C.Admissible() ) // C is low-rank
+    {
+        if( teamSize > 1 )
+        {
+            if( C._inSourceTeam || C._inTargetTeam )
+            {
+                C._block.type = DIST_LOW_RANK;
+                C._block.data.DF = new DistLowRank;
+                DistLowRank& DF = *C._block.data.DF;
+                DF.rank = 0;
+                if( C._inTargetTeam )
+                    DF.ULocal.Resize( C.LocalHeight(), 0 );
+                if( C._inSourceTeam )
+                    DF.VLocal.Resize( C.LocalWidth(), 0 );
+                context.block.type = DIST_LOW_RANK;
+                context.block.data.DF = 
+                    new typename MapHMatrixContext::DistLowRankContext;
+            }
+            else
+            {
+                C._block.type = DIST_LOW_RANK_GHOST;
+                C._block.data.DFG = new DistLowRankGhost;
+                DistLowRankGhost& DFG = *C._block.data.DFG;
+                DFG.rank = 0;
+                context.block.type = DIST_LOW_RANK_GHOST;
+                context.block.data.DF = 
+                    new typename MapHMatrixContext::DistLowRankContext;
+            }
+        }
+        else // teamSize == 1
+        {
+            if( C._sourceRoot == C._targetRoot )
+            {
+                if( C._inSourceTeam || C._inTargetTeam )
+                {
+                    C._block.type = LOW_RANK;
+                    C._block.data.F = new LowRank;
+                    LowRank& F = *C._block.data.F;
+                    F.U.Resize( C.Height(), 0 );
+                    F.V.Resize( C.Width(), 0 );
+                    context.block.type = LOW_RANK;
+                    context.block.data.F = 
+                        new typename MapHMatrixContext::LowRankContext;
+                }
+                else
+                {
+                    C._block.type = LOW_RANK_GHOST;
+                    C._block.data.FG = new LowRankGhost;
+                    LowRankGhost& FG = *C._block.data.FG;
+                    FG.rank = 0;
+                    context.block.type = LOW_RANK_GHOST;
+                    context.block.data.F = 
+                        new typename MapHMatrixContext::LowRankContext;
+                }
+            }
+            else
+            {
+                if( C._inSourceTeam || C._inTargetTeam )
+                {
+                    C._block.type = SPLIT_LOW_RANK;
+                    C._block.data.SF = new SplitLowRank;
+                    SplitLowRank& SF = *C._block.data.SF;
+                    SF.rank = 0;
+                    if( C._inTargetTeam )
+                        SF.D.Resize( C.Height(), 0 );
+                    else
+                        SF.D.Resize( C.Width(), 0 );
+                    context.block.type = SPLIT_LOW_RANK;
+                    context.block.data.SF =
+                        new typename MapHMatrixContext::SplitLowRankContext;
+                }
+                else
+                {
+                    C._block.type = SPLIT_LOW_RANK_GHOST;
+                    C._block.data.SFG = new SplitLowRankGhost;
+                    SplitLowRankGhost& SFG = *C._block.data.SFG;
+                    SFG.rank = 0;
+                    context.block.type = SPLIT_LOW_RANK_GHOST;
+                    context.block.data.SF = 
+                        new typename MapHMatrixContext::SplitLowRankContext;
+                }
+            }
+        }
+    }
+    else if( C._numLevels > 1 ) // C is hierarchical
+    {
+        if( teamSize > 1 )
+        {
+            if( C._inSourceTeam || C._inTargetTeam )
+            {
+                C._block.type = DIST_NODE;
+                C._block.data.N = C.NewNode();
+                Node& node = *C._block.data.N;
+                for( int j=0; j<16; ++j )
+                    node.children[j] = new DistQuasi2d;
+                context.block.type = DIST_NODE;
+                context.block.data.DN = 
+                    new typename MapHMatrixContext::DistNodeContext;
+            }
+            else
+            {
+                C._block.type = DIST_NODE_GHOST;
+                C._block.data.N = C.NewNode();
+                Node& node = *C._block.data.N;
+                for( int j=0; j<16; ++j )
+                    node.children[j] = new DistQuasi2d;
+                context.block.type = DIST_NODE_GHOST;
+                context.block.data.DN = 
+                    new typename MapHMatrixContext::DistNodeContext;
+            }
+        }
+        else
+        {
+            if( C._sourceRoot == C._targetRoot )
+            {
+                if( C._inSourceTeam || C._inTargetTeam )
+                {
+                    C._block.type = NODE;
+                    C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
+                    for( int j=0; j<16; ++j )
+                        node.children[j] = new DistQuasi2d;
+                    context.block.type = NODE;
+                    context.block.data.N = 
+                        new typename MapHMatrixContext::NodeContext;
+                }
+                else
+                {
+                    C._block.type = NODE_GHOST;
+                    C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
+                    for( int j=0; j<16; ++j )
+                        node.children[j] = new DistQuasi2d;
+                    context.block.type = NODE_GHOST;
+                    context.block.data.N = 
+                        new typename MapHMatrixContext::NodeContext;
+                }
+            }
+            else
+            {
+                if( C._inSourceTeam || C._inTargetTeam )
+                {
+                    C._block.type = SPLIT_NODE;
+                    C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
+                    for( int j=0; j<16; ++j )
+                        node.children[j] = new DistQuasi2d;
+                    context.block.type = SPLIT_NODE;
+                    context.block.data.SN = 
+                        new typename MapHMatrixContext::SplitNodeContext;
+                }
+                else
+                {
+                    C._block.type = SPLIT_NODE_GHOST;
+                    C._block.data.N = C.NewNode();
+                    Node& node = *C._block.data.N;
+                    for( int j=0; j<16; ++j )
+                        node.children[j] = new DistQuasi2d;
+                    context.block.type = SPLIT_NODE_GHOST;
+                    context.block.data.SN = 
+                        new typename MapHMatrixContext::SplitNodeContext;
+                }
+            }
+        }
+    }
+    else // C is dense
+    {
+        if( C._sourceRoot == C._targetRoot )
+        {
+            if( C._inSourceTeam || C._inTargetTeam )
+            {
+                C._block.type = DENSE;
+                C._block.data.D = new Dense;
+                Dense& D = *C._block.data.D;
+                D.Resize( C.Height(), C.Width(), C.Height() );
+                context.block.type = DENSE;
+                context.block.data.D = 
+                    new typename MapHMatrixContext::DenseContext;
+            }
+            else
+            {
+                C._block.type = DENSE_GHOST;
+                C._block.data.DG = new DenseGhost;
+                context.block.type = DENSE_GHOST;
+                context.block.data.D = 
+                    new typename MapHMatrixContext::DenseContext;
+            }
+        }
+        else
+        {
+            if( C._inSourceTeam || C._inTargetTeam )
+            {
+                C._block.type = SPLIT_DENSE;
+                C._block.data.SD = new SplitDense;
+                SplitDense& SD = *C._block.data.SD;
+                if( C._inSourceTeam )
+                    SD.D.Resize( C.Height(), C.Width() );
+                context.block.type = SPLIT_DENSE;
+                context.block.data.SD = 
+                    new typename MapHMatrixContext::SplitDenseContext;
+            }
+            else
+            {
+                C._block.type = SPLIT_DENSE_GHOST;
+                C._block.data.SDG = new SplitDenseGhost;
+                context.block.type = SPLIT_DENSE_GHOST;
+                context.block.data.SD = 
+                    new typename MapHMatrixContext::SplitDenseContext;
+            }
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -116,225 +331,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         return;
     }
 
+    if( C._block.type == EMPTY )
+        A.MapHMatrixSetUpC( B, C, context );
+
     MPI_Comm team = _subcomms->Subcomm( _level );
     const int teamSize = mpi::CommSize( team );
     const bool admissibleC = C.Admissible();
-    if( C._block.type == EMPTY )
-    {
-        A.MapHMatrixFillMemberData( B, C );
-        if( admissibleC )
-        {
-            if( teamSize > 1 )
-            {
-                if( C._inSourceTeam || C._inTargetTeam )
-                {
-                    C._block.type = DIST_LOW_RANK;
-                    C._block.data.DF = new DistLowRank;
-                    DistLowRank& DF = *C._block.data.DF;
-                    DF.rank = 0;
-                    if( C._inTargetTeam )
-                        DF.ULocal.Resize( C.LocalHeight(), 0 );
-                    if( C._inSourceTeam )
-                        DF.VLocal.Resize( C.LocalWidth(), 0 );
-                    context.block.type = DIST_LOW_RANK;
-                    context.block.data.DF = 
-                        new typename MapHMatrixContext::DistLowRankContext;
-                }
-                else
-                {
-                    C._block.type = DIST_LOW_RANK_GHOST;
-                    C._block.data.DFG = new DistLowRankGhost;
-                    DistLowRankGhost& DFG = *C._block.data.DFG;
-                    DFG.rank = 0;
-                    context.block.type = DIST_LOW_RANK_GHOST;
-                    context.block.data.DF = 
-                        new typename MapHMatrixContext::DistLowRankContext;
-                }
-            }
-            else // teamSize == 1
-            {
-                if( C._sourceRoot == C._targetRoot )
-                {
-                    if( C._inSourceTeam || C._inTargetTeam )
-                    {
-                        C._block.type = LOW_RANK;
-                        C._block.data.F = new LowRank;
-                        LowRank& F = *C._block.data.F;
-                        F.U.Resize( C.Height(), 0 );
-                        F.V.Resize( C.Width(), 0 );
-                        context.block.type = LOW_RANK;
-                        context.block.data.F = 
-                            new typename MapHMatrixContext::LowRankContext;
-                    }
-                    else
-                    {
-                        C._block.type = LOW_RANK_GHOST;
-                        C._block.data.FG = new LowRankGhost;
-                        LowRankGhost& FG = *C._block.data.FG;
-                        FG.rank = 0;
-                        context.block.type = LOW_RANK_GHOST;
-                        context.block.data.F = 
-                            new typename MapHMatrixContext::LowRankContext;
-                    }
-                }
-                else
-                {
-                    if( C._inSourceTeam || C._inTargetTeam )
-                    {
-                        C._block.type = SPLIT_LOW_RANK;
-                        C._block.data.SF = new SplitLowRank;
-                        SplitLowRank& SF = *C._block.data.SF;
-                        SF.rank = 0;
-                        if( C._inTargetTeam )
-                            SF.D.Resize( C.Height(), 0 );
-                        else
-                            SF.D.Resize( C.Width(), 0 );
-                        context.block.type = SPLIT_LOW_RANK;
-                        context.block.data.SF =
-                            new typename MapHMatrixContext::SplitLowRankContext;
-                    }
-                    else
-                    {
-                        C._block.type = SPLIT_LOW_RANK_GHOST;
-                        C._block.data.SFG = new SplitLowRankGhost;
-                        SplitLowRankGhost& SFG = *C._block.data.SFG;
-                        SFG.rank = 0;
-                        context.block.type = SPLIT_LOW_RANK_GHOST;
-                        context.block.data.SF = 
-                            new typename MapHMatrixContext::SplitLowRankContext;
-                    }
-                }
-            }
-        }
-        else if( C._numLevels > 1 )
-        {
-            if( teamSize > 1 )
-            {
-                if( C._inSourceTeam || C._inTargetTeam )
-                {
-                    C._block.type = DIST_NODE;
-                    C._block.data.N = C.NewNode();
-                    Node& node = *C._block.data.N;
-                    for( int j=0; j<16; ++j )
-                        node.children[j] = new DistQuasi2d;
-                    context.block.type = DIST_NODE;
-                    context.block.data.DN = 
-                        new typename MapHMatrixContext::DistNodeContext;
-                }
-                else
-                {
-                    C._block.type = DIST_NODE_GHOST;
-                    C._block.data.N = C.NewNode();
-                    Node& node = *C._block.data.N;
-                    for( int j=0; j<16; ++j )
-                        node.children[j] = new DistQuasi2d;
-                    context.block.type = DIST_NODE_GHOST;
-                    context.block.data.DN = 
-                        new typename MapHMatrixContext::DistNodeContext;
-                }
-            }
-            else
-            {
-                if( C._sourceRoot == C._targetRoot )
-                {
-                    if( C._inSourceTeam || C._inTargetTeam )
-                    {
-                        C._block.type = NODE;
-                        C._block.data.N = C.NewNode();
-                        Node& node = *C._block.data.N;
-                        for( int j=0; j<16; ++j )
-                            node.children[j] = new DistQuasi2d;
-                        context.block.type = NODE;
-                        context.block.data.N = 
-                            new typename MapHMatrixContext::NodeContext;
-                    }
-                    else
-                    {
-                        C._block.type = NODE_GHOST;
-                        C._block.data.N = C.NewNode();
-                        Node& node = *C._block.data.N;
-                        for( int j=0; j<16; ++j )
-                            node.children[j] = new DistQuasi2d;
-                        context.block.type = NODE_GHOST;
-                        context.block.data.N = 
-                            new typename MapHMatrixContext::NodeContext;
-                    }
-                }
-                else
-                {
-                    if( C._inSourceTeam || C._inTargetTeam )
-                    {
-                        C._block.type = SPLIT_NODE;
-                        C._block.data.N = C.NewNode();
-                        Node& node = *C._block.data.N;
-                        for( int j=0; j<16; ++j )
-                            node.children[j] = new DistQuasi2d;
-                        context.block.type = SPLIT_NODE;
-                        context.block.data.SN = 
-                            new typename MapHMatrixContext::SplitNodeContext;
-                    }
-                    else
-                    {
-                        C._block.type = SPLIT_NODE_GHOST;
-                        C._block.data.N = C.NewNode();
-                        Node& node = *C._block.data.N;
-                        for( int j=0; j<16; ++j )
-                            node.children[j] = new DistQuasi2d;
-                        context.block.type = SPLIT_NODE_GHOST;
-                        context.block.data.SN = 
-                            new typename MapHMatrixContext::SplitNodeContext;
-                    }
-                }
-            }
-        }
-        else // C is dense
-        {
-            if( C._sourceRoot == C._targetRoot )
-            {
-                if( C._inSourceTeam || C._inTargetTeam )
-                {
-                    C._block.type = DENSE;
-                    C._block.data.D = new Dense;
-                    Dense& D = *C._block.data.D;
-                    D.Resize( C.Height(), C.Width(), C.Height() );
-                    context.block.type = DENSE;
-                    context.block.data.D = 
-                        new typename MapHMatrixContext::DenseContext;
-                }
-                else
-                {
-                    C._block.type = DENSE_GHOST;
-                    C._block.data.DG = new DenseGhost;
-                    context.block.type = DENSE_GHOST;
-                    context.block.data.D = 
-                        new typename MapHMatrixContext::DenseContext;
-                }
-            }
-            else
-            {
-                if( C._inSourceTeam || C._inTargetTeam )
-                {
-                    C._block.type = SPLIT_DENSE;
-                    C._block.data.SD = new SplitDense;
-                    SplitDense& SD = *C._block.data.SD;
-                    if( C._inSourceTeam )
-                        SD.D.Resize( C.Height(), C.Width() );
-                    context.block.type = SPLIT_DENSE;
-                    context.block.data.SD = 
-                        new typename MapHMatrixContext::SplitDenseContext;
-                }
-                else
-                {
-                    C._block.type = SPLIT_DENSE_GHOST;
-                    C._block.data.SDG = new SplitDenseGhost;
-                    context.block.type = SPLIT_DENSE_GHOST;
-                    context.block.data.SD = 
-                        new typename MapHMatrixContext::SplitDenseContext;
-                }
-            }
-        }
-    }
-
     switch( A._block.type )
     {
     case DIST_NODE:

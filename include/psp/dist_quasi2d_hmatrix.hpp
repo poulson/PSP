@@ -682,9 +682,10 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
 
-    void MapHMatrixFillMemberData
+    void MapHMatrixSetUpC
     ( const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-            DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+            DistQuasi2dHMatrix<Scalar,Conjugated>& C,
+            MapHMatrixContext& context ) const;
     void MapHMatrixMainPrecompute
     ( MapHMatrixContext& context,
       Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
@@ -875,7 +876,16 @@ private:
     int _sourceRoot, _targetRoot;
     int _localSourceOffset, _localTargetOffset;
 
-    // Create shortened names for convenience in implementations.
+    // For the reuse of the computation of H Omega and H' Omega in order to
+    // capture the column and row space, respectively, of H. These variables 
+    // are mutable since they do not effect the usage of the logical state of
+    // the class and simply help avoid redundant computation.
+    // HERE
+    mutable bool _beganRowSpaceComp, _beganColSpaceComp;
+
+    /*
+     * Create shortened names for convenience in implementations.
+     */
     typedef DenseMatrix<Scalar> Dense;
     typedef DenseMatrixGhost DenseGhost;
     typedef LowRankMatrix<Scalar,Conjugated> LowRank;
