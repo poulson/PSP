@@ -22,21 +22,19 @@
 
 namespace { 
 
-psp::ExpandedUInt64 lcgValue;
-
 // Manually import Knuth's multiplication constant, 6364136223846793005,
 // and his additive constant, 1442695040888963407.
 //
 // We initialize the state to an arbitrary value.
-const psp::ExpandedUInt64 lcgMultValue = { 32557U, 19605U, 62509U, 22609U }; 
-const psp::ExpandedUInt64 lcgAddValue = { 33103U, 63335U, 31614U, 5125U };
-psp::ExpandedUInt64 serialLcgValue={ 17U, 0U, 0U, 0U };
+const psp::ExpandedUInt64 lcgMultValue={{32557U,19605U,62509U,22609U}}; 
+const psp::ExpandedUInt64 lcgAddValue={{33103U,63335U,31614U,5125U}};
+psp::ExpandedUInt64 serialLcgValue={{17U,0U,0U,0U}};
 
 // We initialize the state to an arbitrary value and set the coefficients
 // equal to the serial case by default.
 psp::ExpandedUInt64 teamMultValue=lcgMultValue, 
                     teamAddValue=lcgAddValue,
-                    parallelLcgValue={ 17U, 0U, 0U, 0U };
+                    parallelLcgValue={{17U,0U,0U,0U}};
 
 } // anonymous namespace
 
@@ -59,7 +57,7 @@ void psp::Halve( ExpandedUInt64& x )
 psp::ExpandedUInt64 psp::IntegerPowerWith64BitMod
 ( ExpandedUInt64 x, ExpandedUInt64 n )
 {
-    ExpandedUInt64 N=n, Z=x, Y={1U,0U,0U,0U};
+    ExpandedUInt64 N=n, Z=x, Y={{1U,0U,0U,0U}};
     if( N[0]==0 && N[1]==0 && N[2]==0 && N[3]==0 )
         return Y;
     while( 1 )
@@ -93,14 +91,14 @@ void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
     // Compute (a^rank-1)/(a-1) and (a^commSize-1)/(a-1) in O(commSize) work.
     // This could almost certainly be optimized, but its execution time is 
     // probably ignorable.
-    ExpandedUInt64 Y={0U,0U,0U,0U}, one={1U,0U,0U,0U};
-    for( int j=0; j<rank; ++j )
+    ExpandedUInt64 Y={{0U,0U,0U,0U}}, one={{1U,0U,0U,0U}};
+    for( unsigned j=0; j<rank; ++j )
     {
         Y = MultiplyWith64BitMod( Y, ::lcgMultValue );
         Y = AddWith64BitMod( Y, one );
     }
     const ExpandedUInt64 myAddValue = MultiplyWith64BitMod( Y, ::lcgAddValue );
-    for( int j=rank; j<commSize; ++j )
+    for( unsigned j=rank; j<commSize; ++j )
     {
         Y = MultiplyWith64BitMod( Y, ::lcgMultValue );
         Y = AddWith64BitMod( Y, one );

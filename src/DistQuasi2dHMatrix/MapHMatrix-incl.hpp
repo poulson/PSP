@@ -334,8 +334,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     if( C._block.type == EMPTY )
         A.MapHMatrixSetUpC( B, C, context );
 
-    MPI_Comm team = _subcomms->Subcomm( _level );
-    const int teamSize = mpi::CommSize( team );
+    //MPI_Comm team = _subcomms->Subcomm( _level );
+    //const int teamSize = mpi::CommSize( team );
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {

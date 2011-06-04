@@ -23,6 +23,7 @@
 
 #include "mpi.h"
 #include <algorithm>
+#include <climits>
 #include <complex>
 #include <cstring>
 #include <iostream>

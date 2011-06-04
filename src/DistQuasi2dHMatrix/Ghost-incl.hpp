@@ -520,6 +520,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::SetGhostRank
     switch( _block.type )
     {
     case DIST_NODE: 
+    case SPLIT_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
     {
         Node& node = *_block.data.N;
         int t=0,tOffset=_targetOffset;

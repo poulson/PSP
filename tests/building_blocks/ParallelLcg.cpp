@@ -31,7 +31,7 @@ main( int argc, char* argv[] )
     // 3 entries from each process from the parallel RNG.
     try
     {
-        psp::UInt64 seed = { 17U, 0U };
+        psp::UInt64 seed = {{ 17U, 0U }};
         if( rank == 0 )
         {
             psp::SeedSerialLcg( seed );
