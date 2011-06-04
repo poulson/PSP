@@ -263,6 +263,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
+  set(BUILDING_BLOCKS_TESTS ParallelLcg)
   set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
   set(QUASI2D_TESTS Invert LowRankConstructor Pack)
   set(DIST_QUASI2D_TESTS Ghost Pack)
@@ -298,6 +299,16 @@ add_library(psp STATIC ${PSP_SRC})
 
 # Build the test drivers if necessary
 if(BUILD_TESTS)
+  # Build teh building_blocks tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/building_blocks")
+  foreach(TEST ${BUILDING_BLOCKS_TESTS}) 
+    add_executable(building_blocks-${TEST} 
+                   ${TEST_DIR}/building_blocks/${TEST}.cpp)
+    target_link_libraries(building_blocks-${TEST} psp cmake-dummy-lib)
+    set_target_properties(building_blocks-${TEST}
+                          PROPERTIES OUTPUT_NAME ${TEST}
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+  endforeach(TEST)
   # Build the hmatrix_tools tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmatrix_tools")
   foreach(TEST ${HMATRIX_TOOLS_TESTS})

@@ -60,9 +60,11 @@ psp::ExpandedUInt64 psp::IntegerPowerWith64BitMod
 ( ExpandedUInt64 x, ExpandedUInt64 n )
 {
     ExpandedUInt64 N=n, Z=x, Y={1U,0U,0U,0U};
+    if( N[0]==0 && N[1]==0 && N[2]==0 && N[3]==0 )
+        return Y;
     while( 1 )
     {
-        const bool odd = ( N[0]&0x1 );
+        const bool odd = ( N[0] & 1U );
         Halve( N );
         if( odd )
         {
@@ -91,20 +93,19 @@ void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
     // Compute (a^rank-1)/(a-1) and (a^commSize-1)/(a-1) in O(commSize) work.
     // This could almost certainly be optimized, but its execution time is 
     // probably ignorable.
-    ExpandedUInt64 Y, one={1U,0U,0U,0U};
-    Y = one;
+    ExpandedUInt64 Y={0U,0U,0U,0U}, one={1U,0U,0U,0U};
     for( int j=0; j<rank; ++j )
     {
         Y = MultiplyWith64BitMod( Y, ::lcgMultValue );
         Y = AddWith64BitMod( Y, one );
     }
-    const ExpandedUInt64 myAddValue = Y;
+    const ExpandedUInt64 myAddValue = MultiplyWith64BitMod( Y, ::lcgAddValue );
     for( int j=rank; j<commSize; ++j )
     {
         Y = MultiplyWith64BitMod( Y, ::lcgMultValue );
         Y = AddWith64BitMod( Y, one );
     }
-    ::teamAddValue = Y;
+    ::teamAddValue = MultiplyWith64BitMod( Y, ::lcgAddValue );
 
     // Set our local value equal to 
     //     X_rank := a^rank X_0 + (a^rank-1)/(a-1) c mod 2^64
@@ -116,14 +117,16 @@ void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
 // Return a uniform sample from [0,2^64)
 psp::UInt64 psp::SerialLcg()
 {
+    UInt64 value = Deflate( ::serialLcgValue );
     ManualLcg( ::lcgMultValue, ::lcgAddValue, ::serialLcgValue );
-    return Deflate( ::serialLcgValue );
+    return value;
 }
 
 // Return a uniform sample from [0,2^64)
 psp::UInt64 psp::ParallelLcg()
 {
+    UInt64 value = Deflate( ::parallelLcgValue );
     ManualLcg( ::teamMultValue, ::teamAddValue, ::parallelLcgValue ); 
-    return Deflate( ::parallelLcgValue );
+    return value;
 }
 

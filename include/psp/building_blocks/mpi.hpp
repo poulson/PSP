@@ -33,6 +33,9 @@ namespace mpi {
 
 void SafeMpi( int mpiError );
 
+void Allgather
+( const unsigned* sendBuf, int sendCount,
+        unsigned* recvBuf, int recvCount, MPI_Comm comm );
 void AllGather
 ( const int* sendBuf, int sendCount,
         int* recvBuf, int recvCount, MPI_Comm comm );
@@ -235,6 +238,23 @@ SafeMpi( int mpiError )
         MPI_Error_string( mpiError, errorString, &lengthOfErrorString );
         throw std::logic_error( errorString );
     }
+#endif
+}
+
+inline void AllGather
+( const unsigned* sendBuf, int sendCount,
+        unsigned* recvBuf, int recvCount, MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::AllGather");
+#endif
+    SafeMpi(
+        MPI_Allgather
+        ( const_cast<unsigned*>(sendBuf), sendCount, MPI_UNSIGNED,
+          recvBuf,                        recvCount, MPI_UNSIGNED, comm )
+    );
+#ifndef RELEASE
+    PopCallStack();
 #endif
 }
 
