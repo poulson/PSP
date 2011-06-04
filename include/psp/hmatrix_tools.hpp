@@ -36,6 +36,8 @@
 #include "psp/building_blocks/low_rank_matrix.hpp"
 #include "psp/building_blocks/sparse_matrix.hpp"
 
+#include "psp/building_blocks/random.hpp"
+
 #include "psp/building_blocks/abstract_hmatrix.hpp"
 
 namespace psp {
@@ -786,26 +788,6 @@ void HermitianTranspose
         LowRankMatrix<Scalar,Conjugated>& B );
 
 /*
- *  For generating Gaussian random variables/vectors
- */
-template<typename Real>
-void Uniform( Real& U );
-template<typename Real>
-void BoxMuller( Real& X, Real& Y );
-template<typename Real>
-void GaussianRandomVariable( Real& X );
-template<typename Real>
-void GaussianRandomVariable( std::complex<Real>& X );
-template<typename Real>
-void GaussianRandomVector( Vector<Real>& x );
-template<typename Real>
-void GaussianRandomVector( Vector< std::complex<Real> >& x );
-template<typename Real>
-void GaussianRandomVectors( DenseMatrix<Real>& A );
-template<typename Real>
-void GaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
-
-/*
  *  For computing the in-place QR decomposition of two r x r upper-triangular
  *  matrices with their nonzeros packed columnwise.
  */
@@ -1446,7 +1428,7 @@ Real psp::hmatrix_tools::EstimateTwoNorm
     // Sample the unit sphere
     Vector<Real> x( n );
     {
-        hmatrix_tools::GaussianRandomVector( x );
+        SerialGaussianRandomVector( x );
         const Real twoNorm = hmatrix_tools::TwoNorm( x );
         hmatrix_tools::Scale( ((Real)1)/twoNorm, x );
     }
@@ -1492,7 +1474,7 @@ Real psp::hmatrix_tools::EstimateTwoNorm
     // Sample the unit sphere
     Vector<Scalar> x( n );
     {
-        hmatrix_tools::GaussianRandomVector( x );
+        SerialGaussianRandomVector( x );
         const Real twoNorm = hmatrix_tools::TwoNorm( x );
         hmatrix_tools::Scale( ((Scalar)1)/twoNorm, x );
     }
@@ -1628,7 +1610,7 @@ void psp::hmatrix_tools::MatrixMatrix
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Real> Omega( B.Width(), r+oversampling );
-    GaussianRandomVectors( Omega );
+    SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A B) on Omega (into Y)
     DenseMatrix<Real> X;
@@ -1724,7 +1706,7 @@ void psp::hmatrix_tools::MatrixMatrix
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Scalar> Omega( B.Width(), r+oversampling );
-    GaussianRandomVectors( Omega );
+    SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A B) on Omega (into Y)
     DenseMatrix<Scalar> X;
@@ -1834,7 +1816,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Real> Omega( B.Width(), r+oversampling );
-    GaussianRandomVectors( Omega );
+    SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A^T B) on Omega (into Y)
     DenseMatrix<Real> X;
@@ -1930,7 +1912,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Scalar> Omega( B.Width(), r+oversampling );
-    GaussianRandomVectors( Omega );
+    SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A^T B) on Omega (into Y)
     DenseMatrix<Scalar> X;
@@ -2065,7 +2047,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 
     // Generate a few more than r Gaussian random vectors
     DenseMatrix<Scalar> Omega( B.Width(), r+oversampling );
-    GaussianRandomVectors( Omega );
+    SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A^H B) on Omega (into Y)
     DenseMatrix<Scalar> X;
@@ -2151,156 +2133,6 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     ( 'N', option, Y.Height(), r, Y.Width(), 
       1, Y.LockedBuffer(), Y.LDim(), X.LockedBuffer(), X.LDim(), 
       0, F.U.Buffer(), F.U.LDim() );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-/*
- *  For generating Gaussian random variables/vectors
- */
-
-// Return a uniform sample from [0,1]
-template<typename Real>
-inline void
-psp::hmatrix_tools::Uniform
-( Real& U )
-{
-    U = static_cast<Real>(rand()) / static_cast<Real>(RAND_MAX);
-}
-
-template<typename Real>
-inline void
-psp::hmatrix_tools::BoxMuller
-( Real& X, Real& Y )
-{
-    Real U, V;
-    Uniform( U );
-    Uniform( V );
-    const Real A = sqrt(-2*log(U));
-    const Real c = cos(2*M_PI*V);
-    const Real s = sin(2*M_PI*V);
-    X = A*c;
-    Y = A*s;
-}
-
-template<typename Real>
-inline void
-psp::hmatrix_tools::GaussianRandomVariable
-( Real& X )
-{
-    // Use half of Box-Muller
-    Real U, V;
-    Uniform( U );
-    Uniform( V );
-    X = sqrt(-2*log(U)) * cos(2*M_PI*V);
-}
-
-template<typename Real>
-inline void
-psp::hmatrix_tools::GaussianRandomVariable
-( std::complex<Real>& X )
-{
-    Real Y, Z;
-    BoxMuller( Y, Z );
-    X = std::complex<Real>( Y, Z );
-}
-
-template<typename Real>
-void
-psp::hmatrix_tools::GaussianRandomVector
-( psp::Vector<Real>& x )
-{
-#ifndef RELEASE
-    PushCallStack("hmatrix_tools::GaussianRandomVector");
-#endif
-    // Use BoxMuller for every pair of entries
-    const int n = x.Height();
-    const int numPairs = (n+1)/2;
-    Real* buffer = x.Buffer();
-    for( int i=0; i<numPairs-1; ++i )
-    {
-        Real X, Y;
-        BoxMuller( X, Y );
-        buffer[2*i] = X;
-        buffer[2*i+1] = Y;
-    }
-    if( n & 1 )
-        GaussianRandomVariable( buffer[n-1] );
-    else
-        BoxMuller( buffer[n-2], buffer[n-1] );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Real>
-void
-psp::hmatrix_tools::GaussianRandomVector
-( psp::Vector< std::complex<Real> >& x )
-{
-#ifndef RELEASE
-    PushCallStack("hmatrix_tools::GaussianRandomVector");
-#endif
-    const int n = x.Height();
-    std::complex<Real>* buffer = x.Buffer();
-    for( int i=0; i<n; ++i )
-        GaussianRandomVariable( buffer[i] );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Real>
-void
-psp::hmatrix_tools::GaussianRandomVectors
-( psp::DenseMatrix<Real>& A )
-{
-#ifndef RELEASE
-    PushCallStack("hmatrix_tools::GaussianRandomVectors");
-#endif
-    // Use BoxMuller for every pair of entries in each column
-    A.SetType( GENERAL );
-    const int m = A.Height();
-    const int n = A.Width();
-    const int numPairs = (m+1)/2;
-    for( int j=0; j<n; ++j )
-    {
-        Real* ACol = A.Buffer(0,j);
-        for( int i=0; i<numPairs-1; ++i )
-        {
-            Real X, Y;
-            BoxMuller( X, Y );
-            ACol[2*i] = X;
-            ACol[2*i+1] = Y;
-        }
-        if( m & 1 )
-            GaussianRandomVariable( ACol[n-1] );
-        else
-            BoxMuller( ACol[n-2], ACol[n-1] );
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Real>
-void
-psp::hmatrix_tools::GaussianRandomVectors
-( psp::DenseMatrix< std::complex<Real> >& A )
-{
-#ifndef RELEASE
-    PushCallStack("hmatrix_tools::GaussianRandomVectors");
-#endif
-    A.SetType( GENERAL );
-    const int m = A.Height();
-    const int n = A.Width();
-    for( int j=0; j<n; ++j )
-    {
-        std::complex<Real>* ACol = A.Buffer(0,j);
-        for( int i=0; i<m; ++i )
-            GaussianRandomVariable( ACol[i] );
-    }
 #ifndef RELEASE
     PopCallStack();
 #endif

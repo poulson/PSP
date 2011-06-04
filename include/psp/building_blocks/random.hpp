@@ -29,12 +29,19 @@ namespace psp {
 // as a 32-bit unsigned integer in order to allow for multiplication and 
 // addition without overflow.
 typedef unsigned UInt32;
-typedef UInt32 UInt64[2];
-typedef UInt32 ExpandedUInt64[4];
+struct UInt64 
+{ 
+    UInt32 d[2]; 
+    UInt32& operator[]( int i ) { return d[i]; }
+    const UInt32& operator[]( int i ) const { return d[i]; }
+};
+struct ExpandedUInt64 
+{ 
+    UInt32 d[4]; 
+    UInt32& operator[]( int i ) { return d[i]; }
+    const UInt32& operator[]( int i ) const { return d[i]; }
+};
 
-UInt32 NextPowerOfTwo( UInt32 a );
-UInt32 Log2( UInt32 a );
-UInt32 Log2PowerOfTwo( UInt32 a );
 UInt32 Lower16Bits( UInt32 a );
 UInt32 Upper16Bits( UInt32 a );
 
@@ -46,40 +53,62 @@ UInt64 Deflate( ExpandedUInt64 a );
 // expanded representation of a UInt64. The topmost 16 bits are simply zeroed.
 void CarryUpper16Bits( ExpandedUInt64& a );
 
-// Add two expanded UInt64's mod 2^64
+// Add/multiply two expanded UInt64's mod 2^64
 ExpandedUInt64 AddWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b );
-
-// Multiply two expanded UInt64's mod 2^64
 ExpandedUInt64 MultiplyWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b );
+ExpandedUInt64 IntegerPowerWith64BitMod( ExpandedUInt64 x, ExpandedUInt64 n );
+void Halve( ExpandedUInt64& a );
 
-void Lcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X );
+void SeedSerialLcg( UInt64 globalSeed );
 void SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed );
-UInt64 ParallelLcg();
 
-template<typename R> R psp::ParallelUniform();
-template<> float psp::ParallelUniform<float>();
-template<> double psp::ParallelUniform<double>();
+UInt64 SerialLcg();
+UInt64 ParallelLcg();
+void ManualLcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X );
+
+// For grabbing uniform samples from [0,1]
+template<typename R> R SerialUniform();
+template<> float SerialUniform<float>();
+template<> double SerialUniform<double>();
+template<typename R> R ParallelUniform();
+template<> float ParallelUniform<float>();
+template<> double ParallelUniform<double>();
+
+// For generating Gaussian random variables/vectors
+template<typename Real>
+void SerialBoxMuller( Real& X, Real& Y );
+template<typename Real>
+void ParallelBoxMuller( Real& X, Real& Y );
+template<typename Real>
+void SerialGaussianRandomVariable( Real& X );
+template<typename Real>
+void ParallelGaussianRandomVariable( Real& X );
+template<typename Real>
+void SerialGaussianRandomVariable( std::complex<Real>& X );
+template<typename Real>
+void ParallelGaussianRandomVariable( std::complex<Real>& X );
+template<typename Real>
+void SerialGaussianRandomVector( Vector<Real>& x );
+template<typename Real>
+void ParallelGaussianRandomVector( Vector<Real>& xLocal );
+template<typename Real>
+void SerialGaussianRandomVector( Vector< std::complex<Real> >& x );
+template<typename Real>
+void ParallelaussianRandomVector( Vector< std::complex<Real> >& xLocal );
+template<typename Real>
+void SerialGaussianRandomVectors( DenseMatrix<Real>& A );
+template<typename Real>
+void ParallelGaussianRandomVectors( DenseMatrix<Real>& ALocal );
+template<typename Real>
+void SerialGaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
+template<typename Real>
+void ParallelGaussianRandomVectors( DenseMatrix< std::complex<Real> >& ALocal );
 
 } // namespace psp
 
 //----------------------------------------------------------------------------//
 // Header implementations                                                     //
 //----------------------------------------------------------------------------//
-
-inline psp::UInt32
-psp::NextPowerOfTwo( UInt32 a )
-{
-    --a;
-    a |= a >> 1;
-    a |= a >> 2;
-    a |= a >> 4;
-    a |= a >> 8;
-    a |= a >> 16;
-    ++a;
-    a += ( a == 0 );
-
-    return a;
-}
 
 inline psp::UInt32
 psp::Lower16Bits( UInt32 a )
@@ -97,10 +126,12 @@ inline psp::ExpandedUInt64
 psp::Expand( UInt32 a )
 {
     ExpandedUInt64 b;
-    b[0] = LowerBits( a );
-    b[1] = UpperBits( a );
+    b[0] = Lower16Bits( a );
+    b[1] = Upper16Bits( a );
     b[2] = 0U;
     b[3] = 0U;
+
+    return b;
 }
 
 inline psp::ExpandedUInt64
@@ -218,10 +249,318 @@ psp::AddWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b )
 }
 
 inline void
-psp::Lcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X )
+psp::ManualLcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X )
 {
-    X = MultWith64BitMod( a, X );
+    X = MultiplyWith64BitMod( a, X );
     X = AddWith64BitMod( c, X );
+}
+
+template<>
+inline float psp::SerialUniform<float>()
+{
+    const UInt64 state = SerialLcg();
+    // Use the upper 32-bits of the LCG since they are the most random.
+    return static_cast<float>(state[1])/static_cast<float>(UINT_MAX);
+}
+
+template<>
+inline double psp::SerialUniform<double>()
+{
+    const UInt64 state = SerialLcg();
+    // Use the upper 32-bits of the LCG since they are the most random
+    // and we cannot rely on the existence of 64-bit integers in C++.
+    return static_cast<double>(state[1])/static_cast<double>(UINT_MAX);
+}
+
+template<>
+inline float psp::ParallelUniform<float>()
+{
+    const UInt64 state = ParallelLcg();
+    // Use the upper 32-bits of the LCG since they are the most random.
+    return static_cast<float>(state[1])/static_cast<float>(UINT_MAX);
+}
+
+template<>
+inline double psp::ParallelUniform<double>()
+{
+    const UInt64 state = ParallelLcg();
+    // Use the upper 32-bits of the LCG since they are the most random
+    // and we cannot rely on the existence of 64-bit integers in C++.
+    return static_cast<double>(state[1])/static_cast<double>(UINT_MAX);
+}
+
+/*
+ *  For generating Gaussian random variables/vectors
+ */
+
+template<typename Real>
+inline void
+psp::SerialBoxMuller
+( Real& X, Real& Y )
+{
+    const Real U = SerialUniform<Real>();
+    const Real V = SerialUniform<Real>();
+    const Real A = sqrt(-2*log(U));
+    const Real c = cos(2*M_PI*V);
+    const Real s = sin(2*M_PI*V);
+    X = A*c;
+    Y = A*s;
+}
+
+template<typename Real>
+inline void
+psp::ParallelBoxMuller
+( Real& X, Real& Y )
+{
+    const Real U = ParallelUniform<Real>();
+    const Real V = ParallelUniform<Real>();
+    const Real A = sqrt(-2*log(U));
+    const Real c = cos(2*M_PI*V);
+    const Real s = sin(2*M_PI*V);
+    X = A*c;
+    Y = A*s;
+}
+
+template<typename Real>
+inline void
+psp::SerialGaussianRandomVariable
+( Real& X )
+{
+    // Use half of Box-Muller
+    const Real U = SerialUniform<Real>();
+    const Real V = SerialUniform<Real>();
+    X = sqrt(-2*log(U)) * cos(2*M_PI*V);
+}
+
+template<typename Real>
+inline void
+psp::ParallelGaussianRandomVariable
+( Real& X )
+{
+    // Use half of Box-Muller
+    const Real U = ParallelUniform<Real>();
+    const Real V = ParallelUniform<Real>();
+    X = sqrt(-2*log(U)) * cos(2*M_PI*V);
+}
+
+template<typename Real>
+inline void
+psp::SerialGaussianRandomVariable
+( std::complex<Real>& X )
+{
+    Real Y, Z;
+    SerialBoxMuller( Y, Z );
+    X = std::complex<Real>( Y, Z );
+}
+
+template<typename Real>
+inline void
+psp::ParallelGaussianRandomVariable
+( std::complex<Real>& X )
+{
+    Real Y, Z;
+    ParallelBoxMuller( Y, Z );
+    X = std::complex<Real>( Y, Z );
+}
+
+template<typename Real>
+void
+psp::SerialGaussianRandomVector
+( psp::Vector<Real>& x )
+{
+#ifndef RELEASE
+    PushCallStack("SerialGaussianRandomVector");
+#endif
+    // Use BoxMuller for every pair of entries
+    const int n = x.Height();
+    const int numPairs = (n+1)/2;
+    Real* buffer = x.Buffer();
+    for( int i=0; i<numPairs-1; ++i )
+    {
+        Real X, Y;
+        SerialBoxMuller( X, Y );
+        buffer[2*i] = X;
+        buffer[2*i+1] = Y;
+    }
+    if( n & 1 )
+        SerialGaussianRandomVariable( buffer[n-1] );
+    else
+        SerialBoxMuller( buffer[n-2], buffer[n-1] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::ParallelGaussianRandomVector
+( psp::Vector<Real>& x )
+{
+#ifndef RELEASE
+    PushCallStack("ParallelGaussianRandomVector");
+#endif
+    // Use BoxMuller for every pair of entries
+    const int n = x.Height();
+    const int numPairs = (n+1)/2;
+    Real* buffer = x.Buffer();
+    for( int i=0; i<numPairs-1; ++i )
+    {
+        Real X, Y;
+        ParallelBoxMuller( X, Y );
+        buffer[2*i] = X;
+        buffer[2*i+1] = Y;
+    }
+    if( n & 1 )
+        ParallelGaussianRandomVariable( buffer[n-1] );
+    else
+        ParallelBoxMuller( buffer[n-2], buffer[n-1] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::SerialGaussianRandomVector
+( psp::Vector< std::complex<Real> >& x )
+{
+#ifndef RELEASE
+    PushCallStack("SerialGaussianRandomVector");
+#endif
+    const int n = x.Height();
+    std::complex<Real>* buffer = x.Buffer();
+    for( int i=0; i<n; ++i )
+        SerialGaussianRandomVariable( buffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::ParallelGaussianRandomVector
+( psp::Vector< std::complex<Real> >& x )
+{
+#ifndef RELEASE
+    PushCallStack("ParallelGaussianRandomVector");
+#endif
+    const int n = x.Height();
+    std::complex<Real>* buffer = x.Buffer();
+    for( int i=0; i<n; ++i )
+        ParallelGaussianRandomVariable( buffer[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::SerialGaussianRandomVectors
+( psp::DenseMatrix<Real>& A )
+{
+#ifndef RELEASE
+    PushCallStack("SerialGaussianRandomVectors");
+#endif
+    // Use BoxMuller for every pair of entries in each column
+    A.SetType( GENERAL );
+    const int m = A.Height();
+    const int n = A.Width();
+    const int numPairs = (m+1)/2;
+    for( int j=0; j<n; ++j )
+    {
+        Real* ACol = A.Buffer(0,j);
+        for( int i=0; i<numPairs-1; ++i )
+        {
+            Real X, Y;
+            SerialBoxMuller( X, Y );
+            ACol[2*i] = X;
+            ACol[2*i+1] = Y;
+        }
+        if( m & 1 )
+            SerialGaussianRandomVariable( ACol[n-1] );
+        else
+            SerialBoxMuller( ACol[n-2], ACol[n-1] );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::ParallelGaussianRandomVectors
+( psp::DenseMatrix<Real>& A )
+{
+#ifndef RELEASE
+    PushCallStack("ParallelGaussianRandomVectors");
+#endif
+    // Use BoxMuller for every pair of entries in each column
+    A.SetType( GENERAL );
+    const int m = A.Height();
+    const int n = A.Width();
+    const int numPairs = (m+1)/2;
+    for( int j=0; j<n; ++j )
+    {
+        Real* ACol = A.Buffer(0,j);
+        for( int i=0; i<numPairs-1; ++i )
+        {
+            Real X, Y;
+            ParallelBoxMuller( X, Y );
+            ACol[2*i] = X;
+            ACol[2*i+1] = Y;
+        }
+        if( m & 1 )
+            ParallelGaussianRandomVariable( ACol[n-1] );
+        else
+            ParallelBoxMuller( ACol[n-2], ACol[n-1] );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::SerialGaussianRandomVectors
+( psp::DenseMatrix< std::complex<Real> >& A )
+{
+#ifndef RELEASE
+    PushCallStack("SerialGaussianRandomVectors");
+#endif
+    A.SetType( GENERAL );
+    const int m = A.Height();
+    const int n = A.Width();
+    for( int j=0; j<n; ++j )
+    {
+        std::complex<Real>* ACol = A.Buffer(0,j);
+        for( int i=0; i<m; ++i )
+            SerialGaussianRandomVariable( ACol[i] );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Real>
+void
+psp::ParallelGaussianRandomVectors
+( psp::DenseMatrix< std::complex<Real> >& ALocal )
+{
+#ifndef RELEASE
+    PushCallStack("ParallelGaussianRandomVectors");
+#endif
+    ALocal.SetType( GENERAL );
+    const int m = ALocal.Height();
+    const int n = ALocal.Width();
+    for( int j=0; j<n; ++j )
+    {
+        std::complex<Real>* ALocalCol = ALocal.Buffer(0,j);
+        for( int i=0; i<m; ++i )
+            ParallelGaussianRandomVariable( ALocalCol[i] );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 #endif // PSP_RANDOM_HPP
