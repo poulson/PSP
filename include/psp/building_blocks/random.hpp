@@ -255,38 +255,42 @@ psp::ManualLcg( ExpandedUInt64 a, ExpandedUInt64 c, ExpandedUInt64& X )
     X = AddWith64BitMod( c, X );
 }
 
+// Provide a uniform sample from (0,1]
 template<>
 inline float psp::SerialUniform<float>()
 {
     const UInt64 state = SerialLcg();
     // Use the upper 32-bits of the LCG since they are the most random.
-    return static_cast<float>(state[1])/static_cast<float>(UINT_MAX);
+    return (static_cast<float>(state[1])+1.f) / 4294967296.f;
 }
 
+// Provide a uniform sample from (0,1]
 template<>
 inline double psp::SerialUniform<double>()
 {
     const UInt64 state = SerialLcg();
     // Use the upper 32-bits of the LCG since they are the most random
     // and we cannot rely on the existence of 64-bit integers in C++.
-    return static_cast<double>(state[1])/static_cast<double>(UINT_MAX);
+    return (static_cast<double>(state[1])+1.) / 4294967296.;
 }
 
+// Provide a uniform sample from (0,1]
 template<>
 inline float psp::ParallelUniform<float>()
 {
     const UInt64 state = ParallelLcg();
     // Use the upper 32-bits of the LCG since they are the most random.
-    return static_cast<float>(state[1])/static_cast<float>(UINT_MAX);
+    return (static_cast<float>(state[1])+1.f) / 4294967296.f;
 }
 
+// Provide a uniform sample from (0,1]
 template<>
 inline double psp::ParallelUniform<double>()
 {
     const UInt64 state = ParallelLcg();
     // Use the upper 32-bits of the LCG since they are the most random
     // and we cannot rely on the existence of 64-bit integers in C++.
-    return static_cast<double>(state[1])/static_cast<double>(UINT_MAX);
+    return (static_cast<double>(state[1])+1.) / 4294967296.;
 }
 
 /*
