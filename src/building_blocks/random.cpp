@@ -26,15 +26,15 @@ namespace {
 // and his additive constant, 1442695040888963407.
 //
 // We initialize the state to an arbitrary value.
-const psp::ExpandedUInt64 lcgMultValue={{32557U,19605U,62509U,22609U}}; 
-const psp::ExpandedUInt64 lcgAddValue={{33103U,63335U,31614U,5125U}};
+const psp::ExpandedUInt64 serialMultValue={{32557U,19605U,62509U,22609U}}; 
+const psp::ExpandedUInt64 serialAddValue={{33103U,63335U,31614U,5125U}};
 psp::ExpandedUInt64 serialLcgValue={{17U,0U,0U,0U}};
 
 // We initialize the state to an arbitrary value and set the coefficients
 // equal to the serial case by default.
-psp::ExpandedUInt64 teamMultValue=lcgMultValue, 
-                    teamAddValue=lcgAddValue,
-                    parallelLcgValue={{17U,0U,0U,0U}};
+psp::ExpandedUInt64 parallelMultValue=serialMultValue, 
+                    parallelAddValue=serialAddValue,
+                    parallelLcgValue=serialLcgValue;
 
 } // anonymous namespace
 
@@ -84,9 +84,9 @@ void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
 {
     // Compute a^rank and a^commSize in O(log2(commSize)) work.
     const ExpandedUInt64 myMultValue = 
-        IntegerPowerWith64BitMod( ::lcgMultValue, Expand(rank) );
-    ::teamMultValue = 
-        IntegerPowerWith64BitMod( ::lcgMultValue, Expand(commSize) );
+        IntegerPowerWith64BitMod( ::serialMultValue, Expand(rank) );
+    ::parallelMultValue = 
+        IntegerPowerWith64BitMod( ::serialMultValue, Expand(commSize) );
 
     // Compute (a^rank-1)/(a-1) and (a^commSize-1)/(a-1) in O(commSize) work.
     // This could almost certainly be optimized, but its execution time is 
@@ -94,16 +94,17 @@ void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
     ExpandedUInt64 Y={{0U,0U,0U,0U}}, one={{1U,0U,0U,0U}};
     for( unsigned j=0; j<rank; ++j )
     {
-        Y = MultiplyWith64BitMod( Y, ::lcgMultValue );
+        Y = MultiplyWith64BitMod( Y, ::serialMultValue );
         Y = AddWith64BitMod( Y, one );
     }
-    const ExpandedUInt64 myAddValue = MultiplyWith64BitMod( Y, ::lcgAddValue );
+    const ExpandedUInt64 myAddValue = 
+        MultiplyWith64BitMod( Y, ::serialAddValue );
     for( unsigned j=rank; j<commSize; ++j )
     {
-        Y = MultiplyWith64BitMod( Y, ::lcgMultValue );
+        Y = MultiplyWith64BitMod( Y, ::serialMultValue );
         Y = AddWith64BitMod( Y, one );
     }
-    ::teamAddValue = MultiplyWith64BitMod( Y, ::lcgAddValue );
+    ::parallelAddValue = MultiplyWith64BitMod( Y, ::serialAddValue );
 
     // Set our local value equal to 
     //     X_rank := a^rank X_0 + (a^rank-1)/(a-1) c mod 2^64
@@ -116,7 +117,7 @@ void psp::SeedParallelLcg( UInt32 rank, UInt32 commSize, UInt64 globalSeed )
 psp::UInt64 psp::SerialLcg()
 {
     UInt64 value = Deflate( ::serialLcgValue );
-    ManualLcg( ::lcgMultValue, ::lcgAddValue, ::serialLcgValue );
+    ManualLcg( ::serialMultValue, ::serialAddValue, ::serialLcgValue );
     return value;
 }
 
@@ -124,7 +125,7 @@ psp::UInt64 psp::SerialLcg()
 psp::UInt64 psp::ParallelLcg()
 {
     UInt64 value = Deflate( ::parallelLcgValue );
-    ManualLcg( ::teamMultValue, ::teamAddValue, ::parallelLcgValue ); 
+    ManualLcg( ::parallelMultValue, ::parallelAddValue, ::parallelLcgValue ); 
     return value;
 }
 
