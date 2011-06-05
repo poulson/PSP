@@ -38,6 +38,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         throw std::logic_error("Mismatched levels");
 #endif
     const DistQuasi2d& A = *this;
+    A.RequireRoot();
     if( !A.Ghosted() || !B.Ghosted() )
         throw std::logic_error("A and B must have their ghost nodes");
     C.Clear();
@@ -323,6 +324,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapHMatrixMainPrecompute");
 #endif
+    const int oversampling = 4; // TODO: Lift this definition
     const DistQuasi2d& A = *this;
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
@@ -334,39 +336,101 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     if( C._block.type == EMPTY )
         A.MapHMatrixSetUpC( B, C, context );
 
-    //MPI_Comm team = _subcomms->Subcomm( _level );
-    //const int teamSize = mpi::CommSize( team );
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
     case DIST_NODE:
+    {
+        Node& nodeC = *C._block.data.N;
+        typename MapHMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+
         switch( B._block.type )
         {
         case DIST_NODE:
             if( admissibleC )
             {
-                // TODO: Start F += H H 
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize
+                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A.HermitianTransposeMapDenseMatrixPrecompute
+                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
+                if( !B._beganColSpaceComp )
+                {
+                    B._Omega1.Resize
+                    ( B.LocalWidth(), C.MaxRank()+oversampling ); 
+                    ParallelGaussianRandomVectors( B._Omega1 );
+                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B.MapDenseMatrixPrecompute
+                    ( B._T1Context, alpha, B._Omega1, B._T1 );
+                    B._beganColSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Recurse
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( nodeContext.Child(t,s), 
+                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         case DIST_NODE_GHOST:
-            // We must be in the left team
             if( admissibleC )
             {
-                // TODO: Start F += H H
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize
+                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A.HermitianTransposeMapDenseMatrixPrecompute
+                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Recurse
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         case DIST_LOW_RANK:
             if( admissibleC )
             {
-                // TODO: Start F += H F
+                const int key = A._sourceOffset;
+                DistLowRank& DFB = *B._block.data.DF;
+
+                if( C._inTargetTeam )
+                    nodeContext.ULocalMap[key] = 
+                        new Dense( C.LocalHeight(), DFB.rank, C.LocalHeight() );
+                if( C._inSourceTeam )
+                    nodeContext.VLocalMap[key] = 
+                        new Dense( C.LocalWidth(), DFB.rank, C.LocalWidth() );
+                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *nodeContext.denseContextMap[key];
+
+                // HERE
+                /*
+                A.MapDenseMatrixInitialize( denseContext );
+                if( A._inSourceTeam )
+                    A.MapDenseMatrixPrecompute( 
+                */
             }
             else
             {
@@ -391,6 +455,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case DIST_NODE_GHOST:
         switch( B._block.type )
         {

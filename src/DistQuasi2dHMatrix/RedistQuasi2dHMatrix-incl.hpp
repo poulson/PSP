@@ -809,6 +809,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::ComputeLocalSizesRecursion
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
 ( const byte* packedSub, const Subcomms& subcomms )
+: _beganRowSpaceComp(false), _beganColSpaceComp(false)
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::DistQuasi2dHMatrix");

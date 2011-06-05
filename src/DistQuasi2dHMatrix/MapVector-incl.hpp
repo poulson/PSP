@@ -74,6 +74,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVector
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapVector");
 #endif
+    RequireRoot();
     hmatrix_tools::Scale( beta, yLocal );
 
     MapVectorContext context;
@@ -103,6 +104,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::TransposeMapVector");
 #endif
+    RequireRoot();
     hmatrix_tools::Scale( beta, yLocal );
 
     MapVectorContext context;
@@ -132,6 +134,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
 #endif
+    RequireRoot();
     hmatrix_tools::Scale( beta, yLocal );
 
     MapVectorContext context;

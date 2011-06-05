@@ -188,9 +188,6 @@ psp::CarryUpper16Bits( ExpandedUInt64& c )
 //   2^0  ( a0 b0 )
 //
 // Since c := a b (mod 2^64), only the last four terms must be computed.
-//
-// NOTE: k (mod 2^n) may be quickly computed using k & (2^n - 1),
-//       and 2^16-1 = 65535 = 0xFFFF.
 inline psp::ExpandedUInt64 
 psp::MultiplyWith64BitMod( ExpandedUInt64 a, ExpandedUInt64 b )
 {

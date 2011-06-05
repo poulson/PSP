@@ -40,7 +40,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0),
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
-  _localSourceOffset(0), _localTargetOffset(0)
+  _localSourceOffset(0), _localTargetOffset(0),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }
@@ -65,7 +66,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix
   _ySource(ySource), _yTarget(yTarget), _subcomms(&subcomms), _level(level),
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _sourceRoot(sourceRoot), _targetRoot(targetRoot),
-  _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset)
+  _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }

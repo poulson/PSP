@@ -94,7 +94,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         else if( A.IsHierarchical() && B.IsHierarchical() )
         {
             // C.F := alpha H H
-            const int oversampling = 4; // lift this definition
+            const int oversampling = 4; // TODO: Lift this definition
             hmatrix_tools::MatrixMatrix
             ( oversampling, alpha, *this, B, *C._block.data.F );
         }
@@ -126,10 +126,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
               C._zSize );
 
 #ifndef RELEASE
-        if( IsDense() || B.IsDense() )
+        if( A.IsDense() || B.IsDense() )
             throw std::logic_error("Invalid H-matrix combination");
 #endif
-        if( IsLowRank() && B.IsLowRank() )
+        if( A.IsLowRank() && B.IsLowRank() )
         {
             // Form W := alpha A B
             LowRank W;
@@ -139,7 +139,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // Form C :~= W
             C.ImportLowRankMatrix( W );
         }
-        else if( IsLowRank() && B.IsHierarchical() )
+        else if( A.IsLowRank() && B.IsHierarchical() )
         {
             // Form W := alpha A B
             LowRank W;
@@ -154,7 +154,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             // Form C :=~ W
             C.ImportLowRankMatrix( W );
         }
-        else if( IsHierarchical() && B.IsLowRank() )
+        else if( A.IsHierarchical() && B.IsLowRank() )
         {
             // Form W := alpha A B    
             LowRank W;
@@ -167,7 +167,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         else
         {
 #ifndef RELEASE
-            if( Symmetric() || B.Symmetric() )
+            if( A.Symmetric() || B.Symmetric() )
                 throw std::logic_error("Unsupported h-matrix multipy case.");
 #endif
             const Node& nodeA = *A._block.data.N;
@@ -196,19 +196,19 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     else /* C is dense */
     {
 #ifndef RELEASE
-        if( IsHierarchical() || B.IsHierarchical() )
+        if( A.IsHierarchical() || B.IsHierarchical() )
             throw std::logic_error("Invalid combination of H-matrices.");
 #endif
         C._block.type = DENSE;
         C._block.data.D = new Dense;
 
-        if( IsDense() && B.IsDense() )
+        if( A.IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( alpha, *A._block.data.D, *B._block.data.D, *C._block.data.D );
-        else if( IsDense() && B.IsLowRank() )
+        else if( A.IsDense() && B.IsLowRank() )
             hmatrix_tools::MatrixMatrix
             ( alpha, *A._block.data.D, *B._block.data.F, *C._block.data.D );
-        else if( IsLowRank() && B.IsDense() )
+        else if( A.IsLowRank() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( alpha, *A._block.data.F, *B._block.data.D, *C._block.data.D );
         else /* both low-rank */
@@ -242,7 +242,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     const Quasi2d& A = *this;
     if( C.Admissible() )
     {
-        if( IsLowRank() && B.IsLowRank() )
+        if( A.IsLowRank() && B.IsLowRank() )
         {
             // W := alpha A.F B.F
             LowRank W;
@@ -253,7 +253,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixUpdateRounded
             ( C.MaxRank(), (Scalar)1, W, beta, *C._block.data.F );
         }
-        else if( IsLowRank() && B.IsHierarchical() )
+        else if( A.IsLowRank() && B.IsHierarchical() )
         {
             // W := alpha A.F B
             LowRank W;
@@ -269,7 +269,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixUpdateRounded
             ( C.MaxRank(), (Scalar)1, W, beta, *C._block.data.F );
         }
-        else if( IsLowRank() && B.IsDense() )
+        else if( A.IsLowRank() && B.IsDense() )
         {
             // W := alpha A.F B.D
             LowRank W;
@@ -285,7 +285,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixUpdateRounded
             ( C.MaxRank(), (Scalar)1, W, beta, *C._block.data.F );
         }
-        else if( IsHierarchical() && B.IsLowRank() )
+        else if( A.IsHierarchical() && B.IsLowRank() )
         {
             // W := alpha A B.F
             LowRank W;
@@ -296,11 +296,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixUpdateRounded
             ( C.MaxRank(), (Scalar)1, W, beta, *C._block.data.F );
         }
-        else if( IsHierarchical() && B.IsHierarchical() )
+        else if( A.IsHierarchical() && B.IsHierarchical() )
         {
             // W := alpha A B
             LowRank W;
-            const int oversampling = 4; // lift this definition
+            const int oversampling = 4; // TODO: Lift this definition
             hmatrix_tools::MatrixMatrix
             ( oversampling, alpha, *this, B, W );
 
@@ -308,7 +308,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixUpdateRounded
             ( C.MaxRank(), (Scalar)1, W, beta, *C._block.data.F );
         }
-        else if( IsDense() && B.IsLowRank() )
+        else if( A.IsDense() && B.IsLowRank() )
         {
             // W := alpha A.D B.F
             LowRank W;
@@ -320,7 +320,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             hmatrix_tools::MatrixUpdateRounded
             ( C.MaxRank(), (Scalar)1, W, beta, *C._block.data.F );
         }
-        else if( IsDense() && B.IsDense() )
+        else if( A.IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( C.MaxRank(),
               alpha, *A._block.data.D, *B._block.data.D, 
@@ -334,10 +334,10 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     {
 
 #ifndef RELEASE
-        if( IsDense() || B.IsDense() )
+        if( A.IsDense() || B.IsDense() )
             throw std::logic_error("Invalid H-matrix combination");
 #endif
-        if( IsLowRank() && B.IsLowRank() )
+        if( A.IsLowRank() && B.IsLowRank() )
         {
             // Form W := alpha A B 
             LowRank W;
@@ -348,7 +348,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             C.Scale( beta );
             C.UpdateWithLowRankMatrix( (Scalar)1, W );
         }
-        else if( IsLowRank() && B.IsHierarchical() )
+        else if( A.IsLowRank() && B.IsHierarchical() )
         {
             // Form W := alpha A B
             LowRank W;
@@ -364,7 +364,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             C.Scale( beta );
             C.UpdateWithLowRankMatrix( (Scalar)1, W );
         }
-        else if( IsHierarchical() && B.IsLowRank() )
+        else if( A.IsHierarchical() && B.IsLowRank() )
         {
             // Form W := alpha A B    
             LowRank W;
@@ -377,7 +377,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         }
         else
         {
-            if( Symmetric() || B.Symmetric() )
+            if( A.Symmetric() || B.Symmetric() )
                 throw std::logic_error("Unsupported h-matrix multipy case.");
             else 
             {
@@ -406,18 +406,18 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     else /* C is dense */
     {
 #ifndef RELEASE
-        if( IsHierarchical() || B.IsHierarchical() )
+        if( A.IsHierarchical() || B.IsHierarchical() )
             throw std::logic_error("Invalid combination of H-matrices.");
 #endif
-        if( IsDense() && B.IsDense() )
+        if( A.IsDense() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( alpha, *A._block.data.D, *B._block.data.D, 
               beta, *C._block.data.D );
-        else if( IsDense() && B.IsLowRank() )
+        else if( A.IsDense() && B.IsLowRank() )
             hmatrix_tools::MatrixMatrix
             ( alpha, *A._block.data.D, *B._block.data.F, 
               beta, *C._block.data.D );
-        else if( IsLowRank() && B.IsDense() )
+        else if( A.IsLowRank() && B.IsDense() )
             hmatrix_tools::MatrixMatrix
             ( alpha, *A._block.data.F, *B._block.data.D, 
               beta, *C._block.data.D );

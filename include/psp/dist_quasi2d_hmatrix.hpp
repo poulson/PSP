@@ -91,6 +91,7 @@ public:
 
     int Height() const;
     int Width() const;
+    int MaxRank() const;
 
     int LocalHeight() const;
     int LocalWidth() const;
@@ -876,12 +877,13 @@ private:
     int _sourceRoot, _targetRoot;
     int _localSourceOffset, _localTargetOffset;
 
-    // For the reuse of the computation of H Omega and H' Omega in order to
-    // capture the column and row space, respectively, of H. These variables 
-    // are mutable since they do not effect the usage of the logical state of
-    // the class and simply help avoid redundant computation.
-    // HERE
+    // For the reuse of the computation of T1 = H Omega1 and T2 = H' Omega2 in 
+    // order to capture the column and row space, respectively, of H. These 
+    // variables are mutable since they do not effect the usage of the logical 
+    // state of the class and simply help avoid redundant computation.
     mutable bool _beganRowSpaceComp, _beganColSpaceComp;
+    mutable DenseMatrix<Scalar> _Omega1, _Omega2, _T1, _T2;
+    mutable MapDenseMatrixContext _T1Context, _T2Context;
 
     /*
      * Create shortened names for convenience in implementations.
@@ -1528,6 +1530,13 @@ inline int
 DistQuasi2dHMatrix<Scalar,Conjugated>::Width() const
 {
     return _xSizeSource*_ySizeSource*_zSize;
+}
+
+template<typename Scalar,bool Conjugated>
+inline int
+DistQuasi2dHMatrix<Scalar,Conjugated>::MaxRank() const
+{
+    return _maxRank;
 }
 
 /*
