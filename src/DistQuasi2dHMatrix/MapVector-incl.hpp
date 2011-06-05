@@ -174,7 +174,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorInitialize
     {
         context.block.type = DIST_NODE;
         context.block.data.DN = 
-            new typename MapVectorContext::DistNodeContext();
+            new typename MapVectorContext::DistNodeContext;
 
         typename MapVectorContext::DistNodeContext& nodeContext = 
             *context.block.data.DN;
@@ -188,7 +188,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorInitialize
     {
         context.block.type = SPLIT_NODE;
         context.block.data.SN = 
-            new typename MapVectorContext::SplitNodeContext();
+            new typename MapVectorContext::SplitNodeContext;
 
         typename MapVectorContext::SplitNodeContext& nodeContext = 
             *context.block.data.DN;
@@ -200,15 +200,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorInitialize
     }
     case DIST_LOW_RANK:
         context.block.type = DIST_LOW_RANK;
-        context.block.data.z = new Vector<Scalar>();
+        context.block.data.z = new Vector<Scalar>;
         break;
     case SPLIT_LOW_RANK:
         context.block.type = SPLIT_LOW_RANK;
-        context.block.data.z = new Vector<Scalar>();
+        context.block.data.z = new Vector<Scalar>;
         break;
     case SPLIT_DENSE:
         context.block.type = SPLIT_DENSE;
-        context.block.data.z = new Vector<Scalar>();
+        context.block.data.z = new Vector<Scalar>;
         break;
 
     default:
@@ -973,17 +973,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveSummations
         if( _inSourceTeam )
         {
             const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
+            if( DF.rank != 0 )
             {
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, z.Buffer(), 
-                  DF.rank, 0, MPI_SUM, team );
+                Vector<Scalar>& z = *context.block.data.z;
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    mpi::Reduce
+                    ( (const Scalar*)MPI_IN_PLACE, z.Buffer(), 
+                      DF.rank, 0, MPI_SUM, team );
+                }
+                else
+                    mpi::Reduce
+                    ( z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
             }
-            else
-                mpi::Reduce( z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
         }
         break;
 
@@ -1020,17 +1024,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations
         if( _inTargetTeam )
         {
             const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
+            if( DF.rank != 0 )
             {
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, z.Buffer(), 
-                  DF.rank, 0, MPI_SUM, team );
+                Vector<Scalar>& z = *context.block.data.z;
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    mpi::Reduce
+                    ( (const Scalar*)MPI_IN_PLACE, z.Buffer(), 
+                      DF.rank, 0, MPI_SUM, team );
+                }
+                else
+                    mpi::Reduce
+                    ( z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
             }
-            else
-                mpi::Reduce( z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
         }
         break;
 
@@ -1222,11 +1230,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MapVectorPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s) );
-            mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
         }
         else
         {
-            mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
@@ -1242,17 +1252,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData
 
         const DistLowRank& DF = *_block.data.DF;
         Vector<Scalar>& z = *context.block.data.z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-        MPI_Comm team = _subcomms->Subcomm( _level );
-        const int teamRank = mpi::CommRank( team );
-        if( teamRank == 0 )
+        z.Resize( DF.rank );
+        if( DF.rank != 0 )
         {
-            if( _inSourceTeam )
-                mpi::Send( z.LockedBuffer(), DF.rank, _targetRoot, 0, comm );
-            else
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                z.Resize( DF.rank );
-                mpi::Recv( z.Buffer(), DF.rank, _sourceRoot, 0, comm );
+                if( _inSourceTeam )
+                    mpi::Send
+                    ( z.LockedBuffer(), DF.rank, _targetRoot, 0, comm );
+                else
+                    mpi::Recv( z.Buffer(), DF.rank, _sourceRoot, 0, comm );
             }
         }
         break;
@@ -1261,28 +1273,28 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPassData
     {
         const SplitLowRank& SF = *_block.data.SF;
         Vector<Scalar>& z = *context.block.data.z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inSourceTeam )
-            mpi::Send( z.LockedBuffer(), SF.rank, _targetRoot, 0, comm );
-        else
+        z.Resize( SF.rank );
+        if( SF.rank != 0 )
         {
-            z.Resize( SF.rank );
-            mpi::Recv( z.Buffer(), SF.rank, _sourceRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inSourceTeam )
+                mpi::Send( z.LockedBuffer(), SF.rank, _targetRoot, 0, comm );
+            else
+                mpi::Recv( z.Buffer(), SF.rank, _sourceRoot, 0, comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
         Vector<Scalar>& z = *context.block.data.z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inSourceTeam )
-            mpi::Send( z.LockedBuffer(), Height(), _targetRoot, 0, comm );
-        else
+        z.Resize( Height() );
+        if( Height() != 0 )
         {
-            z.Resize( Height() );
-            mpi::Recv( z.Buffer(), Height(), _sourceRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inSourceTeam )
+                mpi::Send( z.LockedBuffer(), Height(), _targetRoot, 0, comm );
+            else
+                mpi::Recv( z.Buffer(), Height(), _sourceRoot, 0, comm );
         }
         break;
     }
@@ -1586,11 +1598,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).TransposeMapVectorPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s), xLocal );
-            mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
         }
         else
         {
-            mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
@@ -1606,17 +1620,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
 
         const DistLowRank& DF = *_block.data.DF;
         Vector<Scalar>& z = *context.block.data.z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-        MPI_Comm team = _subcomms->Subcomm( _level );
-        const int teamRank = mpi::CommRank( team );
-        if( teamRank == 0 )
+        z.Resize( DF.rank );
+        if( DF.rank != 0 )
         {
-            if( _inTargetTeam )
-                mpi::Send( z.LockedBuffer(), DF.rank, _sourceRoot, 0, comm );
-            else
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                z.Resize( DF.rank );
-                mpi::Recv( z.Buffer(), DF.rank, _targetRoot, 0, comm );
+                if( _inTargetTeam )
+                    mpi::Send
+                    ( z.LockedBuffer(), DF.rank, _sourceRoot, 0, comm );
+                else
+                    mpi::Recv( z.Buffer(), DF.rank, _targetRoot, 0, comm );
             }
         }
         break;
@@ -1625,33 +1641,33 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPassData
     {
         const SplitLowRank& SF = *_block.data.SF;
         Vector<Scalar>& z = *context.block.data.z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inTargetTeam )
-            mpi::Send( z.LockedBuffer(), SF.rank, _sourceRoot, 0, comm );
-        else
+        z.Resize( SF.rank );
+        if( SF.rank != 0 )
         {
-            z.Resize( SF.rank );
-            mpi::Recv( z.Buffer(), SF.rank, _targetRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inTargetTeam )
+                mpi::Send( z.LockedBuffer(), SF.rank, _sourceRoot, 0, comm );
+            else
+                mpi::Recv( z.Buffer(), SF.rank, _targetRoot, 0, comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
         Vector<Scalar>& z = *context.block.data.z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inTargetTeam )
+        z.Resize( Height() );
+        if( Height() != 0 )
         {
-            Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView( xLocal, _localTargetOffset, Height() );
-            mpi::Send
-            ( xLocalSub.LockedBuffer(), Height(), _sourceRoot, 0, comm );
-        }
-        else
-        {
-            z.Resize( Height() );
-            mpi::Recv( z.Buffer(), Height(), _targetRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inTargetTeam )
+            {
+                Vector<Scalar> xLocalSub;
+                xLocalSub.LockedView( xLocal, _localTargetOffset, Height() );
+                mpi::Send
+                ( xLocalSub.LockedBuffer(), Height(), _sourceRoot, 0, comm );
+            }
+            else
+                mpi::Recv( z.Buffer(), Height(), _targetRoot, 0, comm );
         }
         break;
     }
@@ -2195,9 +2211,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorNaiveBroadcasts
         {
             const DistLowRank& DF = *_block.data.DF;
             Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
             z.Resize( DF.rank );
-            mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
+            }
         }
         break;
 
@@ -2235,9 +2254,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts
         {
             const DistLowRank& DF = *_block.data.DF;
             Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
             z.Resize( DF.rank );
-            mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
+            }
         }
         break;
 

@@ -344,6 +344,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
+                // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
                     A._Omega2.Resize
@@ -367,6 +368,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             else
             {
+                // Start H += H H
                 Node& nodeC = *C._block.data.N;
                 typename MapHMatrixContext::DistNodeContext& nodeContext = 
                     *context.block.data.DN;
@@ -381,9 +383,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         }
         case DIST_NODE_GHOST:
         {
+            // We must be in the left team
             const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
+                // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
                     A._Omega2.Resize
@@ -397,6 +401,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             else
             {
+                // Start H += H H
                 Node& nodeC = *C._block.data.N;
                 typename MapHMatrixContext::DistNodeContext& nodeContext = 
                     *context.block.data.DN;
@@ -414,6 +419,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             const DistLowRank& DFB = *B._block.data.DF;
             if( admissibleC )
             {
+                // Start F += H F
                 typename MapHMatrixContext::DistLowRankContext& DFContext = 
                     *context.block.data.DF;
 
@@ -432,6 +438,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             else
             {
+                // Start H += H F
                 typename MapHMatrixContext::DistNodeContext& nodeContext = 
                     *context.block.data.DN;
 
@@ -457,14 +464,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             const DistLowRankGhost& DFGB = *B._block.data.DFG;
             if( admissibleC )
             {
+                // Start F += H F
                 typename MapHMatrixContext::DistLowRankContext& DFContext = 
                     *context.block.data.DF;
 
                 const int key = A._sourceOffset;
                 DFContext.ULocalMap[key] = 
                     new Dense( C.LocalHeight(), DFGB.rank );
-                DFContext.VLocalMap[key] =
-                    new Dense( C.LocalWidth(), DFGB.rank );
                 DFContext.denseContextMap[key] = new MapDenseMatrixContext;
                 MapDenseMatrixContext& denseContext = 
                     *DFContext.denseContextMap[key];
@@ -473,14 +479,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             else
             {
+                // Start H += H F
                 typename MapHMatrixContext::DistNodeContext& nodeContext = 
                     *context.block.data.DN;
 
                 const int key = A._sourceOffset;
                 nodeContext.ULocalMap[key] = 
                     new Dense( C.LocalHeight(), DFGB.rank );
-                nodeContext.VLocalMap[key] =
-                    new Dense( C.LocalWidth(), DFGB.rank );
                 nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
                 MapDenseMatrixContext& denseContext = 
                     *nodeContext.denseContextMap[key];
@@ -497,32 +502,70 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         }
         break;
     }
-    // HERE
     case DIST_NODE_GHOST:
+    {
+        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case DIST_NODE:
+        {
             // We must be in the right team
+            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
-                // TODO: Start F += H H
+                // Start F += H H
+                if( !B._beganColSpaceComp )
+                {
+                    B._Omega1.Resize
+                    ( B.LocalWidth(), C.MaxRank()+oversampling ); 
+                    ParallelGaussianRandomVectors( B._Omega1 );
+                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B.MapDenseMatrixPrecompute
+                    ( B._T1Context, alpha, B._Omega1, B._T1 );
+                    B._beganColSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Start H += H H
+                // Start H += H H
+                Node& nodeC = *C._block.data.N;
+                typename MapHMatrixContext::DistNodeContext& nodeContext = 
+                    *context.block.data.DN;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( nodeContext.Child(t,s), 
+                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
+        }
         case DIST_LOW_RANK:
+        {
             // We must be in the right team
+            const DistLowRank& DFB = *B._block.data.DF;
             if( admissibleC )
             {
-                // TODO: Start F += H F
+                // Start F += H F
+                typename MapHMatrixContext::DistLowRankContext& DFContext = 
+                    *context.block.data.DF;
+
+                const int key = A._sourceOffset;
+                DFContext.VLocalMap[key] = 
+                    new Dense( C.LocalWidth(), DFB.rank );
             }
             else
             {
-                // TODO: Start H += H F
+                // Start H += H F
+                typename MapHMatrixContext::DistNodeContext& nodeContext = 
+                    *context.block.data.DN;
+
+                const int key = A._sourceOffset;
+                nodeContext.VLocalMap[key] =
+                    new Dense( C.LocalWidth(), DFB.rank );
             }
             break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -530,64 +573,257 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case SPLIT_NODE:
+    {
+        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case SPLIT_NODE:
+        {
             // We must be the middle process or both the left and right process
+            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
-                // TODO: Start F += H H
+                // Start F += H H
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize
+                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A.HermitianTransposeMapDenseMatrixPrecompute
+                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
+                if( !B._beganColSpaceComp )
+                {
+                    B._Omega1.Resize
+                    ( B.LocalWidth(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( B._Omega1 );
+                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B.MapDenseMatrixPrecompute
+                    ( B._T1Context, alpha, B._Omega1, B._T1 );
+                    B._beganColSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Start H += H H
+                // Start H += H H
+                Node& nodeC = *C._block.data.N;
+                switch( C._block.type )
+                {
+                case SPLIT_NODE_GHOST:
+                {
+                    typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                        *context.block.data.SN;
+                    for( int t=0; t<4; ++t )
+                        for( int s=0; s<4; ++s )
+                            for( int r=0; r<4; ++r )
+                                nodeA.Child(t,r).MapHMatrixMainPrecompute
+                                ( nodeContext.Child(t,s),
+                                  alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                    break;
+                }
+                case NODE_GHOST:
+                case NODE:
+                {
+                    typename MapHMatrixContext::NodeContext& nodeContext =
+                        *context.block.data.N;
+                    for( int t=0; t<4; ++t )
+                        for( int s=0; s<4; ++s )
+                            for( int r=0; r<4; ++r )
+                                nodeA.Child(t,r).MapHMatrixMainPrecompute
+                                ( nodeContext.Child(t,s),
+                                  alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                    break;
+                }
+                default:
+#ifndef RELEASE
+                    throw std::logic_error("Invalid logic");
+#endif
+                    break;
+                }
             }
             break;
+        }
         case SPLIT_NODE_GHOST:
+        {
             // We must be in the left team
+            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
-                // TODO: Start F += H H
+                // Start F += H H
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize
+                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A.HermitianTransposeMapDenseMatrixPrecompute
+                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Start H += H H
+                // Start H += H H
+                Node& nodeC = *C._block.data.N;
+                typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                    *context.block.data.SN;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
+        }
         case NODE:
+        {
             // We must be in the middle and right teams
+            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
-                // TODO: Start F += H H
+                // Start F += H H
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize
+                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A.HermitianTransposeMapDenseMatrixPrecompute
+                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
+                if( !B._beganColSpaceComp )
+                {
+                    B._Omega1.Resize
+                    ( B.LocalWidth(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( B._Omega1 );
+                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B.MapDenseMatrixPrecompute
+                    ( B._T1Context, alpha, B._Omega1, B._T1 );
+                    B._beganColSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Start H += H H
+                // Start H += H H
+                Node& nodeC = *C._block.data.N;
+                typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                    *context.block.data.SN;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
+        }
         case NODE_GHOST:
+        {
             // We must be in the left team
+            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
-                // TODO: Start F += H H
+                // Start F += H H
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize
+                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A.HermitianTransposeMapDenseMatrixPrecompute
+                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
             }
             else
             {
-                // TODO: Start H += H H
+                // Start H += H H
+                Node& nodeC = *C._block.data.N;
+                typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                    *context.block.data.SN;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
+        }
         case SPLIT_LOW_RANK:
+        {
             // We are either the middle process or both the left and right
+            const SplitLowRank& SFB = *B._block.data.SF;
             if( admissibleC )
             {
-                // TODO: Start F += H F
+                // Start F += H F
+                const int key = A._sourceOffset;
+                switch( C._block.type )
+                {
+                case LOW_RANK:
+                {
+                    // Our process owns the left and right sides
+                    typename MapHMatrixContext::LowRankContext& FContext = 
+                        *context.block.data.F;
+                    FContext.UMap[key] = new Dense( C.Height(), SFB.rank );
+                    FContext.VMap[key] = new Dense( C.Width(), SFB.rank );
+                    FContext.denseContextMap[key] = new MapDenseMatrixContext;
+                    MapDenseMatrixContext& denseContext = 
+                        *FContext.denseContextMap[key];
+
+                    A.MapDenseMatrixInitialize( denseContext );
+                    break;
+                }
+                case SPLIT_LOW_RANK_GHOST:
+                {
+                    // We are the middle process
+                    typename MapHMatrixContext::SplitLowRankContext& SFContext =
+                        *context.block.data.SF;
+                    SFContext.denseContextMap[key] = new MapDenseMatrixContext;
+                    MapDenseMatrixContext& denseContext = 
+                        *SFContext.denseContextMap[key];
+
+                    Dense dummy;
+                    A.MapDenseMatrixInitialize( denseContext );
+                    A.MapDenseMatrixPrecompute
+                    ( denseContext, alpha, SFB.D, dummy );
+                    break;
+                }
+                case LOW_RANK_GHOST:
+                {
+                    // We are the middle process
+                    typename MapHMatrixContext::LowRankContext& FContext =
+                        *context.block.data.F;
+                    FContext.denseContextMap[key] = new MapDenseMatrixContext;
+                    MapDenseMatrixContext& denseContext =
+                        *FContext.denseContextMap[key];
+
+                    Dense dummy;
+                    A.MapDenseMatrixInitialize( denseContext );
+                    A.MapDenseMatrixPrecompute
+                    ( denseContext, alpha, SFB.D, dummy );
+                    break;
+                }
+                default:
+#ifndef RELEASE
+                    throw std::logic_error("Invalid logic");
+#endif
+                    break;
+                }
             }
             else
             {
+                // HERE
                 // TODO: Start H += H F
             }
             break;
+        }
         case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK:
         case LOW_RANK_GHOST:
@@ -598,6 +834,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case SPLIT_NODE_GHOST:
         switch( B._block.type )
         {
