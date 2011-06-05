@@ -92,12 +92,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LocalHeight() const
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::LocalHeight");
 #endif
-    int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-    int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
-
     int localHeight;
-    ComputeLocalDimensionRecursion
-    ( localHeight, teamSize, teamRank, _xSizeTarget, _ySizeTarget, _zSize );
+    if( _inTargetTeam )
+    {
+        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
+        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        ComputeLocalDimensionRecursion
+        ( localHeight, teamSize, teamRank, _xSizeTarget, _ySizeTarget, _zSize );
+    }
+    else
+        localHeight = 0;
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -111,12 +115,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LocalWidth() const
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::LocalWidth");
 #endif
-    int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-    int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
-
     int localWidth;
-    ComputeLocalDimensionRecursion
-    ( localWidth, teamSize, teamRank, _xSizeSource, _ySizeSource, _zSize );
+    if( _inSourceTeam )
+    {
+        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
+        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        ComputeLocalDimensionRecursion
+        ( localWidth, teamSize, teamRank, _xSizeSource, _ySizeSource, _zSize );
+    }
+    else
+        localWidth = 0;
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -130,12 +138,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FirstLocalRow() const
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::FirstLocalRow");
 #endif
-    int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-    int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
-
     int firstLocalRow = 0;
-    ComputeFirstLocalIndexRecursion
-    ( firstLocalRow, teamSize, teamRank, _xSizeTarget, _ySizeTarget, _zSize );
+    if( _inTargetTeam )
+    {
+        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
+        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        ComputeFirstLocalIndexRecursion
+        ( firstLocalRow, teamSize, teamRank, 
+          _xSizeTarget, _ySizeTarget, _zSize );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -149,12 +160,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::FirstLocalCol() const
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::FirstLocalCol");
 #endif
-    int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-    int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
-
     int firstLocalCol = 0;
-    ComputeFirstLocalIndexRecursion
-    ( firstLocalCol, teamSize, teamRank, _xSizeSource, _ySizeSource, _zSize );
+    if( _inSourceTeam )
+    {
+        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
+        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        ComputeFirstLocalIndexRecursion
+        ( firstLocalCol, teamSize, teamRank, 
+          _xSizeSource, _ySizeSource, _zSize );
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif

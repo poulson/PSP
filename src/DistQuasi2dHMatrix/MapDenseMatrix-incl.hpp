@@ -77,6 +77,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     PushCallStack("DistQuasi2dHMatrix::MapMatrix");
 #endif
     RequireRoot();
+    if( XLocal.Height() == 0 || YLocal.Height() == 0 || YLocal.Width() == 0 )
+        return;
     hmatrix_tools::Scale( beta, YLocal );
 
     MapDenseMatrixContext context;
@@ -107,6 +109,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
     PushCallStack("DistQuasi2dHMatrix::TransposeMapMatrix");
 #endif
     RequireRoot();
+    if( XLocal.Height() == 0 || YLocal.Height() == 0 || YLocal.Width() == 0 )
+        return;
     hmatrix_tools::Scale( beta, YLocal );
 
     MapDenseMatrixContext context;
@@ -138,6 +142,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 #endif
     RequireRoot();
     hmatrix_tools::Scale( beta, YLocal );
+    if( XLocal.Height() == 0 || YLocal.Height() == 0 || YLocal.Width() == 0 )
+        return;
 
     MapDenseMatrixContext context;
     HermitianTransposeMapDenseMatrixInitialize( context );
@@ -310,7 +316,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPrecompute
             // Form Z := alpha VLocal^[T/H] XLocal
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
+            Z.Resize( DF.rank, width );
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
             ( option, 'N', DF.rank, width, DF.VLocal.Height(), 
@@ -386,102 +392,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSourcePrecompute
-( MapDenseMatrixContext& context,
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixSourcePrecompute");
-#endif
-    const int width = XLocal.Width();
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapDenseMatrixSourcePrecompute
-                ( nodeContext.Child(t,s), alpha, XLocal );
-        break;
-    }
-    case SPLIT_NODE:
-    {
-        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
-            *context.block.data.SN;
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MapDenseMatrixSourcePrecompute
-                ( nodeContext.Child(t,s), alpha, XLocal );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            // Form Z := alpha VLocal^[T/H] XLocal
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemm
-            ( option, 'N', DF.rank, width, DF.VLocal.Height(), 
-              alpha,     DF.VLocal.LockedBuffer(), DF.VLocal.LDim(), 
-                         XLocal.LockedBuffer(),    XLocal.LDim(),
-              (Scalar)0, Z.Buffer(),               Z.LDim() );
-        }
-        break;
-    case SPLIT_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Dense& Z = *context.block.data.Z;
-
-            Dense XLocalSub, YLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, SF.D.Height(), width );
-            if( Conjugated )
-                hmatrix_tools::MatrixHermitianTransposeMatrix
-                ( alpha, SF.D, XLocalSub, Z );
-            else
-                hmatrix_tools::MatrixTransposeMatrix
-                ( alpha, SF.D, XLocalSub, Z );
-        }
-        break;
-    case SPLIT_DENSE:
-        if( _inSourceTeam )
-        {
-            const SplitDense& SD = *_block.data.SD;
-            Dense& Z = *context.block.data.Z;
-
-            Dense XLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, Width(), width );
-            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, Z );
-        }
-        break;
-
-#ifndef RELEASE
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-        throw std::logic_error("Invalid call to source precompute");
-        break;
-#endif
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-
-template<typename Scalar,bool Conjugated>
-void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPrecompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
@@ -530,7 +440,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPrecompute
             // Form Z := alpha ULocal^T XLocal
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
+            Z.Resize( DF.rank, width );
             blas::Gemm
             ( 'T', 'N', DF.rank, width, DF.ULocal.Height(),
               alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
@@ -593,86 +503,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-TransposeMapDenseMatrixTargetPrecompute
-( MapDenseMatrixContext& context,
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::TransposeMapDenseMatrixTargetPrecompute");
-#endif
-    const int width = XLocal.Width();
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapDenseMatrixTargetPrecompute
-                ( nodeContext.Child(t,s), alpha, XLocal );
-        break;
-    }
-    case SPLIT_NODE:
-    {
-        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
-            *context.block.data.SN;
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMapDenseMatrixTargetPrecompute
-                ( nodeContext.Child(t,s), alpha, XLocal );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            // Form Z := alpha ULocal^T XLocal
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-            blas::Gemm
-            ( 'T', 'N', DF.rank, width, DF.ULocal.Height(),
-              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
-                         XLocal.LockedBuffer(),    XLocal.LDim(),
-              (Scalar)0, Z.Buffer(),               Z.LDim() );
-        }
-        break;
-    case SPLIT_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Dense& Z = *context.block.data.Z;
-            Dense XLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
-            hmatrix_tools::MatrixTransposeMatrix( alpha, SF.D, XLocalSub, Z );
-        }
-        break;
-    case SPLIT_DENSE:
-        break;
-
-#ifndef RELEASE
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-        throw std::logic_error("Invalid call to target precompute");
-        break;
-#endif
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
 HermitianTransposeMapDenseMatrixPrecompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
@@ -722,7 +552,7 @@ HermitianTransposeMapDenseMatrixPrecompute
             // Form Z := alpha ULocal^H XLocal
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
+            Z.Resize( DF.rank, width );
             blas::Gemm
             ( 'C', 'N', DF.rank, width, DF.ULocal.Height(), 
               alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
@@ -774,88 +604,6 @@ HermitianTransposeMapDenseMatrixPrecompute
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapDenseMatrixTargetPrecompute
-( MapDenseMatrixContext& context,
-  Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixTargetPrecompute");
-#endif
-    const int width = XLocal.Width();
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
-            *context.block.data.DN;
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapDenseMatrixTargetPrecompute
-                ( nodeContext.Child(t,s), alpha, XLocal );
-        break;
-    }
-    case SPLIT_NODE:
-    {
-        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
-            *context.block.data.SN;
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapDenseMatrixTargetPrecompute
-                ( nodeContext.Child(t,s), alpha, XLocal );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            // Form Z := alpha ULocal^H XLocal
-            const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-            blas::Gemm
-            ( 'C', 'N', DF.rank, width, DF.ULocal.Height(), 
-              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
-                         XLocal.LockedBuffer(),    XLocal.LDim(),
-              (Scalar)0, Z.Buffer(),               Z.LDim() );
-        }
-        break;
-    case SPLIT_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Dense& Z = *context.block.data.Z;
-
-            Dense XLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
-            hmatrix_tools::MatrixHermitianTransposeMatrix
-            ( alpha, SF.D, XLocalSub, Z );
-        }
-        break;
-    case SPLIT_DENSE:
-        break;
-
-#ifndef RELEASE
-    case NODE:
-    case LOW_RANK:
-    case DENSE:
-        throw std::logic_error("Invalid call to target precompute");
-        break;
-#endif
 
     default:
         break;
@@ -1083,9 +831,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummationsPack
             const DistLowRank& DF = *_block.data.DF;
             const Dense& Z = *context.block.data.Z;
             const int width = Z.Width();
-            std::memcpy
-            ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-              DF.rank*width*sizeof(Scalar) );
+            if( Z.Height() == Z.LDim() )
+                std::memcpy
+                ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+                  DF.rank*width*sizeof(Scalar) );
+            else
+                for( int j=0; j<width; ++j )
+                    std::memcpy
+                    ( &buffer[offsets[_level-1]+j*DF.rank], Z.LockedBuffer(0,j),
+                      DF.rank*sizeof(Scalar) );
             offsets[_level-1] += DF.rank*width;
         }
         break;
@@ -1127,9 +881,15 @@ TransposeMapDenseMatrixSummationsPack
             const DistLowRank& DF = *_block.data.DF;
             const Dense& Z = *context.block.data.Z;
             const int width = Z.Width();
-            std::memcpy
-            ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-              DF.rank*width*sizeof(Scalar) );
+            if( Z.Height() == Z.LDim() )
+                std::memcpy
+                ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+                  DF.rank*width*sizeof(Scalar) );
+            else
+                for( int j=0; j<width; ++j )
+                    std::memcpy
+                    ( &buffer[offsets[_level-1]+j*DF.rank], Z.LockedBuffer(0,j),
+                      DF.rank*sizeof(Scalar) );
             offsets[_level-1] += DF.rank*width;
         }
         break;
@@ -1174,9 +934,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummationsUnpack
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
-                std::memcpy
-                ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                  DF.rank*width*sizeof(Scalar) );
+                if( Z.Height() == Z.LDim() )
+                    std::memcpy
+                    ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                      DF.rank*width*sizeof(Scalar) );
+                else
+                    for( int j=0; j<width; ++j )
+                        std::memcpy
+                        ( Z.Buffer(0,j), &buffer[offsets[_level-1]+j*DF.rank],
+                          DF.rank*sizeof(Scalar) );
                 offsets[_level-1] += DF.rank*width;
             }
         }
@@ -1224,9 +990,15 @@ TransposeMapDenseMatrixSummationsUnpack
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
-                std::memcpy
-                ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                  DF.rank*width*sizeof(Scalar) );
+                if( Z.Height() == Z.LDim() )
+                    std::memcpy
+                    ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                      DF.rank*width*sizeof(Scalar) );
+                else
+                    for( int j=0; j<width; ++j )
+                        std::memcpy
+                        ( Z.Buffer(0,j), &buffer[offsets[_level-1]+j*DF.rank],
+                          DF.rank*sizeof(Scalar) );
                 offsets[_level-1] += DF.rank*width;
             }
         }
@@ -1265,16 +1037,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixNaiveSummations
         if( _inSourceTeam )
         {
             const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                  DF.rank*width, 0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+            if( DF.rank != 0 )
+            {
+                Dense& Z = *context.block.data.Z;
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                    mpi::Reduce
+                    ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
+                      DF.rank*width, 0, MPI_SUM, team );
+                else
+                    mpi::Reduce
+                    ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+            }
         }
         break;
 
@@ -1312,16 +1087,19 @@ TransposeMapDenseMatrixNaiveSummations
         if( _inTargetTeam )
         {
             const DistLowRank& DF = *_block.data.DF;
-            Dense& Z = *context.block.data.Z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                  DF.rank*width, 0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+            if( DF.rank != 0 )
+            {
+                Dense& Z = *context.block.data.Z;
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                    mpi::Reduce
+                    ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
+                      DF.rank*width, 0, MPI_SUM, team );
+                else
+                    mpi::Reduce
+                    ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+            }
         }
         break;
 
@@ -1504,8 +1282,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MapVectorPassDataSplitNodeCount( bufferSize );
         bufferSize *= width;
-        std::vector<byte> buffer( bufferSize );
 
+        std::vector<byte> buffer( bufferSize );
         MPI_Comm comm = _subcomms->Subcomm(0);
         if( _inSourceTeam )
         {
@@ -1514,11 +1292,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MapDenseMatrixPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s) );
-            mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
         }
         else
         {
-            mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
@@ -1531,54 +1311,68 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPassData
     {
         if( _inSourceTeam && _inTargetTeam )
             break;
-
         const DistLowRank& DF = *_block.data.DF;
         Dense& Z = *context.block.data.Z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-        MPI_Comm team = _subcomms->Subcomm( _level );
-        const int teamRank = mpi::CommRank( team );
-        if( teamRank == 0 )
+        if( DF.rank != 0 )
         {
-            if( _inSourceTeam )
-                mpi::Send
-                ( Z.LockedBuffer(), DF.rank*width, _targetRoot, 0, comm );
-            else
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                Z.Resize( DF.rank, width, DF.rank );
-                mpi::Recv( Z.Buffer(), DF.rank*width, _sourceRoot, 0, comm );
+                if( _inSourceTeam )
+                    mpi::Send
+                    ( Z.LockedBuffer(), DF.rank*width, _targetRoot, 0, comm );
+                else
+                {
+                    Z.Resize( DF.rank, width, DF.rank );
+                    mpi::Recv
+                    ( Z.Buffer(), DF.rank*width, _sourceRoot, 0, comm );
+                }
             }
         }
+        else
+            Z.Resize( 0, width );
         break;
     }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRank& SF = *_block.data.SF;
         Dense& Z = *context.block.data.Z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inSourceTeam )
-            mpi::Send( Z.LockedBuffer(), SF.rank*width, _targetRoot, 0, comm );
-        else
+        if( SF.rank != 0 )
         {
-            Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( Z.Buffer(), SF.rank*width, _sourceRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inSourceTeam )
+                mpi::Send
+                ( Z.LockedBuffer(), SF.rank*width, _targetRoot, 0, comm );
+            else
+            {
+                Z.Resize( SF.rank, width, SF.rank );
+                mpi::Recv( Z.Buffer(), SF.rank*width, _sourceRoot, 0, comm );
+            }
         }
+        else
+            Z.Resize( 0, width );
         break;
     }
     case SPLIT_DENSE:
     {
         Dense& Z = *context.block.data.Z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inSourceTeam )
-            mpi::Send
-            ( Z.LockedBuffer(), Z.Height()*width, _targetRoot, 0, comm );
-        else
+        if( Height() != 0 )
         {
-            Z.Resize( Height(), width, Height() );
-            mpi::Recv
-            ( Z.Buffer(), Z.Height()*width, _sourceRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inSourceTeam )
+                mpi::Send
+                ( Z.LockedBuffer(), Z.Height()*width, _targetRoot, 0, comm );
+            else
+            {
+                Z.Resize( Height(), width, Height() );
+                mpi::Recv
+                ( Z.Buffer(), Z.Height()*width, _sourceRoot, 0, comm );
+            }
         }
+        else
+            Z.Resize( 0, width );
         break;
     }
 
@@ -1664,15 +1458,25 @@ MapDenseMatrixPassDataSplitNodeUnpack
     {
         const SplitLowRank& SF = *_block.data.SF;
         Dense& Z = *context.block.data.Z;
-        Z.Resize( SF.rank, width, SF.rank );
-        Read( Z.Buffer(), head, Z.Height()*width );
+        if( SF.rank != 0 )
+        {
+            Z.Resize( SF.rank, width, SF.rank );
+            Read( Z.Buffer(), head, Z.Height()*width );
+        }
+        else
+            Z.Resize( 0, width );
         break;
     }
     case SPLIT_DENSE:
     {
         Dense& Z = *context.block.data.Z;
-        Z.Resize( Height(), width, Height() );
-        Read( Z.Buffer(), head, Z.Height()*width );
+        if( Height() != 0 )
+        {
+            Z.Resize( Height(), width, Height() );
+            Read( Z.Buffer(), head, Z.Height()*width );
+        }
+        else
+            Z.Resize( 0, width );
         break;
     }
     default:
@@ -1841,8 +1645,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
                 node.Child(t,s).TransposeMapVectorPassDataSplitNodeCount
                 ( bufferSize );
         bufferSize *= width;
-        std::vector<byte> buffer( bufferSize );
 
+        std::vector<byte> buffer( bufferSize );
         MPI_Comm comm = _subcomms->Subcomm(0);
         if( _inTargetTeam )
         {
@@ -1851,11 +1655,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).TransposeMapDenseMatrixPassDataSplitNodePack
                     ( head, nodeContext.Child(t,s), XLocal );
-            mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
         }
         else
         {
-            mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
+            if( bufferSize != 0 )
+                mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
             const byte* head = &buffer[0];
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
@@ -1869,74 +1675,88 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPassData
     {
         if( _inSourceTeam && _inTargetTeam )
             break;
-
         const DistLowRank& DF = *_block.data.DF;
         Dense& Z = *context.block.data.Z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-        MPI_Comm team = _subcomms->Subcomm( _level );
-        const int teamRank = mpi::CommRank( team );
-        if( teamRank == 0 )
+        if( DF.rank != 0 )
         {
-            if( _inTargetTeam )
-                mpi::Send
-                ( Z.LockedBuffer(), DF.rank*width, _sourceRoot, 0, comm );
-            else
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm team = _subcomms->Subcomm( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                Z.Resize( DF.rank, width, DF.rank );
-                mpi::Recv( Z.Buffer(), DF.rank*width, _targetRoot, 0, comm );
+                if( _inTargetTeam )
+                    mpi::Send
+                    ( Z.LockedBuffer(), DF.rank*width, _sourceRoot, 0, comm );
+                else
+                {
+                    Z.Resize( DF.rank, width, DF.rank );
+                    mpi::Recv
+                    ( Z.Buffer(), DF.rank*width, _targetRoot, 0, comm );
+                }
             }
         }
+        else
+            Z.Resize( 0, width );
         break;
     }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRank& SF = *_block.data.SF;
         Dense& Z = *context.block.data.Z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inTargetTeam )
-            mpi::Send( Z.LockedBuffer(), SF.rank*width, _sourceRoot, 0, comm );
-        else
+        if( SF.rank != 0 )
         {
-            Z.Resize( SF.rank, width, SF.rank );
-            mpi::Recv( Z.Buffer(), SF.rank*width, _targetRoot, 0, comm );
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inTargetTeam )
+                mpi::Send
+                ( Z.LockedBuffer(), SF.rank*width, _sourceRoot, 0, comm );
+            else
+            {
+                Z.Resize( SF.rank, width, SF.rank );
+                mpi::Recv( Z.Buffer(), SF.rank*width, _targetRoot, 0, comm );
+            }
         }
+        else
+            Z.Resize( 0, width );
         break;
     }
     case SPLIT_DENSE:
     {
         const int height = Height();
         Dense& Z = *context.block.data.Z;
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
-
-        if( _inTargetTeam )
+        if( height != 0 )
         {
-            Dense XLocalSub;
-            XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, height, width );
-            if( XLocalSub.LDim() != XLocalSub.Height() )
+            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            if( _inTargetTeam )
             {
-                // We must pack first
-                Z.Resize( height, width, height );
-                for( int j=0; j<width; ++j )
-                    std::memcpy
-                    ( Z.Buffer(0,j), XLocalSub.LockedBuffer(0,j), 
-                      height*sizeof(Scalar) );
-                mpi::Send
-                ( Z.LockedBuffer(), height*width, _sourceRoot, 0, comm );
+                Dense XLocalSub;
+                XLocalSub.LockedView
+                ( XLocal, _localTargetOffset, 0, height, width );
+                if( XLocalSub.LDim() != XLocalSub.Height() )
+                {
+                    // We must pack first
+                    Z.Resize( height, width, height );
+                    for( int j=0; j<width; ++j )
+                        std::memcpy
+                        ( Z.Buffer(0,j), XLocalSub.LockedBuffer(0,j), 
+                          height*sizeof(Scalar) );
+                    mpi::Send
+                    ( Z.LockedBuffer(), height*width, _sourceRoot, 0, comm );
+                }
+                else
+                {
+                    mpi::Send
+                    ( XLocalSub.LockedBuffer(), height*width, 
+                      _sourceRoot, 0, comm );
+                }
             }
             else
             {
-                mpi::Send
-                ( XLocalSub.LockedBuffer(), height*width, 
-                  _sourceRoot, 0, comm );
+                Z.Resize( height, width, height );
+                mpi::Recv( Z.Buffer(), height*width, _targetRoot, 0, comm );
             }
         }
         else
-        {
-            Z.Resize( height, width, height );
-            mpi::Recv( Z.Buffer(), height*width, _targetRoot, 0, comm );
-        }
+            Z.Resize( 0, width );
         break;
     }
 
@@ -2028,15 +1848,25 @@ TransposeMapDenseMatrixPassDataSplitNodeUnpack
     {
         const SplitLowRank& SF = *_block.data.SF;
         Dense& Z = *context.block.data.Z;
-        Z.Resize( SF.rank, width, SF.rank );
-        Read( Z.Buffer(), head, Z.Height()*width );
+        if( SF.rank != 0 )
+        {
+            Z.Resize( SF.rank, width, SF.rank );
+            Read( Z.Buffer(), head, Z.Height()*width );
+        }
+        else
+            Z.Resize( 0, width );
         break;
     }
     case SPLIT_DENSE:
     {
         Dense& Z = *context.block.data.Z;
-        Z.Resize( Height(), width, Height() );
-        Read( Z.Buffer(), head, Z.Height()*width );
+        if( Height() != 0 )
+        {
+            Z.Resize( Height(), width, Height() );
+            Read( Z.Buffer(), head, Z.Height()*width );
+        }
+        else
+            Z.Resize( 0, width );
         break;
     }
     default:
@@ -2370,11 +2200,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixBroadcastsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-            std::memcpy
-            ( Z.Buffer(), &buffer[offsets[_level-1]], 
-              DF.rank*width*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*width;
+            if( DF.rank != 0 )
+            {
+                Z.Resize( DF.rank, width, DF.rank );
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                  DF.rank*width*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*width;
+            }
+            else
+                Z.Resize( 0, width );
         }
         break;
 
@@ -2414,11 +2249,16 @@ TransposeMapDenseMatrixBroadcastsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-            std::memcpy
-            ( Z.Buffer(), &buffer[offsets[_level-1]], 
-              DF.rank*width*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*width;
+            if( DF.rank != 0 )
+            {
+                Z.Resize( DF.rank, width, DF.rank );
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                  DF.rank*width*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*width;
+            }
+            else
+                Z.Resize( 0, width );
         }
         break;
 
@@ -2456,10 +2296,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixNaiveBroadcasts
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
+            if( DF.rank != 0 )
+            {
+                Z.Resize( DF.rank, width, DF.rank );
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
+            }
+            else
+                Z.Resize( 0, width );
         }
         break;
 
@@ -2498,10 +2342,14 @@ TransposeMapDenseMatrixNaiveBroadcasts
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width, DF.rank );
-
-            MPI_Comm team = _subcomms->Subcomm( _level );
-            mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
+            if( DF.rank != 0 )
+            {
+                Z.Resize( DF.rank, width, DF.rank );
+                MPI_Comm team = _subcomms->Subcomm( _level );
+                mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
+            }
+            else
+                Z.Resize( 0, width );
         }
         break;
 
