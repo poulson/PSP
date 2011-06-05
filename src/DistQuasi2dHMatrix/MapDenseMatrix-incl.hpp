@@ -386,6 +386,102 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSourcePrecompute
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapDenseMatrixSourcePrecompute");
+#endif
+    const int width = XLocal.Width();
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapDenseMatrixSourcePrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.block.data.SN;
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MapDenseMatrixSourcePrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            // Form Z := alpha VLocal^[T/H] XLocal
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            Z.Resize( DF.rank, width, DF.rank );
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', DF.rank, width, DF.VLocal.Height(), 
+              alpha,     DF.VLocal.LockedBuffer(), DF.VLocal.LDim(), 
+                         XLocal.LockedBuffer(),    XLocal.LDim(),
+              (Scalar)0, Z.Buffer(),               Z.LDim() );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inSourceTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            Dense& Z = *context.block.data.Z;
+
+            Dense XLocalSub, YLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localSourceOffset, 0, SF.D.Height(), width );
+            if( Conjugated )
+                hmatrix_tools::MatrixHermitianTransposeMatrix
+                ( alpha, SF.D, XLocalSub, Z );
+            else
+                hmatrix_tools::MatrixTransposeMatrix
+                ( alpha, SF.D, XLocalSub, Z );
+        }
+        break;
+    case SPLIT_DENSE:
+        if( _inSourceTeam )
+        {
+            const SplitDense& SD = *_block.data.SD;
+            Dense& Z = *context.block.data.Z;
+
+            Dense XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localSourceOffset, 0, Width(), width );
+            hmatrix_tools::MatrixMatrix( alpha, SD.D, XLocalSub, Z );
+        }
+        break;
+
+#ifndef RELEASE
+    case NODE:
+    case LOW_RANK:
+    case DENSE:
+        throw std::logic_error("Invalid call to source precompute");
+        break;
+#endif
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPrecompute
 ( MapDenseMatrixContext& context,
   Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
@@ -485,6 +581,86 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixPrecompute
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+TransposeMapDenseMatrixTargetPrecompute
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::TransposeMapDenseMatrixTargetPrecompute");
+#endif
+    const int width = XLocal.Width();
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapDenseMatrixTargetPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.block.data.SN;
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMapDenseMatrixTargetPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            // Form Z := alpha ULocal^T XLocal
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            Z.Resize( DF.rank, width, DF.rank );
+            blas::Gemm
+            ( 'T', 'N', DF.rank, width, DF.ULocal.Height(),
+              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                         XLocal.LockedBuffer(),    XLocal.LDim(),
+              (Scalar)0, Z.Buffer(),               Z.LDim() );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            Dense& Z = *context.block.data.Z;
+            Dense XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
+            hmatrix_tools::MatrixTransposeMatrix( alpha, SF.D, XLocalSub, Z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+
+#ifndef RELEASE
+    case NODE:
+    case LOW_RANK:
+    case DENSE:
+        throw std::logic_error("Invalid call to target precompute");
+        break;
+#endif
 
     default:
         break;
@@ -598,6 +774,88 @@ HermitianTransposeMapDenseMatrixPrecompute
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
+
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
+HermitianTransposeMapDenseMatrixTargetPrecompute
+( MapDenseMatrixContext& context,
+  Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMatrix::HermitianTransposeMapDenseMatrixTargetPrecompute");
+#endif
+    const int width = XLocal.Width();
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        typename MapDenseMatrixContext::DistNodeContext& nodeContext = 
+            *context.block.data.DN;
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapDenseMatrixTargetPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        typename MapDenseMatrixContext::SplitNodeContext& nodeContext = 
+            *context.block.data.SN;
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).HermitianTransposeMapDenseMatrixTargetPrecompute
+                ( nodeContext.Child(t,s), alpha, XLocal );
+        break;
+    }
+    case DIST_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            // Form Z := alpha ULocal^H XLocal
+            const DistLowRank& DF = *_block.data.DF;
+            Dense& Z = *context.block.data.Z;
+            Z.Resize( DF.rank, width, DF.rank );
+            blas::Gemm
+            ( 'C', 'N', DF.rank, width, DF.ULocal.Height(), 
+              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                         XLocal.LockedBuffer(),    XLocal.LDim(),
+              (Scalar)0, Z.Buffer(),               Z.LDim() );
+        }
+        break;
+    case SPLIT_LOW_RANK:
+        if( _inTargetTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            Dense& Z = *context.block.data.Z;
+
+            Dense XLocalSub;
+            XLocalSub.LockedView
+            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
+            hmatrix_tools::MatrixHermitianTransposeMatrix
+            ( alpha, SF.D, XLocalSub, Z );
+        }
+        break;
+    case SPLIT_DENSE:
+        break;
+
+#ifndef RELEASE
+    case NODE:
+    case LOW_RANK:
+    case DENSE:
+        throw std::logic_error("Invalid call to target precompute");
+        break;
+#endif
 
     default:
         break;

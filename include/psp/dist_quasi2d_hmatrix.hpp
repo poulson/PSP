@@ -646,6 +646,9 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
+    void MapDenseMatrixSourcePrecompute
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
     void MapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
     void MapDenseMatrixSummationsCount
@@ -772,6 +775,9 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
+    void TransposeMapDenseMatrixTargetPrecompute
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
     void TransposeMapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
     void TransposeMapDenseMatrixSummationsCount
@@ -839,6 +845,9 @@ private:
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
+    void HermitianTransposeMapDenseMatrixTargetPrecompute
+    ( MapDenseMatrixContext& context,
+      Scalar alpha, const DenseMatrix<Scalar>& XLocal ) const;
     void HermitianTransposeMapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
     void HermitianTransposeMapDenseMatrixNaiveSummations

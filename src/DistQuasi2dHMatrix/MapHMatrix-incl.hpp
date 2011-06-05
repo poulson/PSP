@@ -425,15 +425,21 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 MapDenseMatrixContext& denseContext = 
                     *nodeContext.denseContextMap[key];
 
-                // HERE
-                /*
                 A.MapDenseMatrixInitialize( denseContext );
                 if( A._inSourceTeam )
-                    A.MapDenseMatrixPrecompute( 
-                */
+                {
+                    if( C._inTargetTeam )
+                        A.MapDenseMatrixPrecompute
+                        ( denseContext, alpha, DFB.ULocal, 
+                          *nodeContext.ULocalMap[key] );
+                    else
+                        A.MapDenseMatrixSourcePrecompute
+                        ( denseContext, alpha, DFB.ULocal );
+                }
             }
             else
             {
+                // HERE
                 // TODO: Start H += H F
             }
             break;
