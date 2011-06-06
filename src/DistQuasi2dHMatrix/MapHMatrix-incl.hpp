@@ -819,8 +819,63 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             else
             {
-                // HERE
-                // TODO: Start H += H F
+                // Start H += H F
+                const int key = A._sourceOffset;
+                switch( C._block.type )
+                {
+                case NODE:
+                {
+                    // Our process owns the left and right sides
+                    typename MapHMatrixContext::NodeContext& nodeContext = 
+                        *context.block.data.N;
+                    nodeContext.UMap[key] = new Dense( C.Height(), SFB.rank );
+                    nodeContext.VMap[key] = new Dense( C.Width(), SFB.rank );
+                    nodeContext.denseContextMap[key] = 
+                        new MapDenseMatrixContext;
+                    MapDenseMatrixContext& denseContext = 
+                        *nodeContext.denseContextMap[key];
+
+                    A.MapDenseMatrixInitialize( denseContext );
+                    break;
+                }
+                case SPLIT_NODE_GHOST:
+                {
+                    // We are the middle process
+                    typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                        *context.block.data.SN;
+                    nodeContext.denseContextMap[key] = 
+                        new MapDenseMatrixContext;
+                    MapDenseMatrixContext& denseContext = 
+                        *nodeContext.denseContextMap[key];
+
+                    Dense dummy;
+                    A.MapDenseMatrixInitialize( denseContext );
+                    A.MapDenseMatrixPrecompute
+                    ( denseContext, alpha, SFB.D, dummy );
+                    break;
+                }
+                case NODE_GHOST:
+                {
+                    // We are the middle process
+                    typename MapHMatrixContext::NodeContext& nodeContext =
+                        *context.block.data.N;
+                    nodeContext.denseContextMap[key] = 
+                        new MapDenseMatrixContext;
+                    MapDenseMatrixContext& denseContext =
+                        *nodeContext.denseContextMap[key];
+
+                    Dense dummy;
+                    A.MapDenseMatrixInitialize( denseContext );
+                    A.MapDenseMatrixPrecompute
+                    ( denseContext, alpha, SFB.D, dummy );
+                    break;
+                }
+                default:
+#ifndef RELEASE
+                    throw std::logic_error("Invalid logic");
+#endif
+                    break;
+                }
             }
             break;
         }
