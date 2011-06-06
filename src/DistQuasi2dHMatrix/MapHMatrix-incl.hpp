@@ -279,18 +279,56 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     if( C._block.type == EMPTY )
         A.MapHMatrixSetUp( B, C );
 
-    const int key = A._sourceOffset;
+    // Take care of the H += H H cases first
     const bool admissibleC = C.Admissible();
+    if( !admissibleC )
+    {
+        switch( A._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            switch( B._block.type )
+            {
+            case DIST_NODE:
+            case DIST_NODE_GHOST:
+            case SPLIT_NODE:
+            case SPLIT_NODE_GHOST:
+            case NODE:
+            case NODE_GHOST:
+            {
+                // Start H += H H
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                break;
+            }
+            default:
+                break;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    const int key = A._sourceOffset;
     switch( A._block.type )
     {
     case DIST_NODE:
     {
-        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case DIST_NODE:
         {
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -321,22 +359,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     B._beganColSpaceComp = true;
                 }
             }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
-            }
             break;
         }
         case DIST_NODE_GHOST:
         {
             // We must be in the left team
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -352,16 +379,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
                     A._beganRowSpaceComp = true;
                 }
-            }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -403,13 +420,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     }
     case DIST_NODE_GHOST:
     {
-        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case DIST_NODE:
         {
             // We must be in the right team
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -425,16 +440,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
                     B._beganColSpaceComp = true;
                 }
-            }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -456,13 +461,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     }
     case SPLIT_NODE:
     {
-        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case SPLIT_NODE:
         {
             // We must be the middle process or both the left and right process
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -493,22 +496,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     B._beganColSpaceComp = true;
                 }
             }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
-            }
             break;
         }
         case SPLIT_NODE_GHOST:
         {
             // We must be in the left team
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -525,22 +517,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     A._beganRowSpaceComp = true;
                 }
             }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
-            }
             break;
         }
         case NODE:
         {
             // We must be in the middle and right teams
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -566,22 +547,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     B._beganColSpaceComp = true;
                 }
             }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
-            }
             break;
         }
         case NODE_GHOST:
         {
             // We must be in the left team
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -597,16 +567,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
                     A._beganRowSpaceComp = true;
                 }
-            }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -715,13 +675,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     }
     case SPLIT_NODE_GHOST:
     {
-        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case SPLIT_NODE:
         {
             // We must be the right process
-            const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
@@ -737,16 +695,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
                     B._beganColSpaceComp = true;
                 }
-            }
-            else
-            {
-                // Start H += H H
-                Node& nodeC = *C._block.data.N;
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -779,10 +727,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start F += H H
                 // HERE
-            }
-            else
-            {
-
             }
             break;
         }
