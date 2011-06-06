@@ -43,16 +43,15 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         throw std::logic_error("A and B must have their ghost nodes");
     C.Clear();
 
-    MapHMatrixContext context;
-    A.MapHMatrixMainPrecompute( context, alpha, B, C );
+    A.MapHMatrixMainPrecompute( alpha, B, C );
     /*
-    A.MapHMatrixMainPassData( context, alpha, B, C );
-    A.MapHMatrixMainPostcompute( context, alpha, B, C );
-    A.MapHMatrixFHHPrecompute( context, alpha, B, C );
-    A.MapHMatrixFHHPassData( context, alpha, B, C );
-    A.MapHMatrixFHHPostcompute( context, alpha, B, C );
-    A.MapHMatrixFHHFinalize( context, alpha, B, C );
-    A.MapHMatrixRoundedAddition( context, alpha, B, C );
+    A.MapHMatrixMainPassData( alpha, B, C );
+    A.MapHMatrixMainPostcompute( alpha, B, C );
+    A.MapHMatrixFHHPrecompute( alpha, B, C );
+    A.MapHMatrixFHHPassData( alpha, B, C );
+    A.MapHMatrixFHHPostcompute( alpha, B, C );
+    A.MapHMatrixFHHFinalize( alpha, B, C );
+    A.MapHMatrixRoundedAddition( alpha, B, C );
     */
 #ifndef RELEASE
     PopCallStack();
@@ -62,8 +61,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
-( MapHMatrixContext& context,
-  const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+( const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
         DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
@@ -110,9 +108,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                 DF.rank = 0;
                 DF.ULocal.Resize( C.LocalHeight(), 0 );
                 DF.VLocal.Resize( C.LocalWidth(), 0 );
-                context.block.type = DIST_LOW_RANK;
-                context.block.data.DF = 
-                    new typename MapHMatrixContext::DistLowRankContext;
             }
             else
             {
@@ -120,9 +115,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                 C._block.data.DFG = new DistLowRankGhost;
                 DistLowRankGhost& DFG = *C._block.data.DFG;
                 DFG.rank = 0;
-                context.block.type = DIST_LOW_RANK_GHOST;
-                context.block.data.DF = 
-                    new typename MapHMatrixContext::DistLowRankContext;
             }
         }
         else // teamSize == 1
@@ -136,9 +128,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     LowRank& F = *C._block.data.F;
                     F.U.Resize( C.Height(), 0 );
                     F.V.Resize( C.Width(), 0 );
-                    context.block.type = LOW_RANK;
-                    context.block.data.F = 
-                        new typename MapHMatrixContext::LowRankContext;
                 }
                 else
                 {
@@ -146,9 +135,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     C._block.data.FG = new LowRankGhost;
                     LowRankGhost& FG = *C._block.data.FG;
                     FG.rank = 0;
-                    context.block.type = LOW_RANK_GHOST;
-                    context.block.data.F = 
-                        new typename MapHMatrixContext::LowRankContext;
                 }
             }
             else
@@ -163,9 +149,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                         SF.D.Resize( C.Height(), 0 );
                     else
                         SF.D.Resize( C.Width(), 0 );
-                    context.block.type = SPLIT_LOW_RANK;
-                    context.block.data.SF =
-                        new typename MapHMatrixContext::SplitLowRankContext;
                 }
                 else
                 {
@@ -173,9 +156,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     C._block.data.SFG = new SplitLowRankGhost;
                     SplitLowRankGhost& SFG = *C._block.data.SFG;
                     SFG.rank = 0;
-                    context.block.type = SPLIT_LOW_RANK_GHOST;
-                    context.block.data.SF = 
-                        new typename MapHMatrixContext::SplitLowRankContext;
                 }
             }
         }
@@ -191,9 +171,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                 Node& node = *C._block.data.N;
                 for( int j=0; j<16; ++j )
                     node.children[j] = new DistQuasi2d;
-                context.block.type = DIST_NODE;
-                context.block.data.DN = 
-                    new typename MapHMatrixContext::DistNodeContext;
             }
             else
             {
@@ -202,9 +179,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                 Node& node = *C._block.data.N;
                 for( int j=0; j<16; ++j )
                     node.children[j] = new DistQuasi2d;
-                context.block.type = DIST_NODE_GHOST;
-                context.block.data.DN = 
-                    new typename MapHMatrixContext::DistNodeContext;
             }
         }
         else
@@ -218,9 +192,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
                         node.children[j] = new DistQuasi2d;
-                    context.block.type = NODE;
-                    context.block.data.N = 
-                        new typename MapHMatrixContext::NodeContext;
                 }
                 else
                 {
@@ -229,9 +200,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
                         node.children[j] = new DistQuasi2d;
-                    context.block.type = NODE_GHOST;
-                    context.block.data.N = 
-                        new typename MapHMatrixContext::NodeContext;
                 }
             }
             else
@@ -243,9 +211,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
                         node.children[j] = new DistQuasi2d;
-                    context.block.type = SPLIT_NODE;
-                    context.block.data.SN = 
-                        new typename MapHMatrixContext::SplitNodeContext;
                 }
                 else
                 {
@@ -254,9 +219,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                     Node& node = *C._block.data.N;
                     for( int j=0; j<16; ++j )
                         node.children[j] = new DistQuasi2d;
-                    context.block.type = SPLIT_NODE_GHOST;
-                    context.block.data.SN = 
-                        new typename MapHMatrixContext::SplitNodeContext;
                 }
             }
         }
@@ -269,17 +231,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
             {
                 C._block.type = DENSE;
                 C._block.data.D = new Dense( C.Height(), C.Width() );
-                context.block.type = DENSE;
-                context.block.data.D = 
-                    new typename MapHMatrixContext::DenseContext;
             }
             else
             {
                 C._block.type = DENSE_GHOST;
                 C._block.data.DG = new DenseGhost;
-                context.block.type = DENSE_GHOST;
-                context.block.data.D = 
-                    new typename MapHMatrixContext::DenseContext;
             }
         }
         else
@@ -291,17 +247,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                 SplitDense& SD = *C._block.data.SD;
                 if( C._inSourceTeam )
                     SD.D.Resize( C.Height(), C.Width() );
-                context.block.type = SPLIT_DENSE;
-                context.block.data.SD = 
-                    new typename MapHMatrixContext::SplitDenseContext;
             }
             else
             {
                 C._block.type = SPLIT_DENSE_GHOST;
                 C._block.data.SDG = new SplitDenseGhost;
-                context.block.type = SPLIT_DENSE_GHOST;
-                context.block.data.SD = 
-                    new typename MapHMatrixContext::SplitDenseContext;
             }
         }
     }
@@ -313,8 +263,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
-( MapHMatrixContext& context,
-  Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                       DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
@@ -325,12 +274,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
         C._block.type = EMPTY;
-        context.block.type = EMPTY;
         return;
     }
     if( C._block.type == EMPTY )
-        A.MapHMatrixSetUp( context, B, C );
+        A.MapHMatrixSetUp( B, C );
 
+    const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
@@ -370,14 +319,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                typename MapHMatrixContext::DistNodeContext& nodeContext = 
-                    *context.block.data.DN;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( nodeContext.Child(t,s), 
-                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -403,14 +349,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                typename MapHMatrixContext::DistNodeContext& nodeContext = 
-                    *context.block.data.DN;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( nodeContext.Child(t,s),
-                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -420,41 +363,26 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             if( admissibleC )
             {
                 // Start F += H F
-                typename MapHMatrixContext::DistLowRankContext& DFContext = 
-                    *context.block.data.DF;
-
-                const int key = A._sourceOffset;
-                DFContext.ULocalMap[key] = 
-                    new Dense( C.LocalHeight(), DFB.rank );
-                DFContext.VLocalMap[key] = 
-                    new Dense( C.LocalWidth(), DFB.rank );
-                DFContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *DFContext.denseContextMap[key];
+                C._UMap[key] = new Dense( C.LocalHeight(), DFB.rank );
+                C._VMap[key] = new Dense( C.LocalWidth(), DFB.rank );
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
                 A.MapDenseMatrixPrecompute
-                ( denseContext, alpha, DFB.ULocal, *DFContext.ULocalMap[key] );
+                ( denseContext, alpha, DFB.ULocal, *C._UMap[key] );
             }
             else
             {
                 // Start H += H F
-                typename MapHMatrixContext::DistNodeContext& nodeContext = 
-                    *context.block.data.DN;
-
-                const int key = A._sourceOffset;
-                nodeContext.ULocalMap[key] = 
-                    new Dense( C.LocalHeight(), DFB.rank );
-                nodeContext.VLocalMap[key] =
-                    new Dense( C.LocalWidth(), DFB.rank );
-                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *nodeContext.denseContextMap[key];
+                C._UMap[key] = new Dense( C.LocalHeight(), DFB.rank );
+                C._VMap[key] = new Dense( C.LocalWidth(), DFB.rank );
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
                 A.MapDenseMatrixPrecompute
-                ( denseContext, 
-                  alpha, DFB.ULocal, *nodeContext.ULocalMap[key] );
+                ( denseContext, alpha, DFB.ULocal, *C._UMap[key] );
             }
             break;
         }
@@ -465,30 +393,18 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             if( admissibleC )
             {
                 // Start F += H F
-                typename MapHMatrixContext::DistLowRankContext& DFContext = 
-                    *context.block.data.DF;
-
-                const int key = A._sourceOffset;
-                DFContext.ULocalMap[key] = 
-                    new Dense( C.LocalHeight(), DFGB.rank );
-                DFContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *DFContext.denseContextMap[key];
+                C._UMap[key] = new Dense( C.LocalHeight(), DFGB.rank );
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
             }
             else
             {
                 // Start H += H F
-                typename MapHMatrixContext::DistNodeContext& nodeContext = 
-                    *context.block.data.DN;
-
-                const int key = A._sourceOffset;
-                nodeContext.ULocalMap[key] = 
-                    new Dense( C.LocalHeight(), DFGB.rank );
-                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *nodeContext.denseContextMap[key];
+                C._UMap[key] = new Dense( C.LocalHeight(), DFGB.rank );
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
             }
@@ -529,14 +445,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                typename MapHMatrixContext::DistNodeContext& nodeContext = 
-                    *context.block.data.DN;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( nodeContext.Child(t,s), 
-                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -547,22 +460,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             if( admissibleC )
             {
                 // Start F += H F
-                typename MapHMatrixContext::DistLowRankContext& DFContext = 
-                    *context.block.data.DF;
-
-                const int key = A._sourceOffset;
-                DFContext.VLocalMap[key] = 
-                    new Dense( C.LocalWidth(), DFB.rank );
+                C._VMap[key] = new Dense( C.LocalWidth(), DFB.rank );
             }
             else
             {
                 // Start H += H F
-                typename MapHMatrixContext::DistNodeContext& nodeContext = 
-                    *context.block.data.DN;
-
-                const int key = A._sourceOffset;
-                nodeContext.VLocalMap[key] =
-                    new Dense( C.LocalWidth(), DFB.rank );
+                C._VMap[key] = new Dense( C.LocalWidth(), DFB.rank );
             }
             break;
         }
@@ -611,39 +514,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                switch( C._block.type )
-                {
-                case SPLIT_NODE_GHOST:
-                {
-                    typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                        *context.block.data.SN;
-                    for( int t=0; t<4; ++t )
-                        for( int s=0; s<4; ++s )
-                            for( int r=0; r<4; ++r )
-                                nodeA.Child(t,r).MapHMatrixMainPrecompute
-                                ( nodeContext.Child(t,s),
-                                  alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
-                    break;
-                }
-                case NODE_GHOST:
-                case NODE:
-                {
-                    typename MapHMatrixContext::NodeContext& nodeContext =
-                        *context.block.data.N;
-                    for( int t=0; t<4; ++t )
-                        for( int s=0; s<4; ++s )
-                            for( int r=0; r<4; ++r )
-                                nodeA.Child(t,r).MapHMatrixMainPrecompute
-                                ( nodeContext.Child(t,s),
-                                  alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
-                    break;
-                }
-                default:
-#ifndef RELEASE
-                    throw std::logic_error("Invalid logic");
-#endif
-                    break;
-                }
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MapHMatrixMainPrecompute
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -669,14 +544,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                    *context.block.data.SN;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( nodeContext.Child(t,s),
-                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -712,14 +584,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                    *context.block.data.SN;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( nodeContext.Child(t,s),
-                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -745,14 +614,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 // Start H += H H
                 Node& nodeC = *C._block.data.N;
-                typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                    *context.block.data.SN;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
-                            ( nodeContext.Child(t,s),
-                              alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
             }
             break;
         }
@@ -763,118 +629,55 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             if( admissibleC )
             {
                 // Start F += H F
-                const int key = A._sourceOffset;
-                switch( C._block.type )
-                {
-                case LOW_RANK:
+                if( C._inTargetTeam )
                 {
                     // Our process owns the left and right sides
-                    typename MapHMatrixContext::LowRankContext& FContext = 
-                        *context.block.data.F;
-                    FContext.UMap[key] = new Dense( C.Height(), SFB.rank );
-                    FContext.VMap[key] = new Dense( C.Width(), SFB.rank );
-                    FContext.denseContextMap[key] = new MapDenseMatrixContext;
+                    C._UMap[key] = new Dense( C.Height(), SFB.rank );
+                    C._VMap[key] = new Dense( C.Width(), SFB.rank );
+                    C._denseContextMap[key] = new MapDenseMatrixContext;
                     MapDenseMatrixContext& denseContext = 
-                        *FContext.denseContextMap[key];
+                        *C._denseContextMap[key];
 
                     A.MapDenseMatrixInitialize( denseContext );
-                    break;
                 }
-                case SPLIT_LOW_RANK_GHOST:
+                else
                 {
                     // We are the middle process
-                    typename MapHMatrixContext::SplitLowRankContext& SFContext =
-                        *context.block.data.SF;
-                    SFContext.denseContextMap[key] = new MapDenseMatrixContext;
-                    MapDenseMatrixContext& denseContext = 
-                        *SFContext.denseContextMap[key];
-
-                    Dense dummy;
-                    A.MapDenseMatrixInitialize( denseContext );
-                    A.MapDenseMatrixPrecompute
-                    ( denseContext, alpha, SFB.D, dummy );
-                    break;
-                }
-                case LOW_RANK_GHOST:
-                {
-                    // We are the middle process
-                    typename MapHMatrixContext::LowRankContext& FContext =
-                        *context.block.data.F;
-                    FContext.denseContextMap[key] = new MapDenseMatrixContext;
+                    C._denseContextMap[key] = new MapDenseMatrixContext;
                     MapDenseMatrixContext& denseContext =
-                        *FContext.denseContextMap[key];
+                        *C._denseContextMap[key];
 
                     Dense dummy;
                     A.MapDenseMatrixInitialize( denseContext );
                     A.MapDenseMatrixPrecompute
                     ( denseContext, alpha, SFB.D, dummy );
-                    break;
-                }
-                default:
-#ifndef RELEASE
-                    throw std::logic_error("Invalid logic");
-#endif
-                    break;
                 }
             }
             else
             {
                 // Start H += H F
-                const int key = A._sourceOffset;
-                switch( C._block.type )
-                {
-                case NODE:
+                if( C._inTargetTeam )
                 {
                     // Our process owns the left and right sides
-                    typename MapHMatrixContext::NodeContext& nodeContext = 
-                        *context.block.data.N;
-                    nodeContext.UMap[key] = new Dense( C.Height(), SFB.rank );
-                    nodeContext.VMap[key] = new Dense( C.Width(), SFB.rank );
-                    nodeContext.denseContextMap[key] = 
-                        new MapDenseMatrixContext;
+                    C._UMap[key] = new Dense( C.Height(), SFB.rank );
+                    C._VMap[key] = new Dense( C.Width(), SFB.rank );
+                    C._denseContextMap[key] = new MapDenseMatrixContext;
                     MapDenseMatrixContext& denseContext = 
-                        *nodeContext.denseContextMap[key];
+                        *C._denseContextMap[key];
 
                     A.MapDenseMatrixInitialize( denseContext );
-                    break;
                 }
-                case SPLIT_NODE_GHOST:
+                else
                 {
                     // We are the middle process
-                    typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                        *context.block.data.SN;
-                    nodeContext.denseContextMap[key] = 
-                        new MapDenseMatrixContext;
+                    C._denseContextMap[key] = new MapDenseMatrixContext;
                     MapDenseMatrixContext& denseContext = 
-                        *nodeContext.denseContextMap[key];
+                        *C._denseContextMap[key];
 
                     Dense dummy;
                     A.MapDenseMatrixInitialize( denseContext );
                     A.MapDenseMatrixPrecompute
                     ( denseContext, alpha, SFB.D, dummy );
-                    break;
-                }
-                case NODE_GHOST:
-                {
-                    // We are the middle process
-                    typename MapHMatrixContext::NodeContext& nodeContext =
-                        *context.block.data.N;
-                    nodeContext.denseContextMap[key] = 
-                        new MapDenseMatrixContext;
-                    MapDenseMatrixContext& denseContext =
-                        *nodeContext.denseContextMap[key];
-
-                    Dense dummy;
-                    A.MapDenseMatrixInitialize( denseContext );
-                    A.MapDenseMatrixPrecompute
-                    ( denseContext, alpha, SFB.D, dummy );
-                    break;
-                }
-                default:
-#ifndef RELEASE
-                    throw std::logic_error("Invalid logic");
-#endif
-                    break;
                 }
             }
             break;
@@ -882,29 +685,20 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         case SPLIT_LOW_RANK_GHOST:
         {
             // We are the left process
-            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
             if( admissibleC )
             {
                 // Start F += H F
-                const int key = A._sourceOffset;
-                typename MapHMatrixContext::SplitLowRankContext& SFContext =
-                    *context.block.data.SF;
-                SFContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *SFContext.denseContextMap[key];
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
-                break;
             }
             else
             {
                 // Start H += H F
-                const int key = A._sourceOffset;
-                typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                    *context.block.data.SN;
-                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                C._denseContextMap[key] = new MapDenseMatrixContext;
                 MapDenseMatrixContext& denseContext = 
-                    *nodeContext.denseContextMap[key];
+                    *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
             }
@@ -920,12 +714,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // A: SPLIT_NODE     (we own the right side)
                 // B: LOW_RANK
                 // C: SPLIT_LOW_RANK (we own the right side)
-                const int key = A._sourceOffset;
-                typename MapHMatrixContext::SplitLowRankContext& SFContext =
-                    *context.block.data.SF;
-                SFContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *SFContext.denseContextMap[key];
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 Dense dummy;
                 A.MapDenseMatrixInitialize( denseContext );
@@ -937,12 +727,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // A: SPLIT_NODE (we own the right side)
                 // B: LOW_RANK   
                 // C: SPLIT_NODE (we own the right side)
-                const int key = A._sourceOffset;
-                typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                    *context.block.data.SN;
-                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *nodeContext.denseContextMap[key];
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 Dense dummy;
                 A.MapDenseMatrixInitialize( denseContext );
@@ -953,19 +739,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         case LOW_RANK_GHOST:
         {
             // We are the left process
-            const LowRankGhost& FGB = *B._block.data.FG;
             if( admissibleC )
             {
                 // Start F += H F
                 // A: SPLIT_NODE     (we own the left side)
                 // B: LOW_RANK_GHOST
                 // C: SPLIT_LOW_RANK (we own the left side)
-                const int key = A._sourceOffset;
-                typename MapHMatrixContext::SplitLowRankContext& SFContext =
-                    *context.block.data.SF;
-                SFContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *SFContext.denseContextMap[key];
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 Dense dummy;
                 A.MapDenseMatrixInitialize( denseContext );
@@ -976,12 +757,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // A: SPLIT_NODE     (we own the left side)
                 // B: LOW_RANK_GHOST   
                 // C: SPLIT_NODE     (we own the left side)
-                const int key = A._sourceOffset;
-                typename MapHMatrixContext::SplitNodeContext& nodeContext =
-                    *context.block.data.SN;
-                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
-                MapDenseMatrixContext& denseContext = 
-                    *nodeContext.denseContextMap[key];
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
                 A.MapDenseMatrixInitialize( denseContext );
             }
@@ -998,7 +775,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     case SPLIT_NODE_GHOST:
     {
         // HERE
-        const Node& nodeA = *A._block.data.N;
+        //const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case SPLIT_NODE:

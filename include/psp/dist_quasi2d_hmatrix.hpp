@@ -22,6 +22,7 @@
 #define PSP_DIST_QUASI2D_HMATRIX_HPP 1
 
 #include "psp/building_blocks/mpi.hpp"
+#include "psp/building_blocks/memory_map.hpp"
 #include "psp/quasi2d_hmatrix.hpp"
 
 namespace psp {
@@ -393,157 +394,6 @@ private:
         void Clear();
     };
 
-    struct MapHMatrixContext
-    {
-        template<typename T1,typename T2>
-        class MemoryMap 
-        {
-        private:
-            std::map<T1,T2*> _map;
-        public:
-            // NOTE: Insertion with the same key without manual deletion
-            //       will cause a memory leak.
-            T2*& operator[]( T1 key )
-            {
-                return _map[key];
-            }
-
-            ~MemoryMap()
-            {
-                typename std::map<T1,T2*>::iterator it;
-                for( it=_map.begin(); it!=_map.end(); it++ )
-                    delete (*it).second;
-            }
-        };
-
-        /*
-         * Structs for the different types of matrix blocks. Some store several
-         * types of updates.
-         */
-        struct DistNodeContext
-        {
-            std::vector<MapHMatrixContext*> children;
-            DistNodeContext();
-            ~DistNodeContext();
-            MapHMatrixContext& Child( int t, int s );
-            const MapHMatrixContext& Child( int t, int s ) const;
-
-            // For low-rank updates
-            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
-            MemoryMap<int,DenseMatrix<Scalar> > ULocalMap, VLocalMap;
-            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
-        };
-
-        struct SplitNodeContext
-        {
-            std::vector<MapHMatrixContext*> children;
-            SplitNodeContext();
-            ~SplitNodeContext();
-            MapHMatrixContext& Child( int t, int s );
-            const MapHMatrixContext& Child( int t, int s ) const;
-
-            // For low-rank updates
-            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
-            MemoryMap<int,DenseMatrix<Scalar> > UOrVMap;
-        };
-
-        struct NodeContext
-        {
-            std::vector<MapHMatrixContext*> children;
-            NodeContext();
-            ~NodeContext();
-            MapHMatrixContext& Child( int t, int s );
-            const MapHMatrixContext& Child( int t, int s ) const;
-
-            // For low-rank updates
-            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
-            MemoryMap<int,DenseMatrix<Scalar> > UMap, VMap;
-        };
-
-        struct DistLowRankContext
-        {
-            // For low-rank updates
-            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
-            MemoryMap<int,DenseMatrix<Scalar> > ULocalMap, VLocalMap;
-
-            // For temporary inner products
-            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
-        };
-
-        struct SplitLowRankContext
-        {
-            // For low-rank updates
-            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
-            MemoryMap<int,DenseMatrix<Scalar> > UOrVMap;
-
-            // For dense updates
-            MemoryMap<int,DenseMatrix<Scalar> > DMap;
-        };
-
-        struct LowRankContext
-        {
-            // For low-rank updates
-            MemoryMap<int,MapDenseMatrixContext> denseContextMap;
-            MemoryMap<int,DenseMatrix<Scalar> > UMap, VMap;
-
-            // For dense updates
-            MemoryMap<int,DenseMatrix<Scalar> > DMap;
-
-            // For temporary inner products
-            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
-        };
-
-        struct SplitDenseContext
-        {
-            // For low-rank updates
-            MemoryMap<int,DenseMatrix<Scalar> > UOrVMap;
-
-            // For dense updates
-            MemoryMap<int,DenseMatrix<Scalar> > DMap;
-
-            // For temporary inner products
-            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
-        };
-
-        struct DenseContext
-        {
-            // For low-rank updates
-            MemoryMap<int,DenseMatrix<Scalar> > UMap, VMap;
-
-            // For dense updates
-            MemoryMap<int,DenseMatrix<Scalar> > DMap;
-
-            // For temporary inner products
-            MemoryMap<int,DenseMatrix<Scalar> > ZMap;
-        };
-
-        /*
-         * Wrapper for storing different types of contexts.
-         */
-        struct ContextBlock
-        {
-            BlockType type;
-            union Data
-            {
-                DistNodeContext* DN;
-                SplitNodeContext* SN;
-                NodeContext* N;
-
-                DistLowRankContext* DF;
-                SplitLowRankContext* SF;
-                LowRankContext* F;
-
-                SplitDenseContext* SD;
-                DenseContext* D;
-            } data;
-            ContextBlock();
-            ~ContextBlock();
-            void Clear();
-        };
-        ContextBlock block;
-        void Clear();
-    };
-
     /*
      * Private static functions
      */
@@ -684,40 +534,31 @@ private:
                           DenseMatrix<Scalar>& YLocal ) const;
 
     void MapHMatrixSetUp
-    ( MapHMatrixContext& context,
-      const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
             DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPrecompute
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPassData
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPostcompute
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixFHHPrecompute
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixFHHPassData
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixFHHPostcompute
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixFHHFinalize
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixRoundedAddition
-    ( MapHMatrixContext& context,
-      Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
     void TransposeMapVectorInitialize
@@ -876,6 +717,10 @@ private:
     bool _inSourceTeam, _inTargetTeam;
     int _sourceRoot, _targetRoot;
     int _localSourceOffset, _localTargetOffset;
+
+    // For temporary products in an H-matrix/H-matrix multiplication
+    MemoryMap<int,MapDenseMatrixContext> _denseContextMap;
+    MemoryMap<int,DenseMatrix<Scalar> > _UMap, _VMap, _DMap, _ZMap;
 
     // For the reuse of the computation of T1 = H Omega1 and T2 = H' Omega2 in 
     // order to capture the column and row space, respectively, of H. These 
@@ -1267,249 +1112,6 @@ ContextBlock::Clear()
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixContext::Clear()
-{
-    block.Clear();
-}
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-DistNodeContext::DistNodeContext()
-: children(16)
-{
-    for( int i=0; i<16; ++i )
-        children[i] = new MapHMatrixContext;
-}
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-DistNodeContext::~DistNodeContext()
-{
-    for( int i=0; i<16; ++i )
-        delete children[i];
-    children.clear();
-}
-
-template<typename Scalar,bool Conjugated>
-inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-DistNodeContext::Child( int t, int s )
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::MapHMatrixContext::DistNodeContext::Child");
-    if( t < 0 || s < 0 )
-        throw std::logic_error("Indices must be non-negative");
-    if( t > 3 || s > 3 )
-        throw std::logic_error("Indices out of bounds");
-    if( children.size() != 16 )
-        throw std::logic_error("children array not yet set up");
-    PopCallStack();
-#endif
-    return *children[s+4*t];
-}
-
-template<typename Scalar,bool Conjugated>
-inline const typename 
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-DistNodeContext::Child( int t, int s ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::MapHMatrixContext::DistNodeContext::Child");
-    if( t < 0 || s < 0 )
-        throw std::logic_error("Indices must be non-negative");
-    if( t > 3 || s > 3 )
-        throw std::logic_error("Indices out of bounds");
-    if( children.size() != 16 )
-        throw std::logic_error("children array not yet set up");
-    PopCallStack();
-#endif
-    return *children[s+4*t];
-}
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-SplitNodeContext::SplitNodeContext()
-: children(16)
-{
-    for( int i=0; i<16; ++i )
-        children[i] = new MapHMatrixContext;
-}
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-SplitNodeContext::~SplitNodeContext()
-{
-    for( int i=0; i<16; ++i )
-        delete children[i];
-    children.clear();
-}
-
-template<typename Scalar,bool Conjugated>
-inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-SplitNodeContext::Child( int t, int s )
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::MapHMatrixContext::SplitNodeContext::Child");
-    if( t < 0 || s < 0 )
-        throw std::logic_error("Indices must be non-negative");
-    if( t > 3 || s > 3 )
-        throw std::logic_error("Indices out of bounds");
-    if( children.size() != 16 )
-        throw std::logic_error("children array not yet set up");
-    PopCallStack();
-#endif
-    return *children[s+4*t];
-}
-
-template<typename Scalar,bool Conjugated>
-inline const typename 
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-SplitNodeContext::Child( int t, int s ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::MapHMatrixContext::SplitNodeContext::Child");
-    if( t < 0 || s < 0 )
-        throw std::logic_error("Indices must be non-negative");
-    if( t > 3 || s > 3 )
-        throw std::logic_error("Indices out of bounds");
-    if( children.size() != 16 )
-        throw std::logic_error("children array not yet set up");
-    PopCallStack();
-#endif
-    return *children[s+4*t];
-}
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-NodeContext::NodeContext()
-: children(16)
-{
-    for( int i=0; i<16; ++i )
-        children[i] = new MapHMatrixContext;
-}
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-NodeContext::~NodeContext()
-{
-    for( int i=0; i<16; ++i )
-        delete children[i];
-    children.clear();
-}
-
-template<typename Scalar,bool Conjugated>
-inline typename DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-NodeContext::Child( int t, int s )
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::MapHMatrixContext::NodeContext::Child");
-    if( t < 0 || s < 0 )
-        throw std::logic_error("Indices must be non-negative");
-    if( t > 3 || s > 3 )
-        throw std::logic_error("Indices out of bounds");
-    if( children.size() != 16 )
-        throw std::logic_error("children array not yet set up");
-    PopCallStack();
-#endif
-    return *children[s+4*t];
-}
-
-template<typename Scalar,bool Conjugated>
-inline const typename 
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext&
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-NodeContext::Child( int t, int s ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::MapHMatrixContext::NodeContext::Child");
-    if( t < 0 || s < 0 )
-        throw std::logic_error("Indices must be non-negative");
-    if( t > 3 || s > 3 )
-        throw std::logic_error("Indices out of bounds");
-    if( children.size() != 16 )
-        throw std::logic_error("children array not yet set up");
-    PopCallStack();
-#endif
-    return *children[s+4*t];
-}
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-ContextBlock::ContextBlock()
-: type(EMPTY), data()
-{ }
-
-template<typename Scalar,bool Conjugated>
-inline
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-ContextBlock::~ContextBlock()
-{
-    Clear();
-}
-
-template<typename Scalar,bool Conjugated>
-inline void
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::
-ContextBlock::Clear()
-{
-    switch( type )
-    {
-    case DIST_NODE: 
-    case DIST_NODE_GHOST:
-        delete data.DN; break;
-
-    case SPLIT_NODE:
-    case SPLIT_NODE_GHOST:
-        delete data.SN; break;
-
-    case NODE:
-    case NODE_GHOST:
-        delete data.N; break;
-
-    case DIST_LOW_RANK:  
-    case DIST_LOW_RANK_GHOST:
-        delete data.DF; break;
-
-    case SPLIT_LOW_RANK:
-    case SPLIT_LOW_RANK_GHOST:
-        delete data.SF;
-
-    case LOW_RANK:
-    case LOW_RANK_GHOST:
-        delete data.F;
-
-    case SPLIT_DENSE:
-    case SPLIT_DENSE_GHOST:
-        delete data.SD; break;
-
-    case DENSE:
-    case DENSE_GHOST:
-        delete data.D; break;
-
-    case EMPTY: 
-        break;
-    }
-    type = EMPTY;
-}
-
-template<typename Scalar,bool Conjugated>
-inline void
-DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixContext::Clear()
 {
     block.Clear();
 }
