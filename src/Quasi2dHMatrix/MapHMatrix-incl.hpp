@@ -66,7 +66,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             hmatrix_tools::Copy( A._block.data.F->U, C._block.data.F->U );
             if( Conjugated )
-                B.HermitianTransposeMapMatrix
+                B.AdjointMapMatrix
                 ( Conj(alpha), A._block.data.F->V, C._block.data.F->V );
             else
                 B.TransposeMapMatrix
@@ -76,7 +76,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
         {
             hmatrix_tools::Copy( A._block.data.F->U, C._block.data.F->U );
             if( Conjugated )
-                hmatrix_tools::MatrixHermitianTransposeMatrix
+                hmatrix_tools::MatrixAdjointMatrix
                 ( Conj(alpha), *B._block.data.D, A._block.data.F->V, 
                   C._block.data.F->V );
             else
@@ -145,7 +145,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             LowRank W;
             hmatrix_tools::Copy( A._block.data.F->U, W.U );
             if( Conjugated )
-                B.HermitianTransposeMapMatrix
+                B.AdjointMapMatrix
                 ( Conj(alpha), A._block.data.F->V, W.V );
             else
                 B.TransposeMapMatrix
@@ -259,7 +259,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             LowRank W;
             hmatrix_tools::Copy( A._block.data.F->U, W.U );
             if( Conjugated )
-                B.HermitianTransposeMapMatrix
+                B.AdjointMapMatrix
                 ( Conj(alpha), A._block.data.F->V, W.V );
             else
                 B.TransposeMapMatrix
@@ -275,7 +275,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             LowRank W;
             hmatrix_tools::Copy( A._block.data.F->U, W.U );
             if( Conjugated )
-                hmatrix_tools::MatrixHermitianTransposeMatrix
+                hmatrix_tools::MatrixAdjointMatrix
                 ( Conj(alpha), *B._block.data.D, A._block.data.F->V, W.V );
             else
                 hmatrix_tools::MatrixTransposeMatrix
@@ -354,7 +354,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::MapMatrix
             LowRank W;
             hmatrix_tools::Copy( A._block.data.F->U, W.U );
             if( Conjugated )
-                B.HermitianTransposeMapMatrix
+                B.AdjointMapMatrix
                 ( Conj(alpha), A._block.data.F->V, W.V );
             else
                 B.TransposeMapMatrix

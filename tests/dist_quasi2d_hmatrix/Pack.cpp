@@ -245,15 +245,15 @@ main( int argc, char* argv[] )
             std::cout.flush();
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double hmatHermTransMatStartTime = psp::mpi::WallTime();
+        double hmatAdjointMatStartTime = psp::mpi::WallTime();
         psp::DenseMatrix<Scalar> Z;
-        H.HermitianTransposeMapMatrix( (Scalar)1, X, Z );
+        H.AdjointMapMatrix( (Scalar)1, X, Z );
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double hmatHermTransMatStopTime = psp::mpi::WallTime();
+        double hmatAdjointMatStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " 
-                      << hmatHermTransMatStopTime-hmatHermTransMatStartTime 
+                      << hmatAdjointMatStopTime-hmatAdjointMatStartTime 
                       << " seconds." << std::endl;
         }
 
@@ -387,7 +387,7 @@ main( int argc, char* argv[] )
         if( rank == 0 )
             std::cout << "done" << std::endl;
         
-        // Apply the Hermitian-transposed distributed H-matrix
+        // Apply the adjoint of distributed H-matrix
         if( rank == 0 )
         {
             std::cout << "Distributed Z := H' X...";
@@ -396,16 +396,16 @@ main( int argc, char* argv[] )
         XLocal.LockedView
         ( X, distH.FirstLocalRow(), 0, distH.LocalHeight(), X.Width() );
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distHmatHermTransMatStartTime = psp::mpi::WallTime();
+        double distHmatAdjointMatStartTime = psp::mpi::WallTime();
         psp::DenseMatrix<Scalar> ZLocal;
-        distH.HermitianTransposeMapMatrix( (Scalar)1, XLocal, ZLocal );
+        distH.AdjointMapMatrix( (Scalar)1, XLocal, ZLocal );
         psp::mpi::Barrier( MPI_COMM_WORLD );
-        double distHmatHermTransMatStopTime = psp::mpi::WallTime();
+        double distHmatAdjointMatStopTime = psp::mpi::WallTime();
         if( rank == 0 )
         {
             std::cout << "done: " 
-                      << distHmatHermTransMatStopTime-
-                         distHmatHermTransMatStartTime
+                      << distHmatAdjointMatStopTime-
+                         distHmatAdjointMatStartTime
                       << " seconds." << std::endl;
         }
 

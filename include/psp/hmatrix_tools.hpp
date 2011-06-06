@@ -414,7 +414,7 @@ void MatrixTransposeMatrix
         LowRankMatrix<std::complex<Real>,Conjugated>& F );
 
 /*
- *  Matrix Hermitian Transpose Matrix Multiply, C := alpha A^H B
+ *  Matrix-Adjoint Matrix Multiply, C := alpha A^H B
  * 
  *  When the resulting matrix is dense, an update form is also provided, i.e.,
  *  C := alpha A^H B + beta C
@@ -424,87 +424,87 @@ void MatrixTransposeMatrix
  */
 // D := alpha D^H D
 template<typename Scalar>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D^H D + beta D
 template<typename Scalar>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha D^H F
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha D^H F + beta D
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F^H D
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F^H D + beta D
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // D := alpha F^H F
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
                 const LowRankMatrix<Scalar,Conjugated>& B,
                       DenseMatrix<Scalar>& C );
 // D := alpha F^H F + beta D
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A,
                 const LowRankMatrix<Scalar,Conjugated>& B,
   Scalar beta,        DenseMatrix<Scalar>& C );
 // F := alpha F^H F
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const LowRankMatrix<Scalar,Conjugated>& B,
                       LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D^H F
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const LowRankMatrix<Scalar,Conjugated>& B,
                       LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha F^H D
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const DenseMatrix<Scalar>& B,
                       LowRankMatrix<Scalar,Conjugated>& C );
 // F := alpha D^H D
 template<typename Real,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( int maxRank, Real alpha, 
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
         LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D^H D
 template<typename Real,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( int maxRank, std::complex<Real> alpha, 
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
         LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha D^H D + beta F
 template<typename Real,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( int maxRank, Real alpha, 
   const DenseMatrix<Real>& A,
   const DenseMatrix<Real>& B,
@@ -512,7 +512,7 @@ void MatrixHermitianTransposeMatrix
         LowRankMatrix<Real,Conjugated>& C );
 // F := alpha D^H D + beta F
 template<typename Real,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( int maxRank, std::complex<Real> alpha, 
   const DenseMatrix< std::complex<Real> >& A,
   const DenseMatrix< std::complex<Real> >& B,
@@ -520,14 +520,14 @@ void MatrixHermitianTransposeMatrix
         LowRankMatrix<std::complex<Real>,Conjugated>& C );
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( int oversampling,
   Real alpha, 
   const AbstractHMatrix<Real>& A,
   const AbstractHMatrix<Real>& B,
         LowRankMatrix<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
-void MatrixHermitianTransposeMatrix
+void MatrixAdjointMatrix
 ( int oversampling,
   std::complex<Real> alpha, 
   const AbstractHMatrix< std::complex<Real> >& A,
@@ -603,13 +603,13 @@ void MatrixTransposeVector
  */
 // y := alpha D^H x + beta y
 template<typename Scalar>
-void MatrixHermitianTransposeVector
+void MatrixAdjointVector
 ( Scalar alpha, const DenseMatrix<Scalar>& D, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
 // y := alpha F^H x + beta y
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeVector
+void MatrixAdjointVector
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y );
@@ -619,13 +619,13 @@ void MatrixHermitianTransposeVector
  */
 // y := alpha D^H x
 template<typename Scalar>
-void MatrixHermitianTransposeVector
+void MatrixAdjointVector
 ( Scalar alpha, const DenseMatrix<Scalar>& D, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
 // y := alpha F^H x
 template<typename Scalar,bool Conjugated>
-void MatrixHermitianTransposeVector
+void MatrixAdjointVector
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& F, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y );
@@ -778,12 +778,12 @@ void Transpose
  *  Hermitian-transpose a matrix: B := A^H
  */
 template<typename Scalar>
-void HermitianTranspose
+void Adjoint
 ( const DenseMatrix<Scalar>& A, 
         DenseMatrix<Scalar>& B );
 
 template<typename Scalar,bool Conjugated>
-void HermitianTranspose
+void Adjoint
 ( const LowRankMatrix<Scalar,Conjugated>& A,
         LowRankMatrix<Scalar,Conjugated>& B );
 
@@ -1303,11 +1303,11 @@ void psp::hmatrix_tools::Transpose
  */
 
 template<typename Scalar>
-void psp::hmatrix_tools::HermitianTranspose
+void psp::hmatrix_tools::Adjoint
 ( const DenseMatrix<Scalar>& A, DenseMatrix<Scalar>& B )
 {
 #ifndef RELEASE
-    PushCallStack("hmatrix_tools::HermitianTranspose (DenseMatrix)");
+    PushCallStack("hmatrix_tools::Adjoint (DenseMatrix)");
 #endif
     if( B.Symmetric() )
     {
@@ -1332,12 +1332,12 @@ void psp::hmatrix_tools::HermitianTranspose
 }
 
 template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::HermitianTranspose
+void psp::hmatrix_tools::Adjoint
 ( const LowRankMatrix<Scalar,Conjugated>& A, 
         LowRankMatrix<Scalar,Conjugated>& B )
 {
 #ifndef RELEASE
-    PushCallStack("hmatrix_tools::HermitianTranspose (LowRankMatrix)");
+    PushCallStack("hmatrix_tools::Adjoint (LowRankMatrix)");
 #endif
     if( Conjugated )
     {
@@ -1745,8 +1745,8 @@ void psp::hmatrix_tools::MatrixMatrix
     if( Conjugated )
     {
         // Compute (Q^H (alpha AB))^H = conj(alpha) B^H A^H Q into F.V
-        A.HermitianTransposeMapMatrix( Conj(alpha), Y, X );
-        B.HermitianTransposeMapMatrix( 1, X, F.V );
+        A.AdjointMapMatrix( Conj(alpha), Y, X );
+        B.AdjointMapMatrix( 1, X, F.V );
     }
     else
     {
@@ -2010,7 +2010,7 @@ void psp::hmatrix_tools::MatrixTransposeMatrix
 
 // F := alpha H^H H,
 template<typename Real,bool Conjugated>
-void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+void psp::hmatrix_tools::MatrixAdjointMatrix
 ( int oversampling, 
   Real alpha, 
   const psp::AbstractHMatrix<Real>& A,
@@ -2018,7 +2018,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         psp::LowRankMatrix<Real,Conjugated>& F )
 {
 #ifndef RELEASE
-    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := A^H A)");
+    PushCallStack("hmatrix_tools::MatrixAdjointMatrix (F := A^H A)");
 #endif
     MatrixTransposeMatrix( oversampling, alpha, A, B, F );
 #ifndef RELEASE
@@ -2028,7 +2028,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
 
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
-void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
+void psp::hmatrix_tools::MatrixAdjointMatrix
 ( int oversampling, 
   std::complex<Real> alpha, 
   const psp::AbstractHMatrix< std::complex<Real> >& A,
@@ -2036,7 +2036,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
         psp::LowRankMatrix<std::complex<Real>,Conjugated>& F )
 {
 #ifndef RELEASE
-    PushCallStack("hmatrix_tools::MatrixHermitianTransposeMatrix (F := A^H A)");
+    PushCallStack("hmatrix_tools::MatrixAdjointMatrix (F := A^H A)");
 #endif
     typedef std::complex<Real> Scalar;
 
@@ -2053,7 +2053,7 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     DenseMatrix<Scalar> X;
     B.MapMatrix( alpha, Omega, X );
     DenseMatrix<Scalar> Y;
-    A.HermitianTransposeMapMatrix( 1, X, Y );
+    A.AdjointMapMatrix( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
     const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
@@ -2087,14 +2087,14 @@ void psp::hmatrix_tools::MatrixHermitianTransposeMatrix
     {
         // Compute (Q^H (alpha A^H B))^H = conj(alpha) B^H A Q into F.V.
         A.MapMatrix( Conj(alpha), Y, X );
-        B.HermitianTransposeMapMatrix( 1, X, F.V );
+        B.AdjointMapMatrix( 1, X, F.V );
     }
     else
     {
         // Compute (Q^H (alpha A^H B))^T = alpha B^T conj(A) conj(Q)
         //                               = conj(conj(alpha) B^H A Q)
         A.MapMatrix( Conj(alpha), Y, X );
-        B.HermitianTransposeMapMatrix( 1, X, F.V );
+        B.AdjointMapMatrix( 1, X, F.V );
         Conjugate( F.V );
     }
         

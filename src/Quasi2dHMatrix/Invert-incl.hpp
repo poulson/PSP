@@ -162,7 +162,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::SchulzInvert
 
     // Initialize X_0 := alpha A^H
     Quasi2d X;
-    X.HermitianTransposeFrom( *this );
+    X.AdjointFrom( *this );
     X.Scale( alpha );
 
     for( int k=0; k<numIterations; ++k )

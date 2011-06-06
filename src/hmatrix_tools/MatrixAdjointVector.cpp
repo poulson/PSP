@@ -22,14 +22,13 @@
 
 // Dense y := alpha A^H x + beta y
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixHermitianTransposeVector
+void psp::hmatrix_tools::MatrixAdjointVector
 ( Scalar alpha, const DenseMatrix<Scalar>& A,
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
 #ifndef RELEASE
-    PushCallStack
-    ("hmatrix_tools::MatrixHermitianTransposeVector (y := D^H x + y)");
+    PushCallStack("hmatrix_tools::MatrixAdjointVector (y := D^H x + y)");
 #endif
     if( A.Symmetric() )
     {
@@ -58,13 +57,13 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
 
 // Dense y := alpha A^H x
 template<typename Scalar>
-void psp::hmatrix_tools::MatrixHermitianTransposeVector
+void psp::hmatrix_tools::MatrixAdjointVector
 ( Scalar alpha, const DenseMatrix<Scalar>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
 #ifndef RELEASE
-    PushCallStack("hmatrix_tools::MatrixHermitianTransposeVector (y := D^H x)");
+    PushCallStack("hmatrix_tools::MatrixAdjointVector (y := D^H x)");
 #endif
     y.Resize( A.Width() );
     if( A.Symmetric() )
@@ -93,14 +92,13 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
 
 // Low-rank y := alpha A^H x + beta y
 template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::MatrixHermitianTransposeVector
+void psp::hmatrix_tools::MatrixAdjointVector
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
   Scalar beta,        Vector<Scalar>& y )
 {
 #ifndef RELEASE
-    PushCallStack
-    ("hmatrix_tools::MatrixHermitianTransposeVector (y := F x + y)");
+    PushCallStack("hmatrix_tools::MatrixAdjointVector (y := F x + y)");
 #endif
     const int m = A.Height();
     const int n = A.Width();
@@ -141,13 +139,13 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
 
 // Low-rank y := alpha A^H x
 template<typename Scalar,bool Conjugated>
-void psp::hmatrix_tools::MatrixHermitianTransposeVector
+void psp::hmatrix_tools::MatrixAdjointVector
 ( Scalar alpha, const LowRankMatrix<Scalar,Conjugated>& A, 
                 const Vector<Scalar>& x,
                       Vector<Scalar>& y )
 {
 #ifndef RELEASE
-    PushCallStack("hmatrix_tools::MatrixHermitianTransposeVector (y := F x)");
+    PushCallStack("hmatrix_tools::MatrixAdjointVector (y := F x)");
 #endif
     const int m = A.Height();
     const int n = A.Width();
@@ -186,113 +184,113 @@ void psp::hmatrix_tools::MatrixHermitianTransposeVector
 #endif
 }
 
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( float alpha, const DenseMatrix<float>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( double alpha, const DenseMatrix<double>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const Vector< std::complex<float> >& x,
   std::complex<float> beta,        Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const Vector< std::complex<double> >& x,
   std::complex<double> beta,        Vector< std::complex<double> >& y );
 
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( float alpha, const DenseMatrix<float>& A,
                const Vector<float>& x,
                      Vector<float>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( double alpha, const DenseMatrix<double>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<float> alpha, const DenseMatrix< std::complex<float> >& A,
                              const Vector< std::complex<float> >& x,
                                    Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<double> alpha, const DenseMatrix< std::complex<double> >& A,
                               const Vector< std::complex<double> >& x,
                                     Vector< std::complex<double> >& y );
 
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( float alpha, const LowRankMatrix<float,false>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( float alpha, const LowRankMatrix<float,true>& A,
                const Vector<float>& x,
   float beta,        Vector<float>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( double alpha, const LowRankMatrix<double,false>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( double alpha, const LowRankMatrix<double,true>& A,
                 const Vector<double>& x,
   double beta,        Vector<double>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<float> alpha, 
   const LowRankMatrix<std::complex<float>,false>& A,
   const Vector< std::complex<float> >& x,
   std::complex<float> beta, 
         Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<float> alpha, 
   const LowRankMatrix<std::complex<float>,true>& A,
   const Vector< std::complex<float> >& x,
   std::complex<float> beta, 
         Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<double> alpha, 
   const LowRankMatrix<std::complex<double>,false>& A,
   const Vector< std::complex<double> >& x,
   std::complex<double> beta,
         Vector< std::complex<double> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<double> alpha, 
   const LowRankMatrix<std::complex<double>,true>& A,
   const Vector< std::complex<double> >& x,
   std::complex<double> beta, 
         Vector< std::complex<double> >& y );
 
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( float alpha, const LowRankMatrix<float,false>& A,
                const Vector<float>& x,
                      Vector<float>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( float alpha, const LowRankMatrix<float,true>& A,
                const Vector<float>& x,
                      Vector<float>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( double alpha, const LowRankMatrix<double,false>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( double alpha, const LowRankMatrix<double,true>& A,
                 const Vector<double>& x,
                       Vector<double>& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<float> alpha, 
   const LowRankMatrix<std::complex<float>,false>& A,
   const Vector< std::complex<float> >& x,
         Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<float> alpha, 
   const LowRankMatrix<std::complex<float>,true>& A,
   const Vector< std::complex<float> >& x,
         Vector< std::complex<float> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<double> alpha, 
   const LowRankMatrix<std::complex<double>,false>& A,
   const Vector< std::complex<double> >& x,
         Vector< std::complex<double> >& y );
-template void psp::hmatrix_tools::MatrixHermitianTransposeVector
+template void psp::hmatrix_tools::MatrixAdjointVector
 ( std::complex<double> alpha, 
   const LowRankMatrix<std::complex<double>,true>& A,
   const Vector< std::complex<double> >& x,

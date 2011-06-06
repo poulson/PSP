@@ -154,13 +154,12 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeMapMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
+psp::Quasi2dHMatrix<Scalar,Conjugated>::AdjointMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
   Scalar beta,        DenseMatrix<Scalar>& C ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D)");
+    PushCallStack("Quasi2dHMatrix::AdjointMapMatrix (D := H^H D + D)");
 #endif
     hmatrix_tools::Scale( beta, C );
     switch( _block.type )
@@ -180,7 +179,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
                 BSub.LockedView
                 ( B, sOffset, 0, node.targetSizes[s], B.Width() );
 
-                node.Child(s,t).HermitianTransposeMapMatrix
+                node.Child(s,t).AdjointMapMatrix
                 ( alpha, BSub, (Scalar)1, CSub );
             }
         }
@@ -196,11 +195,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         break;
     }
     case LOW_RANK:
-        hmatrix_tools::MatrixHermitianTransposeMatrix
+        hmatrix_tools::MatrixAdjointMatrix
         ( alpha, *_block.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
-        hmatrix_tools::MatrixHermitianTransposeMatrix
+        hmatrix_tools::MatrixAdjointMatrix
         ( alpha, *_block.data.D, B, (Scalar)1, C );
         break;
     }
@@ -212,13 +211,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 // This version allows for temporary in-place conjugation of B
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
+psp::Quasi2dHMatrix<Scalar,Conjugated>::AdjointMapMatrix
 ( Scalar alpha, DenseMatrix<Scalar>& B,
   Scalar beta,  DenseMatrix<Scalar>& C ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D + D, non-const)");
+    ("Quasi2dHMatrix::AdjointMapMatrix (D := H^H D + D, non-const)");
 #endif
     hmatrix_tools::Scale( beta, C );
     switch( _block.type )
@@ -238,7 +237,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
                 BSub.LockedView
                 ( B, sOffset, 0, node.targetSizes[s], B.Width() );
 
-                node.Child(s,t).HermitianTransposeMapMatrix
+                node.Child(s,t).AdjointMapMatrix
                 ( alpha, BSub, (Scalar)1, CSub );
             }
         }
@@ -252,11 +251,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
         hmatrix_tools::Conjugate( C );
         break;
     case LOW_RANK:
-        hmatrix_tools::MatrixHermitianTransposeMatrix
+        hmatrix_tools::MatrixAdjointMatrix
         ( alpha, *_block.data.F, B, (Scalar)1, C );
         break;
     case DENSE:
-        hmatrix_tools::MatrixHermitianTransposeMatrix
+        hmatrix_tools::MatrixAdjointMatrix
         ( alpha, *_block.data.D, B, (Scalar)1, C );
         break;
     }
@@ -267,16 +266,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
+psp::Quasi2dHMatrix<Scalar,Conjugated>::AdjointMapMatrix
 ( Scalar alpha, const DenseMatrix<Scalar>& B,
                       DenseMatrix<Scalar>& C ) const
 {
 #ifndef RELEASE
-    PushCallStack("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D)");
+    PushCallStack("Quasi2dHMatrix::AdjointMapMatrix (D := H^H D)");
 #endif
     C.SetType( GENERAL );
     C.Resize( Width(), B.Width() );
-    HermitianTransposeMapMatrix( alpha, B, 0, C );
+    AdjointMapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -285,17 +284,16 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
 // This version allows for temporary in-place conjugation of B
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapMatrix
+psp::Quasi2dHMatrix<Scalar,Conjugated>::AdjointMapMatrix
 ( Scalar alpha, DenseMatrix<Scalar>& B,
                 DenseMatrix<Scalar>& C ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("Quasi2dHMatrix::HermitianTransposeMapMatrix (D := H^H D, non-const)");
+    PushCallStack("Quasi2dHMatrix::AdjointMapMatrix (D := H^H D, non-const)");
 #endif
     C.SetType( GENERAL );
     C.Resize( Width(), B.Width() );
-    HermitianTransposeMapMatrix( alpha, B, 0, C );
+    AdjointMapMatrix( alpha, B, 0, C );
 #ifndef RELEASE
     PopCallStack();
 #endif

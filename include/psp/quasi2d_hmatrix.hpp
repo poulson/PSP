@@ -278,21 +278,21 @@ public:
     ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
 
     // y := alpha A^H x + beta y
-    virtual void HermitianTransposeMapVector
+    virtual void AdjointMapVector
     ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) 
     const;
 
     // y := alpha A^H x + beta y (temporarily conjugate x in-place)
-    void HermitianTransposeMapVector
+    void AdjointMapVector
     ( Scalar alpha, Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) 
     const;
 
     // y := alpha A^H x
-    virtual void HermitianTransposeMapVector
+    virtual void AdjointMapVector
     ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
 
     // y := alpha A^H x (temporarily conjugate x in-place)
-    void HermitianTransposeMapVector
+    void AdjointMapVector
     ( Scalar alpha, Vector<Scalar>& x, Vector<Scalar>& y ) const;
 
     // C := alpha A B + beta C
@@ -316,22 +316,22 @@ public:
     const;
     
     // C := alpha A^H B + beta C
-    virtual void HermitianTransposeMapMatrix
+    virtual void AdjointMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, 
       Scalar beta, DenseMatrix<Scalar>& C ) const;
 
     // C := alpha A^H B + beta C (temporarily conjugate B in place)
-    void HermitianTransposeMapMatrix
+    void AdjointMapMatrix
     ( Scalar alpha, DenseMatrix<Scalar>& B, 
       Scalar beta,  DenseMatrix<Scalar>& C ) const;
 
     // C := alpha A^H B
-    virtual void HermitianTransposeMapMatrix
+    virtual void AdjointMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
     
     // C := alpha A^H B (temporarily conjugate B in place)
-    void HermitianTransposeMapMatrix
+    void AdjointMapMatrix
     ( Scalar alpha, DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
     
@@ -352,7 +352,7 @@ public:
     void TransposeFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
 
     // A := B^H
-    void HermitianTransposeFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
+    void AdjointFrom( const Quasi2dHMatrix<Scalar,Conjugated>& B );
 
     // A := alpha A
     void Scale( Scalar alpha );

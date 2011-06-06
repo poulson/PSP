@@ -547,11 +547,11 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::TransposeFrom
 // A := B^H
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
+psp::Quasi2dHMatrix<Scalar,Conjugated>::AdjointFrom
 ( const Quasi2dHMatrix<Scalar,Conjugated>& B )
 {
 #ifndef RELEASE
-    PushCallStack("Quasi2dHMatrix::HermitianTransposeFrom");
+    PushCallStack("Quasi2dHMatrix::AdjointFrom");
 #endif
     Quasi2d& A = *this;
 
@@ -585,7 +585,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
             for( int s=0; s<4; ++s )
             {
                 nodeA.children[s+4*t] = new Quasi2d;
-                nodeA.Child(t,s).HermitianTransposeFrom( nodeB.Child(s,t) );
+                nodeA.Child(t,s).AdjointFrom( nodeB.Child(s,t) );
             }
         }
         break;
@@ -605,13 +605,13 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeFrom
     case LOW_RANK:
     {
         A._block.data.F = new LowRank;
-        hmatrix_tools::HermitianTranspose( *B._block.data.F, *A._block.data.F );
+        hmatrix_tools::Adjoint( *B._block.data.F, *A._block.data.F );
         break;
     }
     case DENSE:
     {
         A._block.data.D = new Dense;
-        hmatrix_tools::HermitianTranspose( *B._block.data.D, *A._block.data.D );
+        hmatrix_tools::Adjoint( *B._block.data.D, *A._block.data.D );
         break;
     }
     }

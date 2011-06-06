@@ -66,12 +66,12 @@ public:
     ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const = 0;
 
     // y := alpha A^H x + beta y
-    virtual void HermitianTransposeMapVector
+    virtual void AdjointMapVector
     ( Scalar alpha, const Vector<Scalar>& x, Scalar beta, Vector<Scalar>& y ) 
     const = 0;
 
     // y := alpha A^H x
-    virtual void HermitianTransposeMapVector
+    virtual void AdjointMapVector
     ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const = 0;
 
     // C := alpha A B + beta C
@@ -95,12 +95,12 @@ public:
     const = 0;
     
     // C := alpha A^H B + beta C
-    virtual void HermitianTransposeMapMatrix
+    virtual void AdjointMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, 
       Scalar beta, DenseMatrix<Scalar>& C ) const = 0;
 
     // C := alpha A^H B
-    virtual void HermitianTransposeMapMatrix
+    virtual void AdjointMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const = 0;
 };

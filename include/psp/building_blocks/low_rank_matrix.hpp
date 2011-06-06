@@ -25,7 +25,7 @@
 
 namespace psp {
 
-// NOTE: We have two different factorized forms since Hermitian-transposes are
+// NOTE: We have two different factorized forms since adjoints are
 //       more natural, but plain transposes will almost certainly be faster for
 //       complex symmetric problems.
 

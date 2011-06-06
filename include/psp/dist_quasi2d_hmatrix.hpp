@@ -181,32 +181,32 @@ public:
       Scalar beta,        DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
     // y := alpha H' x
-    void HermitianTransposeMapVector
+    void AdjointMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
     // y := alpha H' x + beta y
-    void HermitianTransposeMapVector
+    void AdjointMapVector
     ( Scalar alpha, const Vector<Scalar>& xLocal,
       Scalar beta,        Vector<Scalar>& yLocal ) const;
 
     // Y := alpha H' X
-    void HermitianTransposeMapMatrix
+    void AdjointMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
 
     // Y := alpha H' X + beta Y
-    void HermitianTransposeMapMatrix
+    void AdjointMapMatrix
     ( Scalar alpha, const DenseMatrix<Scalar>& XLocal,
       Scalar beta,        DenseMatrix<Scalar>& YLocal ) const;
 
     // C := alpha A' B
-    void HermitianTransposeMapMatrix
+    void AdjointMapMatrix
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
     // C := alpha A' B + beta C
-    void HermitianTransposeMapMatrix
+    void AdjointMapMatrix
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
       Scalar beta,        DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
 
@@ -651,48 +651,48 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
 
-    void HermitianTransposeMapVectorInitialize
+    void AdjointMapVectorInitialize
     ( MapVectorContext& context ) const;
-    void HermitianTransposeMapVectorPrecompute
+    void AdjointMapVectorPrecompute
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void HermitianTransposeMapVectorSummations
+    void AdjointMapVectorSummations
     ( MapVectorContext& context ) const;
-    void HermitianTransposeMapVectorNaiveSummations
+    void AdjointMapVectorNaiveSummations
     ( MapVectorContext& context ) const;
-    void HermitianTransposeMapVectorPassData
+    void AdjointMapVectorPassData
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void HermitianTransposeMapVectorBroadcasts
+    void AdjointMapVectorBroadcasts
     ( MapVectorContext& context ) const;
-    void HermitianTransposeMapVectorNaiveBroadcasts
+    void AdjointMapVectorNaiveBroadcasts
     ( MapVectorContext& context ) const;
-    void HermitianTransposeMapVectorPostcompute
+    void AdjointMapVectorPostcompute
     ( MapVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
-    void HermitianTransposeMapDenseMatrixInitialize
+    void AdjointMapDenseMatrixInitialize
     ( MapDenseMatrixContext& context ) const;
-    void HermitianTransposeMapDenseMatrixPrecompute
+    void AdjointMapDenseMatrixPrecompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void HermitianTransposeMapDenseMatrixSummations
+    void AdjointMapDenseMatrixSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapDenseMatrixNaiveSummations
+    void AdjointMapDenseMatrixNaiveSummations
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapDenseMatrixPassData
+    void AdjointMapDenseMatrixPassData
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;
-    void HermitianTransposeMapDenseMatrixBroadcasts
+    void AdjointMapDenseMatrixBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapDenseMatrixNaiveBroadcasts
+    void AdjointMapDenseMatrixNaiveBroadcasts
     ( MapDenseMatrixContext& context, int width ) const;
-    void HermitianTransposeMapDenseMatrixPostcompute
+    void AdjointMapDenseMatrixPostcompute
     ( MapDenseMatrixContext& context,
       Scalar alpha, const DenseMatrix<Scalar>& XLocal,
                           DenseMatrix<Scalar>& YLocal ) const;

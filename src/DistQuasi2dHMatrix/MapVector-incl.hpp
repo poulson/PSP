@@ -52,14 +52,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVector");
 #endif
     yLocal.Resize( LocalWidth() );
-    HermitianTransposeMapVector( alpha, xLocal, (Scalar)0, yLocal );
+    AdjointMapVector( alpha, xLocal, (Scalar)0, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -127,29 +127,29 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVector
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::HermitianTransposeMapVector
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVector
 ( Scalar alpha, const Vector<Scalar>& xLocal, 
   Scalar beta,        Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVector");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVector");
 #endif
     RequireRoot();
     hmatrix_tools::Scale( beta, yLocal );
 
     MapVectorContext context;
-    HermitianTransposeMapVectorInitialize( context );
-    HermitianTransposeMapVectorPrecompute( context, alpha, xLocal, yLocal );
+    AdjointMapVectorInitialize( context );
+    AdjointMapVectorPrecompute( context, alpha, xLocal, yLocal );
 
-    HermitianTransposeMapVectorSummations( context );
-    //HermitianTransposeMapVectorNaiveSummations( context );
+    AdjointMapVectorSummations( context );
+    //AdjointMapVectorNaiveSummations( context );
 
-    HermitianTransposeMapVectorPassData( context, alpha, xLocal, yLocal );
+    AdjointMapVectorPassData( context, alpha, xLocal, yLocal );
 
-    HermitianTransposeMapVectorBroadcasts( context );
-    //HermitianTransposeMapVectorNaiveBroadcasts( context );
+    AdjointMapVectorBroadcasts( context );
+    //AdjointMapVectorNaiveBroadcasts( context );
 
-    HermitianTransposeMapVectorPostcompute( context, alpha, xLocal, yLocal );
+    AdjointMapVectorPostcompute( context, alpha, xLocal, yLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -237,12 +237,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorInitialize
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorInitialize
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorInitialize
 ( MapVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorInitialize");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorInitialize");
 #endif
     // The non-transposed initialization is identical
     MapVectorInitialize( context );
@@ -317,7 +316,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapVectorPrecompute
             Vector<Scalar> xLocalSub;
             xLocalSub.LockedView( xLocal, _localSourceOffset, SF.D.Height() );
             if( Conjugated )
-                hmatrix_tools::MatrixHermitianTransposeVector
+                hmatrix_tools::MatrixAdjointVector
                 ( alpha, SF.D, xLocalSub, z );
             else
                 hmatrix_tools::MatrixTransposeVector
@@ -478,13 +477,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorPrecompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorPrecompute
 ( MapVectorContext& context,
   Scalar alpha, const Vector<Scalar>& xLocal, Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPrecompute");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorPrecompute");
 #endif
     switch( _block.type )
     {
@@ -495,7 +493,7 @@ HermitianTransposeMapVectorPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapVectorPrecompute
+                node.Child(t,s).AdjointMapVectorPrecompute
                 ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         break;
     }
@@ -506,7 +504,7 @@ HermitianTransposeMapVectorPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapVectorPrecompute
+                node.Child(t,s).AdjointMapVectorPrecompute
                 ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         break;
     }
@@ -515,7 +513,7 @@ HermitianTransposeMapVectorPrecompute
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapVectorPrecompute
+                node.Child(t,s).AdjointMapVectorPrecompute
                 ( context, alpha, xLocal, yLocal );
         break;
     }
@@ -542,7 +540,7 @@ HermitianTransposeMapVectorPrecompute
             Vector<Scalar> xLocalSub;
             xLocalSub.LockedView
             ( xLocal, _localTargetOffset, SF.D.Height() );
-            hmatrix_tools::MatrixHermitianTransposeVector
+            hmatrix_tools::MatrixAdjointVector
             ( alpha, SF.D, xLocalSub, z );
         }
         break;
@@ -557,7 +555,7 @@ HermitianTransposeMapVectorPrecompute
         Vector<Scalar> xLocalSub, yLocalSub;
         xLocalSub.LockedView( xLocal, _localTargetOffset, F.Height() );
         yLocalSub.View( yLocal, _localSourceOffset, F.Width() );
-        hmatrix_tools::MatrixHermitianTransposeVector
+        hmatrix_tools::MatrixAdjointVector
         ( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
@@ -571,7 +569,7 @@ HermitianTransposeMapVectorPrecompute
         Vector<Scalar> xLocalSub, yLocalSub;
         xLocalSub.LockedView( xLocal, _localTargetOffset, D.Height() );
         yLocalSub.View( yLocal, _localSourceOffset, D.Width() );
-        hmatrix_tools::MatrixHermitianTransposeVector
+        hmatrix_tools::MatrixAdjointVector
         ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
         break;
     }
@@ -694,12 +692,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorSummations
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorSummations
 ( MapVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorSummations");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorSummations");
 #endif
     // This unconjugated version is identical
     TransposeMapVectorSummations( context );
@@ -1052,13 +1049,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorNaiveSummations
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorNaiveSummations
 ( MapVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaiveSummations");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorNaiveSummations");
 #endif
     // The unconjugated version should be identical
     TransposeMapVectorNaiveSummations( context );
@@ -1816,15 +1811,13 @@ TransposeMapVectorPassDataSplitNodeUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorPassData
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorPassData
 ( MapVectorContext& context,
   Scalar alpha, const Vector<Scalar>& xLocal,
                       Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapVectorPassData");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorPassData");
 #endif
     // The unconjugated version should be identical
     TransposeMapVectorPassData( context, alpha, xLocal, yLocal );
@@ -1931,12 +1924,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorBroadcasts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorBroadcasts
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorBroadcasts
 ( MapVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorBroadcasts");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorBroadcasts");
 #endif
     // The unconjugated version should be identical
     TransposeMapVectorBroadcasts( context );
@@ -2273,13 +2265,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorNaiveBroadcasts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorNaiveBroadcasts
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorNaiveBroadcasts
 ( MapVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMatrix::HermitianTransposeMapVectorNaiveBroadcasts");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorNaiveBroadcasts");
 #endif
     // The unconjugated version should be identical
     TransposeMapVectorNaiveBroadcasts( context );
@@ -2477,14 +2467,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapVectorPostcompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::
-HermitianTransposeMapVectorPostcompute
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::AdjointMapVectorPostcompute
 ( MapVectorContext& context,
   Scalar alpha, const Vector<Scalar>& xLocal,
                       Vector<Scalar>& yLocal ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::HermitianTransposeMapVectorPostcompute");
+    PushCallStack("DistQuasi2dHMatrix::AdjointMapVectorPostcompute");
 #endif
     switch( _block.type )
     {
@@ -2495,7 +2484,7 @@ HermitianTransposeMapVectorPostcompute
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).HermitianTransposeMapVectorPostcompute
+                node.Child(t,s).AdjointMapVectorPostcompute
                 ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         break;
     }
@@ -2507,7 +2496,7 @@ HermitianTransposeMapVectorPostcompute
                 *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).HermitianTransposeMapVectorPostcompute
+                    node.Child(t,s).AdjointMapVectorPostcompute
                     ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         }
         break;
@@ -2570,7 +2559,7 @@ HermitianTransposeMapVectorPostcompute
             const Vector<Scalar>& z = *context.block.data.z;
             Vector<Scalar> yLocalSub;
             yLocalSub.View( yLocal, _localSourceOffset, SD.D.Width() );
-            hmatrix_tools::MatrixHermitianTransposeVector
+            hmatrix_tools::MatrixAdjointVector
             ( alpha, SD.D, z, (Scalar)1, yLocalSub );
         }
         break;
