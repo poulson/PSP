@@ -880,8 +880,113 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         case SPLIT_LOW_RANK_GHOST:
+        {
+            // We are the left process
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
+            if( admissibleC )
+            {
+                // Start F += H F
+                const int key = A._sourceOffset;
+                typename MapHMatrixContext::SplitLowRankContext& SFContext =
+                    *context.block.data.SF;
+                SFContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *SFContext.denseContextMap[key];
+
+                A.MapDenseMatrixInitialize( denseContext );
+                break;
+            }
+            else
+            {
+                // Start H += H F
+                const int key = A._sourceOffset;
+                typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                    *context.block.data.SN;
+                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *nodeContext.denseContextMap[key];
+
+                A.MapDenseMatrixInitialize( denseContext );
+            }
+            break;
+        }
         case LOW_RANK:
+        {
+            // We are the middle and right processes
+            const LowRank& FB = *B._block.data.F;
+            if( admissibleC )
+            {
+                // Start F += H F
+                // A: SPLIT_NODE     (we own the right side)
+                // B: LOW_RANK
+                // C: SPLIT_LOW_RANK (we own the right side)
+                const int key = A._sourceOffset;
+                typename MapHMatrixContext::SplitLowRankContext& SFContext =
+                    *context.block.data.SF;
+                SFContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *SFContext.denseContextMap[key];
+
+                Dense dummy;
+                A.MapDenseMatrixInitialize( denseContext );
+                A.MapDenseMatrixPrecompute( denseContext, alpha, FB.U, dummy );
+            }
+            else
+            {
+                // Start H += H F
+                // A: SPLIT_NODE (we own the right side)
+                // B: LOW_RANK   
+                // C: SPLIT_NODE (we own the right side)
+                const int key = A._sourceOffset;
+                typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                    *context.block.data.SN;
+                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *nodeContext.denseContextMap[key];
+
+                Dense dummy;
+                A.MapDenseMatrixInitialize( denseContext );
+                A.MapDenseMatrixPrecompute( denseContext, alpha, FB.U, dummy );
+            }
+            break;
+        }
         case LOW_RANK_GHOST:
+        {
+            // We are the left process
+            const LowRankGhost& FGB = *B._block.data.FG;
+            if( admissibleC )
+            {
+                // Start F += H F
+                // A: SPLIT_NODE     (we own the left side)
+                // B: LOW_RANK_GHOST
+                // C: SPLIT_LOW_RANK (we own the left side)
+                const int key = A._sourceOffset;
+                typename MapHMatrixContext::SplitLowRankContext& SFContext =
+                    *context.block.data.SF;
+                SFContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *SFContext.denseContextMap[key];
+
+                Dense dummy;
+                A.MapDenseMatrixInitialize( denseContext );
+            }
+            else
+            {
+                // Start H += H F
+                // A: SPLIT_NODE     (we own the left side)
+                // B: LOW_RANK_GHOST   
+                // C: SPLIT_NODE     (we own the left side)
+                const int key = A._sourceOffset;
+                typename MapHMatrixContext::SplitNodeContext& nodeContext =
+                    *context.block.data.SN;
+                nodeContext.denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = 
+                    *nodeContext.denseContextMap[key];
+
+                A.MapDenseMatrixInitialize( denseContext );
+            }
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -891,6 +996,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         break;
     }
     case SPLIT_NODE_GHOST:
+    {
+        // HERE
+        const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case SPLIT_NODE:
@@ -903,6 +1011,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case NODE:
         switch( B._block.type )
         {
