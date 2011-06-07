@@ -168,8 +168,7 @@ void MatrixUpdateRounded
   std::complex<Real> alpha, 
   const LowRankMatrix<std::complex<Real>,Conjugated>& A,
   std::complex<Real> beta, 
-        LowRankMatrix<std::complex<Real>,Conjugated>& B
-);
+        LowRankMatrix<std::complex<Real>,Conjugated>& B );
 
 /*
  *  Matrix Matrix multiply, C := alpha A B

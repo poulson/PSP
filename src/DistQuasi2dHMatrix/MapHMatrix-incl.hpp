@@ -853,14 +853,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 const DistLowRank& DFB = *B._block.data.DF;
                 C._ZMap[key] = new Dense( DFA.rank, DFB.rank );
-                Dense& Z = *C._ZMap[key];
+                Dense& ZC = *C._ZMap[key];
 
                 const char option = ( Conjugated ? 'C' : 'T' );
                 blas::Gemm
                 ( option, 'N', DFA.rank, DFB.rank, A.LocalWidth(),
                   (Scalar)1, DFA.VLocal.LockedBuffer(), DFA.VLocal.LDim(),
                              DFB.ULocal.LockedBuffer(), DFB.ULocal.LDim(),
-                  (Scalar)0, Z.Buffer(),                Z.LDim() );
+                  (Scalar)0, ZC.Buffer(),               ZC.LDim() );
             }
             break;
         }
@@ -977,13 +977,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             {
                 const SplitLowRank& SFB = *B._block.data.SF;
                 C._ZMap[key] = new Dense( SFA.rank, SFB.rank );
-                Dense& CZ = *C._ZMap[key];
+                Dense& ZC = *C._ZMap[key];
                 const char option = ( Conjugated ? 'C' : 'T' );
                 blas::Gemm
                 ( option, 'N', SFA.rank, SFB.rank, A.Width(),
                   (Scalar)1, SFA.D.LockedBuffer(), SFA.D.LDim(),
                              SFB.D.LockedBuffer(), SFB.D.LDim(),
-                  (Scalar)0, CZ.Buffer(),          CZ.LDim() );
+                  (Scalar)0, ZC.Buffer(),          ZC.LDim() );
             }
             break;
         }
@@ -992,13 +992,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // We must be the middle and right process
             const LowRank& FB = *B._block.data.F;
             C._ZMap[key] = new Dense( SFA.rank, FB.Rank() );
-            Dense& CZ = *C._ZMap[key];
+            Dense& ZC = *C._ZMap[key];
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
             ( option, 'N', SFA.rank, FB.Rank(), A.Width(),
               (Scalar)1, SFA.D.LockedBuffer(), SFA.D.LDim(),
                          FB.U.LockedBuffer(),  FB.U.LDim(),
-              (Scalar)0, CZ.Buffer(),          CZ.LDim() );
+              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
             break;
         }
         case DENSE:
@@ -1118,14 +1118,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // We must be the left and middle process
             const SplitLowRank& SFB = *B._block.data.SF;
             C._ZMap[key] = new Dense( FA.Rank(), SFB.rank );
-            Dense& DC = *C._ZMap[key];
+            Dense& ZC = *C._ZMap[key];
 
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
             ( option, 'N', FA.Rank(), SFB.rank, B.Height(),
               (Scalar)1, FA.V.LockedBuffer(),  FA.V.LDim(),
                          SFB.D.LockedBuffer(), SFB.D.LDim(),
-              (Scalar)0, DC.Buffer(),          DC.LDim() );
+              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
             break;
         }
         case LOW_RANK:
@@ -1133,14 +1133,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // We must own all of A, B, and C
             const LowRank& FB = *B._block.data.F;
             C._ZMap[key] = new Dense( FA.Rank(), FB.Rank() );
-            Dense& DC = *C._ZMap[key];
+            Dense& ZC = *C._ZMap[key];
 
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
             ( option, 'N', FA.Rank(), FB.Rank(), B.Height(),
               (Scalar)1, FA.V.LockedBuffer(), FA.V.LDim(),
                          FB.U.LockedBuffer(), FB.U.LDim(),
-              (Scalar)0, DC.Buffer(),         DC.LDim() );
+              (Scalar)0, ZC.Buffer(),         ZC.LDim() );
             break;
         }
         case SPLIT_DENSE:
@@ -1204,22 +1204,56 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     }
     case SPLIT_DENSE:
     {
+        const SplitDense& SDA = *A._block.data.SD;
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
         {
             // We are either the middle process or both the left and right
-            // HERE
+            if( A._inSourceTeam )
+            {
+                const SplitLowRank& SFB = *B._block.data.SF;
+                C._ZMap[key] = new Dense( A.Height(), SFB.rank );
+                Dense& ZC = *C._ZMap[key];
+
+                blas::Gemm
+                ( 'N', 'N', A.Height(), SFB.rank, A.Width(),
+                  alpha,     SDA.D.LockedBuffer(), SDA.D.LDim(),
+                             SFB.D.LockedBuffer(), SFB.D.LDim(),
+                  (Scalar)0, ZC.Buffer(),          ZC.LDim() );
+            }
             break;
         }
         case LOW_RANK:
         {
-            // TODO
+            const LowRank& FB = *B._block.data.F;
+            C._ZMap[key] = new Dense( A.Height(), FB.Rank() );
+            Dense& ZC = *C._ZMap[key];
+
+            blas::Gemm
+            ( 'N', 'N', A.Height(), FB.Rank(), A.Width(),
+              alpha,     SDA.D.LockedBuffer(), SDA.D.LDim(),
+                         FB.U.LockedBuffer(),  FB.U.LDim(),
+              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
             break;
         }
         case DENSE:
         {
-            // TODO
+            const Dense& DB = *B._block.data.D;
+            if( admissibleC )
+            {
+                // F += D D
+                C._DMap[key] = new Dense( A.Height(), B.Width() );
+                hmatrix_tools::MatrixMatrix
+                ( alpha, SDA.D, DB, (Scalar)0, *C._DMap[key] );
+            }
+            else
+            {
+                // D += D D
+                SplitDense& SDC = *C._block.data.SD;
+                hmatrix_tools::MatrixMatrix
+                ( alpha, SDA.D, DB, (Scalar)1, SDC.D );
+            }
             break;
         }
 
@@ -1244,26 +1278,62 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         break;
     case DENSE:
     {
+        const Dense& DA = *A._block.data.D;
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
         {
-            // TODO
+            // We are the left and middle process
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._ZMap[key] = new Dense( A.Height(), SFB.rank );
+            Dense& ZC = *C._ZMap[key];
+
+            blas::Gemm
+            ( 'N', 'N', A.Height(), SFB.rank, A.Width(),
+              alpha,     DA.LockedBuffer(),    DA.LDim(),
+                         SFB.D.LockedBuffer(), SFB.D.LDim(),
+              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
             break;
         }
         case LOW_RANK:
         {
-            // TODO
+            const LowRank& FB = *B._block.data.F;
+            if( admissibleC )
+            {
+                LowRank& FC = *C._block.data.F;
+                LowRank update;
+                hmatrix_tools::MatrixMatrix( alpha, DA, FB, update );
+                hmatrix_tools::MatrixUpdateRounded
+                ( C.MaxRank(), (Scalar)1, update, (Scalar)1, FC );
+            }
+            else
+            {
+                Dense& DC = *C._block.data.D;
+                hmatrix_tools::MatrixMatrix( alpha, DA, FB, (Scalar)1, DC );
+            }
             break;
         }
         case SPLIT_DENSE:
         {
-            // TODO
+            // There is nothing to do
             break;
         }
         case DENSE:
         {
-            // TODO
+            const Dense& DB = *B._block.data.D;
+            if( admissibleC )
+            {
+                // F += D D
+                C._DMap[key] = new Dense( A.Height(), B.Width() );
+                hmatrix_tools::MatrixMatrix
+                ( alpha, DA, DB, (Scalar)0, *C._DMap[key] );
+            }
+            else
+            {
+                // D += D D
+                Dense& DC = *C._block.data.D;
+                hmatrix_tools::MatrixMatrix( alpha, DA, DB, (Scalar)1, DC );
+            }
             break;
         }
         default:
