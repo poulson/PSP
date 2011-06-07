@@ -225,12 +225,14 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
     }
     else // C is dense
     {
+        // Delay the allocation of C's dense blocks at least until after the
+        // major communication buffers have been freed
         if( C._sourceRoot == C._targetRoot )
         {
             if( C._inSourceTeam || C._inTargetTeam )
             {
                 C._block.type = DENSE;
-                C._block.data.D = new Dense( C.Height(), C.Width() );
+                C._block.data.D = new Dense;
             }
             else
             {
@@ -245,8 +247,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
                 C._block.type = SPLIT_DENSE;
                 C._block.data.SD = new SplitDense;
                 SplitDense& SD = *C._block.data.SD;
-                if( C._inSourceTeam )
-                    SD.D.Resize( C.Height(), C.Width() );
             }
             else
             {
@@ -385,7 +385,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // Start H/F += H F
             const DistLowRank& DFB = *B._block.data.DF;
             C._UMap[key] = new Dense( C.LocalHeight(), DFB.rank );
-            C._VMap[key] = new Dense( C.LocalWidth(), DFB.rank );
             C._denseContextMap[key] = new MapDenseMatrixContext;
             MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
@@ -400,11 +399,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // Start H/F += H F
             // We must be in the left team
             const DistLowRankGhost& DFGB = *B._block.data.DFG;
-            C._UMap[key] = new Dense( C.LocalHeight(), DFGB.rank );
             C._denseContextMap[key] = new MapDenseMatrixContext;
             MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
-            hmatrix_tools::Scale( (Scalar)0, *C._UMap[key] );
             A.MapDenseMatrixInitialize( denseContext );
             break;
         }
@@ -444,8 +441,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         {
             // Start H/F += H F
             // We must be in the right team
-            const DistLowRank& DFB = *B._block.data.DF;
-            C._VMap[key] = new Dense( C.LocalWidth(), DFB.rank );
             break;
         }
         default:
@@ -572,14 +567,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 if( C._inTargetTeam )
                 {
                     // Our process owns the left and right sides
-                    C._UMap[key] = new Dense( C.Height(), SFB.rank );
-                    C._VMap[key] = new Dense( C.Width(), SFB.rank );
                     C._denseContextMap[key] = new MapDenseMatrixContext;
                     MapDenseMatrixContext& denseContext = 
                         *C._denseContextMap[key];
 
-                    hmatrix_tools::Scale( (Scalar)0, *C._UMap[key] );
-                    hmatrix_tools::Scale( (Scalar)0, *C._VMap[key] );
                     A.MapDenseMatrixInitialize( denseContext );
                 }
                 else
@@ -601,14 +592,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 if( C._inTargetTeam )
                 {
                     // Our process owns the left and right sides
-                    C._UMap[key] = new Dense( C.Height(), SFB.rank );
-                    C._VMap[key] = new Dense( C.Width(), SFB.rank );
                     C._denseContextMap[key] = new MapDenseMatrixContext;
                     MapDenseMatrixContext& denseContext = 
                         *C._denseContextMap[key];
 
-                    hmatrix_tools::Scale( (Scalar)0, *C._UMap[key] );
-                    hmatrix_tools::Scale( (Scalar)0, *C._VMap[key] );
                     A.MapDenseMatrixInitialize( denseContext );
                 }
                 else
@@ -693,8 +680,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         {
             // Start F/H += H F
             // We must be the right process
-            const SplitLowRank& SFB = *B._block.data.SF;
-            C._VMap[key] = new Dense( C.Width(), SFB.rank );
             break;
         }
         default:
@@ -790,7 +775,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             // We own all of A, B, and C
             const LowRank& FB = *B._block.data.F;
             C._UMap[key] = new Dense( C.Height(), FB.Rank() );
-            C._VMap[key] = new Dense( C.Width(), FB.Rank() );
             C._denseContextMap[key] = new MapDenseMatrixContext;
             MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
@@ -834,7 +818,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         }
         case SPLIT_LOW_RANK:
         { 
-            // HERE
+            // Start H/F += H F
+            // We are the right process
             break;
         }
         default:
@@ -846,13 +831,48 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         break;
     }
     case DIST_LOW_RANK:
+    {
+        const DistLowRank& DFA = *A._block.data.DF;
         switch( B._block.type )
         {
         case DIST_NODE:
-        case DIST_NODE_GHOST:
-        case DIST_LOW_RANK:
-        case DIST_LOW_RANK_GHOST:
+        {
+            // Start H/F += F H
+            C._VMap[key] = new Dense( C.LocalWidth(), DFA.rank );
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
+            hmatrix_tools::Scale( (Scalar)0, *C._VMap[key] );
+            if( Conjugated )
+            {
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+                B.AdjointMapDenseMatrixPrecompute
+                ( denseContext, Conj(alpha), DFA.VLocal, *C._VMap[key] );
+            }
+            else
+            {
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+                B.TransposeMapDenseMatrixPrecompute
+                ( denseContext, alpha, DFA.VLocal, *C._VMap[key] );
+            }
+            break;
+        }
+        case DIST_NODE_GHOST:
+        {
+            // Start H/F += F H
+            // We must be in the left team
+            break;
+        }
+        case DIST_LOW_RANK:
+        {
+            // HERE
+            break;
+        }
+        case DIST_LOW_RANK_GHOST:
+        {
+            // TODO
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -860,6 +880,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case DIST_LOW_RANK_GHOST:
         switch( B._block.type )
         {
@@ -1005,6 +1026,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
 #ifndef RELEASE
         throw std::logic_error("A should not be empty");
 #endif
+        break;
     }
 #ifndef RELEASE
     PopCallStack();
