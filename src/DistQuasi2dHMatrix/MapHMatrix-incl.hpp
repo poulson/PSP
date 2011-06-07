@@ -516,9 +516,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._T2.Resize( A.Width(), paddedRank );
-
-                    hmatrix_tools::Scale( (Scalar)0, A._T2 );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
                     A._beganRowSpaceComp = true;
                 }
@@ -679,7 +676,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         case SPLIT_LOW_RANK:
         {
             // Start F/H += H F
-            // We must be the right process
+            // We are the right process, so there is nothing to do
             break;
         }
         default:
@@ -714,9 +711,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 }
                 if( !B._beganColSpaceComp )
                 {
-                    B._T1.Resize( B.Height(), paddedRank );
-
-                    hmatrix_tools::Scale( (Scalar)0, B._T1 );
                     B.MapDenseMatrixInitialize( B._T1Context );
                     B._beganColSpaceComp = true;
                 }
@@ -819,7 +813,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         case SPLIT_LOW_RANK:
         { 
             // Start H/F += H F
-            // We are the right process
+            // We are the right process, so there is nothing to do
             break;
         }
         default:
@@ -860,17 +854,31 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         case DIST_NODE_GHOST:
         {
             // Start H/F += F H
-            // We must be in the left team
+            // We're in the left team, so there is nothing to do
             break;
         }
         case DIST_LOW_RANK:
         {
-            // HERE
+            // Start H/F += F F
+            if( A._inSourceTeam )
+            {
+                const DistLowRank& DFB = *B._block.data.DF;
+                C._ZMap[key] = new Dense( DFA.rank, DFB.rank );
+                Dense& Z = *C._ZMap[key];
+
+                const char option = ( Conjugated ? 'C' : 'T' );
+                blas::Gemm
+                ( option, 'N', DFA.rank, DFB.rank, A.LocalWidth(),
+                  (Scalar)1, DFA.VLocal.LockedBuffer(), DFA.VLocal.LDim(),
+                             DFB.ULocal.LockedBuffer(), DFB.ULocal.LDim(),
+                  (Scalar)0, Z.Buffer(),                Z.LDim() );
+            }
             break;
         }
         case DIST_LOW_RANK_GHOST:
         {
-            // TODO
+            // Start H/F += F F
+            // We're in the left team, so there is nothing to do
             break;
         }
         default:
@@ -882,11 +890,28 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         break;
     }
     case DIST_LOW_RANK_GHOST:
+    {
         switch( B._block.type )
         {
         case DIST_NODE:
-        case DIST_LOW_RANK:
+        {
+            // Start H/F += F H
+            // We are in the right team
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
+            if( Conjugated )
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+            else
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+            break;
+        }
+        case DIST_LOW_RANK:
+        {
+            // Start H/F += F F
+            // We are in the right team, so there is nothing to do
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -894,10 +919,16 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case SPLIT_LOW_RANK:
+    {
         switch( B._block.type )
         {
         case SPLIT_NODE:
+        {
+            // HERE
+            break;
+        }
         case SPLIT_NODE_GHOST:
         case NODE:
         case NODE_GHOST:
@@ -917,6 +948,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case SPLIT_LOW_RANK_GHOST:
         switch( B._block.type )
         {
