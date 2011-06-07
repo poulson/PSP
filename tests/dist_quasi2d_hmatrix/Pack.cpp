@@ -192,7 +192,10 @@ main( int argc, char* argv[] )
             if( print )
                 H.Print("H");
             if( printStructure )
-                H.WriteStructure("H_serial_structure");
+            {
+                H.LatexWriteStructure("H_serial_structure");
+                H.MScriptWriteStructure("H_serial_structure");
+            }
         }
 
         // Invert the H-matrix
@@ -213,7 +216,10 @@ main( int argc, char* argv[] )
             if( print )
                 H.Print("inv(H)");
             if( printStructure )
-                H.WriteStructure("invH_serial_structure");
+            {
+                H.LatexWriteStructure("invH_serial_structure");
+                H.MScriptWriteStructure("invH_serial_structure");
+            }
         }
 
         // Store the result of a serial hmat-mat

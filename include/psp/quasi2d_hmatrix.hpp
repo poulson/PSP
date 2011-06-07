@@ -146,7 +146,10 @@ private:
     ( Scalar alpha, const DenseMatrix<Scalar>& B, DenseMatrix<Scalar>& C ) 
     const;
 
-    void WriteStructureRecursion( std::ofstream& file ) const;
+    void LatexWriteStructureRecursion
+    ( std::ofstream& file, int globalHeight ) const;
+
+    void MScriptWriteStructureRecursion( std::ofstream& file ) const;
 
 public:    
 
@@ -248,9 +251,13 @@ public:
     { return _block.type == NODE || _block.type == NODE_SYMMETRIC; }
     bool IsLowRank() const { return _block.type == LOW_RANK; }
 
-    // Write a representation of the H-matrix structure to file. It can be
-    // visualized with util/PlotHStructure.m
-    void WriteStructure( const std::string& filename ) const;
+    /* 
+     * Write a representation of the H-matrix structure to file. 
+     */
+    // Compile this output with pdflatex+TikZ
+    void LatexWriteStructure( const std::string& filebase ) const;
+    // This can be visualized with util/PlotHStructure.m and Octave/Matlab
+    void MScriptWriteStructure( const std::string& filebase ) const;
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMatrix interface                              //

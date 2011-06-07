@@ -295,14 +295,39 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::Print
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructure
-( const std::string& filename ) const
+psp::Quasi2dHMatrix<Scalar,Conjugated>::LatexWriteStructure
+( const std::string& filebase ) const
 {
 #ifndef RELEASE
-    PushCallStack("Quasi2dHMatrix::WriteStructure");
+    PushCallStack("Quasi2dHMatrix::LatexWriteStructure");
 #endif
-    std::ofstream file( filename.c_str() );
-    WriteStructureRecursion( file );
+
+    std::ofstream file( (filebase+".tex").c_str() );
+    double scale = 12.8;
+    file << "\\documentclass[11pt]{article}\n"
+         << "\\usepackage{tikz}\n"
+         << "\\begin{document}\n"
+         << "\\begin{center}\n"
+         << "\\begin{tikzpicture}[scale=" << scale << "]\n";
+    LatexWriteStructureRecursion( file, Height() );
+    file << "\\end{tikzpicture}\n"
+         << "\\end{center}\n"
+         << "\\end{document}" << std::endl;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::MScriptWriteStructure
+( const std::string& filebase ) const
+{
+#ifndef RELEASE
+    PushCallStack("Quasi2dHMatrix::MScriptWriteStructure");
+#endif
+    std::ofstream file( (filebase+".dat").c_str() );
+    MScriptWriteStructureRecursion( file );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1165,7 +1190,55 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::UpdateMatrixWithNodeSymmetric
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
+psp::Quasi2dHMatrix<Scalar,Conjugated>::LatexWriteStructureRecursion
+( std::ofstream& file, int globalHeight ) const
+{
+    const double invScale = globalHeight; 
+    const double horzStart = _sourceOffset/invScale;
+    const double horzStop  = (_sourceOffset+Width())/invScale;
+    const double vertStart = (globalHeight-(_targetOffset + Height()))/invScale;
+    const double vertStop  = (globalHeight-_targetOffset)/invScale;
+    switch( _block.type )
+    {
+    case NODE:
+    {
+        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).LatexWriteStructureRecursion
+                ( file, globalHeight );
+        break;
+    }
+    case NODE_SYMMETRIC:
+    {
+        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        const NodeSymmetric& node = *_block.data.NS;
+        for( unsigned child=0; child<node.children.size(); ++child )
+            node.children[child]->LatexWriteStructureRecursion
+            ( file, globalHeight );
+        break;
+    }
+    case LOW_RANK:
+        file << "\\fill[lightgray] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n"
+             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        break;
+    case DENSE:
+        file << "\\fill[darkgray] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n"
+             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        break;
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::Quasi2dHMatrix<Scalar,Conjugated>::MScriptWriteStructureRecursion
 ( std::ofstream& file ) const
 {
     switch( _block.type )
@@ -1178,7 +1251,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).WriteStructureRecursion( file );
+                node.Child(t,s).MScriptWriteStructureRecursion( file );
         break;
     }
     case NODE_SYMMETRIC:
@@ -1188,7 +1261,7 @@ psp::Quasi2dHMatrix<Scalar,Conjugated>::WriteStructureRecursion
              << Height() << " " << Width() << "\n";
         const NodeSymmetric& node = *_block.data.NS;
         for( unsigned child=0; child<node.children.size(); ++child )
-            node.children[child]->WriteStructureRecursion( file );
+            node.children[child]->MScriptWriteStructureRecursion( file );
         break;
     }
     case LOW_RANK:

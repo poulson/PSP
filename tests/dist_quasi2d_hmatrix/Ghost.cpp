@@ -192,7 +192,10 @@ main( int argc, char* argv[] )
             if( print )
                 H.Print("H");
             if( printStructure )
-                H.WriteStructure("H_serial_structure");
+            {
+                H.LatexWriteStructure("H_serial_structure");
+                H.MScriptWriteStructure("H_serial_structure");
+            }
         }
 
         // Set up our subcommunicators and compute the packed sizes

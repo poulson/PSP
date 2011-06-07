@@ -296,7 +296,10 @@ main( int argc, char* argv[] )
             if( print )
                 H.Print( "H" );
             if( printStructure )
-                H.WriteStructure( "structure.dat" );
+            {
+                H.LatexWriteStructure("structure");
+                H.MScriptWriteStructure("structure");
+            }
         }
 
         // Test against a vector of all 1's
