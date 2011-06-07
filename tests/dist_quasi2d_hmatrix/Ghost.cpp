@@ -277,7 +277,10 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
         }
         if( printStructure )
-            distH.WriteLocalStructure("distH_structure");
+        {
+            distH.LatexWriteLocalStructure("distH_structure");
+            distH.MScriptWriteLocalStructure("distH_structure");
+        }
 
         // Ensure that our check for ghost nodes fails
         if( distH.Ghosted() )
@@ -300,7 +303,10 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
         }
         if( printStructure )
-            distH.WriteLocalStructure("distH_ghosted_structure");
+        {
+            distH.LatexWriteLocalStructure("distH_ghosted_structure");
+            distH.MScriptWriteLocalStructure("distH_ghosted_structure");
+        }
 
         // Ensure that our check for ghost nodes succeeds
         if( !distH.Ghosted() )

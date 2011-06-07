@@ -342,7 +342,10 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
         }
         if( printStructure )
-            distH.WriteLocalStructure("distH_structure");
+        {
+            distH.LatexWriteLocalStructure("distH_structure");
+            distH.MScriptWriteLocalStructure("distH_structure");
+        }
 
         // Apply the distributed H-matrix
         if( rank == 0 )

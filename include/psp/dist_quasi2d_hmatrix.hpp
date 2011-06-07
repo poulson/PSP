@@ -102,8 +102,13 @@ public:
 
     void RequireRoot() const;
 
-    // Print out the structure of the tree that we're aware of
-    void WriteLocalStructure( const std::string& basename ) const;
+    /*
+     * Routines for visualizing the locally known H-matrix structure
+     */
+    // Compile this output with pdflatex+TikZ
+    void LatexWriteLocalStructure( const std::string& basename ) const;
+    // This can be visualized with util/PlotHStructure.m and Octave/Matlab
+    void MScriptWriteLocalStructure( const std::string& basename ) const;
 
     // Unpack this process's portion of the DistQuasi2dHMatrix
     std::size_t Unpack
@@ -424,7 +429,9 @@ private:
     bool Admissible() const;
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
-    void WriteLocalStructureRecursion( std::ofstream& file ) const;
+    void LatexWriteLocalStructureRecursion
+    ( std::ofstream& file, int globalheight ) const;
+    void MScriptWriteLocalStructureRecursion( std::ofstream& file ) const;
     
     // This default constructure is purposely not publically accessible
     // because many routines are not functional without _subcomms set.

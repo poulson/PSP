@@ -286,19 +286,49 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::Admissible
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructure
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LatexWriteLocalStructure
 ( const std::string& basename ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMatrix::WriteLocalStructure");
+    PushCallStack("DistQuasi2dHMatrix::LatexWriteLocalStructure");
 #endif
     MPI_Comm comm = _subcomms->Subcomm( 0 );
     const int commRank = mpi::CommRank( comm );
 
     std::ostringstream os;
-    os << basename << "-" << commRank;
+    os << basename << "-" << commRank << ".tex";
     std::ofstream file( os.str().c_str() );
-    WriteLocalStructureRecursion( file );
+
+    double scale = 12.8;
+    file << "\\documentclass[11pt]{article}\n"
+         << "\\usepackage{tikz}\n"
+         << "\\begin{document}\n"
+         << "\\begin{center}\n"
+         << "\\begin{tikzpicture}[scale=" << scale << "]\n";
+    LatexWriteLocalStructureRecursion( file, Height() );
+    file << "\\end{tikzpicture}\n"
+         << "\\end{center}\n"
+         << "\\end{document}" << std::endl;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MScriptWriteLocalStructure
+( const std::string& basename ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MScriptWriteLocalStructure");
+#endif
+    MPI_Comm comm = _subcomms->Subcomm( 0 );
+    const int commRank = mpi::CommRank( comm );
+
+    std::ostringstream os;
+    os << basename << "-" << commRank << ".dat";
+    std::ofstream file( os.str().c_str() );
+    MScriptWriteLocalStructureRecursion( file );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -324,7 +354,63 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::DistQuasi2dHMatrix()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructureRecursion
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LatexWriteLocalStructureRecursion
+( std::ofstream& file, int globalHeight ) const
+{
+    const double invScale = globalHeight;
+    const double horzStart = _sourceOffset/invScale;
+    const double horzStop  = (_sourceOffset+Width())/invScale;
+    const double vertStart = (globalHeight-(_targetOffset + Height()))/invScale;
+    const double vertStop  = (globalHeight-_targetOffset)/invScale;
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
+    {
+        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).LatexWriteLocalStructureRecursion
+                ( file, globalHeight );
+        break;
+    }
+
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK:
+    case LOW_RANK_GHOST:
+        file << "\\fill[lightgray] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n"
+             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        break;
+
+    case SPLIT_DENSE:
+    case SPLIT_DENSE_GHOST:
+    case DENSE:
+    case DENSE_GHOST:
+        file << "\\fill[darkgray] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n"
+             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        break;
+
+    case EMPTY:
+        break;
+    }
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MScriptWriteLocalStructureRecursion
 ( std::ofstream& file ) const
 {
     switch( _block.type )
@@ -342,7 +428,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::WriteLocalStructureRecursion
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).WriteLocalStructureRecursion( file );
+                node.Child(t,s).MScriptWriteLocalStructureRecursion( file );
         break;
     }
 
