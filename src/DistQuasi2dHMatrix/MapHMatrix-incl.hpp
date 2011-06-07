@@ -246,7 +246,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixSetUp
             {
                 C._block.type = SPLIT_DENSE;
                 C._block.data.SD = new SplitDense;
-                SplitDense& SD = *C._block.data.SD;
             }
             else
             {
@@ -398,7 +397,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         {
             // Start H/F += H F
             // We must be in the left team
-            const DistLowRankGhost& DFGB = *B._block.data.DFG;
             C._denseContextMap[key] = new MapDenseMatrixContext;
             MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
 
@@ -437,12 +435,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             break;
         }
+
         case DIST_LOW_RANK:
-        {
-            // Start H/F += H F
-            // We must be in the right team
+            // We must be in the right team, so there is nothing to do yet
             break;
-        }
+
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -673,12 +670,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             break;
         }
+
         case SPLIT_LOW_RANK:
-        {
-            // Start F/H += H F
             // We are the right process, so there is nothing to do
             break;
-        }
+
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -810,12 +806,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             break;
         }
+
         case SPLIT_LOW_RANK:
-        { 
-            // Start H/F += H F
             // We are the right process, so there is nothing to do
             break;
-        }
+
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -851,12 +846,6 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             break;
         }
-        case DIST_NODE_GHOST:
-        {
-            // Start H/F += F H
-            // We're in the left team, so there is nothing to do
-            break;
-        }
         case DIST_LOW_RANK:
         {
             // Start H/F += F F
@@ -875,12 +864,12 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             }
             break;
         }
+
+        case DIST_NODE_GHOST:
         case DIST_LOW_RANK_GHOST:
-        {
-            // Start H/F += F F
             // We're in the left team, so there is nothing to do
             break;
-        }
+
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -906,12 +895,11 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 B.TransposeMapDenseMatrixInitialize( denseContext );
             break;
         }
+
         case DIST_LOW_RANK:
-        {
-            // Start H/F += F F
             // We are in the right team, so there is nothing to do
             break;
-        }
+
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -922,24 +910,122 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     }
     case SPLIT_LOW_RANK:
     {
+        const SplitLowRank& SFA = *A._block.data.SF;
         switch( B._block.type )
         {
         case SPLIT_NODE:
         {
-            // HERE
+            // We are either the middle process or both the left and right
+            if( A._inSourceTeam )
+            {
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+                
+                Dense dummy( B.Width(), SFA.rank );
+                if( Conjugated )
+                {
+                    B.AdjointMapDenseMatrixInitialize( denseContext );
+                    B.AdjointMapDenseMatrixPrecompute
+                    ( denseContext, Conj(alpha), SFA.D, dummy );
+                }
+                else
+                {
+                    B.TransposeMapDenseMatrixInitialize( denseContext );
+                    B.TransposeMapDenseMatrixPrecompute
+                    ( denseContext, alpha, SFA.D, dummy );
+                }
+            }
+            else
+            {
+                C._denseContextMap[key] = new MapDenseMatrixContext;
+                MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+
+                if( Conjugated )
+                    B.AdjointMapDenseMatrixInitialize( denseContext );
+                else
+                    B.TransposeMapDenseMatrixInitialize( denseContext );
+            }
             break;
         }
-        case SPLIT_NODE_GHOST:
         case NODE:
-        case NODE_GHOST:
+        {
+            // We are the middle and right process
+            C._VMap[key] = new Dense( B.Width(), SFA.rank );
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            Dense& CV = *C._VMap[key];
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+                
+            hmatrix_tools::Scale( (Scalar)0, CV );
+            if( Conjugated )
+            {
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+                B.AdjointMapDenseMatrixPrecompute
+                ( denseContext, Conj(alpha), SFA.D, CV );
+            }
+            else
+            {
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+                B.TransposeMapDenseMatrixPrecompute
+                ( denseContext, alpha, SFA.D, CV );
+            }
+            break;
+        }
         case SPLIT_LOW_RANK:
-        case SPLIT_LOW_RANK_GHOST:
+        {
+            // We are either the middle process or both the left and right
+            if( A._inSourceTeam )
+            {
+                const SplitLowRank& SFB = *B._block.data.SF;
+                C._ZMap[key] = new Dense( SFA.rank, SFB.rank );
+                Dense& CZ = *C._ZMap[key];
+                const char option = ( Conjugated ? 'C' : 'T' );
+                blas::Gemm
+                ( option, 'N', SFA.rank, SFB.rank, A.Width(),
+                  (Scalar)1, SFA.D.LockedBuffer(), SFA.D.LDim(),
+                             SFB.D.LockedBuffer(), SFB.D.LDim(),
+                  (Scalar)0, CZ.Buffer(),          CZ.LDim() );
+            }
+            break;
+        }
         case LOW_RANK:
+        {
+            // We must be the middle and right process
+            const LowRank& FB = *B._block.data.F;
+            C._ZMap[key] = new Dense( SFA.rank, FB.Rank() );
+            Dense& CZ = *C._ZMap[key];
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', SFA.rank, FB.Rank(), A.Width(),
+              (Scalar)1, SFA.D.LockedBuffer(), SFA.D.LDim(),
+                         FB.U.LockedBuffer(),  FB.U.LDim(),
+              (Scalar)0, CZ.Buffer(),          CZ.LDim() );
+            break;
+        }
+        case DENSE:
+        {
+            // We must be both the middle and right process
+            C._VMap[key] = new Dense( B.Width(), SFA.rank );
+            const Dense& DB = *B._block.data.D;
+            Dense& VC = *C._VMap[key];
+
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', B.Width(), SFA.rank, B.Height(),
+              (Scalar)1, DB.LockedBuffer(),    DB.LDim(),
+                         SFA.D.LockedBuffer(), SFA.D.LDim(),
+              (Scalar)0, VC.Buffer(),          VC.LDim() );
+            break;
+        }
+
+        case SPLIT_NODE_GHOST:
+        case NODE_GHOST:
+        case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK_GHOST:
         case SPLIT_DENSE:
         case SPLIT_DENSE_GHOST:
-        case DENSE:
         case DENSE_GHOST:
+            // We are the left process, so there is no work to do
+            break;
 
         default:
 #ifndef RELEASE
@@ -950,11 +1036,26 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         break;
     }
     case SPLIT_LOW_RANK_GHOST:
+    {
+        // We must be the right process
         switch( B._block.type )
         {
         case SPLIT_NODE:
+        {
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+
+            if( Conjugated )
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+            else
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+            break;
+        }
+
         case SPLIT_LOW_RANK:
         case SPLIT_DENSE:
+            // There is nothing for us to compute yet
+            break;
 
         default:
 #ifndef RELEASE
@@ -963,16 +1064,106 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case LOW_RANK:
+    {
+        const LowRank& FA = *A._block.data.F;
         switch( B._block.type )
         {
         case SPLIT_NODE:
+        {
+            // We must be the left and middle process
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+                
+            Dense dummy( B.Width(), FA.Rank() );
+            if( Conjugated )
+            {
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+                B.AdjointMapDenseMatrixPrecompute
+                ( denseContext, Conj(alpha), FA.V, dummy );
+            }
+            else
+            {
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+                B.TransposeMapDenseMatrixPrecompute
+                ( denseContext, alpha, FA.V, dummy );
+            }
+            break;
+        }
         case NODE:
+        {
+            // We must own all of A, B, and C
+            C._VMap[key] = new Dense( B.Width(), FA.Rank() );
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+                
+            hmatrix_tools::Scale( (Scalar)0, *C._VMap[key] );
+            if( Conjugated )
+            {
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+                B.AdjointMapDenseMatrixPrecompute
+                ( denseContext, Conj(alpha), FA.V, *C._VMap[key] );
+            }
+            else
+            {
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+                B.TransposeMapDenseMatrixPrecompute
+                ( denseContext, alpha, FA.V, *C._VMap[key] );
+            }
+            break;
+        }
         case SPLIT_LOW_RANK:
-        case LOW_RANK:
-        case SPLIT_DENSE:
-        case DENSE:
+        {
+            // We must be the left and middle process
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._ZMap[key] = new Dense( FA.Rank(), SFB.rank );
+            Dense& DC = *C._ZMap[key];
 
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', FA.Rank(), SFB.rank, B.Height(),
+              (Scalar)1, FA.V.LockedBuffer(),  FA.V.LDim(),
+                         SFB.D.LockedBuffer(), SFB.D.LDim(),
+              (Scalar)0, DC.Buffer(),          DC.LDim() );
+            break;
+        }
+        case LOW_RANK:
+        {
+            // We must own all of A, B, and C
+            const LowRank& FB = *B._block.data.F;
+            C._ZMap[key] = new Dense( FA.Rank(), FB.Rank() );
+            Dense& DC = *C._ZMap[key];
+
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', FA.Rank(), FB.Rank(), B.Height(),
+              (Scalar)1, FA.V.LockedBuffer(), FA.V.LDim(),
+                         FB.U.LockedBuffer(), FB.U.LDim(),
+              (Scalar)0, DC.Buffer(),         DC.LDim() );
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            // We must be the left and middle process, but there is no
+            // work to be done (split dense owned by right process)
+            break;
+        }
+        case DENSE:
+        {
+            // We must own all of A, B, and C
+            C._VMap[key] = new Dense( B.Width(), FA.Rank() );
+            const Dense& DB = *B._block.data.D;
+            Dense& VC = *C._VMap[key];
+
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( option, 'N', B.Width(), FA.Rank(), B.Height(),
+              (Scalar)1, DB.LockedBuffer(),   DB.LDim(),
+                         FA.V.LockedBuffer(), FA.V.LDim(),
+              (Scalar)0, VC.Buffer(),         VC.LDim() );
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -980,12 +1171,28 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case LOW_RANK_GHOST:
+    {
+        // We must be the right process
         switch( B._block.type )
         {
         case SPLIT_NODE:
+        {
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+                
+            if( Conjugated )
+                B.AdjointMapDenseMatrixInitialize( denseContext );
+            else
+                B.TransposeMapDenseMatrixInitialize( denseContext );
+            break;
+        }
+
         case SPLIT_LOW_RANK:
         case SPLIT_DENSE:
+            // There is nothing to do
+            break;
 
         default:
 #ifndef RELEASE
@@ -994,17 +1201,35 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case SPLIT_DENSE:
+    {
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
-        case SPLIT_LOW_RANK_GHOST:
+        {
+            // We are either the middle process or both the left and right
+            // HERE
+            break;
+        }
         case LOW_RANK:
+        {
+            // TODO
+            break;
+        }
+        case DENSE:
+        {
+            // TODO
+            break;
+        }
+
+        case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK_GHOST:
         case SPLIT_DENSE:
         case SPLIT_DENSE_GHOST:
-        case DENSE:
         case DENSE_GHOST:
+            // There is nothing for us to do
+            break;
 
         default:
 #ifndef RELEASE
@@ -1013,27 +1238,34 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case SPLIT_DENSE_GHOST:
-        switch( B._block.type )
-        {
-        case SPLIT_LOW_RANK:
-        case SPLIT_DENSE:
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
+        // There is nothing for us to do
         break;
     case DENSE:
+    {
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
+        {
+            // TODO
+            break;
+        }
         case LOW_RANK:
+        {
+            // TODO
+            break;
+        }
         case SPLIT_DENSE:
+        {
+            // TODO
+            break;
+        }
         case DENSE:
-
+        {
+            // TODO
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -1041,18 +1273,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case DENSE_GHOST:
-        switch( B._block.type )
-        {
-        case SPLIT_LOW_RANK:
-        case SPLIT_DENSE:
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
+        // There is nothing for us to do
         break;
     case EMPTY:
 #ifndef RELEASE
