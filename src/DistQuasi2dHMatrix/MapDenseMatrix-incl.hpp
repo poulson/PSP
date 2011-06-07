@@ -626,14 +626,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixSummations
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numReduces );
-    for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    std::memset( &offsets[0], 0, numReduces*sizeof(int) );
     MapDenseMatrixSummationsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
-    for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     for( int i=0; i<numReduces; ++i )
     {
@@ -680,14 +679,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixSummations
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numReduces );
-    for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    std::memset( &offsets[0], 0, numReduces*sizeof(int) );
     TransposeMapDenseMatrixSummationsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
-    for( int i=0,offset=0; i<numReduces; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     for( int i=0; i<numReduces; ++i )
     {
@@ -1908,14 +1906,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapDenseMatrixBroadcasts
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numBroadcasts );
-    for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    std::memset( &offsets[0], 0, numBroadcasts*sizeof(int) );
     MapDenseMatrixBroadcastsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
-    for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     for( int i=0; i<numBroadcasts; ++i )
     {
@@ -1956,14 +1953,13 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::TransposeMapDenseMatrixBroadcasts
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numBroadcasts );
-    for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    std::memset( &offsets[0], 0, numBroadcasts*sizeof(int) );
     TransposeMapDenseMatrixBroadcastsPack( buffer, offsets, context );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
-    for( int i=0,offset=0; i<numBroadcasts; offset+=offsets[i],++i )
+    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     for( int i=0; i<numBroadcasts; ++i )
     {

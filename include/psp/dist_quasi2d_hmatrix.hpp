@@ -540,24 +540,40 @@ private:
       Scalar alpha, const DenseMatrix<Scalar>& XLocal, 
                           DenseMatrix<Scalar>& YLocal ) const;
 
+    /*
+     * H-matrix/H-matrix multiplication
+     */
     void MapHMatrixSetUp
     ( const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
             DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPrecompute
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
-    void MapHMatrixMainSummations
-    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
+    // Summation steps are to be called from C
+    void MapHMatrixMainSummations(); 
+    void MapHMatrixMainSummationsCount( std::vector<int>& sizes );
+    void MapHMatrixMainSummationsPack
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets ); 
+    void MapHMatrixMainSummationsUnpack
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+
     void MapHMatrixMainPassData
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
-    void MapHMatrixMainBroadcasts
-    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
-                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
+    // Broadcast steps are to be called from C
+    void MapHMatrixMainBroadcasts();
+    void MapHMatrixMainBroadcastsCount( std::vector<int>& sizes );
+    void MapHMatrixMainBroadcastsPack
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    void MapHMatrixMainBroadcastsUnpack
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+
     void MapHMatrixMainPostcompute
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
     void MapHMatrixFHHPrecompute
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
@@ -570,6 +586,7 @@ private:
     void MapHMatrixFHHFinalize
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+
     void MapHMatrixRoundedAddition
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;

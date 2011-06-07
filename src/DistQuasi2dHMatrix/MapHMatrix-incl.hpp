@@ -44,15 +44,19 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
     C.Clear();
 
     A.MapHMatrixMainPrecompute( alpha, B, C );
+
     /*
-    A.MapHMatrixMainSummations( alpha, B, C );
+    C.MapHMatrixMainSummations();
     A.MapHMatrixMainPassData( alpha, B, C );
-    A.MapHMatrixMainBroadcasts( alpha, B, C );
+    C.MapHMatrixMainBroadcasts();
+
     A.MapHMatrixMainPostcompute( alpha, B, C );
+
     A.MapHMatrixFHHPrecompute( alpha, B, C );
     A.MapHMatrixFHHPassData( alpha, B, C );
     A.MapHMatrixFHHPostcompute( alpha, B, C );
     A.MapHMatrixFHHFinalize( alpha, B, C );
+
     A.MapHMatrixRoundedAddition( alpha, B, C );
     */
 #ifndef RELEASE
@@ -1355,6 +1359,50 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
 #endif
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainSummations()
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapHMatrixMainSummations");
+#endif
+    /*
+    // Compute the message sizes for each reduce
+    // (the first and last comms are unneeded)
+    const int numLevels = _subcomms->NumLevels();
+    const int numReduces = std::max(0,numLevels-2);
+    std::vector<int> sizes( numReduces );
+    std::memset( &sizes[0], 0, numReduces*sizeof(int) );
+    MapHMatrixMainSummationsCount( sizes );
+
+    // Pack all of the data to be reduced into a single buffer
+    int totalSize = 0;
+    for( int i=0; i<numReduces; ++i )
+        totalSize += sizes[i];
+    std::vector<Scalar> buffer( totalSize );
+    std::vector<int> offsets( numReduces );
+    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
+        offsets[i] = offset;
+    MapHMatrixMainSummationsPack( buffer, offsets );
+    */
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainBroadcasts()
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMatrix::MapHMatrixMainBroadcasts");
+#endif
+    // TODO
 #ifndef RELEASE
     PopCallStack();
 #endif
