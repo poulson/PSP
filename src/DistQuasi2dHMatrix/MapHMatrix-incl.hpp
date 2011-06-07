@@ -269,7 +269,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMatrix::MapHMatrixMainPrecompute");
 #endif
-    const int oversampling = 4; // TODO: Lift this definition
+    const int paddedRank = C.MaxRank() + 4;
     const DistQuasi2d& A = *this;
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
@@ -309,6 +309,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MapHMatrixMainPrecompute
                             ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                return;
                 break;
             }
             default:
@@ -334,10 +335,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._Omega2.Resize
-                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    A._Omega2.Resize( A.LocalHeight(), paddedRank );
                     ParallelGaussianRandomVectors( A._Omega2 );
-                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A._T2.Resize( A.LocalWidth(), paddedRank );
 
                     hmatrix_tools::Scale( (Scalar)0, A._T2 );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
@@ -347,10 +347,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 }
                 if( !B._beganColSpaceComp )
                 {
-                    B._Omega1.Resize
-                    ( B.LocalWidth(), C.MaxRank()+oversampling ); 
+                    B._Omega1.Resize( B.LocalWidth(), paddedRank ); 
                     ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B._T1.Resize( B.LocalHeight(), paddedRank );
 
                     hmatrix_tools::Scale( (Scalar)0, B._T1 );
                     B.MapDenseMatrixInitialize( B._T1Context );
@@ -369,11 +368,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._Omega2.Resize
-                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    A._Omega2.Resize( A.LocalHeight(), paddedRank );
                     ParallelGaussianRandomVectors( A._Omega2 );
 
-                    Dense dummy( A.LocalWidth(), C.MaxRank()+oversampling );
+                    Dense dummy( A.LocalWidth(), paddedRank );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
                     A.AdjointMapDenseMatrixPrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
@@ -430,11 +428,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !B._beganColSpaceComp )
                 {
-                    B._Omega1.Resize
-                    ( B.LocalWidth(), C.MaxRank()+oversampling ); 
+                    B._Omega1.Resize( B.LocalWidth(), paddedRank ); 
                     ParallelGaussianRandomVectors( B._Omega1 );
 
-                    Dense dummy( B.LocalHeight(), C.MaxRank()+oversampling );
+                    Dense dummy( B.LocalHeight(), paddedRank );
                     B.MapDenseMatrixInitialize( B._T1Context );
                     B.MapDenseMatrixPrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
@@ -471,10 +468,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._Omega2.Resize
-                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    A._Omega2.Resize( A.LocalHeight(), paddedRank );
                     ParallelGaussianRandomVectors( A._Omega2 );
-                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A._T2.Resize( A.LocalWidth(), paddedRank );
 
                     hmatrix_tools::Scale( (Scalar)0, A._T2 );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
@@ -484,10 +480,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 }
                 if( !B._beganColSpaceComp )
                 {
-                    B._Omega1.Resize
-                    ( B.LocalWidth(), C.MaxRank()+oversampling );
+                    B._Omega1.Resize( B.LocalWidth(), paddedRank );
                     ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B._T1.Resize( B.LocalHeight(), paddedRank );
 
                     hmatrix_tools::Scale( (Scalar)0, B._T1 );
                     B.MapDenseMatrixInitialize( B._T1Context );
@@ -506,11 +501,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._Omega2.Resize
-                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    A._Omega2.Resize( A.Height(), paddedRank );
                     ParallelGaussianRandomVectors( A._Omega2 );
 
-                    Dense dummy( A.LocalWidth(), C.MaxRank()+oversampling );
+                    Dense dummy( A.Width(), paddedRank );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
                     A.AdjointMapDenseMatrixPrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
@@ -527,7 +521,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._T2.Resize( A.LocalWidth(), C.MaxRank()+oversampling );
+                    A._T2.Resize( A.Width(), paddedRank );
 
                     hmatrix_tools::Scale( (Scalar)0, A._T2 );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
@@ -535,10 +529,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 }
                 if( !B._beganColSpaceComp )
                 {
-                    B._Omega1.Resize
-                    ( B.LocalWidth(), C.MaxRank()+oversampling );
+                    B._Omega1.Resize( B.Width(), paddedRank );
                     ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.LocalHeight(), C.MaxRank()+oversampling );
+                    B._T1.Resize( B.Height(), paddedRank );
 
                     hmatrix_tools::Scale( (Scalar)0, B._T1 );
                     B.MapDenseMatrixInitialize( B._T1Context );
@@ -557,11 +550,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A._Omega2.Resize
-                    ( A.LocalHeight(), C.MaxRank()+oversampling );
+                    A._Omega2.Resize( A.Height(), paddedRank );
                     ParallelGaussianRandomVectors( A._Omega2 );
 
-                    Dense dummy( A.LocalWidth(), C.MaxRank()+oversampling );
+                    Dense dummy( A.Width(), paddedRank );
                     A.AdjointMapDenseMatrixInitialize( A._T2Context );
                     A.AdjointMapDenseMatrixPrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
@@ -597,7 +589,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     MapDenseMatrixContext& denseContext =
                         *C._denseContextMap[key];
 
-                    Dense dummy( A.Height(), SFB.D.Width() );
+                    Dense dummy( A.Height(), SFB.rank );
                     A.MapDenseMatrixInitialize( denseContext );
                     A.MapDenseMatrixPrecompute
                     ( denseContext, alpha, SFB.D, dummy );
@@ -626,7 +618,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                     MapDenseMatrixContext& denseContext = 
                         *C._denseContextMap[key];
 
-                    Dense dummy( A.Height(), SFB.D.Width() );
+                    Dense dummy( A.Height(), SFB.rank );
                     A.MapDenseMatrixInitialize( denseContext );
                     A.MapDenseMatrixPrecompute
                     ( denseContext, alpha, SFB.D, dummy );
@@ -685,11 +677,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
                 // Start F += H H
                 if( !B._beganColSpaceComp )
                 {
-                    B._Omega1.Resize
-                    ( B.LocalWidth(), C.MaxRank()+oversampling );
+                    B._Omega1.Resize( B.Width(), paddedRank );
                     ParallelGaussianRandomVectors( B._Omega1 );
 
-                    Dense dummy( B.Height(), B._Omega1.Width() );
+                    Dense dummy( B.Height(), paddedRank );
                     B.MapDenseMatrixInitialize( B._T1Context );
                     B.MapDenseMatrixPrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
@@ -716,24 +707,99 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
     }
     case NODE:
     {
-        //const Node& nodeA = *A._block.data.N;
         switch( B._block.type )
         {
         case SPLIT_NODE:
         {
             // We must be in the left and middle teams
-            //const Node& nodeB = *B._block.data.N;
             if( admissibleC )
             {
                 // Start F += H H
-                // HERE
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize( A.Height(), paddedRank );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.Width(), paddedRank );
+
+                    hmatrix_tools::Scale( (Scalar)0, A._T2 );
+                    A.AdjointMapDenseMatrixInitialize( A._T2Context );
+                    A.AdjointMapDenseMatrixPrecompute
+                    ( A._T2Context, alpha, A._Omega2, A._T2 );
+                    A._beganRowSpaceComp = true;
+                }
+                if( !B._beganColSpaceComp )
+                {
+                    B._T1.Resize( B.Height(), paddedRank );
+
+                    hmatrix_tools::Scale( (Scalar)0, B._T1 );
+                    B.MapDenseMatrixInitialize( B._T1Context );
+                    B._beganColSpaceComp = true;
+                }
             }
             break;
         }
         case NODE:
+        {
+            // We own all of A, B, and C
+            if( admissibleC )
+            {
+                // Start the F += H H update
+                if( !A._beganRowSpaceComp )
+                {
+                    A._Omega2.Resize( A.Height(), paddedRank );
+                    ParallelGaussianRandomVectors( A._Omega2 );
+                    A._T2.Resize( A.Width(), paddedRank );
+
+                    hmatrix_tools::Scale( (Scalar)0, A._T2 );
+                    A.AdjointMapDenseMatrixInitialize( A._T2Context );
+                    A.AdjointMapDenseMatrixPrecompute
+                    ( A._T2Context, alpha, A._Omega2, A._T2 );
+                }
+                if( !B._beganColSpaceComp )
+                {
+                    B._Omega1.Resize( B.Width(), paddedRank );
+                    ParallelGaussianRandomVectors( B._Omega1 );
+                    B._T1.Resize( B.Height(), paddedRank );
+
+                    hmatrix_tools::Scale( (Scalar)0, B._T1 );
+                    B.MapDenseMatrixInitialize( B._T1Context );
+                    B.MapDenseMatrixPrecompute
+                    ( B._T1Context, alpha, B._Omega1, B._T1 );
+                }
+            }
+            break;
+        }
         case SPLIT_LOW_RANK:
+        {
+            // Start H/F += H F
+            // We are the left and middle processes
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._UMap[key] = new Dense( C.Height(), SFB.rank );
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+
+            hmatrix_tools::Scale( (Scalar)0, *C._UMap[key] );
+            A.MapDenseMatrixInitialize( denseContext );
+            A.MapDenseMatrixPrecompute
+            ( denseContext, alpha, SFB.D, *C._UMap[key] );
+            break;
+        }
         case LOW_RANK:
-        
+        {
+            // Start H/F += H F
+            // We own all of A, B, and C
+            const LowRank& FB = *B._block.data.F;
+            C._UMap[key] = new Dense( C.Height(), FB.Rank() );
+            C._VMap[key] = new Dense( C.Width(), FB.Rank() );
+            C._denseContextMap[key] = new MapDenseMatrixContext;
+            MapDenseMatrixContext& denseContext = *C._denseContextMap[key];
+
+            hmatrix_tools::Scale( (Scalar)0, *C._UMap[key] );
+            A.MapDenseMatrixInitialize( denseContext );
+            A.MapDenseMatrixPrecompute
+            ( denseContext, alpha, FB.U, *C._UMap[key] );
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -743,11 +809,34 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
         break;
     }
     case NODE_GHOST:
+    {
         switch( B._block.type )
         {
         case SPLIT_NODE:
+        {
+            // We must be the right process
+            if( admissibleC )
+            {
+                // Start F += H H
+                if( !B._beganColSpaceComp )
+                {
+                    B._Omega1.Resize( B.Width(), paddedRank );
+                    ParallelGaussianRandomVectors( B._Omega1 );
+
+                    Dense dummy( B.Height(), paddedRank );
+                    B.MapDenseMatrixInitialize( B._T1Context );
+                    B.MapDenseMatrixPrecompute
+                    ( B._T1Context, alpha, B._Omega1, dummy );
+                    B._beganColSpaceComp = true;
+                }
+            }
+            break;
+        }
         case SPLIT_LOW_RANK:
-        
+        { 
+            // HERE
+            break;
+        }
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -755,6 +844,7 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapHMatrixMainPrecompute
             break;
         }
         break;
+    }
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
