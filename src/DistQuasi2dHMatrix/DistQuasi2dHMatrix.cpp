@@ -371,8 +371,10 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LatexWriteLocalStructureRecursion
     case NODE:
     case NODE_GHOST:
     {
+        /*
         file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
              << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        */
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -404,6 +406,8 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::LatexWriteLocalStructureRecursion
         break;
 
     case EMPTY:
+        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
+             << "rectangle (" << horzStop << "," << vertStop << ");\n";
         break;
     }
 }

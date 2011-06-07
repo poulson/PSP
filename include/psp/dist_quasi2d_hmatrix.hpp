@@ -546,7 +546,13 @@ private:
     void MapHMatrixMainPrecompute
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixMainSummations
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPassData
+    ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
+                          DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
+    void MapHMatrixMainBroadcasts
     ( Scalar alpha, const DistQuasi2dHMatrix<Scalar,Conjugated>& B,
                           DistQuasi2dHMatrix<Scalar,Conjugated>& C ) const;
     void MapHMatrixMainPostcompute

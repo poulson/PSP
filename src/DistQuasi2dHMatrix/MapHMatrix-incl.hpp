@@ -45,7 +45,9 @@ psp::DistQuasi2dHMatrix<Scalar,Conjugated>::MapMatrix
 
     A.MapHMatrixMainPrecompute( alpha, B, C );
     /*
+    A.MapHMatrixMainSummations( alpha, B, C );
     A.MapHMatrixMainPassData( alpha, B, C );
+    A.MapHMatrixMainBroadcasts( alpha, B, C );
     A.MapHMatrixMainPostcompute( alpha, B, C );
     A.MapHMatrixFHHPrecompute( alpha, B, C );
     A.MapHMatrixFHHPassData( alpha, B, C );
