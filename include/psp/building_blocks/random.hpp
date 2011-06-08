@@ -96,13 +96,13 @@ void SerialGaussianRandomVector( Vector< std::complex<Real> >& x );
 template<typename Real>
 void ParallelaussianRandomVector( Vector< std::complex<Real> >& xLocal );
 template<typename Real>
-void SerialGaussianRandomVectors( DenseMatrix<Real>& A );
+void SerialGaussianRandomVectors( Dense<Real>& A );
 template<typename Real>
-void ParallelGaussianRandomVectors( DenseMatrix<Real>& ALocal );
+void ParallelGaussianRandomVectors( Dense<Real>& ALocal );
 template<typename Real>
-void SerialGaussianRandomVectors( DenseMatrix< std::complex<Real> >& A );
+void SerialGaussianRandomVectors( Dense< std::complex<Real> >& A );
 template<typename Real>
-void ParallelGaussianRandomVectors( DenseMatrix< std::complex<Real> >& ALocal );
+void ParallelGaussianRandomVectors( Dense< std::complex<Real> >& ALocal );
 
 } // namespace psp
 
@@ -457,7 +457,7 @@ psp::ParallelGaussianRandomVector
 template<typename Real>
 void
 psp::SerialGaussianRandomVectors
-( psp::DenseMatrix<Real>& A )
+( psp::Dense<Real>& A )
 {
 #ifndef RELEASE
     PushCallStack("SerialGaussianRandomVectors");
@@ -490,7 +490,7 @@ psp::SerialGaussianRandomVectors
 template<typename Real>
 void
 psp::ParallelGaussianRandomVectors
-( psp::DenseMatrix<Real>& A )
+( psp::Dense<Real>& A )
 {
 #ifndef RELEASE
     PushCallStack("ParallelGaussianRandomVectors");
@@ -523,7 +523,7 @@ psp::ParallelGaussianRandomVectors
 template<typename Real>
 void
 psp::SerialGaussianRandomVectors
-( psp::DenseMatrix< std::complex<Real> >& A )
+( psp::Dense< std::complex<Real> >& A )
 {
 #ifndef RELEASE
     PushCallStack("SerialGaussianRandomVectors");
@@ -545,7 +545,7 @@ psp::SerialGaussianRandomVectors
 template<typename Real>
 void
 psp::ParallelGaussianRandomVectors
-( psp::DenseMatrix< std::complex<Real> >& ALocal )
+( psp::Dense< std::complex<Real> >& ALocal )
 {
 #ifndef RELEASE
     PushCallStack("ParallelGaussianRandomVectors");

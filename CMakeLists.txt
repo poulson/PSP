@@ -264,7 +264,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(BUILDING_BLOCKS_TESTS ParallelLcg)
-  set(HMATRIX_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
+  set(HMAT_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix)
   set(QUASI2D_TESTS Invert LowRankConstructor Pack)
   set(DIST_QUASI2D_TESTS Ghost Pack)
 endif(BUILD_TESTS)
@@ -309,28 +309,28 @@ if(BUILD_TESTS)
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
   endforeach(TEST)
-  # Build the hmatrix_tools tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmatrix_tools")
-  foreach(TEST ${HMATRIX_TOOLS_TESTS})
-    add_executable(hmatrix-${TEST} ${TEST_DIR}/hmatrix_tools/${TEST}.cpp)
-    target_link_libraries(hmatrix-${TEST} psp cmake-dummy-lib)
-    set_target_properties(hmatrix-${TEST} 
+  # Build the hmat_tools tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmat_tools")
+  foreach(TEST ${HMAT_TOOLS_TESTS})
+    add_executable(hmat-${TEST} ${TEST_DIR}/hmat_tools/${TEST}.cpp)
+    target_link_libraries(hmat-${TEST} psp cmake-dummy-lib)
+    set_target_properties(hmat-${TEST} 
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
   endforeach(TEST)
-  # Build the Quasi2dHMatrix tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/quasi2d_hmatrix")
+  # Build the Quasi2dHMat tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/Quasi2dHMat")
   foreach(TEST ${QUASI2D_TESTS})
-    add_executable(quasi2d-${TEST} ${TEST_DIR}/quasi2d_hmatrix/${TEST}.cpp)
+    add_executable(quasi2d-${TEST} ${TEST_DIR}/Quasi2dHMat/${TEST}.cpp)
     target_link_libraries(quasi2d-${TEST} psp cmake-dummy-lib)
     set_target_properties(quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
   endforeach(TEST)
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/dist_quasi2d_hmatrix")
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/DistQuasi2dHMat")
   foreach(TEST ${DIST_QUASI2D_TESTS})
     add_executable(dist-quasi2d-${TEST} 
-                   ${TEST_DIR}/dist_quasi2d_hmatrix/${TEST}.cpp)
+                   ${TEST_DIR}/DistQuasi2dHMat/${TEST}.cpp)
     target_link_libraries(dist-quasi2d-${TEST} psp cmake-dummy-lib)
     set_target_properties(dist-quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}

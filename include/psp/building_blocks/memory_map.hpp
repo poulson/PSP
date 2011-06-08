@@ -27,16 +27,19 @@ template<typename T1,typename T2>
 class MemoryMap 
 {   
 private:
-    std::map<T1,T2*> _map;
+    std::map<T1,T2*> _baseMap;
 public:
     // NOTE: Insertion with the same key without manual deletion
     //       will cause a memory leak.
-    T2*& operator[]( T1 key ) { return _map[key]; }
+    T2*& operator[]( T1 key ) { return _baseMap[key]; }
+
+    std::map<T1,T2*>& BaseMap() { return _baseMap; }
+    const std::map<T1,T2*>& BaseMap() const { return _baseMap; }
 
     ~MemoryMap()
     {   
         typename std::map<T1,T2*>::iterator it; 
-        for( it=_map.begin(); it!=_map.end(); it++ )
+        for( it=_baseMap.begin(); it!=_baseMap.end(); it++ )
             delete (*it).second;
     }   
 };  
