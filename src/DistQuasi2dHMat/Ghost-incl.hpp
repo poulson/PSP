@@ -441,15 +441,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
         else
         {
             if( sourceRoot == targetRoot )
-            {
                 _block.type = DENSE_GHOST;
-                _block.data.DG = new DenseGhost;
-            }
             else
-            {
                 _block.type = SPLIT_DENSE_GHOST;
-                _block.data.SDG = new SplitDenseGhost;
-            }
         }
         break;
     }

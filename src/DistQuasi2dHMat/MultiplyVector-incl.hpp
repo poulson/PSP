@@ -600,7 +600,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyVectorSummationsPack( buffer, offsets, context );
+    MultiplyVectorSummationsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -623,7 +623,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    MultiplyVectorSummationsUnpack( buffer, offsets, context );
+    MultiplyVectorSummationsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -653,7 +653,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    TransposeMultiplyVectorSummationsPack( buffer, offsets, context );
+    TransposeMultiplyVectorSummationsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -676,7 +676,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    TransposeMultiplyVectorSummationsUnpack( buffer, offsets, context );
+    TransposeMultiplyVectorSummationsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -762,8 +762,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyVectorContext& context ) const
+( MultiplyVectorContext& context, 
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSummationsPack");
@@ -778,7 +778,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorSummationsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -804,8 +804,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyVectorContext& context ) const
+( TransposeMultiplyVectorContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummationsPack");
@@ -820,7 +820,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorSummationsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -846,8 +846,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyVectorContext& context ) const
+( MultiplyVectorContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSummationsUnpack");
@@ -862,7 +862,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorSummationsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -893,8 +893,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyVectorContext& context ) const
+( TransposeMultiplyVectorContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummationsUnpack");
@@ -909,7 +909,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorSummationsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -1217,7 +1217,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MultiplyVectorPassDataSplitNodePack
-                    ( head, nodeContext.Child(t,s) );
+                    ( nodeContext.Child(t,s), head );
             if( bufferSize != 0 )
                 mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
         }
@@ -1229,7 +1229,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MultiplyVectorPassDataSplitNodeUnpack
-                    ( head, nodeContext.Child(t,s) );
+                    ( nodeContext.Child(t,s), head );
         }
         break;
     }
@@ -1332,7 +1332,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
-( byte*& head, const MultiplyVectorContext& context ) const
+( const MultiplyVectorContext& context, byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataSplitNodePack");
@@ -1349,7 +1349,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorPassDataSplitNodePack
-                ( head, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1378,7 +1378,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeUnpack
-( const byte*& head, MultiplyVectorContext& context ) const
+( MultiplyVectorContext& context, const byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataSplitNodeUnpack");
@@ -1395,7 +1395,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorPassDataSplitNodeUnpack
-                ( head, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1585,7 +1585,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodePack
-                    ( head, nodeContext.Child(t,s), xLocal );
+                    ( nodeContext.Child(t,s), xLocal, head );
             if( bufferSize != 0 )
                 mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
         }
@@ -1598,7 +1598,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).
                     TransposeMultiplyVectorPassDataSplitNodeUnpack
-                    ( head, nodeContext.Child(t,s) );
+                    ( nodeContext.Child(t,s), head );
         }
         break;
     }
@@ -1711,8 +1711,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyVectorPassDataSplitNodePack
-( byte*& head, const TransposeMultiplyVectorContext& context,
-  const Vector<Scalar>& xLocal ) const
+( const TransposeMultiplyVectorContext& context,
+  const Vector<Scalar>& xLocal, byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1730,7 +1730,7 @@ TransposeMultiplyVectorPassDataSplitNodePack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodePack
-                ( head, nodeContext.Child(t,s), xLocal );
+                ( nodeContext.Child(t,s), xLocal, head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1757,7 +1757,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyVectorPassDataSplitNodeUnpack
-( const byte*& head, TransposeMultiplyVectorContext& context ) const
+( TransposeMultiplyVectorContext& context, const byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1775,7 +1775,7 @@ TransposeMultiplyVectorPassDataSplitNodeUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodeUnpack
-                ( head, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1845,7 +1845,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     std::vector<int> offsets( numBroadcasts );
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyVectorBroadcastsPack( buffer, offsets, context );
+    MultiplyVectorBroadcastsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1861,7 +1861,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     }
 
     // Unpack the broadcasted buffers 
-    MultiplyVectorBroadcastsUnpack( buffer, offsets, context );
+    MultiplyVectorBroadcastsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1892,7 +1892,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     std::vector<int> offsets( numBroadcasts );
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    TransposeMultiplyVectorBroadcastsPack( buffer, offsets, context );
+    TransposeMultiplyVectorBroadcastsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1908,7 +1908,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     }
 
     // Unpack the broadcasted buffers 
-    TransposeMultiplyVectorBroadcastsUnpack( buffer, offsets, context );
+    TransposeMultiplyVectorBroadcastsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1994,8 +1994,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyVectorContext& context ) const
+( MultiplyVectorContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcastsPack");
@@ -2010,7 +2010,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorBroadcastsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -2041,8 +2041,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyVectorContext& context ) const
+( TransposeMultiplyVectorContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcastsPack");
@@ -2057,7 +2057,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorBroadcastsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -2088,8 +2088,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyVectorContext& context ) const
+( MultiplyVectorContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcastsPack");
@@ -2104,7 +2104,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorBroadcastsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -2130,8 +2130,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyVectorContext& context ) const
+( TransposeMultiplyVectorContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcastsPack");
@@ -2146,7 +2146,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorBroadcastsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:

@@ -245,10 +245,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSetUp
                 C._block.data.D = new Dense<Scalar>;
             }
             else
-            {
                 C._block.type = DENSE_GHOST;
-                C._block.data.DG = new DenseGhost;
-            }
         }
         else
         {
@@ -258,10 +255,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSetUp
                 C._block.data.SD = new SplitDense;
             }
             else
-            {
                 C._block.type = SPLIT_DENSE_GHOST;
-                C._block.data.SDG = new SplitDenseGhost;
-            }
         }
     }
 #ifndef RELEASE
@@ -349,7 +343,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     A._T2.Resize( A.LocalWidth(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
                     A._beganRowSpaceComp = true;
@@ -361,7 +356,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     B._T1.Resize( B.LocalHeight(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, B._T1 );
                     B._beganColSpaceComp = true;
@@ -381,7 +376,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     ParallelGaussianRandomVectors( A._Omega2 );
 
                     Dense<Scalar> dummy( A.LocalWidth(), paddedRank );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
                     A._beganRowSpaceComp = true;
@@ -398,7 +394,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, DFB.rank );
             A.MultiplyDensePrecompute
             ( denseContext, alpha, DFB.ULocal, *C._UMap[key] );
             break;
@@ -407,10 +403,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += H F
             // We must be in the left team
+            const DistLowRankGhost& DFGB = *B._block.data.DFG;
             C._denseContextMap[key] = new MultiplyDenseContext;
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
 
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, DFGB.rank );
             break;
         }
         default:
@@ -437,7 +434,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     ParallelGaussianRandomVectors( B._Omega1 );
 
                     Dense<Scalar> dummy( B.LocalHeight(), paddedRank );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
                     B._beganColSpaceComp = true;
@@ -475,7 +472,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     A._T2.Resize( A.LocalWidth(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
                     A._beganRowSpaceComp = true;
@@ -487,7 +485,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     B._T1.Resize( B.LocalHeight(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, B._T1 );
                     B._beganColSpaceComp = true;
@@ -507,7 +505,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     ParallelGaussianRandomVectors( A._Omega2 );
 
                     Dense<Scalar> dummy( A.Width(), paddedRank );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
                     A._beganRowSpaceComp = true;
@@ -523,7 +522,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 // Start F += H H
                 if( !A._beganRowSpaceComp )
                 {
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A._beganRowSpaceComp = true;
                 }
                 if( !B._beganColSpaceComp )
@@ -533,7 +533,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     B._T1.Resize( B.Height(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, B._T1 );
                     B._beganColSpaceComp = true;
@@ -553,7 +553,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     ParallelGaussianRandomVectors( A._Omega2 );
 
                     Dense<Scalar> dummy( A.Width(), paddedRank );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, Conj(alpha), A._Omega2, dummy );
                     A._beganRowSpaceComp = true;
@@ -575,7 +576,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     MultiplyDenseContext& denseContext = 
                         *C._denseContextMap[key];
 
-                    A.MultiplyDenseInitialize( denseContext );
+                    A.MultiplyDenseInitialize( denseContext, SFB.rank );
                 }
                 else
                 {
@@ -585,7 +586,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         *C._denseContextMap[key];
 
                     Dense<Scalar> dummy( A.Height(), SFB.rank );
-                    A.MultiplyDenseInitialize( denseContext );
+                    A.MultiplyDenseInitialize( denseContext, SFB.rank );
                     A.MultiplyDensePrecompute
                     ( denseContext, alpha, SFB.D, dummy );
                 }
@@ -600,7 +601,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     MultiplyDenseContext& denseContext = 
                         *C._denseContextMap[key];
 
-                    A.MultiplyDenseInitialize( denseContext );
+                    A.MultiplyDenseInitialize( denseContext, SFB.rank );
                 }
                 else
                 {
@@ -610,7 +611,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         *C._denseContextMap[key];
 
                     Dense<Scalar> dummy( A.Height(), SFB.rank );
-                    A.MultiplyDenseInitialize( denseContext );
+                    A.MultiplyDenseInitialize( denseContext, SFB.rank );
                     A.MultiplyDensePrecompute
                     ( denseContext, alpha, SFB.D, dummy );
                 }
@@ -621,9 +622,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += H F
             // We are the left process
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
             C._denseContextMap[key] = new MultiplyDenseContext;
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, SFGB.rank );
             break;
         }
         case LOW_RANK:
@@ -635,7 +637,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
 
             Dense<Scalar> dummy( A.Height(), FB.U.Width() );
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, FB.Rank() );
             A.MultiplyDensePrecompute( denseContext, alpha, FB.U, dummy );
             break;
         }
@@ -643,9 +645,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += H F
             // We are the left process
+            const LowRankGhost& FGB = *B._block.data.FG;
             C._denseContextMap[key] = new MultiplyDenseContext;
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, FGB.rank );
             break;
         }
         default:
@@ -672,7 +675,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     ParallelGaussianRandomVectors( B._Omega1 );
 
                     Dense<Scalar> dummy( B.Height(), paddedRank );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
                     B._beganColSpaceComp = true;
@@ -710,14 +713,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     A._T2.Resize( A.Width(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, alpha, A._Omega2, A._T2 );
                     A._beganRowSpaceComp = true;
                 }
                 if( !B._beganColSpaceComp )
                 {
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B._beganColSpaceComp = true;
                 }
             }
@@ -736,7 +740,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     A._T2.Resize( A.Width(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize( A._T2Context );
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
                     A.AdjointMultiplyDensePrecompute
                     ( A._T2Context, alpha, A._Omega2, A._T2 );
                 }
@@ -747,7 +752,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     B._T1.Resize( B.Height(), paddedRank );
 
                     hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, B._T1 );
                 }
@@ -764,7 +769,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, SFB.rank );
             A.MultiplyDensePrecompute
             ( denseContext, alpha, SFB.D, *C._UMap[key] );
             break;
@@ -779,7 +784,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             MultiplyDenseContext& denseContext = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( denseContext );
+            A.MultiplyDenseInitialize( denseContext, FB.Rank() );
             A.MultiplyDensePrecompute
             ( denseContext, alpha, FB.U, *C._UMap[key] );
             break;
@@ -808,7 +813,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     ParallelGaussianRandomVectors( B._Omega1 );
 
                     Dense<Scalar> dummy( B.Height(), paddedRank );
-                    B.MultiplyDenseInitialize( B._T1Context );
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
                     B.MultiplyDensePrecompute
                     ( B._T1Context, alpha, B._Omega1, dummy );
                     B._beganColSpaceComp = true;
@@ -846,7 +851,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, DFA.rank );
                 B.AdjointMultiplyDensePrecompute
                 ( context, Conj(alpha), DFA.VLocal, *C._VMap[key] );
             }
@@ -856,7 +861,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, DFA.rank );
                 B.TransposeMultiplyDensePrecompute
                 ( context, alpha, DFA.VLocal, *C._VMap[key] );
             }
@@ -902,13 +907,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += F H
             // We are in the right team
+            const DistLowRankGhost& DFGA = *A._block.data.DFG;
             if( Conjugated )
             {
                 C._adjointDenseContextMap[key] = 
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, DFGA.rank );
             }
             else
             {
@@ -916,7 +922,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, DFGA.rank );
             }
             break;
         }
@@ -950,7 +956,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         new AdjointMultiplyDenseContext;
                     AdjointMultiplyDenseContext& context = 
                         *C._adjointDenseContextMap[key];
-                    B.AdjointMultiplyDenseInitialize( context );
+                    B.AdjointMultiplyDenseInitialize( context, SFA.rank );
                     B.AdjointMultiplyDensePrecompute
                     ( context, Conj(alpha), SFA.D, dummy );
                 }
@@ -960,7 +966,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         new TransposeMultiplyDenseContext;
                     TransposeMultiplyDenseContext& context = 
                         *C._transposeDenseContextMap[key];
-                    B.TransposeMultiplyDenseInitialize( context );
+                    B.TransposeMultiplyDenseInitialize( context, SFA.rank );
                     B.TransposeMultiplyDensePrecompute
                     ( context, alpha, SFA.D, dummy );
                 }
@@ -973,7 +979,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         new AdjointMultiplyDenseContext;
                     AdjointMultiplyDenseContext& context = 
                         *C._adjointDenseContextMap[key];
-                    B.AdjointMultiplyDenseInitialize( context );
+                    B.AdjointMultiplyDenseInitialize( context, SFA.rank );
                 }
                 else
                 {
@@ -981,7 +987,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         new TransposeMultiplyDenseContext;
                     TransposeMultiplyDenseContext& context = 
                         *C._transposeDenseContextMap[key];
-                    B.TransposeMultiplyDenseInitialize( context );
+                    B.TransposeMultiplyDenseInitialize( context, SFA.rank );
                 }
             }
             break;
@@ -999,7 +1005,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, SFA.rank );
                 B.AdjointMultiplyDensePrecompute
                 ( context, Conj(alpha), SFA.D, CV );
             }
@@ -1009,7 +1015,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, SFA.rank );
                 B.TransposeMultiplyDensePrecompute
                 ( context, alpha, SFA.D, CV );
             }
@@ -1087,13 +1093,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
         case SPLIT_NODE:
         {
+            const SplitLowRankGhost& SFGA = *A._block.data.SFG;
             if( Conjugated )
             {
                 C._adjointDenseContextMap[key] = 
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, SFGA.rank );
             }
             else
             {
@@ -1101,7 +1108,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, SFGA.rank );
             }
             break;
         }
@@ -1134,7 +1141,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, FA.Rank() );
                 B.AdjointMultiplyDensePrecompute
                 ( context, Conj(alpha), FA.V, dummy );
             }
@@ -1144,7 +1151,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, FA.Rank() );
                 B.TransposeMultiplyDensePrecompute
                 ( context, alpha, FA.V, dummy );
             }
@@ -1162,7 +1169,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, FA.Rank() );
                 B.AdjointMultiplyDensePrecompute
                 ( context, Conj(alpha), FA.V, *C._VMap[key] );
             }
@@ -1172,7 +1179,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, FA.Rank() );
                 B.TransposeMultiplyDensePrecompute
                 ( context, alpha, FA.V, *C._VMap[key] );
             }
@@ -1244,13 +1251,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
         case SPLIT_NODE:
         {
+            const LowRankGhost& FGA = *A._block.data.FG;
             if( Conjugated )
             {
                 C._adjointDenseContextMap[key] = 
                     new AdjointMultiplyDenseContext;
                 AdjointMultiplyDenseContext& context = 
                     *C._adjointDenseContextMap[key];
-                B.AdjointMultiplyDenseInitialize( context );
+                B.AdjointMultiplyDenseInitialize( context, FGA.rank );
             }
             else
             {
@@ -1258,7 +1266,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     new TransposeMultiplyDenseContext;
                 TransposeMultiplyDenseContext& context = 
                     *C._transposeDenseContextMap[key];
-                B.TransposeMultiplyDenseInitialize( context );
+                B.TransposeMultiplyDenseInitialize( context, FGA.rank );
             }
             break;
         }

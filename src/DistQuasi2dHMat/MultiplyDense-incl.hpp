@@ -82,16 +82,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     hmat_tools::Scale( beta, YLocal );
 
     MultiplyDenseContext context;
-    MultiplyDenseInitialize( context );
+    MultiplyDenseInitialize( context, XLocal.Width() );
     MultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
-    MultiplyDenseSummations( context, XLocal.Width() );
-    //MultiplyDenseNaiveSummations( context, XLocal.Width() );
+    MultiplyDenseSummations( context );
+    //MultiplyDenseNaiveSummations( context );
 
     MultiplyDensePassData( context, alpha, XLocal, YLocal );
 
-    MultiplyDenseBroadcasts( context, XLocal.Width() );
-    //MultiplyDenseNaiveBroadcasts( context, XLocal.Width() );
+    MultiplyDenseBroadcasts( context );
+    //MultiplyDenseNaiveBroadcasts( context );
 
     MultiplyDensePostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
@@ -114,16 +114,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     hmat_tools::Scale( beta, YLocal );
 
     TransposeMultiplyDenseContext context;
-    TransposeMultiplyDenseInitialize( context );
+    TransposeMultiplyDenseInitialize( context, XLocal.Width() );
     TransposeMultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
-    TransposeMultiplyDenseSummations( context, XLocal.Width() );
-    //TransposeMultiplyDenseNaiveSummations( context, XLocal.Width() );
+    TransposeMultiplyDenseSummations( context );
+    //TransposeMultiplyDenseNaiveSummations( context );
 
     TransposeMultiplyDensePassData( context, alpha, XLocal, YLocal );
 
-    TransposeMultiplyDenseBroadcasts( context, XLocal.Width() );
-    //TransposeMultiplyDenseNaiveBroadcasts( context, XLocal.Width() );
+    TransposeMultiplyDenseBroadcasts( context );
+    //TransposeMultiplyDenseNaiveBroadcasts( context );
 
     TransposeMultiplyDensePostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
@@ -146,16 +146,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
         return;
 
     AdjointMultiplyDenseContext context;
-    AdjointMultiplyDenseInitialize( context );
+    AdjointMultiplyDenseInitialize( context, XLocal.Width() );
     AdjointMultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
-    AdjointMultiplyDenseSummations( context, XLocal.Width() );
-    //AdjointMultiplyDenseNaiveSummations( context, XLocal.Width() );
+    AdjointMultiplyDenseSummations( context );
+    //AdjointMultiplyDenseNaiveSummations( context );
 
     AdjointMultiplyDensePassData( context, alpha, XLocal, YLocal );
 
-    AdjointMultiplyDenseBroadcasts( context, XLocal.Width() );
-    //AdjointMultiplyDenseNaiveBroadcasts( context, XLocal.Width() );
+    AdjointMultiplyDenseBroadcasts( context );
+    //AdjointMultiplyDenseNaiveBroadcasts( context );
 
     AdjointMultiplyDensePostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
@@ -170,12 +170,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseInitialize
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseInitialize");
 #endif
     context.Clear();
+    context.numRhs = numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -189,7 +190,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseInitialize
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseInitialize
-                ( nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), numRhs );
         break;
     }
     case SPLIT_NODE:
@@ -203,7 +204,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseInitialize
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseInitialize
-                ( nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), numRhs );
         break;
     }
     case DIST_LOW_RANK:
@@ -231,13 +232,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseInitialize
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseInitialize
-( TransposeMultiplyDenseContext& context ) const
+( TransposeMultiplyDenseContext& context, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseInitialize");
 #endif
     // The non-transposed initialization is identical
-    TransposeMultiplyDenseInitialize( context );
+    MultiplyDenseInitialize( context, numRhs );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -246,13 +247,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseInitialize
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseInitialize
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseInitialize");
 #endif
     // The non-transposed initialization is identical
-    MultiplyDenseInitialize( context );
+    MultiplyDenseInitialize( context, numRhs );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -268,7 +269,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePrecompute");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -308,10 +309,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
             // Form Z := alpha VLocal^[T/H] XLocal
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width );
+            Z.Resize( DF.rank, numRhs );
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
-            ( option, 'N', DF.rank, width, DF.VLocal.Height(), 
+            ( option, 'N', DF.rank, numRhs, DF.VLocal.Height(), 
               alpha,     DF.VLocal.LockedBuffer(), DF.VLocal.LDim(), 
                          XLocal.LockedBuffer(),    XLocal.LDim(),
               (Scalar)0, Z.Buffer(),               Z.LDim() );
@@ -325,7 +326,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
 
             Dense<Scalar> XLocalSub, YLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, SF.D.Height(), width );
+            ( XLocal, _localSourceOffset, 0, SF.D.Height(), numRhs );
             if( Conjugated )
                 hmat_tools::AdjointMultiply( alpha, SF.D, XLocalSub, Z );
             else
@@ -341,8 +342,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
         //       diagonal block to be low-rank.
         const LowRank<Scalar,Conjugated>& F = *_block.data.F;
         Dense<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, F.Width(), width );
-        YLocalSub.View( YLocal, _localTargetOffset, 0, F.Height(), width );
+        XLocalSub.LockedView
+        ( XLocal, _localSourceOffset, 0, F.Width(), numRhs );
+        YLocalSub.View( YLocal, _localTargetOffset, 0, F.Height(), numRhs );
         hmat_tools::Multiply( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
@@ -354,7 +356,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
 
             Dense<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localSourceOffset, 0, Width(), width );
+            ( XLocal, _localSourceOffset, 0, Width(), numRhs );
             hmat_tools::Multiply( alpha, SD.D, XLocalSub, Z );
         }
         break;
@@ -364,8 +366,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
         // the entire update.
         const Dense<Scalar>& D = *_block.data.D;
         Dense<Scalar> XLocalSub, YLocalSub;
-        XLocalSub.LockedView( XLocal, _localSourceOffset, 0, D.Width(), width );
-        YLocalSub.View( YLocal, _localTargetOffset, 0, D.Height(), width );
+        XLocalSub.LockedView
+        ( XLocal, _localSourceOffset, 0, D.Width(), numRhs );
+        YLocalSub.View( YLocal, _localTargetOffset, 0, D.Height(), numRhs );
         hmat_tools::Multiply( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
@@ -388,7 +391,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePrecompute");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -428,9 +431,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePrecompute
             // Form Z := alpha ULocal^T XLocal
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width );
+            Z.Resize( DF.rank, numRhs );
             blas::Gemm
-            ( 'T', 'N', DF.rank, width, DF.ULocal.Height(),
+            ( 'T', 'N', DF.rank, numRhs, DF.ULocal.Height(),
               alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
                          XLocal.LockedBuffer(),    XLocal.LDim(),
               (Scalar)0, Z.Buffer(),               Z.LDim() );
@@ -443,7 +446,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePrecompute
             Dense<Scalar>& Z = *context.block.data.Z;
             Dense<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
+            ( XLocal, _localTargetOffset, 0, SF.D.Height(), numRhs );
             hmat_tools::TransposeMultiply( alpha, SF.D, XLocalSub, Z );
         }
         break;
@@ -457,8 +460,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePrecompute
         const LowRank<Scalar,Conjugated>& F = *_block.data.F;
         Dense<Scalar> XLocalSub, YLocalSub;
         XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, F.Height(), width );
-        YLocalSub.View( YLocal, _localSourceOffset, 0, F.Width(), width );
+        ( XLocal, _localTargetOffset, 0, F.Height(), numRhs );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, F.Width(), numRhs );
         hmat_tools::TransposeMultiply
         ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
         break;
@@ -472,9 +475,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePrecompute
         const Dense<Scalar>& D = *_block.data.D;
         Dense<Scalar> XLocalSub, YLocalSub;
         XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, D.Height(), width );
+        ( XLocal, _localTargetOffset, 0, D.Height(), numRhs );
         YLocalSub.View
-        ( YLocal, _localSourceOffset, 0, D.Width(), width );
+        ( YLocal, _localSourceOffset, 0, D.Width(), numRhs );
         hmat_tools::TransposeMultiply
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
@@ -498,7 +501,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDensePrecompute");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -538,9 +541,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
             // Form Z := alpha ULocal^H XLocal
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            Z.Resize( DF.rank, width );
+            Z.Resize( DF.rank, numRhs );
             blas::Gemm
-            ( 'C', 'N', DF.rank, width, DF.ULocal.Height(), 
+            ( 'C', 'N', DF.rank, numRhs, DF.ULocal.Height(), 
               alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
                          XLocal.LockedBuffer(),    XLocal.LDim(),
               (Scalar)0, Z.Buffer(),               Z.LDim() );
@@ -554,7 +557,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
 
             Dense<Scalar> XLocalSub;
             XLocalSub.LockedView
-            ( XLocal, _localTargetOffset, 0, SF.D.Height(), width );
+            ( XLocal, _localTargetOffset, 0, SF.D.Height(), numRhs );
             hmat_tools::AdjointMultiply( alpha, SF.D, XLocalSub, Z );
         }
         break;
@@ -568,8 +571,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
         const LowRank<Scalar,Conjugated>& F = *_block.data.F;
         Dense<Scalar> XLocalSub, YLocalSub;
         XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, F.Height(), width );
-        YLocalSub.View( YLocal, _localSourceOffset, 0, F.Width(), width );
+        ( XLocal, _localTargetOffset, 0, F.Height(), numRhs );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, F.Width(), numRhs );
         hmat_tools::AdjointMultiply
         ( alpha, F, XLocalSub, (Scalar)1, YLocalSub );
         break;
@@ -583,8 +586,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
         const Dense<Scalar>& D = *_block.data.D;
         Dense<Scalar> XLocalSub, YLocalSub;
         XLocalSub.LockedView
-        ( XLocal, _localTargetOffset, 0, D.Height(), width );
-        YLocalSub.View( YLocal, _localSourceOffset, 0, D.Width(), width );
+        ( XLocal, _localTargetOffset, 0, D.Height(), numRhs );
+        YLocalSub.View( YLocal, _localSourceOffset, 0, D.Width(), numRhs );
         hmat_tools::AdjointMultiply
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
@@ -601,7 +604,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
-( MultiplyDenseContext& context, int width ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSummations");
@@ -612,7 +615,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    MultiplyDenseSummationsCount( sizes, width );
+    MultiplyDenseSummationsCount( sizes, context.numRhs );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -622,7 +625,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyDenseSummationsPack( buffer, offsets, context );
+    MultiplyDenseSummationsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -645,7 +648,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    MultiplyDenseSummationsUnpack( buffer, offsets, context );
+    MultiplyDenseSummationsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -654,7 +657,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
-( TransposeMultiplyDenseContext& context, int width ) const
+( TransposeMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummations");
@@ -665,7 +668,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    TransposeMultiplyDenseSummationsCount( sizes, width );
+    TransposeMultiplyDenseSummationsCount( sizes, context.numRhs );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -675,7 +678,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    TransposeMultiplyDenseSummationsPack( buffer, offsets, context );
+    TransposeMultiplyDenseSummationsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -698,7 +701,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    TransposeMultiplyDenseSummationsUnpack( buffer, offsets, context );
+    TransposeMultiplyDenseSummationsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -707,13 +710,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSummations
-( AdjointMultiplyDenseContext& context, int width ) const
+( AdjointMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseSummations");
 #endif
     // This unconjugated version is identical
-    TransposeMultiplyDenseSummations( context, width );
+    TransposeMultiplyDenseSummations( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -722,7 +725,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
-( std::vector<int>& sizes, int width ) const
+( std::vector<int>& sizes, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSummationsCount");
@@ -731,15 +734,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
     {
     case DIST_NODE:
     {
+        // We can avoid passing the child contexts because the data we 
+        // want is invariant
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseSummationsCount( sizes, width );
+                node.Child(t,s).MultiplyDenseSummationsCount( sizes, numRhs );
         break;
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank*width;
+            sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
 
     default:
@@ -753,7 +758,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
-( std::vector<int>& sizes, int width ) const
+( std::vector<int>& sizes, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummationsCount");
@@ -766,12 +771,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseSummationsCount
-                ( sizes, width );
+                ( sizes, numRhs );
         break;
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank*width;
+            sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
 
     default:
@@ -785,12 +790,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, 
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSummationsPack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -801,7 +807,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseSummationsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -809,17 +815,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
         {
             const DistLowRank& DF = *_block.data.DF;
             const Dense<Scalar>& Z = *context.block.data.Z;
-            const int width = Z.Width();
             if( Z.Height() == Z.LDim() )
                 std::memcpy
                 ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-                  DF.rank*width*sizeof(Scalar) );
+                  DF.rank*numRhs*sizeof(Scalar) );
             else
-                for( int j=0; j<width; ++j )
+                for( int j=0; j<numRhs; ++j )
                     std::memcpy
                     ( &buffer[offsets[_level-1]+j*DF.rank], Z.LockedBuffer(0,j),
                       DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*width;
+            offsets[_level-1] += DF.rank*numRhs;
         }
         break;
 
@@ -834,12 +839,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyDenseContext& context ) const
+( TransposeMultiplyDenseContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummationsPack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -850,7 +856,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseSummationsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -858,17 +864,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
         {
             const DistLowRank& DF = *_block.data.DF;
             const Dense<Scalar>& Z = *context.block.data.Z;
-            const int width = Z.Width();
             if( Z.Height() == Z.LDim() )
                 std::memcpy
                 ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-                  DF.rank*width*sizeof(Scalar) );
+                  DF.rank*numRhs*sizeof(Scalar) );
             else
-                for( int j=0; j<width; ++j )
+                for( int j=0; j<numRhs; ++j )
                     std::memcpy
                     ( &buffer[offsets[_level-1]+j*DF.rank], Z.LockedBuffer(0,j),
                       DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*width;
+            offsets[_level-1] += DF.rank*numRhs;
         }
         break;
 
@@ -883,12 +888,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, 
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSummationsUnpack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -899,7 +905,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseSummationsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -907,7 +913,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            const int width = Z.Width();
             MPI_Comm team = _subcomms->Subcomm( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
@@ -915,13 +920,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
                 if( Z.Height() == Z.LDim() )
                     std::memcpy
                     ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                      DF.rank*width*sizeof(Scalar) );
+                      DF.rank*numRhs*sizeof(Scalar) );
                 else
-                    for( int j=0; j<width; ++j )
+                    for( int j=0; j<numRhs; ++j )
                         std::memcpy
                         ( Z.Buffer(0,j), &buffer[offsets[_level-1]+j*DF.rank],
                           DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
+                offsets[_level-1] += DF.rank*numRhs;
             }
         }
         break;
@@ -937,12 +942,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyDenseContext& context ) const
+( TransposeMultiplyDenseContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummationsUnpack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -953,7 +959,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseSummationsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -961,7 +967,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            const int width = Z.Width();
             MPI_Comm team = _subcomms->Subcomm( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
@@ -969,13 +974,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
                 if( Z.Height() == Z.LDim() )
                     std::memcpy
                     ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                      DF.rank*width*sizeof(Scalar) );
+                      DF.rank*numRhs*sizeof(Scalar) );
                 else
-                    for( int j=0; j<width; ++j )
+                    for( int j=0; j<numRhs; ++j )
                         std::memcpy
                         ( Z.Buffer(0,j), &buffer[offsets[_level-1]+j*DF.rank],
                           DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
+                offsets[_level-1] += DF.rank*numRhs;
             }
         }
         break;
@@ -991,11 +996,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
-( MultiplyDenseContext& context, int width ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseNaiveSummations");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1006,7 +1012,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseNaiveSummations
-                ( nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s) );
         break;
     }
     case DIST_LOW_RANK:
@@ -1021,10 +1027,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
                 if( teamRank == 0 )
                     mpi::Reduce
                     ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                      DF.rank*width, 0, MPI_SUM, team );
+                      DF.rank*numRhs, 0, MPI_SUM, team );
                 else
                     mpi::Reduce
-                    ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+                    ( Z.LockedBuffer(), 0, DF.rank*numRhs, 0, MPI_SUM, team );
             }
         }
         break;
@@ -1040,11 +1046,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
-( TransposeMultiplyDenseContext& context, int width ) const
+( TransposeMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseNaiveSummations");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1055,7 +1062,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseNaiveSummations
-                ( nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s) );
         break;
     }
     case DIST_LOW_RANK:
@@ -1070,10 +1077,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
                 if( teamRank == 0 )
                     mpi::Reduce
                     ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                      DF.rank*width, 0, MPI_SUM, team );
+                      DF.rank*numRhs, 0, MPI_SUM, team );
                 else
                     mpi::Reduce
-                    ( Z.LockedBuffer(), 0, DF.rank*width, 0, MPI_SUM, team );
+                    ( Z.LockedBuffer(), 0, DF.rank*numRhs, 0, MPI_SUM, team );
             }
         }
         break;
@@ -1089,13 +1096,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveSummations
-( AdjointMultiplyDenseContext& context, int width ) const
+( AdjointMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseNaiveSummations");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDenseNaiveSummations( context, width );
+    TransposeMultiplyDenseNaiveSummations( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1111,7 +1118,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassData");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1255,7 +1262,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyVectorPassDataSplitNodeCount
                 ( bufferSize );
-        bufferSize *= width;
+        bufferSize *= numRhs;
 
         std::vector<byte> buffer( bufferSize );
         MPI_Comm comm = _subcomms->Subcomm(0);
@@ -1265,7 +1272,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MultiplyDensePassDataSplitNodePack
-                    ( head, nodeContext.Child(t,s) );
+                    ( nodeContext.Child(t,s), head );
             if( bufferSize != 0 )
                 mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
         }
@@ -1277,7 +1284,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MultiplyDensePassDataSplitNodeUnpack
-                    ( head, nodeContext.Child(t,s), width );
+                    ( nodeContext.Child(t,s), head );
         }
         break;
     }
@@ -1296,17 +1303,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             {
                 if( _inSourceTeam )
                     mpi::Send
-                    ( Z.LockedBuffer(), DF.rank*width, _targetRoot, 0, comm );
+                    ( Z.LockedBuffer(), DF.rank*numRhs, _targetRoot, 0, comm );
                 else
                 {
-                    Z.Resize( DF.rank, width, DF.rank );
+                    Z.Resize( DF.rank, numRhs, DF.rank );
                     mpi::Recv
-                    ( Z.Buffer(), DF.rank*width, _sourceRoot, 0, comm );
+                    ( Z.Buffer(), DF.rank*numRhs, _sourceRoot, 0, comm );
                 }
             }
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1318,15 +1325,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             MPI_Comm comm = _subcomms->Subcomm( 0 );
             if( _inSourceTeam )
                 mpi::Send
-                ( Z.LockedBuffer(), SF.rank*width, _targetRoot, 0, comm );
+                ( Z.LockedBuffer(), SF.rank*numRhs, _targetRoot, 0, comm );
             else
             {
-                Z.Resize( SF.rank, width, SF.rank );
-                mpi::Recv( Z.Buffer(), SF.rank*width, _sourceRoot, 0, comm );
+                Z.Resize( SF.rank, numRhs, SF.rank );
+                mpi::Recv( Z.Buffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
             }
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1337,16 +1344,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             MPI_Comm comm = _subcomms->Subcomm( 0 );
             if( _inSourceTeam )
                 mpi::Send
-                ( Z.LockedBuffer(), Z.Height()*width, _targetRoot, 0, comm );
+                ( Z.LockedBuffer(), Z.Height()*numRhs, _targetRoot, 0, comm );
             else
             {
-                Z.Resize( Height(), width, Height() );
+                Z.Resize( Height(), numRhs, Height() );
                 mpi::Recv
-                ( Z.Buffer(), Z.Height()*width, _sourceRoot, 0, comm );
+                ( Z.Buffer(), Z.Height()*numRhs, _sourceRoot, 0, comm );
             }
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
 
@@ -1361,7 +1368,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataSplitNodePack
-( byte*& head, const MultiplyDenseContext& context ) const
+( const MultiplyDenseContext& context, byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataSplitNodePack");
@@ -1378,7 +1385,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataSplitNodePack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDensePassDataSplitNodePack
-                ( head, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1408,13 +1415,14 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 MultiplyDensePassDataSplitNodeUnpack
-( const byte*& head, MultiplyDenseContext& context, int width ) const
+( MultiplyDenseContext& context, const byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataSplitNodeUnpack");
     if( !_inTargetTeam )
         throw std::logic_error("Calling process should be in target team");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case SPLIT_NODE:
@@ -1425,7 +1433,7 @@ MultiplyDensePassDataSplitNodeUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDensePassDataSplitNodeUnpack
-                ( head, nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s), head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1434,11 +1442,11 @@ MultiplyDensePassDataSplitNodeUnpack
         Dense<Scalar>& Z = *context.block.data.Z;
         if( SF.rank != 0 )
         {
-            Z.Resize( SF.rank, width, SF.rank );
-            Read( Z.Buffer(), head, Z.Height()*width );
+            Z.Resize( SF.rank, numRhs, SF.rank );
+            Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1446,11 +1454,11 @@ MultiplyDensePassDataSplitNodeUnpack
         Dense<Scalar>& Z = *context.block.data.Z;
         if( Height() != 0 )
         {
-            Z.Resize( Height(), width, Height() );
-            Read( Z.Buffer(), head, Z.Height()*width );
+            Z.Resize( Height(), numRhs, Height() );
+            Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     default:
@@ -1474,7 +1482,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassData");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1618,7 +1626,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodeCount
                 ( bufferSize );
-        bufferSize *= width;
+        bufferSize *= numRhs;
 
         std::vector<byte> buffer( bufferSize );
         MPI_Comm comm = _subcomms->Subcomm(0);
@@ -1628,7 +1636,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).TransposeMultiplyDensePassDataSplitNodePack
-                    ( head, nodeContext.Child(t,s), XLocal );
+                    ( nodeContext.Child(t,s), XLocal, head );
             if( bufferSize != 0 )
                 mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
         }
@@ -1641,7 +1649,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).
                     TransposeMultiplyDensePassDataSplitNodeUnpack
-                    ( head, nodeContext.Child(t,s), width );
+                    ( nodeContext.Child(t,s), head );
         }
         break;
     }
@@ -1660,17 +1668,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             {
                 if( _inTargetTeam )
                     mpi::Send
-                    ( Z.LockedBuffer(), DF.rank*width, _sourceRoot, 0, comm );
+                    ( Z.LockedBuffer(), DF.rank*numRhs, _sourceRoot, 0, comm );
                 else
                 {
-                    Z.Resize( DF.rank, width, DF.rank );
+                    Z.Resize( DF.rank, numRhs, DF.rank );
                     mpi::Recv
-                    ( Z.Buffer(), DF.rank*width, _targetRoot, 0, comm );
+                    ( Z.Buffer(), DF.rank*numRhs, _targetRoot, 0, comm );
                 }
             }
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1682,15 +1690,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             MPI_Comm comm = _subcomms->Subcomm( 0 );
             if( _inTargetTeam )
                 mpi::Send
-                ( Z.LockedBuffer(), SF.rank*width, _sourceRoot, 0, comm );
+                ( Z.LockedBuffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
             else
             {
-                Z.Resize( SF.rank, width, SF.rank );
-                mpi::Recv( Z.Buffer(), SF.rank*width, _targetRoot, 0, comm );
+                Z.Resize( SF.rank, numRhs, SF.rank );
+                mpi::Recv( Z.Buffer(), SF.rank*numRhs, _targetRoot, 0, comm );
             }
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1704,33 +1712,33 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             {
                 Dense<Scalar> XLocalSub;
                 XLocalSub.LockedView
-                ( XLocal, _localTargetOffset, 0, height, width );
+                ( XLocal, _localTargetOffset, 0, height, numRhs );
                 if( XLocalSub.LDim() != XLocalSub.Height() )
                 {
                     // We must pack first
-                    Z.Resize( height, width, height );
-                    for( int j=0; j<width; ++j )
+                    Z.Resize( height, numRhs, height );
+                    for( int j=0; j<numRhs; ++j )
                         std::memcpy
                         ( Z.Buffer(0,j), XLocalSub.LockedBuffer(0,j), 
                           height*sizeof(Scalar) );
                     mpi::Send
-                    ( Z.LockedBuffer(), height*width, _sourceRoot, 0, comm );
+                    ( Z.LockedBuffer(), height*numRhs, _sourceRoot, 0, comm );
                 }
                 else
                 {
                     mpi::Send
-                    ( XLocalSub.LockedBuffer(), height*width, 
+                    ( XLocalSub.LockedBuffer(), height*numRhs, 
                       _sourceRoot, 0, comm );
                 }
             }
             else
             {
-                Z.Resize( height, width, height );
-                mpi::Recv( Z.Buffer(), height*width, _targetRoot, 0, comm );
+                Z.Resize( height, numRhs, height );
+                mpi::Recv( Z.Buffer(), height*numRhs, _targetRoot, 0, comm );
             }
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
 
@@ -1746,8 +1754,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDensePassDataSplitNodePack
-( byte*& head, const TransposeMultiplyDenseContext& context,
-  const Dense<Scalar>& XLocal ) const
+( const TransposeMultiplyDenseContext& context,
+  const Dense<Scalar>& XLocal, byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1755,6 +1763,7 @@ TransposeMultiplyDensePassDataSplitNodePack
     if( !_inTargetTeam )
         throw std::logic_error("Calling process should be in target team");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case SPLIT_NODE:
@@ -1765,7 +1774,7 @@ TransposeMultiplyDensePassDataSplitNodePack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDensePassDataSplitNodePack
-                ( head, nodeContext.Child(t,s), XLocal );
+                ( nodeContext.Child(t,s), XLocal, head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1777,8 +1786,7 @@ TransposeMultiplyDensePassDataSplitNodePack
     case SPLIT_DENSE:
     {
         const int height = Height();
-        const int width = XLocal.Width();
-        for( int j=0; j<width; ++j )
+        for( int j=0; j<numRhs; ++j )
             Write( head, XLocal.LockedBuffer(_localTargetOffset,j), height );
         break;
     }
@@ -1797,7 +1805,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDensePassDataSplitNodeUnpack
-( const byte*& head, TransposeMultiplyDenseContext& context, int width ) const
+( TransposeMultiplyDenseContext& context, const byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack
@@ -1805,6 +1813,7 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
     if( !_inSourceTeam )
         throw std::logic_error("Calling process should be in source team");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case SPLIT_NODE:
@@ -1815,7 +1824,7 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDensePassDataSplitNodeUnpack
-                ( head, nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s), head );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1824,11 +1833,11 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
         Dense<Scalar>& Z = *context.block.data.Z;
         if( SF.rank != 0 )
         {
-            Z.Resize( SF.rank, width, SF.rank );
-            Read( Z.Buffer(), head, Z.Height()*width );
+            Z.Resize( SF.rank, numRhs, SF.rank );
+            Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1836,11 +1845,11 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
         Dense<Scalar>& Z = *context.block.data.Z;
         if( Height() != 0 )
         {
-            Z.Resize( Height(), width, Height() );
-            Read( Z.Buffer(), head, Z.Height()*width );
+            Z.Resize( Height(), numRhs, Height() );
+            Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
         else
-            Z.Resize( 0, width );
+            Z.Resize( 0, numRhs );
         break;
     }
     default:
@@ -1875,7 +1884,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
-( MultiplyDenseContext& context, int width ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcasts");
@@ -1886,7 +1895,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    MultiplyDenseBroadcastsCount( sizes, width );
+    MultiplyDenseBroadcastsCount( sizes, context.numRhs );
 
     // Pack all of the data to be broadcasted into a single buffer
     // (only roots of subcommunicators contribute)
@@ -1897,7 +1906,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     std::vector<int> offsets( numBroadcasts );
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyDenseBroadcastsPack( buffer, offsets, context );
+    MultiplyDenseBroadcastsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1913,7 +1922,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     }
 
     // Unpack the broadcasted buffers 
-    MultiplyDenseBroadcastsUnpack( buffer, offsets, context, width );
+    MultiplyDenseBroadcastsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1922,7 +1931,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
-( TransposeMultiplyDenseContext& context, int width ) const
+( TransposeMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcasts");
@@ -1933,7 +1942,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    TransposeMultiplyDenseBroadcastsCount( sizes, width );
+    TransposeMultiplyDenseBroadcastsCount( sizes, context.numRhs );
 
     // Pack all of the data to be broadcasted into a single buffer
     // (only roots of subcommunicators contribute)
@@ -1944,7 +1953,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     std::vector<int> offsets( numBroadcasts );
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    TransposeMultiplyDenseBroadcastsPack( buffer, offsets, context );
+    TransposeMultiplyDenseBroadcastsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1960,7 +1969,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     }
 
     // Unpack the broadcasted buffers 
-    TransposeMultiplyDenseBroadcastsUnpack( buffer, offsets, context, width );
+    TransposeMultiplyDenseBroadcastsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1969,13 +1978,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseBroadcasts
-( AdjointMultiplyDenseContext& context, int width ) const
+( AdjointMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDenseBroadcasts( context, width );
+    TransposeMultiplyDenseBroadcasts( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1984,7 +1993,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsCount
-( std::vector<int>& sizes, int width ) const
+( std::vector<int>& sizes, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcastsCount");
@@ -1996,12 +2005,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseBroadcastsCount( sizes, width );
+                node.Child(t,s).MultiplyDenseBroadcastsCount( sizes, numRhs );
         break;
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank*width;
+            sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
 
     default:
@@ -2015,7 +2024,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsCount
-( std::vector<int>& sizes, int width ) const
+( std::vector<int>& sizes, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcastsCount");
@@ -2028,12 +2037,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsCount
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseBroadcastsCount
-                ( sizes, width );
+                ( sizes, numRhs );
         break;
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank*width;
+            sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
 
     default:
@@ -2047,12 +2056,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcastsPack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2063,7 +2073,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseBroadcastsPack
-                ( buffer, offsets, nodeContext.Child(t,s) ); 
+                ( nodeContext.Child(t,s), buffer, offsets ); 
         break;
     }
     case DIST_LOW_RANK:
@@ -2075,11 +2085,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
             {
                 const DistLowRank& DF = *_block.data.DF;
                 const Dense<Scalar>& Z = *context.block.data.Z;
-                const int width = Z.Width();
                 std::memcpy
                 ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-                  DF.rank*width*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
+                  DF.rank*numRhs*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*numRhs;
             }
         }
         break;
@@ -2096,12 +2105,13 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDenseBroadcastsPack
-( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyDenseContext& context ) const
+( TransposeMultiplyDenseContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcastsPack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2112,7 +2122,7 @@ TransposeMultiplyDenseBroadcastsPack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseBroadcastsPack
-                ( buffer, offsets, nodeContext.Child(t,s) );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -2124,11 +2134,10 @@ TransposeMultiplyDenseBroadcastsPack
             {
                 const DistLowRank& DF = *_block.data.DF;
                 const Dense<Scalar>& Z = *context.block.data.Z;
-                const int width = Z.Width();
                 std::memcpy
                 ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
-                  DF.rank*width*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
+                  DF.rank*numRhs*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*numRhs;
             }
         }
         break;
@@ -2144,12 +2153,13 @@ TransposeMultiplyDenseBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  MultiplyDenseContext& context, int width ) const
+( MultiplyDenseContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcastsUnpack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2160,7 +2170,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseBroadcastsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -2170,14 +2180,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
             Dense<Scalar>& Z = *context.block.data.Z;
             if( DF.rank != 0 )
             {
-                Z.Resize( DF.rank, width, DF.rank );
+                Z.Resize( DF.rank, numRhs, DF.rank );
                 std::memcpy
                 ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                  DF.rank*width*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
+                  DF.rank*numRhs*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*numRhs;
             }
             else
-                Z.Resize( 0, width );
+                Z.Resize( 0, numRhs );
         }
         break;
 
@@ -2193,12 +2203,13 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDenseBroadcastsUnpack
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  TransposeMultiplyDenseContext& context, int width ) const
+( TransposeMultiplyDenseContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcastsPack");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2209,7 +2220,7 @@ TransposeMultiplyDenseBroadcastsUnpack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseBroadcastsUnpack
-                ( buffer, offsets, nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -2219,14 +2230,14 @@ TransposeMultiplyDenseBroadcastsUnpack
             Dense<Scalar>& Z = *context.block.data.Z;
             if( DF.rank != 0 )
             {
-                Z.Resize( DF.rank, width, DF.rank );
+                Z.Resize( DF.rank, numRhs, DF.rank );
                 std::memcpy
                 ( Z.Buffer(), &buffer[offsets[_level-1]], 
-                  DF.rank*width*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*width;
+                  DF.rank*numRhs*sizeof(Scalar) );
+                offsets[_level-1] += DF.rank*numRhs;
             }
             else
-                Z.Resize( 0, width );
+                Z.Resize( 0, numRhs );
         }
         break;
 
@@ -2241,11 +2252,12 @@ TransposeMultiplyDenseBroadcastsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
-( MultiplyDenseContext& context, int width ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseNaiveBroadcasts");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2256,7 +2268,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyDenseNaiveBroadcasts
-                ( nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s) );
         break;
     }
     case DIST_LOW_RANK:
@@ -2266,12 +2278,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
             Dense<Scalar>& Z = *context.block.data.Z;
             if( DF.rank != 0 )
             {
-                Z.Resize( DF.rank, width, DF.rank );
+                Z.Resize( DF.rank, numRhs, DF.rank );
                 MPI_Comm team = _subcomms->Subcomm( _level );
-                mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
+                mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
             }
             else
-                Z.Resize( 0, width );
+                Z.Resize( 0, numRhs );
         }
         break;
 
@@ -2287,11 +2299,12 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDenseNaiveBroadcasts
-( TransposeMultiplyDenseContext& context, int width ) const
+( TransposeMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseNaiveBroadcasts");
 #endif
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2302,7 +2315,7 @@ TransposeMultiplyDenseNaiveBroadcasts
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDenseNaiveBroadcasts
-                ( nodeContext.Child(t,s), width );
+                ( nodeContext.Child(t,s) );
         break;
     }
     case DIST_LOW_RANK:
@@ -2312,12 +2325,12 @@ TransposeMultiplyDenseNaiveBroadcasts
             Dense<Scalar>& Z = *context.block.data.Z;
             if( DF.rank != 0 )
             {
-                Z.Resize( DF.rank, width, DF.rank );
+                Z.Resize( DF.rank, numRhs, DF.rank );
                 MPI_Comm team = _subcomms->Subcomm( _level );
-                mpi::Broadcast( Z.Buffer(), DF.rank*width, 0, team );
+                mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
             }
             else
-                Z.Resize( 0, width );
+                Z.Resize( 0, numRhs );
         }
         break;
 
@@ -2332,13 +2345,13 @@ TransposeMultiplyDenseNaiveBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveBroadcasts
-( AdjointMultiplyDenseContext& context, int width ) const
+( AdjointMultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseNaiveBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDenseNaiveBroadcasts( context, width );
+    TransposeMultiplyDenseNaiveBroadcasts( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2354,7 +2367,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePostcompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePostcompute");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2387,7 +2400,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePostcompute
             const DistLowRank& DF = *_block.data.DF;
             const Dense<Scalar>& Z = *context.block.data.Z;
             blas::Gemm
-            ( 'N', 'N', DF.ULocal.Height(), width, DF.rank,
+            ( 'N', 'N', DF.ULocal.Height(), numRhs, DF.rank,
               (Scalar)1, DF.ULocal.LockedBuffer(), DF.ULocal.LDim(),
                          Z.LockedBuffer(),         Z.LDim(),
               (Scalar)1, YLocal.Buffer(),          YLocal.LDim() );
@@ -2400,7 +2413,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePostcompute
             const Dense<Scalar>& Z = *context.block.data.Z;
             Dense<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localTargetOffset, 0, SF.D.Height(), width );
+            ( YLocal, _localTargetOffset, 0, SF.D.Height(), numRhs );
             hmat_tools::Multiply( (Scalar)1, SF.D, Z, (Scalar)1, YLocalSub );
         }
         break;
@@ -2409,7 +2422,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePostcompute
         {
             const Dense<Scalar>& Z = *context.block.data.Z;
             const int localHeight = Height();
-            for( int j=0; j<width; ++j )
+            for( int j=0; j<numRhs; ++j )
             {
                 const Scalar* ZCol = Z.LockedBuffer(0,j);
                 Scalar* YCol = YLocal.Buffer(_localTargetOffset,j);
@@ -2437,7 +2450,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePostcompute");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2475,7 +2488,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
                 hmat_tools::Conjugate( Z );
                 hmat_tools::Conjugate( YLocal );
                 blas::Gemm
-                ( 'N', 'N', DF.VLocal.Height(), width, DF.rank,
+                ( 'N', 'N', DF.VLocal.Height(), numRhs, DF.rank,
                   (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
                              Z.LockedBuffer(),         Z.LDim(),
                   (Scalar)1, YLocal.Buffer(),          YLocal.LDim() );
@@ -2485,7 +2498,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
             {
                 // YLocal += VLocal Z
                 blas::Gemm
-                ( 'N', 'N', DF.VLocal.Height(), width, DF.rank,
+                ( 'N', 'N', DF.VLocal.Height(), numRhs, DF.rank,
                   (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
                              Z.LockedBuffer(),         Z.LDim(),
                   (Scalar)1, YLocal.Buffer(),          YLocal.LDim() );
@@ -2499,7 +2512,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
             Dense<Scalar>& Z = *context.block.data.Z;
             Dense<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SF.D.Height(), width );
+            ( YLocal, _localSourceOffset, 0, SF.D.Height(), numRhs );
             if( Conjugated )
             {
                 // YLocal += conj(V) Z
@@ -2523,7 +2536,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
             const Dense<Scalar>& Z = *context.block.data.Z;
             Dense<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SD.D.Width(), width );
+            ( YLocal, _localSourceOffset, 0, SD.D.Width(), numRhs );
             hmat_tools::TransposeMultiply
             ( alpha, SD.D, Z, (Scalar)1, YLocalSub );
         }
@@ -2547,7 +2560,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDensePostcompute");
 #endif
-    const int width = XLocal.Width();
+    const int numRhs = context.numRhs;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2583,7 +2596,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
             {
                 // YLocal += VLocal Z
                 blas::Gemm
-                ( 'N', 'N', DF.VLocal.Height(), width, DF.rank,
+                ( 'N', 'N', DF.VLocal.Height(), numRhs, DF.rank,
                   (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
                              Z.LockedBuffer(),         Z.LDim(),
                   (Scalar)1, YLocal.Buffer(),          YLocal.LDim() );
@@ -2594,7 +2607,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
                 hmat_tools::Conjugate( Z );
                 hmat_tools::Conjugate( YLocal );
                 blas::Gemm
-                ( 'N', 'N', DF.VLocal.Height(), width, DF.rank,
+                ( 'N', 'N', DF.VLocal.Height(), numRhs, DF.rank,
                   (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
                              Z.LockedBuffer(),         Z.LDim(),
                   (Scalar)1, YLocal.Buffer(),          YLocal.LDim() );
@@ -2609,7 +2622,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
             Dense<Scalar>& Z = *context.block.data.Z;
             Dense<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SF.D.Height(), width );
+            ( YLocal, _localSourceOffset, 0, SF.D.Height(), numRhs );
             if( Conjugated )
             {
                 hmat_tools::Multiply
@@ -2633,7 +2646,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
             const Dense<Scalar>& Z = *context.block.data.Z;
             Dense<Scalar> YLocalSub;
             YLocalSub.View
-            ( YLocal, _localSourceOffset, 0, SD.D.Width(), width );
+            ( YLocal, _localSourceOffset, 0, SD.D.Width(), numRhs );
             hmat_tools::AdjointMultiply
             ( alpha, SD.D, Z, (Scalar)1, YLocalSub );
         }
