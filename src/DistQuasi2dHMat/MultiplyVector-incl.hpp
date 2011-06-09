@@ -762,7 +762,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
-( MultiplyVectorContext& context, 
+( const MultiplyVectorContext& context, 
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -773,7 +773,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
+        const typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -804,7 +804,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
-( TransposeMultiplyVectorContext& context,
+( const TransposeMultiplyVectorContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -815,7 +815,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
+        const typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1994,7 +1994,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
-( MultiplyVectorContext& context,
+( const MultiplyVectorContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -2005,7 +2005,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
+        const typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -2041,7 +2041,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
-( TransposeMultiplyVectorContext& context,
+( const TransposeMultiplyVectorContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -2052,7 +2052,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
+        const typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )

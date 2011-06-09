@@ -458,7 +458,7 @@ private:
     void MultiplyVectorSummationsCount
     ( std::vector<int>& sizes ) const;
     void MultiplyVectorSummationsPack
-    ( MultiplyVectorContext& context, 
+    ( const MultiplyVectorContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyVectorSummationsUnpack
     ( MultiplyVectorContext& context, 
@@ -480,7 +480,7 @@ private:
     void MultiplyVectorBroadcastsCount
     ( std::vector<int>& sizes ) const;
     void MultiplyVectorBroadcastsPack
-    ( MultiplyVectorContext& context,
+    ( const MultiplyVectorContext& context,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyVectorBroadcastsUnpack
     ( MultiplyVectorContext& context,
@@ -503,7 +503,7 @@ private:
     void MultiplyDenseSummationsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void MultiplyDenseSummationsPack
-    ( MultiplyDenseContext& context, 
+    ( const MultiplyDenseContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyDenseSummationsUnpack
     ( MultiplyDenseContext& context, 
@@ -523,7 +523,7 @@ private:
     void MultiplyDenseBroadcastsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void MultiplyDenseBroadcastsPack
-    ( MultiplyDenseContext& context, 
+    ( const MultiplyDenseContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyDenseBroadcastsUnpack
     ( MultiplyDenseContext& context, 
@@ -597,7 +597,7 @@ private:
     void TransposeMultiplyVectorSummationsCount
     ( std::vector<int>& sizes ) const;
     void TransposeMultiplyVectorSummationsPack
-    ( TransposeMultiplyVectorContext& context, 
+    ( const TransposeMultiplyVectorContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void TransposeMultiplyVectorSummationsUnpack
     ( TransposeMultiplyVectorContext& context, 
@@ -620,7 +620,7 @@ private:
     void TransposeMultiplyVectorBroadcastsCount
     ( std::vector<int>& sizes ) const;
     void TransposeMultiplyVectorBroadcastsPack
-    ( TransposeMultiplyVectorContext& context,
+    ( const TransposeMultiplyVectorContext& context,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void TransposeMultiplyVectorBroadcastsUnpack
     ( TransposeMultiplyVectorContext& context, 
@@ -643,7 +643,7 @@ private:
     void TransposeMultiplyDenseSummationsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void TransposeMultiplyDenseSummationsPack
-    ( TransposeMultiplyDenseContext& context,
+    ( const TransposeMultiplyDenseContext& context,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void TransposeMultiplyDenseSummationsUnpack
     ( TransposeMultiplyDenseContext& context,
@@ -664,7 +664,7 @@ private:
     void TransposeMultiplyDenseBroadcastsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void TransposeMultiplyDenseBroadcastsPack
-    ( TransposeMultiplyDenseContext& context,
+    ( const TransposeMultiplyDenseContext& context,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void TransposeMultiplyDenseBroadcastsUnpack
     ( TransposeMultiplyDenseContext& context,

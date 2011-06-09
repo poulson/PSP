@@ -1488,6 +1488,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCount
     case DIST_LOW_RANK:
     case DIST_LOW_RANK_GHOST:
     {
+        // Count the entries in the distributed summations at this level
         {
             const std::map<int,Dense<Scalar>*>& baseMap = _ZMap.BaseMap();
             typename std::map<int,Dense<Scalar>*>::const_iterator itr;
@@ -1498,20 +1499,45 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCount
             }
         }
 
-        /*
+        // Handle the MultiplyDenseContext distributed summations
         {
             const std::map<int,MultiplyDenseContext*>& baseMap = 
-                _normalContextMap.BaseMap();
+                _denseContextMap.BaseMap();
             typename std::map<int,MultiplyDenseContext*>::const_iterator itr;
             for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
             {
-                const MultiplyDenseContext& context = (*itr).second;
-                // HERE
-                // What is the width?!?
-                //MultiplyDenseSummationsCount( sizes, context );
+                const MultiplyDenseContext& context = *(*itr).second;
+                MultiplyDenseSummationsCount( sizes, context.numRhs );
             }
         }
-        */
+
+        // Handle the TransposeMultiplyDenseContext distributed summations
+        {
+            const std::map<int,TransposeMultiplyDenseContext*>& baseMap = 
+                _transposeDenseContextMap.BaseMap();
+            typename std::map<int,TransposeMultiplyDenseContext*>::
+                const_iterator itr;
+            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            {
+                const TransposeMultiplyDenseContext& context = *(*itr).second;
+                TransposeMultiplyDenseSummationsCount( sizes, context.numRhs );
+            }
+        }
+
+        // Handle the AdjointMultiplyDenseContext distributed summations
+        {
+            const std::map<int,AdjointMultiplyDenseContext*>& baseMap = 
+                _adjointDenseContextMap.BaseMap();
+            typename std::map<int,AdjointMultiplyDenseContext*>::
+                const_iterator itr;
+            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            {
+                const AdjointMultiplyDenseContext& context = *(*itr).second;
+                // The adjoint routine simply uses the transpose subroutine
+                TransposeMultiplyDenseSummationsCount( sizes, context.numRhs );
+            }
+        }
+
         break;
     }
     default:
@@ -1551,40 +1577,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPack
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    {
-        const std::map<int,Dense<Scalar>*>& baseMap = _ZMap.BaseMap();
-        typename std::map<int,Dense<Scalar>*>::const_iterator itr;
-        for( itr=baseMap.begin(); itr!=baseMap.end(); ++itr )
-        { 
-            const Dense<Scalar>& Z = *(*itr).second;
-            if( Z.Height() == Z.LDim() )
-            {
-                std::memcpy
-                ( &buffer[offsets[_level-1]], Z.LockedBuffer(),
-                  Z.Height()*Z.Width()*sizeof(Scalar) );
-                offsets[_level-1] += Z.Height()*Z.Width();
-            }
-            else
-            {
-                for( int j=0; j<Z.Width(); ++j )
-                {
-                    std::memcpy
-                    ( &buffer[offsets[_level-1]], Z.LockedBuffer(0,j),
-                      Z.Height()*sizeof(Scalar) );
-                    offsets[_level-1] += Z.Height();
-                }
-            }
-        }
-
-        // HERE: Need to pack DenseContext trees
-
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsPack
-                ( buffer, offsets );
-        break;
-    }
     case DIST_LOW_RANK:
     case DIST_LOW_RANK_GHOST:
     {
@@ -1612,14 +1604,70 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPack
             }
         }
 
-        // HERE: Need to pack DenseContext trees
+        // Handle the MultiplyDenseContext distributed summations
+        {
+            const std::map<int,MultiplyDenseContext*>& baseMap = 
+                _denseContextMap.BaseMap();
+            typename std::map<int,MultiplyDenseContext*>::const_iterator itr;
+            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            {
+                const MultiplyDenseContext& context = *(*itr).second;
+                MultiplyDenseSummationsPack( context, buffer, offsets );
+            }
+        }
 
+        // Handle the TransposeMultiplyDenseContext distributed summations
+        {
+            const std::map<int,TransposeMultiplyDenseContext*>& baseMap = 
+                _transposeDenseContextMap.BaseMap();
+            typename std::map<int,TransposeMultiplyDenseContext*>::
+                const_iterator itr;
+            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            {
+                const TransposeMultiplyDenseContext& context = *(*itr).second;
+                TransposeMultiplyDenseSummationsPack
+                ( context, buffer, offsets );
+            }
+        }
+
+        // Handle the AdjointMultiplyDenseContext distributed summations
+        {
+            const std::map<int,AdjointMultiplyDenseContext*>& baseMap = 
+                _adjointDenseContextMap.BaseMap();
+            typename std::map<int,AdjointMultiplyDenseContext*>::
+                const_iterator itr;
+            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            {
+                const AdjointMultiplyDenseContext& context = *(*itr).second;
+                // The adjoint case simply calls the transpose subroutine
+                TransposeMultiplyDenseSummationsPack
+                ( context, buffer, offsets );
+            }
+        }
         break;
     }
 
     default:
         break;
     }
+    
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsPack
+                ( buffer, offsets );
+        break;
+    }
+
+    default:
+        break;
+    }
+
 #ifndef RELEASE
     PopCallStack();
 #endif

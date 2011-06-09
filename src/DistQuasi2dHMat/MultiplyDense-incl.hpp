@@ -790,7 +790,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
-( MultiplyDenseContext& context, 
+( const MultiplyDenseContext& context, 
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -802,7 +802,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
+        const typename MultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -839,7 +839,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
-( TransposeMultiplyDenseContext& context,
+( const TransposeMultiplyDenseContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -851,7 +851,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
+        const typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -2056,7 +2056,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
-( MultiplyDenseContext& context,
+( const MultiplyDenseContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -2068,7 +2068,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
+        const typename MultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -2105,7 +2105,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDenseBroadcastsPack
-( TransposeMultiplyDenseContext& context,
+( const TransposeMultiplyDenseContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -2117,7 +2117,7 @@ TransposeMultiplyDenseBroadcastsPack
     case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
+        const typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -2207,7 +2207,7 @@ TransposeMultiplyDenseBroadcastsUnpack
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcastsPack");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcastsUnpack");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
