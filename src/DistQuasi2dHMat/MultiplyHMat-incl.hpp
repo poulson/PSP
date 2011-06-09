@@ -838,21 +838,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += F H
             C._VMap[key] = new Dense<Scalar>( C.LocalWidth(), DFA.rank );
-            C._denseContextMap[key] = new MultiplyDenseContext;
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._VMap[key] );
             if( Conjugated )
             {
-                B.AdjointMultiplyDenseInitialize( denseContext );
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
                 B.AdjointMultiplyDensePrecompute
-                ( denseContext, Conj(alpha), DFA.VLocal, *C._VMap[key] );
+                ( context, Conj(alpha), DFA.VLocal, *C._VMap[key] );
             }
             else
             {
-                B.TransposeMultiplyDenseInitialize( denseContext );
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
                 B.TransposeMultiplyDensePrecompute
-                ( denseContext, alpha, DFA.VLocal, *C._VMap[key] );
+                ( context, alpha, DFA.VLocal, *C._VMap[key] );
             }
             break;
         }
@@ -896,13 +902,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += F H
             // We are in the right team
-            C._denseContextMap[key] = new MultiplyDenseContext;
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-
             if( Conjugated )
-                B.AdjointMultiplyDenseInitialize( denseContext );
+            {
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
+            }
             else
-                B.TransposeMultiplyDenseInitialize( denseContext );
+            {
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
+            }
             break;
         }
 
@@ -928,32 +943,46 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // We are either the middle process or both the left and right
             if( A._inSourceTeam )
             {
-                C._denseContextMap[key] = new MultiplyDenseContext;
-                MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-                
                 Dense<Scalar> dummy( B.Width(), SFA.rank );
                 if( Conjugated )
                 {
-                    B.AdjointMultiplyDenseInitialize( denseContext );
+                    C._adjointDenseContextMap[key] = 
+                        new AdjointMultiplyDenseContext;
+                    AdjointMultiplyDenseContext& context = 
+                        *C._adjointDenseContextMap[key];
+                    B.AdjointMultiplyDenseInitialize( context );
                     B.AdjointMultiplyDensePrecompute
-                    ( denseContext, Conj(alpha), SFA.D, dummy );
+                    ( context, Conj(alpha), SFA.D, dummy );
                 }
                 else
                 {
-                    B.TransposeMultiplyDenseInitialize( denseContext );
+                    C._transposeDenseContextMap[key] = 
+                        new TransposeMultiplyDenseContext;
+                    TransposeMultiplyDenseContext& context = 
+                        *C._transposeDenseContextMap[key];
+                    B.TransposeMultiplyDenseInitialize( context );
                     B.TransposeMultiplyDensePrecompute
-                    ( denseContext, alpha, SFA.D, dummy );
+                    ( context, alpha, SFA.D, dummy );
                 }
             }
             else
             {
-                C._denseContextMap[key] = new MultiplyDenseContext;
-                MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-
                 if( Conjugated )
-                    B.AdjointMultiplyDenseInitialize( denseContext );
+                {
+                    C._adjointDenseContextMap[key] = 
+                        new AdjointMultiplyDenseContext;
+                    AdjointMultiplyDenseContext& context = 
+                        *C._adjointDenseContextMap[key];
+                    B.AdjointMultiplyDenseInitialize( context );
+                }
                 else
-                    B.TransposeMultiplyDenseInitialize( denseContext );
+                {
+                    C._transposeDenseContextMap[key] = 
+                        new TransposeMultiplyDenseContext;
+                    TransposeMultiplyDenseContext& context = 
+                        *C._transposeDenseContextMap[key];
+                    B.TransposeMultiplyDenseInitialize( context );
+                }
             }
             break;
         }
@@ -961,22 +990,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // We are the middle and right process
             C._VMap[key] = new Dense<Scalar>( B.Width(), SFA.rank );
-            C._denseContextMap[key] = new MultiplyDenseContext;
             Dense<Scalar>& CV = *C._VMap[key];
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
                 
             hmat_tools::Scale( (Scalar)0, CV );
             if( Conjugated )
             {
-                B.AdjointMultiplyDenseInitialize( denseContext );
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
                 B.AdjointMultiplyDensePrecompute
-                ( denseContext, Conj(alpha), SFA.D, CV );
+                ( context, Conj(alpha), SFA.D, CV );
             }
             else
             {
-                B.TransposeMultiplyDenseInitialize( denseContext );
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
                 B.TransposeMultiplyDensePrecompute
-                ( denseContext, alpha, SFA.D, CV );
+                ( context, alpha, SFA.D, CV );
             }
             break;
         }
@@ -1052,13 +1087,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
         case SPLIT_NODE:
         {
-            C._denseContextMap[key] = new MultiplyDenseContext;
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-
             if( Conjugated )
-                B.AdjointMultiplyDenseInitialize( denseContext );
+            {
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
+            }
             else
-                B.TransposeMultiplyDenseInitialize( denseContext );
+            {
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
+            }
             break;
         }
 
@@ -1083,21 +1127,26 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case SPLIT_NODE:
         {
             // We must be the left and middle process
-            C._denseContextMap[key] = new MultiplyDenseContext;
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-                
             Dense<Scalar> dummy( B.Width(), FA.Rank() );
             if( Conjugated )
             {
-                B.AdjointMultiplyDenseInitialize( denseContext );
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
                 B.AdjointMultiplyDensePrecompute
-                ( denseContext, Conj(alpha), FA.V, dummy );
+                ( context, Conj(alpha), FA.V, dummy );
             }
             else
             {
-                B.TransposeMultiplyDenseInitialize( denseContext );
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
                 B.TransposeMultiplyDensePrecompute
-                ( denseContext, alpha, FA.V, dummy );
+                ( context, alpha, FA.V, dummy );
             }
             break;
         }
@@ -1105,21 +1154,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // We must own all of A, B, and C
             C._VMap[key] = new Dense<Scalar>( B.Width(), FA.Rank() );
-            C._denseContextMap[key] = new MultiplyDenseContext;
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
                 
             hmat_tools::Scale( (Scalar)0, *C._VMap[key] );
             if( Conjugated )
             {
-                B.AdjointMultiplyDenseInitialize( denseContext );
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
                 B.AdjointMultiplyDensePrecompute
-                ( denseContext, Conj(alpha), FA.V, *C._VMap[key] );
+                ( context, Conj(alpha), FA.V, *C._VMap[key] );
             }
             else
             {
-                B.TransposeMultiplyDenseInitialize( denseContext );
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
                 B.TransposeMultiplyDensePrecompute
-                ( denseContext, alpha, FA.V, *C._VMap[key] );
+                ( context, alpha, FA.V, *C._VMap[key] );
             }
             break;
         }
@@ -1189,13 +1244,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
         case SPLIT_NODE:
         {
-            C._denseContextMap[key] = new MultiplyDenseContext;
-            MultiplyDenseContext& denseContext = *C._denseContextMap[key];
-                
             if( Conjugated )
-                B.AdjointMultiplyDenseInitialize( denseContext );
+            {
+                C._adjointDenseContextMap[key] = 
+                    new AdjointMultiplyDenseContext;
+                AdjointMultiplyDenseContext& context = 
+                    *C._adjointDenseContextMap[key];
+                B.AdjointMultiplyDenseInitialize( context );
+            }
             else
-                B.TransposeMultiplyDenseInitialize( denseContext );
+            {
+                C._transposeDenseContextMap[key] = 
+                    new TransposeMultiplyDenseContext;
+                TransposeMultiplyDenseContext& context = 
+                    *C._transposeDenseContextMap[key];
+                B.TransposeMultiplyDenseInitialize( context );
+            }
             break;
         }
 

@@ -337,67 +337,73 @@ private:
         int sourceOffset, targetOffset;
     };
 
+    // TODO: Merge this with all of the MultiplyVector routines and create 
+    //       a full-fledged class.
     struct MultiplyVectorContext
     {
-        struct DistNodeContext
+        struct DistNode
         {
             std::vector<MultiplyVectorContext*> children;
-            DistNodeContext();
-            ~DistNodeContext();
+            DistNode();
+            ~DistNode();
             MultiplyVectorContext& Child( int t, int s );
             const MultiplyVectorContext& Child( int t, int s ) const;
         };
-        // For now this will be the same as the DistNodeContext, but we will
-        // eventually have it combine all precompute data into a single buffer.
-        typedef DistNodeContext SplitNodeContext;
+        typedef DistNode SplitNode;
 
-        struct ContextBlock
+        struct Block
         {
             BlockType type;
             union Data
             {
-                DistNodeContext* DN;
-                SplitNodeContext* SN;
+                DistNode* DN;
+                SplitNode* SN;
                 Vector<Scalar>* z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
             } data;
-            ContextBlock();
-            ~ContextBlock();
+            Block();
+            ~Block();
             void Clear();
         };
-        ContextBlock block;
+        Block block;
         void Clear();
     };
+    typedef MultiplyVectorContext TransposeMultiplyVectorContext;
+    typedef MultiplyVectorContext AdjointMultiplyVectorContext;
     
+    // TODO: Merge this with all of the MultiplyDense routines and create 
+    //       a full-fledged class.
     struct MultiplyDenseContext
     {
-        struct DistNodeContext
+        struct DistNode
         {
             std::vector<MultiplyDenseContext*> children;
-            DistNodeContext();
-            ~DistNodeContext();
+            DistNode();
+            ~DistNode();
             MultiplyDenseContext& Child( int t, int s );
             const MultiplyDenseContext& Child( int t, int s ) const;
         };
-        typedef DistNodeContext SplitNodeContext;
+        typedef DistNode SplitNode;
 
-        struct ContextBlock
+        struct Block
         {
             BlockType type;
             union Data
             {
-                DistNodeContext* DN;
-                SplitNodeContext* SN;
+                DistNode* DN;
+                SplitNode* SN;
                 Dense<Scalar>* Z;
                 Data() { std::memset( this, 0, sizeof(Data) ); }
             } data;
-            ContextBlock();
-            ~ContextBlock();
+            Block();
+            ~Block();
             void Clear();
         };
-        ContextBlock block;
+        Block block;
         void Clear();
     };
+    typedef MultiplyDenseContext TransposeMultiplyDenseContext;
+    typedef MultiplyDenseContext AdjointMultiplyDenseContext;
 
     /*
      * Private static functions
@@ -592,138 +598,139 @@ private:
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
 
     void TransposeMultiplyVectorInitialize
-    ( MultiplyVectorContext& context ) const;
+    ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorPrecompute
-    ( MultiplyVectorContext& context,
+    ( TransposeMultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void TransposeMultiplyVectorSummations
-    ( MultiplyVectorContext& context ) const;
+    ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorSummationsCount
     ( std::vector<int>& sizes ) const;
     void TransposeMultiplyVectorSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyVectorContext& context ) const;
+      TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorSummationsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyVectorContext& context ) const;
+      TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorNaiveSummations
-    ( MultiplyVectorContext& context ) const;
+    ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorPassData
-    ( MultiplyVectorContext& context,
+    ( TransposeMultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void TransposeMultiplyVectorPassDataSplitNodeCount
     ( std::size_t& bufferSize ) const;
     void TransposeMultiplyVectorPassDataSplitNodePack
-    ( byte*& head, const MultiplyVectorContext& context,
+    ( byte*& head, const TransposeMultiplyVectorContext& context,
       const Vector<Scalar>& xLocal ) const;
     void TransposeMultiplyVectorPassDataSplitNodeUnpack
-    ( const byte*& head, MultiplyVectorContext& context ) const;
+    ( const byte*& head, TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorBroadcasts
-    ( MultiplyVectorContext& context ) const;
+    ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorBroadcastsCount
     ( std::vector<int>& sizes ) const;
     void TransposeMultiplyVectorBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyVectorContext& context ) const;
+      TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyVectorContext& context ) const;
+      TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorNaiveBroadcasts
-    ( MultiplyVectorContext& context ) const;
+    ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorPostcompute
-    ( MultiplyVectorContext& context,
+    ( TransposeMultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
     void TransposeMultiplyDenseInitialize
-    ( MultiplyDenseContext& context ) const;
+    ( TransposeMultiplyDenseContext& context ) const;
     void TransposeMultiplyDensePrecompute
-    ( MultiplyDenseContext& context,
+    ( TransposeMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
     void TransposeMultiplyDenseSummations
-    ( MultiplyDenseContext& context, int width ) const;
+    ( TransposeMultiplyDenseContext& context, int width ) const;
     void TransposeMultiplyDenseSummationsCount
     ( std::vector<int>& sizes, int width ) const;
     void TransposeMultiplyDenseSummationsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyDenseContext& context ) const;
+      TransposeMultiplyDenseContext& context ) const;
     void TransposeMultiplyDenseSummationsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyDenseContext& context ) const;
+      TransposeMultiplyDenseContext& context ) const;
     void TransposeMultiplyDenseNaiveSummations
-    ( MultiplyDenseContext& context, int width ) const;
+    ( TransposeMultiplyDenseContext& context, int width ) const;
     void TransposeMultiplyDensePassData
-    ( MultiplyDenseContext& context,
+    ( TransposeMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
     void TransposeMultiplyDensePassDataSplitNodePack
-    ( byte*& head, const MultiplyDenseContext& context,
+    ( byte*& head, const TransposeMultiplyDenseContext& context,
       const Dense<Scalar>& XLocal ) const;
     void TransposeMultiplyDensePassDataSplitNodeUnpack
-    ( const byte*& head, MultiplyDenseContext& context, int width ) const;
+    ( const byte*& head, 
+      TransposeMultiplyDenseContext& context, int width ) const;
     void TransposeMultiplyDenseBroadcasts
-    ( MultiplyDenseContext& context, int width ) const;
+    ( TransposeMultiplyDenseContext& context, int width ) const;
     void TransposeMultiplyDenseBroadcastsCount
     ( std::vector<int>& sizes, int width ) const;
     void TransposeMultiplyDenseBroadcastsPack
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyDenseContext& context ) const;
+      TransposeMultiplyDenseContext& context ) const;
     void TransposeMultiplyDenseBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      MultiplyDenseContext& context, int width ) const;
+      TransposeMultiplyDenseContext& context, int width ) const;
     void TransposeMultiplyDenseNaiveBroadcasts
-    ( MultiplyDenseContext& context, int width ) const;
+    ( TransposeMultiplyDenseContext& context, int width ) const;
     void TransposeMultiplyDensePostcompute
-    ( MultiplyDenseContext& context,
+    ( TransposeMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
 
     void AdjointMultiplyVectorInitialize
-    ( MultiplyVectorContext& context ) const;
+    ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorPrecompute
-    ( MultiplyVectorContext& context,
+    ( AdjointMultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void AdjointMultiplyVectorSummations
-    ( MultiplyVectorContext& context ) const;
+    ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorNaiveSummations
-    ( MultiplyVectorContext& context ) const;
+    ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorPassData
-    ( MultiplyVectorContext& context,
+    ( AdjointMultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
     void AdjointMultiplyVectorBroadcasts
-    ( MultiplyVectorContext& context ) const;
+    ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorNaiveBroadcasts
-    ( MultiplyVectorContext& context ) const;
+    ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorPostcompute
-    ( MultiplyVectorContext& context,
+    ( AdjointMultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
     void AdjointMultiplyDenseInitialize
-    ( MultiplyDenseContext& context ) const;
+    ( AdjointMultiplyDenseContext& context ) const;
     void AdjointMultiplyDensePrecompute
-    ( MultiplyDenseContext& context,
+    ( AdjointMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
     void AdjointMultiplyDenseSummations
-    ( MultiplyDenseContext& context, int width ) const;
+    ( AdjointMultiplyDenseContext& context, int width ) const;
     void AdjointMultiplyDenseNaiveSummations
-    ( MultiplyDenseContext& context, int width ) const;
+    ( AdjointMultiplyDenseContext& context, int width ) const;
     void AdjointMultiplyDensePassData
-    ( MultiplyDenseContext& context,
+    ( AdjointMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
     void AdjointMultiplyDenseBroadcasts
-    ( MultiplyDenseContext& context, int width ) const;
+    ( AdjointMultiplyDenseContext& context, int width ) const;
     void AdjointMultiplyDenseNaiveBroadcasts
-    ( MultiplyDenseContext& context, int width ) const;
+    ( AdjointMultiplyDenseContext& context, int width ) const;
     void AdjointMultiplyDensePostcompute
-    ( MultiplyDenseContext& context,
+    ( AdjointMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
 
@@ -750,6 +757,8 @@ private:
 
     // For temporary products in an H-matrix/H-matrix multiplication
     MemoryMap<int,MultiplyDenseContext> _denseContextMap;
+    MemoryMap<int,TransposeMultiplyDenseContext> _transposeDenseContextMap;
+    MemoryMap<int,AdjointMultiplyDenseContext> _adjointDenseContextMap;
     MemoryMap<int,Dense<Scalar> > _UMap, _VMap, _DMap, _ZMap;
 
     // For the reuse of the computation of T1 = H Omega1 and T2 = H' Omega2 in 
@@ -758,7 +767,8 @@ private:
     // state of the class and simply help avoid redundant computation.
     mutable bool _beganRowSpaceComp, _beganColSpaceComp;
     mutable Dense<Scalar> _Omega1, _Omega2, _T1, _T2;
-    mutable MultiplyDenseContext _T1Context, _T2Context;
+    mutable MultiplyDenseContext _T1Context;
+    mutable AdjointMultiplyDenseContext _T2Context;
 };
 
 } // namespace psp
@@ -901,8 +911,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Block::Clear()
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-DistNodeContext::DistNodeContext()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::DistNode::DistNode()
 : children(16)
 {
     for( int i=0; i<16; ++i )
@@ -911,8 +920,7 @@ DistNodeContext::DistNodeContext()
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-DistNodeContext::~DistNodeContext()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::DistNode::~DistNode()
 {
     for( int i=0; i<16; ++i )
         delete children[i];
@@ -921,12 +929,11 @@ DistNodeContext::~DistNodeContext()
 
 template<typename Scalar,bool Conjugated>
 inline typename DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext&
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-DistNodeContext::Child( int t, int s )
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::DistNode::
+Child( int t, int s )
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::MultiplyVectorContext::DistNodeContext::Child");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorContext::DistNode::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -940,12 +947,11 @@ DistNodeContext::Child( int t, int s )
 
 template<typename Scalar,bool Conjugated>
 inline const typename DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext&
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-DistNodeContext::Child( int t, int s ) const
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::DistNode::
+Child( int t, int s ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::MultiplyVectorContext::DistNodeContext::Child");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorContext::DistNode::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -959,23 +965,20 @@ DistNodeContext::Child( int t, int s ) const
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-ContextBlock::ContextBlock()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::Block::Block()
 : type(EMPTY), data()
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-ContextBlock::~ContextBlock()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::Block::~Block()
 {
     Clear();
 }
 
 template<typename Scalar,bool Conjugated>
 inline void
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::
-ContextBlock::Clear()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::Block::Clear()
 {
     switch( type )
     {
@@ -1016,8 +1019,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorContext::Clear()
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-DistNodeContext::DistNodeContext()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::DistNode::DistNode()
 : children(16)
 {
     for( int i=0; i<16; ++i )
@@ -1026,8 +1028,7 @@ DistNodeContext::DistNodeContext()
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-DistNodeContext::~DistNodeContext()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::DistNode::~DistNode()
 {
     for( int i=0; i<16; ++i )
         delete children[i];
@@ -1036,12 +1037,11 @@ DistNodeContext::~DistNodeContext()
 
 template<typename Scalar,bool Conjugated>
 inline typename DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext&
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-DistNodeContext::Child( int t, int s )
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::DistNode::
+Child( int t, int s )
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::MultiplyDenseContext::DistNodeContext::Child");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseContext::DistNode::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -1056,12 +1056,11 @@ DistNodeContext::Child( int t, int s )
 template<typename Scalar,bool Conjugated>
 inline const typename 
 DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext&
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-DistNodeContext::Child( int t, int s ) const
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::DistNode::
+Child( int t, int s ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::MultiplyDenseContext::DistNodeContext::Child");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseContext::DistNode::Child");
     if( t < 0 || s < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( t > 3 || s > 3 )
@@ -1075,23 +1074,20 @@ DistNodeContext::Child( int t, int s ) const
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-ContextBlock::ContextBlock()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::Block::Block()
 : type(EMPTY), data()
 { }
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-ContextBlock::~ContextBlock()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::Block::~Block()
 {
     Clear();
 }
 
 template<typename Scalar,bool Conjugated>
 inline void
-DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::
-ContextBlock::Clear()
+DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseContext::Block::Clear()
 {
     switch( type )
     {
