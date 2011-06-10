@@ -45,10 +45,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
 
     A.MultiplyHMatMainPrecompute( alpha, B, C );
 
-    C.MultiplyHMatMainSummations();
+    A.MultiplyHMatMainSummations( B, C );
     /*
     A.MultiplyHMatMainPassData( alpha, B, C );
-    C.MultiplyHMatMainBroadcasts();
+    A.MultiplyHMatMainBroadcasts( B, C );
 
     A.MultiplyHMatMainPostcompute( alpha, B, C );
 
@@ -1462,18 +1462,29 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations()
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummations");
 #endif
+    // Uncomment after we make use of it
+    //const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
     // Compute the message sizes for each reduce
     // (the first and last comms are unneeded)
     const int numLevels = _subcomms->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    MultiplyHMatMainSummationsCount( sizes );
+
+    // These need to be written first
+    /*
+    A.MultiplyHMatMainSummationsCountA( sizes );
+    B.MultiplyHMatMainSummationsCountB( sizes );
+    */
+    C.MultiplyHMatMainSummationsCountC( sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -1483,7 +1494,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations()
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyHMatMainSummationsPack( buffer, offsets );
+
+    // These need to be written first
+    /*
+    A.MultiplyHMatMainSummationsPackA( buffer, offsets );
+    B.MultiplyHMatMainSummationsPackB( buffer, offsets );
+    */
+    C.MultiplyHMatMainSummationsPackC( buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -1506,7 +1523,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations()
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    MultiplyHMatMainSummationsUnpack( buffer, offsets );
+    // These need to be written first
+    /*
+    A.MultiplyHMatMainSummationsUnpackA( buffer, offsets );
+    B.MultiplyHMatMainSummationsUnpackB( buffer, offsets );
+    */
+    C.MultiplyHMatMainSummationsUnpackC( buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1514,11 +1536,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
 ( std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountC");
 #endif
     switch( _block.type )
     {
@@ -1592,7 +1614,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsCount( sizes );
+                node.Child(t,s).MultiplyHMatMainSummationsCountC( sizes );
         break;
     }
     default:
@@ -1605,11 +1627,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
 ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPack");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackC");
 #endif
     switch( _block.type )
     {
@@ -1699,7 +1721,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPack
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsPack
+                node.Child(t,s).MultiplyHMatMainSummationsPackC
                 ( buffer, offsets );
         break;
     }
@@ -1713,11 +1735,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
 ( const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpack");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackC");
 #endif
     switch( _block.type )
     {
@@ -1804,7 +1826,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpack
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsUnpack
+                node.Child(t,s).MultiplyHMatMainSummationsUnpackC
                 ( buffer, offsets );
         break;
     }
@@ -1818,19 +1840,24 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts()
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcasts");
 #endif
     /*
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
     const int numLevels = _subcomms->NumLevels();
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    MultiplyHMatMainBroadcastsCount( sizes );
+    A.MultiplyHMatMainBroadcastsCountA( sizes );
+    B.MultiplyHMatMainBroadcastsCountB( sizes );
+    C.MultiplyHMatMainBroadcastsCountC( sizes );
 
     // Pack all of the data to be broadcast into a single buffer
     // (only roots of subcommunicators contribute)
@@ -1841,7 +1868,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts()
     std::vector<int> offsets( numBroadcasts );
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyHMatMainBroadcastsPack( buffer, offsets );
+    A.MultiplyHMatMainBroadcastsPackA( buffer, offsets );
+    B.MultiplyHMatMainBroadcastsPackB( buffer, offsets );
+    C.MultiplyHMatMainBroadcastsPackC( buffer, offsets );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
@@ -1857,7 +1886,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts()
     }
 
     // Unpack the broadcasted buffers
-    MultiplyHMatMainBroadcastsUnpack( buffer, offsets );
+    A.MultiplyHMatMainBroadcastsUnpackA( buffer, offsets );
+    B.MultiplyHMatMainBroadcastsUnpackB( buffer, offsets );
+    C.MultiplyHMatMainBroadcastsUnpackC( buffer, offsets );
     */
 #ifndef RELEASE
     PopCallStack();
@@ -1866,11 +1897,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
 ( std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCountC");
 #endif
     switch( _block.type )
     {
@@ -1894,7 +1925,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainBroadcastsCount( sizes );
+                node.Child(t,s).MultiplyHMatMainBroadcastsCountC( sizes );
         break;
     }
     default:
