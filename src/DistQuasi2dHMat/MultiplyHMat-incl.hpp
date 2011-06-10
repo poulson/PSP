@@ -1469,8 +1469,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummations");
 #endif
-    // Uncomment after we make use of it
-    //const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
     // (the first and last comms are unneeded)
@@ -1478,12 +1477,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-
-    // These need to be written first
-    /*
     A.MultiplyHMatMainSummationsCountA( sizes );
     B.MultiplyHMatMainSummationsCountB( sizes );
-    */
     C.MultiplyHMatMainSummationsCountC( sizes );
 
     // Pack all of the data to be reduced into a single buffer
@@ -1494,12 +1489,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-
-    // These need to be written first
-    /*
     A.MultiplyHMatMainSummationsPackA( buffer, offsets );
     B.MultiplyHMatMainSummationsPackB( buffer, offsets );
-    */
     C.MultiplyHMatMainSummationsPackC( buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
@@ -1523,12 +1514,266 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     }
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    // These need to be written first
-    /*
     A.MultiplyHMatMainSummationsUnpackA( buffer, offsets );
     B.MultiplyHMatMainSummationsUnpackB( buffer, offsets );
-    */
     C.MultiplyHMatMainSummationsUnpackC( buffer, offsets );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountA
+( std::vector<int>& sizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountA");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    {
+        if( _beganRowSpaceComp )
+            TransposeMultiplyDenseSummationsCount( sizes, _T2Context.numRhs );
+        break;
+    }
+    default:
+        break;
+    }
+
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsCountA( sizes );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
+( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackA");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    {
+        if( _beganRowSpaceComp )
+            TransposeMultiplyDenseSummationsPack( _T2Context, buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+    
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsPackA
+                ( buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackA
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackA");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    {
+        if( _beganRowSpaceComp )
+            TransposeMultiplyDenseSummationsUnpack
+            ( _T2Context, buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+    
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsUnpackA
+                ( buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountB
+( std::vector<int>& sizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountB");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    {
+        if( _beganColSpaceComp )
+            MultiplyDenseSummationsCount( sizes, _T1Context.numRhs );
+        break;
+    }
+    default:
+        break;
+    }
+
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsCountB( sizes );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackB
+( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackB");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    {
+        if( _beganColSpaceComp )
+            MultiplyDenseSummationsPack( _T1Context, buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+    
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsPackB
+                ( buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackB");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case DIST_LOW_RANK:
+    case DIST_LOW_RANK_GHOST:
+    {
+        if( _beganColSpaceComp )
+            MultiplyDenseSummationsUnpack( _T1Context, buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+    
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainSummationsUnpackB
+                ( buffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1833,6 +2078,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
     default:
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassData");
+#endif
+    // HERE
 #ifndef RELEASE
     PopCallStack();
 #endif

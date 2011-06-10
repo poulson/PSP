@@ -566,13 +566,13 @@ private:
     void MultiplyHMatMainSummationsPackA
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const; 
     void MultiplyHMatMainSummationsUnpackA
-    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     // To be called from B
     void MultiplyHMatMainSummationsCountB( std::vector<int>& sizes ) const;
     void MultiplyHMatMainSummationsPackB
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const; 
     void MultiplyHMatMainSummationsUnpackB
-    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     // To be called from C
     void MultiplyHMatMainSummationsCountC( std::vector<int>& sizes ) const;
     void MultiplyHMatMainSummationsPackC
