@@ -358,7 +358,7 @@ private:
     };
     typedef MultiplyVectorContext TransposeMultiplyVectorContext;
     typedef MultiplyVectorContext AdjointMultiplyVectorContext;
-    
+
     // TODO: Merge this with all of the MultiplyDense routines and create 
     //       a full-fledged class.
     struct MultiplyDenseContext
@@ -393,6 +393,19 @@ private:
     };
     typedef MultiplyDenseContext TransposeMultiplyDenseContext;
     typedef MultiplyDenseContext AdjointMultiplyDenseContext;
+
+    typedef 
+        std::pair<const DistQuasi2dHMat<Scalar,Conjugated>*,
+                  MultiplyDenseContext>
+        MultiplyDensePair;
+    typedef 
+        std::pair<const DistQuasi2dHMat<Scalar,Conjugated>*,
+                  TransposeMultiplyDenseContext>
+        TransposeMultiplyDensePair;
+    typedef 
+        std::pair<const DistQuasi2dHMat<Scalar,Conjugated>*,
+                  AdjointMultiplyDenseContext>
+        AdjointMultiplyDensePair;
 
     /*
      * Private static functions
@@ -559,9 +572,9 @@ private:
 
     // Broadcast steps are to be called from C
     void MultiplyHMatMainBroadcasts();
-    void MultiplyHMatMainBroadcastsCount( std::vector<int>& sizes );
+    void MultiplyHMatMainBroadcastsCount( std::vector<int>& sizes ) const;
     void MultiplyHMatMainBroadcastsPack
-    ( std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyHMatMainBroadcastsUnpack
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
 
@@ -744,9 +757,9 @@ private:
     int _localSourceOffset, _localTargetOffset;
 
     // For temporary products in an H-matrix/H-matrix multiplication
-    MemoryMap<int,MultiplyDenseContext> _denseContextMap;
-    MemoryMap<int,TransposeMultiplyDenseContext> _transposeDenseContextMap;
-    MemoryMap<int,AdjointMultiplyDenseContext> _adjointDenseContextMap;
+    MemoryMap<int,MultiplyDensePair> _densePairMap;
+    MemoryMap<int,TransposeMultiplyDensePair> _transposeDensePairMap;
+    MemoryMap<int,AdjointMultiplyDensePair> _adjointDensePairMap;
     MemoryMap<int,Dense<Scalar> > _UMap, _VMap, _DMap, _ZMap;
 
     // For the reuse of the computation of T1 = H Omega1 and T2 = H' Omega2 in 
