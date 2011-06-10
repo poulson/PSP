@@ -1368,7 +1368,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataSplitNodePack
-( const MultiplyDenseContext& context, byte*& head ) const
+( MultiplyDenseContext& context, byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataSplitNodePack");
@@ -1380,7 +1380,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataSplitNodePack
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        const typename MultiplyDenseContext::DistNode& nodeContext =
+        typename MultiplyDenseContext::DistNode& nodeContext =
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1390,14 +1390,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataSplitNodePack
     }
     case SPLIT_LOW_RANK:
     {
-        const Dense<Scalar>& Z = *context.block.data.Z;
+        Dense<Scalar>& Z = *context.block.data.Z;
         Write( head, Z.LockedBuffer(), Z.Height()*Z.Width() );
+        Z.Clear();
         break;
     }
     case SPLIT_DENSE:
     {
-        const Dense<Scalar>& Z = *context.block.data.Z;
+        Dense<Scalar>& Z = *context.block.data.Z;
         Write( head, Z.LockedBuffer(), Z.Height()*Z.Width() );
+        Z.Clear();
         break;
     }
     default:
@@ -1754,7 +1756,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyDensePassDataSplitNodePack
-( const TransposeMultiplyDenseContext& context,
+( TransposeMultiplyDenseContext& context,
   const Dense<Scalar>& XLocal, byte*& head ) const
 {
 #ifndef RELEASE
@@ -1769,7 +1771,7 @@ TransposeMultiplyDensePassDataSplitNodePack
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        const typename TransposeMultiplyDenseContext::DistNode& nodeContext =
+        typename TransposeMultiplyDenseContext::DistNode& nodeContext =
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1779,8 +1781,9 @@ TransposeMultiplyDensePassDataSplitNodePack
     }
     case SPLIT_LOW_RANK:
     {
-        const Dense<Scalar>& Z = *context.block.data.Z;
+        Dense<Scalar>& Z = *context.block.data.Z;
         Write( head, Z.LockedBuffer(), Z.Height()*Z.Width() );
+        Z.Clear();
         break;
     }
     case SPLIT_DENSE:

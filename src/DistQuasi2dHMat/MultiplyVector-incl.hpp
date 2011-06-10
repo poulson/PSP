@@ -1332,7 +1332,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
-( const MultiplyVectorContext& context, byte*& head ) const
+( MultiplyVectorContext& context, byte*& head ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataSplitNodePack");
@@ -1344,7 +1344,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        const typename MultiplyVectorContext::DistNode& nodeContext = 
+        typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1354,14 +1354,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
     }
     case SPLIT_LOW_RANK:
     {
-        const Vector<Scalar>& z = *context.block.data.z;
+        Vector<Scalar>& z = *context.block.data.z;
         Write( head, z.LockedBuffer(), z.Height() );
+        z.Clear();
         break;
     }
     case SPLIT_DENSE:
     {
-        const Vector<Scalar>& z = *context.block.data.z;
+        Vector<Scalar>& z = *context.block.data.z;
         Write( head, z.LockedBuffer(), z.Height() );
+        z.Clear();
         break;
     }
     default:
@@ -1711,7 +1713,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
 TransposeMultiplyVectorPassDataSplitNodePack
-( const TransposeMultiplyVectorContext& context,
+( TransposeMultiplyVectorContext& context,
   const Vector<Scalar>& xLocal, byte*& head ) const
 {
 #ifndef RELEASE
@@ -1725,7 +1727,7 @@ TransposeMultiplyVectorPassDataSplitNodePack
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        const typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
+        typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1735,8 +1737,9 @@ TransposeMultiplyVectorPassDataSplitNodePack
     }
     case SPLIT_LOW_RANK:
     {
-        const Vector<Scalar>& z = *context.block.data.z;
+        Vector<Scalar>& z = *context.block.data.z;
         Write( head, z.LockedBuffer(), z.Height() );
+        z.Clear();
         break;
     }
     case SPLIT_DENSE:

@@ -76,6 +76,7 @@ public:
     int LDim() const;
     void Resize( int height, int width );
     void Resize( int height, int width, int ldim );
+    void Clear();
 
     void Set( int i, int j, Scalar value );
     Scalar Get( int i, int j ) const;
@@ -306,6 +307,27 @@ psp::Dense<Scalar>::Resize( int height, int width, int ldim )
     _ldim = ldim;
     _memory.resize( ldim*width );
     _buffer = &_memory[0];
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar>
+inline void
+psp::Dense<Scalar>::Clear()
+{
+#ifndef RELEASE
+    PushCallStack("Dense::Clear");
+#endif
+    _height = 0;
+    _width = 0;
+    _ldim = 1;
+    _viewing = false;
+    _lockedView = false;
+    _memory.clear();
+    _buffer = 0;
+    _lockedBuffer = 0;
+    _type = GENERAL;
 #ifndef RELEASE
     PopCallStack();
 #endif

@@ -50,6 +50,7 @@ public:
 
     int Height() const;
     void Resize( int height );
+    void Clear();
 
     void Set( int i, Scalar value );
     Scalar Get( int i ) const;
@@ -132,6 +133,24 @@ psp::Vector<Scalar>::Resize( int height )
     _height = height;
     _memory.resize( height );
     _buffer = &_memory[0];
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar>
+inline void
+psp::Vector<Scalar>::Clear()
+{
+#ifndef RELEASE
+    PushCallStack("Vector::Clear");
+#endif
+    _height = 0;
+    _viewing = false;
+    _lockedView = false;
+    _memory.clear();
+    _buffer = 0;
+    _lockedBuffer = 0;
 #ifndef RELEASE
     PopCallStack();
 #endif

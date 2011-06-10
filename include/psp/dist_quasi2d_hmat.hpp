@@ -485,7 +485,7 @@ private:
     void MultiplyVectorPassDataSplitNodeCount
     ( std::size_t& bufferSize ) const;
     void MultiplyVectorPassDataSplitNodePack
-    ( const MultiplyVectorContext& context, byte*& head ) const;
+    ( MultiplyVectorContext& context, byte*& head ) const;
     void MultiplyVectorPassDataSplitNodeUnpack
     ( MultiplyVectorContext& context, const byte*& head ) const;
     void MultiplyVectorBroadcasts
@@ -528,7 +528,7 @@ private:
       Scalar alpha, const Dense<Scalar>& XLocal, 
                           Dense<Scalar>& YLocal ) const;
     void MultiplyDensePassDataSplitNodePack
-    ( const MultiplyDenseContext& context, byte*& head ) const;
+    ( MultiplyDenseContext& context, byte*& head ) const;
     void MultiplyDensePassDataSplitNodeUnpack
     ( MultiplyDenseContext& context, const byte*& head ) const;
     void MultiplyDenseBroadcasts
@@ -624,7 +624,7 @@ private:
     void TransposeMultiplyVectorPassDataSplitNodeCount
     ( std::size_t& bufferSize ) const;
     void TransposeMultiplyVectorPassDataSplitNodePack
-    ( const TransposeMultiplyVectorContext& context,
+    ( TransposeMultiplyVectorContext& context,
       const Vector<Scalar>& xLocal, byte*& head ) const;
     void TransposeMultiplyVectorPassDataSplitNodeUnpack
     ( TransposeMultiplyVectorContext& context, const byte*& head ) const;
@@ -668,7 +668,7 @@ private:
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
     void TransposeMultiplyDensePassDataSplitNodePack
-    ( const TransposeMultiplyDenseContext& context,
+    ( TransposeMultiplyDenseContext& context,
       const Dense<Scalar>& XLocal, byte*& head ) const;
     void TransposeMultiplyDensePassDataSplitNodeUnpack
     ( TransposeMultiplyDenseContext& context, const byte*& head ) const;
