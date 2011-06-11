@@ -219,7 +219,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseInitialize
         context.block.type = SPLIT_DENSE;
         context.block.data.Z = new Dense<Scalar>;
         break;
-
     default:
         context.block.type = EMPTY;
         break;
@@ -372,7 +371,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
         hmat_tools::Multiply( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
-
     default:
         break;
     }
@@ -482,7 +480,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePrecompute
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
-
     default:
         break;
     }
@@ -592,7 +589,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
         ( alpha, D, XLocalSub, (Scalar)1, YLocalSub );
         break;
     }
-
     default:
         break;
     }
@@ -746,7 +742,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
         if( _inSourceTeam )
             sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
-
     default:
         break;
     }
@@ -778,7 +773,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
         if( _inTargetTeam )
             sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
-
     default:
         break;
     }
@@ -827,7 +821,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
             offsets[_level-1] += DF.rank*numRhs;
         }
         break;
-
     default:
         break;
     }
@@ -876,7 +869,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
             offsets[_level-1] += DF.rank*numRhs;
         }
         break;
-
     default:
         break;
     }
@@ -930,7 +922,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
             }
         }
         break;
-
     default:
         break;
     }
@@ -984,7 +975,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
             }
         }
         break;
-
     default:
         break;
     }
@@ -1034,7 +1024,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
             }
         }
         break;
-
     default:
         break;
     }
@@ -1084,7 +1073,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
             }
         }
         break;
-
     default:
         break;
     }
@@ -1356,7 +1344,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             Z.Resize( 0, numRhs );
         break;
     }
-
     default:
         break;
     }
@@ -1467,6 +1454,267 @@ MultiplyDensePassDataSplitNodeUnpack
 #ifndef RELEASE
         throw std::logic_error("This should be impossible");
 #endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataCount
+( std::vector<int>& sendSizes, std::vector<int>& recvSizes, int numRhs ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataCount");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyDensePassDataCount
+                ( sendSizes, recvSizes, numRhs );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
+        {
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                if( _inSourceTeam )
+                    sendSizes[_targetRoot] += DF.rank*numRhs;
+                else
+                    recvSizes[_sourceRoot] += DF.rank*numRhs;
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
+        {
+            if( _inSourceTeam )
+                sendSizes[_targetRoot] += SF.rank*numRhs;
+            else
+                recvSizes[_sourceRoot] += SF.rank*numRhs;
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( Height() != 0 )
+        {
+            if( _inSourceTeam )
+                sendSizes[_targetRoot] += Height()*numRhs;
+            else
+                recvSizes[_sourceRoot] += Height()*numRhs;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataPack
+( MultiplyDenseContext& context,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataPack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyDenseContext::DistNode& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyDensePassDataPack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyDenseContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyDensePassDataPack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inSourceTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Dense<Scalar>& Z = *context.block.data.Z;
+                    std::memcpy
+                    ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
+                      Z.Height()*Z.Width()*sizeof(Scalar) );
+                    offsets[_targetRoot] += Z.Height()*Z.Width();
+                    Z.Clear();
+                }
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        if( _inSourceTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                std::memcpy
+                ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
+                  Z.Height()*Z.Width()*sizeof(Scalar) );
+                offsets[_targetRoot] += Z.Height()*Z.Width();
+                Z.Clear();
+            }
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inSourceTeam )
+        {
+            Dense<Scalar>& Z = *context.block.data.Z;
+            std::memcpy
+            ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
+              Z.Height()*Z.Width()*sizeof(Scalar) );
+            offsets[_targetRoot] += Z.Height()*Z.Width();
+            Z.Clear();
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataUnpack
+( MultiplyDenseContext& context,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataUnpack");
+#endif
+    const int numRhs = context.numRhs;
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyDenseContext::DistNode& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyDensePassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyDenseContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyDensePassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inTargetTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Dense<Scalar>& Z = *context.block.data.Z;
+                    Z.Resize( DF.rank, numRhs, DF.rank );
+                    std::memcpy
+                    ( Z.Buffer(), &buffer[offsets[_sourceRoot]],
+                      DF.rank*numRhs*sizeof(Scalar) );
+                    offsets[_sourceRoot] += DF.rank*numRhs;
+                }
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        if( _inTargetTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                Z.Resize( SF.rank, numRhs, SF.rank );
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_sourceRoot]],
+                  SF.rank*numRhs*sizeof(Scalar) );
+                offsets[_sourceRoot] += SF.rank*numRhs;
+            }
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inTargetTeam )
+        {
+            Dense<Scalar>& Z = *context.block.data.Z;
+            Z.Resize( Height(), numRhs, Height() );
+            std::memcpy
+            ( Z.Buffer(), &buffer[offsets[_sourceRoot]],
+              Z.Height()*numRhs*sizeof(Scalar) );
+            offsets[_sourceRoot] += Z.Height()*numRhs;
+        }
+        break;
+    }
+    default:
         break;
     }
 #ifndef RELEASE
@@ -1743,7 +1991,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             Z.Resize( 0, numRhs );
         break;
     }
-
     default:
         break;
     }
@@ -2015,7 +2262,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsCount
         if( _inTargetTeam )
             sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
-
     default:
         break;
     }
@@ -2047,7 +2293,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsCount
         if( _inSourceTeam )
             sizes[_level-1] += _block.data.DF->rank*numRhs;
         break;
-
     default:
         break;
     }
@@ -2095,7 +2340,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
             }
         }
         break;
-
     default:
         break;
     }
@@ -2144,7 +2388,6 @@ TransposeMultiplyDenseBroadcastsPack
             }
         }
         break;
-
     default:
         break;
     }
@@ -2193,7 +2436,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
                 Z.Resize( 0, numRhs );
         }
         break;
-
     default:
         break;
     }
@@ -2243,7 +2485,6 @@ TransposeMultiplyDenseBroadcastsUnpack
                 Z.Resize( 0, numRhs );
         }
         break;
-
     default:
         break;
     }
@@ -2289,7 +2530,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
                 Z.Resize( 0, numRhs );
         }
         break;
-
     default:
         break;
     }
@@ -2336,7 +2576,6 @@ TransposeMultiplyDenseNaiveBroadcasts
                 Z.Resize( 0, numRhs );
         }
         break;
-
     default:
         break;
     }
@@ -2434,7 +2673,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePostcompute
             }
         }
         break;
-
     default:
         break;
     }
@@ -2544,7 +2782,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
             ( alpha, SD.D, Z, (Scalar)1, YLocalSub );
         }
         break;
-
     default:
         break;
     }
@@ -2654,7 +2891,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
             ( alpha, SD.D, Z, (Scalar)1, YLocalSub );
         }
         break;
-
     default:
         break;
     }

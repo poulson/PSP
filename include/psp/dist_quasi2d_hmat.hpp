@@ -555,7 +555,8 @@ private:
                           Dense<Scalar>& YLocal ) const;
     // Extra fine-grain routines for use within H-matrix/H-matrix multiplication
     void MultiplyDensePassDataCount
-    ( std::vector<int>& sizes, int numRhs ) const;
+    ( std::vector<int>& sendSizes, 
+      std::vector<int>& recvSizes, int numRhs ) const;
     void MultiplyDensePassDataPack
     ( MultiplyDenseContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
