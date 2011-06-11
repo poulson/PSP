@@ -609,8 +609,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
-    std::vector<int> sizes( numReduces );
-    std::memset( &sizes[0], 0, numReduces*sizeof(int) );
+    std::vector<int> sizes( numReduces, 0 );
     MultiplyDenseSummationsCount( sizes, context.numRhs );
 
     // Pack all of the data to be reduced into a single buffer
