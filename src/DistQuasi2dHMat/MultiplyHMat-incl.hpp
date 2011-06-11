@@ -1534,22 +1534,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountA
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDenseSummationsCount( sizes, _T2Context.numRhs );
-        break;
-    }
-    default:
-        break;
-    }
 
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1576,22 +1564,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDenseSummationsPack( _T2Context, buffer, offsets );
-        break;
-    }
-    default:
-        break;
-    }
-    
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
+
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1619,23 +1595,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackA
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDenseSummationsUnpack
             ( _T2Context, buffer, offsets );
-        break;
-    }
-    default:
-        break;
-    }
-    
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
+
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1663,22 +1627,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountB
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     {
         if( _beganColSpaceComp )
             MultiplyDenseSummationsCount( sizes, _T1Context.numRhs );
-        break;
-    }
-    default:
-        break;
-    }
 
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1705,22 +1657,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackB
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     {
         if( _beganColSpaceComp )
             MultiplyDenseSummationsPack( _T1Context, buffer, offsets );
-        break;
-    }
-    default:
-        break;
-    }
-    
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
+
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1748,22 +1688,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
     {
     case DIST_NODE:
     case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     {
         if( _beganColSpaceComp )
             MultiplyDenseSummationsUnpack( _T1Context, buffer, offsets );
-        break;
-    }
-    default:
-        break;
-    }
-    
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
+
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
