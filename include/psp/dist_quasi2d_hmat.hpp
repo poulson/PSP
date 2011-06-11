@@ -463,46 +463,35 @@ private:
     //
     // H-matrix/vector multiplication
     //
-    void MultiplyVectorInitialize
-    ( MultiplyVectorContext& context ) const;
+    void MultiplyVectorInitialize( MultiplyVectorContext& context ) const;
     void MultiplyVectorPrecompute
     ( MultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
-    void MultiplyVectorSummations
-    ( MultiplyVectorContext& context ) const;
-    void MultiplyVectorSummationsCount
-    ( std::vector<int>& sizes ) const;
+    void MultiplyVectorSummations( MultiplyVectorContext& context ) const;
+    void MultiplyVectorSummationsCount( std::vector<int>& sizes ) const;
     void MultiplyVectorSummationsPack
     ( const MultiplyVectorContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyVectorSummationsUnpack
     ( MultiplyVectorContext& context, 
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyVectorNaiveSummations
-    ( MultiplyVectorContext& context ) const;
-    void MultiplyVectorPassData
-    ( MultiplyVectorContext& context,
-      Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
-    void MultiplyVectorPassDataSplitNodeCount
-    ( std::size_t& bufferSize ) const;
+    void MultiplyVectorNaiveSummations( MultiplyVectorContext& context ) const;
+    void MultiplyVectorPassData( MultiplyVectorContext& context ) const;
+    void MultiplyVectorPassDataSplitNodeCount( std::size_t& bufferSize ) const;
     void MultiplyVectorPassDataSplitNodePack
     ( MultiplyVectorContext& context, byte*& head ) const;
     void MultiplyVectorPassDataSplitNodeUnpack
     ( MultiplyVectorContext& context, const byte*& head ) const;
-    void MultiplyVectorBroadcasts
-    ( MultiplyVectorContext& context ) const;
-    void MultiplyVectorBroadcastsCount
-    ( std::vector<int>& sizes ) const;
+    void MultiplyVectorBroadcasts( MultiplyVectorContext& context ) const;
+    void MultiplyVectorBroadcastsCount( std::vector<int>& sizes ) const;
     void MultiplyVectorBroadcastsPack
     ( const MultiplyVectorContext& context,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyVectorBroadcastsUnpack
     ( MultiplyVectorContext& context,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyVectorNaiveBroadcasts
-    ( MultiplyVectorContext& context ) const;
+    void MultiplyVectorNaiveBroadcasts( MultiplyVectorContext& context ) const;
     void MultiplyVectorPostcompute
     ( MultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
@@ -517,8 +506,7 @@ private:
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal, 
                           Dense<Scalar>& YLocal ) const;
-    void MultiplyDenseSummations
-    ( MultiplyDenseContext& context ) const;
+    void MultiplyDenseSummations( MultiplyDenseContext& context ) const;
     void MultiplyDenseSummationsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void MultiplyDenseSummationsPack
@@ -527,18 +515,13 @@ private:
     void MultiplyDenseSummationsUnpack
     ( MultiplyDenseContext& context, 
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyDenseNaiveSummations
-    ( MultiplyDenseContext& context ) const;
-    void MultiplyDensePassData
-    ( MultiplyDenseContext& context,
-      Scalar alpha, const Dense<Scalar>& XLocal, 
-                          Dense<Scalar>& YLocal ) const;
+    void MultiplyDenseNaiveSummations( MultiplyDenseContext& context ) const;
+    void MultiplyDensePassData( MultiplyDenseContext& context ) const;
     void MultiplyDensePassDataSplitNodePack
     ( MultiplyDenseContext& context, byte*& head ) const;
     void MultiplyDensePassDataSplitNodeUnpack
     ( MultiplyDenseContext& context, const byte*& head ) const;
-    void MultiplyDenseBroadcasts
-    ( MultiplyDenseContext& context ) const;
+    void MultiplyDenseBroadcasts( MultiplyDenseContext& context ) const;
     void MultiplyDenseBroadcastsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void MultiplyDenseBroadcastsPack
@@ -547,8 +530,7 @@ private:
     void MultiplyDenseBroadcastsUnpack
     ( MultiplyDenseContext& context, 
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyDenseNaiveBroadcasts
-    ( MultiplyDenseContext& context ) const;
+    void MultiplyDenseNaiveBroadcasts( MultiplyDenseContext& context ) const;
     void MultiplyDensePostcompute
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal, 
@@ -666,8 +648,7 @@ private:
     ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorPassData
     ( TransposeMultiplyVectorContext& context,
-      Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
+      const Vector<Scalar>& xLocal ) const;
     void TransposeMultiplyVectorPassDataSplitNodeCount
     ( std::size_t& bufferSize ) const;
     void TransposeMultiplyVectorPassDataSplitNodePack
@@ -715,8 +696,7 @@ private:
     ( TransposeMultiplyDenseContext& context ) const;
     void TransposeMultiplyDensePassData
     ( TransposeMultiplyDenseContext& context,
-      Scalar alpha, const Dense<Scalar>& XLocal,
-                          Dense<Scalar>& YLocal ) const;
+      const Dense<Scalar>& XLocal ) const;
     void TransposeMultiplyDensePassDataSplitNodePack
     ( TransposeMultiplyDenseContext& context,
       const Dense<Scalar>& XLocal, byte*& head ) const;
@@ -738,6 +718,16 @@ private:
     ( TransposeMultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
+    // Extra fine-grain routines for use within H-matrix/H-matrix multiplication
+    void TransposeMultiplyDensePassDataCount
+    ( std::vector<int>& sendSizes, 
+      std::vector<int>& recvSizes, int numRhs ) const;
+    void TransposeMultiplyDensePassDataPack
+    ( TransposeMultiplyDenseContext& context, const Dense<Scalar>& XLocal,
+      std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
+    void TransposeMultiplyDensePassDataUnpack
+    ( TransposeMultiplyDenseContext& context,
+      const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
 
     //
     // Adjoint H-matrix/vector multiplication
@@ -754,8 +744,7 @@ private:
     ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorPassData
     ( AdjointMultiplyVectorContext& context,
-      Scalar alpha, const Vector<Scalar>& xLocal,
-                          Vector<Scalar>& yLocal ) const;
+      const Vector<Scalar>& xLocal ) const;
     void AdjointMultiplyVectorBroadcasts
     ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorNaiveBroadcasts
@@ -779,9 +768,7 @@ private:
     void AdjointMultiplyDenseNaiveSummations
     ( AdjointMultiplyDenseContext& context ) const;
     void AdjointMultiplyDensePassData
-    ( AdjointMultiplyDenseContext& context,
-      Scalar alpha, const Dense<Scalar>& XLocal,
-                          Dense<Scalar>& YLocal ) const;
+    ( AdjointMultiplyDenseContext& context, const Dense<Scalar>& XLocal ) const;
     void AdjointMultiplyDenseBroadcasts
     ( AdjointMultiplyDenseContext& context ) const;
     void AdjointMultiplyDenseNaiveBroadcasts

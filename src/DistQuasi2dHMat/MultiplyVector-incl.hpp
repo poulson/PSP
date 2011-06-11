@@ -84,7 +84,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MultiplyVectorSummations( context );
     //MultiplyVectorNaiveSummations( context );
 
-    MultiplyVectorPassData( context, alpha, xLocal, yLocal );
+    MultiplyVectorPassData( context );
 
     MultiplyVectorBroadcasts( context );
     //MultiplyVectorNaiveBroadcasts( context );
@@ -114,7 +114,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     TransposeMultiplyVectorSummations( context );
     //TransposeMultiplyVectorNaiveSummations( context );
 
-    TransposeMultiplyVectorPassData( context, alpha, xLocal, yLocal );
+    TransposeMultiplyVectorPassData( context, xLocal );
 
     TransposeMultiplyVectorBroadcasts( context );
     //TransposeMultiplyVectorNaiveBroadcasts( context );
@@ -144,7 +144,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
     AdjointMultiplyVectorSummations( context );
     //AdjointMultiplyVectorNaiveSummations( context );
 
-    AdjointMultiplyVectorPassData( context, alpha, xLocal, yLocal );
+    AdjointMultiplyVectorPassData( context, xLocal );
 
     AdjointMultiplyVectorBroadcasts( context );
     //AdjointMultiplyVectorNaiveBroadcasts( context );
@@ -1057,9 +1057,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorNaiveSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
-( MultiplyVectorContext& context,
-  Scalar alpha, const Vector<Scalar>& xLocal,
-                      Vector<Scalar>& yLocal ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassData");
@@ -1083,7 +1081,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
                 for( int t=0; t<2; ++t )
                     for( int s=0; s<2; ++s )
                         node.Child(t,s).MultiplyVectorPassData
-                        ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                        ( nodeContext.Child(t,s) );
             }
             else
             {
@@ -1091,19 +1089,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
                 for( int t=2; t<4; ++t )
                     for( int s=2; s<4; ++s )
                         node.Child(t,s).MultiplyVectorPassData
-                        ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                        ( nodeContext.Child(t,s) );
             }
             // Top-right quadrant
             for( int t=0; t<2; ++t )
                 for( int s=2; s<4; ++s )
                     node.Child(t,s).MultiplyVectorPassData
-                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                    ( nodeContext.Child(t,s) );
 
             // Bottom-left quadrant
             for( int t=2; t<4; ++t )
                 for( int s=0; s<2; ++s )
                     node.Child(t,s).MultiplyVectorPassData
-                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                    ( nodeContext.Child(t,s) );
         }
         else // teamSize >= 4
         {
@@ -1113,82 +1111,82 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
             case 0:
                 // Take care of the work specific to our subteams
                 node.Child(0,0).MultiplyVectorPassData
-                ( nodeContext.Child(0,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,0) );
                 // Interact with subteam 1
                 node.Child(0,1).MultiplyVectorPassData
-                ( nodeContext.Child(0,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,1) );
                 node.Child(1,0).MultiplyVectorPassData
-                ( nodeContext.Child(1,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,0) );
                 // Interact with subteam 2
                 node.Child(0,2).MultiplyVectorPassData
-                ( nodeContext.Child(0,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,2) );
                 node.Child(2,0).MultiplyVectorPassData
-                ( nodeContext.Child(2,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,0) );
                 // Interact with subteam 3
                 node.Child(0,3).MultiplyVectorPassData
-                ( nodeContext.Child(0,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,3) );
                 node.Child(3,0).MultiplyVectorPassData
-                ( nodeContext.Child(3,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,0) );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
                 node.Child(1,1).MultiplyVectorPassData
-                ( nodeContext.Child(1,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,1) );
                 // Interact with subteam 0
                 node.Child(0,1).MultiplyVectorPassData
-                ( nodeContext.Child(0,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,1) );
                 node.Child(1,0).MultiplyVectorPassData
-                ( nodeContext.Child(1,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,0) );
                 // Interact with subteam 3
                 node.Child(1,3).MultiplyVectorPassData
-                ( nodeContext.Child(1,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,3) );
                 node.Child(3,1).MultiplyVectorPassData
-                ( nodeContext.Child(3,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,1) );
                 // Interact with subteam 2
                 node.Child(1,2).MultiplyVectorPassData
-                ( nodeContext.Child(1,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,2) );
                 node.Child(2,1).MultiplyVectorPassData
-                ( nodeContext.Child(2,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,1) );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
                 node.Child(2,2).MultiplyVectorPassData
-                ( nodeContext.Child(2,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,2) );
                 // Interact with subteam 3
                 node.Child(2,3).MultiplyVectorPassData
-                ( nodeContext.Child(2,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,3) );
                 node.Child(3,2).MultiplyVectorPassData
-                ( nodeContext.Child(3,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,2) );
                 // Interact with subteam 0
                 node.Child(0,2).MultiplyVectorPassData
-                ( nodeContext.Child(0,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,2) );
                 node.Child(2,0).MultiplyVectorPassData
-                ( nodeContext.Child(2,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,0) );
                 // Interact with subteam 1
                 node.Child(1,2).MultiplyVectorPassData
-                ( nodeContext.Child(1,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,2) );
                 node.Child(2,1).MultiplyVectorPassData
-                ( nodeContext.Child(2,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,1) );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
                 node.Child(3,3).MultiplyVectorPassData
-                ( nodeContext.Child(3,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,3) );
                 // Interact with subteam 2
                 node.Child(2,3).MultiplyVectorPassData
-                ( nodeContext.Child(2,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,3) );
                 node.Child(3,2).MultiplyVectorPassData
-                ( nodeContext.Child(3,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,2) );
                 // Interact with subteam 1
                 node.Child(1,3).MultiplyVectorPassData
-                ( nodeContext.Child(1,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,3) );
                 node.Child(3,1).MultiplyVectorPassData
-                ( nodeContext.Child(3,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,1) );
                 // Interact with subteam 0
                 node.Child(0,3).MultiplyVectorPassData
-                ( nodeContext.Child(0,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,3) );
                 node.Child(3,0).MultiplyVectorPassData
-                ( nodeContext.Child(3,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,0) );
                 break;
             default:
                 // This should be impossible
@@ -1249,8 +1247,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
             if( teamRank == 0 )
             {
                 if( _inSourceTeam )
+                {
                     mpi::Send
                     ( z.LockedBuffer(), DF.rank, _targetRoot, 0, comm );
+                    z.Clear();
+                }
                 else
                     mpi::Recv( z.Buffer(), DF.rank, _sourceRoot, 0, comm );
             }
@@ -1266,7 +1267,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
         {
             MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
+            {
                 mpi::Send( z.LockedBuffer(), SF.rank, _targetRoot, 0, comm );
+                z.Clear();
+            }
             else
                 mpi::Recv( z.Buffer(), SF.rank, _sourceRoot, 0, comm );
         }
@@ -1280,7 +1284,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
         {
             MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
+            {
                 mpi::Send( z.LockedBuffer(), Height(), _targetRoot, 0, comm );
+                z.Clear();
+            }
             else
                 mpi::Recv( z.Buffer(), Height(), _sourceRoot, 0, comm );
         }
@@ -1428,9 +1435,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
-( TransposeMultiplyVectorContext& context,
-  Scalar alpha, const Vector<Scalar>& xLocal,
-                      Vector<Scalar>& yLocal ) const
+( TransposeMultiplyVectorContext& context, const Vector<Scalar>& xLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassData");
@@ -1454,7 +1459,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
                 for( int t=0; t<2; ++t )
                     for( int s=0; s<2; ++s )
                         node.Child(t,s).TransposeMultiplyVectorPassData
-                        ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                        ( nodeContext.Child(t,s), xLocal );
             }
             else
             {
@@ -1462,18 +1467,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
                 for( int t=2; t<4; ++t )
                     for( int s=2; s<4; ++s )
                         node.Child(t,s).TransposeMultiplyVectorPassData
-                        ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                        ( nodeContext.Child(t,s), xLocal );
             }
             // Top-right quadrant
             for( int t=0; t<2; ++t )
                 for( int s=2; s<4; ++s )
                     node.Child(t,s).TransposeMultiplyVectorPassData
-                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                    ( nodeContext.Child(t,s), xLocal );
             // Bottom-left quadrant
             for( int t=2; t<4; ++t )
                 for( int s=0; s<2; ++s )
                     node.Child(t,s).TransposeMultiplyVectorPassData
-                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                    ( nodeContext.Child(t,s), xLocal );
         }
         else // teamSize >= 4
         {
@@ -1483,82 +1488,82 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
             case 0:
                 // Take care of the work specific to our subteams
                 node.Child(0,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,0), xLocal );
                 // Interact with subteam 1
                 node.Child(0,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,1), xLocal );
                 node.Child(1,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,0), xLocal );
                 // Interact with subteam 2
                 node.Child(0,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,2), xLocal );
                 node.Child(2,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,0), xLocal );
                 // Interact with subteam 3
                 node.Child(0,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,3), xLocal );
                 node.Child(3,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,0), xLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
                 node.Child(1,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,1), xLocal );
                 // Interact with subteam 0
                 node.Child(0,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,1), xLocal );
                 node.Child(1,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,0), xLocal );
                 // Interact with subteam 3
                 node.Child(1,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,3), alpha, xLocal, yLocal ); 
+                ( nodeContext.Child(1,3), xLocal ); 
                 node.Child(3,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,1), xLocal );
                 // Interact with subteam 2
                 node.Child(1,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,2), xLocal );
                 node.Child(2,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,1), xLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
                 node.Child(2,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,2), xLocal );
                 // Interact with subteam 3
                 node.Child(2,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,3), xLocal );
                 node.Child(3,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,2), xLocal );
                 // Interact with subteam 0
                 node.Child(0,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,2), xLocal );
                 node.Child(2,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,0), xLocal );
                 // Interact with subteam 1
                 node.Child(1,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,2), xLocal );
                 node.Child(2,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,1), xLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
                 node.Child(3,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,3), xLocal );
                 // Interact with subteam 2
                 node.Child(2,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(2,3), xLocal );
                 node.Child(3,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,2), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,2), xLocal );
                 // Interact with subteam 1
                 node.Child(1,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(1,3), xLocal );
                 node.Child(3,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,1), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,1), xLocal );
                 // Interact with subteam 0
                 node.Child(0,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,3), alpha, xLocal, yLocal );
+                ( nodeContext.Child(0,3), xLocal );
                 node.Child(3,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,0), alpha, xLocal, yLocal );
+                ( nodeContext.Child(3,0), xLocal );
                 break;
             default:
                 // This should be impossible
@@ -1620,8 +1625,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
             if( teamRank == 0 )
             {
                 if( _inTargetTeam )
+                {
                     mpi::Send
                     ( z.LockedBuffer(), DF.rank, _sourceRoot, 0, comm );
+                    z.Clear();
+                }
                 else
                     mpi::Recv( z.Buffer(), DF.rank, _targetRoot, 0, comm );
             }
@@ -1637,7 +1645,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
         {
             MPI_Comm comm = _teams->Team( 0 );
             if( _inTargetTeam )
+            {
                 mpi::Send( z.LockedBuffer(), SF.rank, _sourceRoot, 0, comm );
+                z.Clear();
+            }
             else
                 mpi::Recv( z.Buffer(), SF.rank, _targetRoot, 0, comm );
         }
@@ -1809,15 +1820,13 @@ TransposeMultiplyVectorPassDataSplitNodeUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPassData
-( AdjointMultiplyVectorContext& context,
-  Scalar alpha, const Vector<Scalar>& xLocal,
-                      Vector<Scalar>& yLocal ) const
+( AdjointMultiplyVectorContext& context, const Vector<Scalar>& xLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorPassData");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyVectorPassData( context, alpha, xLocal, yLocal );
+    TransposeMultiplyVectorPassData( context, xLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif

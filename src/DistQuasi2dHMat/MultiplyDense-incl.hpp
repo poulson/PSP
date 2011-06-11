@@ -88,7 +88,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MultiplyDenseSummations( context );
     //MultiplyDenseNaiveSummations( context );
 
-    MultiplyDensePassData( context, alpha, XLocal, YLocal );
+    MultiplyDensePassData( context );
 
     MultiplyDenseBroadcasts( context );
     //MultiplyDenseNaiveBroadcasts( context );
@@ -120,7 +120,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     TransposeMultiplyDenseSummations( context );
     //TransposeMultiplyDenseNaiveSummations( context );
 
-    TransposeMultiplyDensePassData( context, alpha, XLocal, YLocal );
+    TransposeMultiplyDensePassData( context, XLocal );
 
     TransposeMultiplyDenseBroadcasts( context );
     //TransposeMultiplyDenseNaiveBroadcasts( context );
@@ -152,7 +152,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
     AdjointMultiplyDenseSummations( context );
     //AdjointMultiplyDenseNaiveSummations( context );
 
-    AdjointMultiplyDensePassData( context, alpha, XLocal, YLocal );
+    AdjointMultiplyDensePassData( context, XLocal );
 
     AdjointMultiplyDenseBroadcasts( context );
     //AdjointMultiplyDenseNaiveBroadcasts( context );
@@ -1099,9 +1099,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
-( MultiplyDenseContext& context,
-  Scalar alpha, const Dense<Scalar>& XLocal,
-                      Dense<Scalar>& YLocal ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassData");
@@ -1126,7 +1124,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
                 for( int t=0; t<2; ++t )
                     for( int s=0; s<2; ++s )
                         node.Child(t,s).MultiplyDensePassData
-                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                        ( nodeContext.Child(t,s) );
             }
             else
             {
@@ -1134,18 +1132,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
                 for( int t=2; t<4; ++t )
                     for( int s=2; s<4; ++s )
                         node.Child(t,s).MultiplyDensePassData
-                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                        ( nodeContext.Child(t,s) );
             }
             // Top-right quadrant
             for( int t=0; t<2; ++t )
                 for( int s=2; s<4; ++s )
                     node.Child(t,s).MultiplyDensePassData
-                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                    ( nodeContext.Child(t,s) );
             // Bottom-left quadrant
             for( int t=2; t<4; ++t )
                 for( int s=0; s<2; ++s )
                     node.Child(t,s).MultiplyDensePassData
-                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                    ( nodeContext.Child(t,s) );
         }
         else // teamSize >= 4
         {
@@ -1154,83 +1152,55 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             {
             case 0:
                 // Take care of the work specific to our subteams
-                node.Child(0,0).MultiplyDensePassData
-                ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
+                node.Child(0,0).MultiplyDensePassData( nodeContext.Child(0,0) );
                 // Interact with subteam 1
-                node.Child(0,1).MultiplyDensePassData
-                ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MultiplyDensePassData
-                ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
+                node.Child(0,1).MultiplyDensePassData( nodeContext.Child(0,1) );
+                node.Child(1,0).MultiplyDensePassData( nodeContext.Child(1,0) );
                 // Interact with subteam 2
-                node.Child(0,2).MultiplyDensePassData
-                ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).MultiplyDensePassData
-                ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
+                node.Child(0,2).MultiplyDensePassData( nodeContext.Child(0,2) );
+                node.Child(2,0).MultiplyDensePassData( nodeContext.Child(2,0) );
                 // Interact with subteam 3
-                node.Child(0,3).MultiplyDensePassData
-                ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).MultiplyDensePassData
-                ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
+                node.Child(0,3).MultiplyDensePassData( nodeContext.Child(0,3) );
+                node.Child(3,0).MultiplyDensePassData( nodeContext.Child(3,0) );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
-                node.Child(1,1).MultiplyDensePassData
-                ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
+                node.Child(1,1).MultiplyDensePassData( nodeContext.Child(1,1) );
                 // Interact with subteam 0
-                node.Child(0,1).MultiplyDensePassData
-                ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
-                node.Child(1,0).MultiplyDensePassData
-                ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
+                node.Child(0,1).MultiplyDensePassData( nodeContext.Child(0,1) );
+                node.Child(1,0).MultiplyDensePassData( nodeContext.Child(1,0) );
                 // Interact with subteam 3
-                node.Child(1,3).MultiplyDensePassData
-                ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).MultiplyDensePassData
-                ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
+                node.Child(1,3).MultiplyDensePassData( nodeContext.Child(1,3) );
+                node.Child(3,1).MultiplyDensePassData( nodeContext.Child(3,1) );
                 // Interact with subteam 2
-                node.Child(1,2).MultiplyDensePassData
-                ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).MultiplyDensePassData
-                ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
+                node.Child(1,2).MultiplyDensePassData( nodeContext.Child(1,2) );
+                node.Child(2,1).MultiplyDensePassData( nodeContext.Child(2,1) );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
-                node.Child(2,2).MultiplyDensePassData
-                ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
+                node.Child(2,2).MultiplyDensePassData( nodeContext.Child(2,2) );
                 // Interact with subteam 3
-                node.Child(2,3).MultiplyDensePassData
-                ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MultiplyDensePassData
-                ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
+                node.Child(2,3).MultiplyDensePassData( nodeContext.Child(2,3) );
+                node.Child(3,2).MultiplyDensePassData( nodeContext.Child(3,2) );
                 // Interact with subteam 0
-                node.Child(0,2).MultiplyDensePassData
-                ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
-                node.Child(2,0).MultiplyDensePassData
-                ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
+                node.Child(0,2).MultiplyDensePassData( nodeContext.Child(0,2) );
+                node.Child(2,0).MultiplyDensePassData( nodeContext.Child(2,0) );
                 // Interact with subteam 1
-                node.Child(1,2).MultiplyDensePassData
-                ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
-                node.Child(2,1).MultiplyDensePassData
-                ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
+                node.Child(1,2).MultiplyDensePassData( nodeContext.Child(1,2) );
+                node.Child(2,1).MultiplyDensePassData( nodeContext.Child(2,1) );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
-                node.Child(3,3).MultiplyDensePassData
-                ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
+                node.Child(3,3).MultiplyDensePassData( nodeContext.Child(3,3) );
                 // Interact with subteam 2
-                node.Child(2,3).MultiplyDensePassData
-                ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
-                node.Child(3,2).MultiplyDensePassData
-                ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
+                node.Child(2,3).MultiplyDensePassData( nodeContext.Child(2,3) );
+                node.Child(3,2).MultiplyDensePassData( nodeContext.Child(3,2) );
                 // Interact with subteam 1
-                node.Child(1,3).MultiplyDensePassData
-                ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
-                node.Child(3,1).MultiplyDensePassData
-                ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
+                node.Child(1,3).MultiplyDensePassData( nodeContext.Child(1,3) );
+                node.Child(3,1).MultiplyDensePassData( nodeContext.Child(3,1) );
                 // Interact with subteam 0
-                node.Child(0,3).MultiplyDensePassData
-                ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
-                node.Child(3,0).MultiplyDensePassData
-                ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
+                node.Child(0,3).MultiplyDensePassData( nodeContext.Child(0,3) );
+                node.Child(3,0).MultiplyDensePassData( nodeContext.Child(3,0) );
                 break;
             default:
                 // This should be impossible
@@ -1290,8 +1260,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
             if( teamRank == 0 )
             {
                 if( _inSourceTeam )
+                {
                     mpi::Send
                     ( Z.LockedBuffer(), DF.rank*numRhs, _targetRoot, 0, comm );
+                    Z.Clear();
+                }
                 else
                 {
                     Z.Resize( DF.rank, numRhs, DF.rank );
@@ -1300,8 +1273,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
                 }
             }
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1312,16 +1283,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         {
             MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
+            {
                 mpi::Send
                 ( Z.LockedBuffer(), SF.rank*numRhs, _targetRoot, 0, comm );
+                Z.Clear();
+            }
             else
             {
                 Z.Resize( SF.rank, numRhs, SF.rank );
                 mpi::Recv( Z.Buffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
             }
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1331,8 +1303,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         {
             MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
+            {
                 mpi::Send
                 ( Z.LockedBuffer(), Z.Height()*numRhs, _targetRoot, 0, comm );
+                Z.Clear();
+            }
             else
             {
                 Z.Resize( Height(), numRhs, Height() );
@@ -1340,8 +1315,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
                 ( Z.Buffer(), Z.Height()*numRhs, _sourceRoot, 0, comm );
             }
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     default:
@@ -1434,8 +1407,6 @@ MultiplyDensePassDataSplitNodeUnpack
             Z.Resize( SF.rank, numRhs, SF.rank );
             Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1446,8 +1417,6 @@ MultiplyDensePassDataSplitNodeUnpack
             Z.Resize( Height(), numRhs, Height() );
             Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     default:
@@ -1725,9 +1694,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
-( TransposeMultiplyDenseContext& context,
-  Scalar alpha, const Dense<Scalar>& XLocal,
-                      Dense<Scalar>& YLocal ) const
+( TransposeMultiplyDenseContext& context, const Dense<Scalar>& XLocal ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassData");
@@ -1752,7 +1719,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
                 for( int t=0; t<2; ++t )
                     for( int s=0; s<2; ++s )
                         node.Child(t,s).TransposeMultiplyDensePassData
-                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                        ( nodeContext.Child(t,s), XLocal );
             }
             else
             {
@@ -1760,18 +1727,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
                 for( int t=2; t<4; ++t )
                     for( int s=2; s<4; ++s )
                         node.Child(t,s).TransposeMultiplyDensePassData
-                        ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                        ( nodeContext.Child(t,s), XLocal );
             }
             // Top-right quadrant
             for( int t=0; t<2; ++t )
                 for( int s=2; s<4; ++s )
                     node.Child(t,s).TransposeMultiplyDensePassData
-                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                    ( nodeContext.Child(t,s), XLocal );
             // Bottom-left quadrant
             for( int t=2; t<4; ++t )
                 for( int s=0; s<2; ++s )
                     node.Child(t,s).TransposeMultiplyDensePassData
-                    ( nodeContext.Child(t,s), alpha, XLocal, YLocal );
+                    ( nodeContext.Child(t,s), XLocal );
         }
         else // teamSize >= 4
         {
@@ -1781,82 +1748,82 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             case 0:
                 // Take care of the work specific to our subteams
                 node.Child(0,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,0), XLocal );
                 // Interact with subteam 1
                 node.Child(0,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,1), XLocal );
                 node.Child(1,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(1,0), XLocal );
                 // Interact with subteam 2
                 node.Child(0,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,2), XLocal );
                 node.Child(2,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,0), XLocal );
                 // Interact with subteam 3
                 node.Child(0,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,3), XLocal );
                 node.Child(3,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,0), XLocal );
                 break;
             case 1:
                 // Take care of the work specific to our subteams
                 node.Child(1,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(1,1), XLocal );
                 // Interact with subteam 0
                 node.Child(0,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,1), XLocal );
                 node.Child(1,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(1,0), XLocal );
                 // Interact with subteam 3
                 node.Child(1,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,3), alpha, XLocal, YLocal ); 
+                ( nodeContext.Child(1,3), XLocal ); 
                 node.Child(3,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,1), XLocal );
                 // Interact with subteam 2
                 node.Child(1,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(1,2), XLocal );
                 node.Child(2,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,1), XLocal );
                 break;
             case 2:
                 // Take care of the work specific to our subteams
                 node.Child(2,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,2), XLocal );
                 // Interact with subteam 3
                 node.Child(2,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,3), XLocal );
                 node.Child(3,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,2), XLocal );
                 // Interact with subteam 0
                 node.Child(0,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,2), XLocal );
                 node.Child(2,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,0), XLocal );
                 // Interact with subteam 1
                 node.Child(1,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(1,2), XLocal );
                 node.Child(2,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,1), XLocal );
                 break;
             case 3:
                 // Take care of the work specific to our subteams
                 node.Child(3,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,3), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,3), XLocal );
                 // Interact with subteam 2
                 node.Child(2,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,3), alpha, XLocal, YLocal );
+                ( nodeContext.Child(2,3), XLocal );
                 node.Child(3,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,2), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,2), XLocal );
                 // Interact with subteam 1
                 node.Child(1,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,3), alpha, XLocal, YLocal );
+                ( nodeContext.Child(1,3), XLocal );
                 node.Child(3,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,1), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,1), XLocal );
                 // Interact with subteam 0
                 node.Child(0,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,3), alpha, XLocal, YLocal );
+                ( nodeContext.Child(0,3), XLocal );
                 node.Child(3,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,0), alpha, XLocal, YLocal );
+                ( nodeContext.Child(3,0), XLocal );
                 break;
             default:
                 // This should be impossible
@@ -1917,8 +1884,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
             if( teamRank == 0 )
             {
                 if( _inTargetTeam )
+                {
                     mpi::Send
                     ( Z.LockedBuffer(), DF.rank*numRhs, _sourceRoot, 0, comm );
+                    Z.Clear();
+                }
                 else
                 {
                     Z.Resize( DF.rank, numRhs, DF.rank );
@@ -1927,8 +1897,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
                 }
             }
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1939,16 +1907,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
         {
             MPI_Comm comm = _teams->Team( 0 );
             if( _inTargetTeam )
+            {
                 mpi::Send
                 ( Z.LockedBuffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
+                Z.Clear();
+            }
             else
             {
                 Z.Resize( SF.rank, numRhs, SF.rank );
                 mpi::Recv( Z.Buffer(), SF.rank*numRhs, _targetRoot, 0, comm );
             }
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -1973,6 +1942,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
                           height*sizeof(Scalar) );
                     mpi::Send
                     ( Z.LockedBuffer(), height*numRhs, _sourceRoot, 0, comm );
+                    Z.Clear();
                 }
                 else
                 {
@@ -1987,8 +1957,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
                 mpi::Recv( Z.Buffer(), height*numRhs, _targetRoot, 0, comm );
             }
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     default:
@@ -2086,8 +2054,6 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
             Z.Resize( SF.rank, numRhs, SF.rank );
             Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     case SPLIT_DENSE:
@@ -2098,8 +2064,6 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
             Z.Resize( Height(), numRhs, Height() );
             Read( Z.Buffer(), head, Z.Height()*numRhs );
         }
-        else
-            Z.Resize( 0, numRhs );
         break;
     }
     default:
@@ -2115,17 +2079,294 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePassData
-( AdjointMultiplyDenseContext& context,
-  Scalar alpha, const Dense<Scalar>& XLocal,
-                      Dense<Scalar>& YLocal ) const
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataCount
+( std::vector<int>& sendSizes, std::vector<int>& recvSizes, int numRhs ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::AdjointMultiplyDensePassData");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataCount");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyDensePassDataCount
+                ( sendSizes, recvSizes, numRhs );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
+        {
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                if( _inTargetTeam )
+                    sendSizes[_sourceRoot] += DF.rank*numRhs;
+                else
+                    recvSizes[_targetRoot] += DF.rank*numRhs;
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
+        {
+            if( _inTargetTeam )
+                sendSizes[_sourceRoot] += SF.rank*numRhs;
+            else
+                recvSizes[_targetRoot] += SF.rank*numRhs;
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( Height() != 0 )
+        {
+            if( _inTargetTeam )
+                sendSizes[_sourceRoot] += Height()*numRhs;
+            else
+                recvSizes[_targetRoot] += Height()*numRhs;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
+( MultiplyDenseContext& context, const Dense<Scalar>& XLocal,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataPack");
+#endif
+    const int numRhs = context.numRhs;
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyDensePassDataPack
+                ( nodeContext.Child(t,s), XLocal, buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename TransposeMultiplyDenseContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyDensePassDataPack
+                ( nodeContext.Child(t,s), XLocal, buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inTargetTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Dense<Scalar>& Z = *context.block.data.Z;
+                    std::memcpy
+                    ( &buffer[offsets[_sourceRoot]], Z.LockedBuffer(),
+                      Z.Height()*Z.Width()*sizeof(Scalar) );
+                    offsets[_sourceRoot] += Z.Height()*Z.Width();
+                    Z.Clear();
+                }
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        if( _inTargetTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                std::memcpy
+                ( &buffer[offsets[_sourceRoot]], Z.LockedBuffer(),
+                  Z.Height()*Z.Width()*sizeof(Scalar) );
+                offsets[_sourceRoot] += Z.Height()*Z.Width();
+                Z.Clear();
+            }
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inTargetTeam )
+        {
+            const int height = XLocal.Height();
+            if( XLocal.LDim() != height )
+            {
+                Scalar* start = &buffer[offsets[_sourceRoot]];
+                for( int j=0; j<numRhs; ++j )
+                {
+                    std::memcpy
+                    ( &start[height*j], 
+                      XLocal.LockedBuffer(_localTargetOffset,j),
+                      height*sizeof(Scalar) );
+                }
+            }
+            else
+            {
+                std::memcpy
+                ( &buffer[offsets[_sourceRoot]],
+                  XLocal.LockedBuffer(_localTargetOffset,0),
+                  height*numRhs*sizeof(Scalar) );
+            }
+            offsets[_sourceRoot] += height*numRhs;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataUnpack
+( MultiplyDenseContext& context, 
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataUnpack");
+#endif
+    const int numRhs = context.numRhs;
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyDensePassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename TransposeMultiplyDenseContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyDensePassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inSourceTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Dense<Scalar>& Z = *context.block.data.Z;
+                    Z.Resize( DF.rank, numRhs, DF.rank );
+                    std::memcpy
+                    ( Z.Buffer(), &buffer[offsets[_targetRoot]],
+                      DF.rank*numRhs*sizeof(Scalar) );
+                    offsets[_targetRoot] += DF.rank*numRhs;
+                }
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        if( _inSourceTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                Z.Resize( SF.rank, numRhs, SF.rank );
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_targetRoot]],
+                  SF.rank*numRhs*sizeof(Scalar) );
+                offsets[_targetRoot] += SF.rank*numRhs;
+            }
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inSourceTeam )
+        {
+            const int height = Height();
+            if( height != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                Z.Resize( height, numRhs, height );
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_targetRoot]],
+                  height*numRhs*sizeof(Scalar) );
+                offsets[_targetRoot] += height*numRhs;
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePassData
+( AdjointMultiplyDenseContext& context, const Dense<Scalar>& XLocal ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDensePassData");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDensePassData( context, alpha, XLocal, YLocal );
+    TransposeMultiplyDensePassData( context, XLocal );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2432,8 +2673,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
                   DF.rank*numRhs*sizeof(Scalar) );
                 offsets[_level-1] += DF.rank*numRhs;
             }
-            else
-                Z.Resize( 0, numRhs );
         }
         break;
     default:
@@ -2481,8 +2720,6 @@ TransposeMultiplyDenseBroadcastsUnpack
                   DF.rank*numRhs*sizeof(Scalar) );
                 offsets[_level-1] += DF.rank*numRhs;
             }
-            else
-                Z.Resize( 0, numRhs );
         }
         break;
     default:
@@ -2526,8 +2763,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
                 MPI_Comm team = _teams->Team( _level );
                 mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
             }
-            else
-                Z.Resize( 0, numRhs );
         }
         break;
     default:
@@ -2572,8 +2807,6 @@ TransposeMultiplyDenseNaiveBroadcasts
                 MPI_Comm team = _teams->Team( _level );
                 mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
             }
-            else
-                Z.Resize( 0, numRhs );
         }
         break;
     default:
