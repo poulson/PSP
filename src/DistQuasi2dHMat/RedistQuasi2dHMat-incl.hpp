@@ -27,12 +27,12 @@ template<typename Scalar,bool Conjugated>
 std::size_t
 psp::DistQuasi2dHMat<Scalar,Conjugated>::PackedSizes
 ( std::vector<std::size_t>& packedSizes, 
-  const Quasi2dHMat<Scalar,Conjugated>& H, const Subcomms& subcomms )
+  const Quasi2dHMat<Scalar,Conjugated>& H, const Teams& teams )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::PackedSizes");
 #endif
-    MPI_Comm comm = subcomms.Subcomm(0);
+    MPI_Comm comm = teams.Team(0);
     const unsigned p = mpi::CommSize( comm );
     if( !(p && !(p & (p-1))) )
         throw std::logic_error("Must use a power of two number of processes");
@@ -65,12 +65,12 @@ template<typename Scalar,bool Conjugated>
 std::size_t
 psp::DistQuasi2dHMat<Scalar,Conjugated>::Pack
 ( std::vector<byte*>& packedSubs, 
-  const Quasi2dHMat<Scalar,Conjugated>& H, const Subcomms& subcomms )
+  const Quasi2dHMat<Scalar,Conjugated>& H, const Teams& teams )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Pack");
 #endif
-    MPI_Comm comm = subcomms.Subcomm(0);
+    MPI_Comm comm = teams.Team(0);
     const int p = mpi::CommSize( comm );
     std::vector<byte*> heads = packedSubs;
     std::vector<byte**> headPointers(p); 
@@ -808,13 +808,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalSizesRecursion
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
-( const byte* packedSub, const Subcomms& subcomms )
+( const byte* packedSub, const Teams& teams )
 : _beganRowSpaceComp(false), _beganColSpaceComp(false)
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");
 #endif
-    Unpack( packedSub, subcomms );
+    Unpack( packedSub, teams );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -823,12 +823,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 template<typename Scalar,bool Conjugated>
 std::size_t
 psp::DistQuasi2dHMat<Scalar,Conjugated>::Unpack
-( const byte* packedDistHMat, const Subcomms& subcomms )
+( const byte* packedDistHMat, const Teams& teams )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Unpack");
 #endif
-    _subcomms = &subcomms;
+    _teams = &teams;
     _level = 0;
     _inSourceTeam = true;
     _inTargetTeam = true;
@@ -868,7 +868,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
 ( const byte*& head )
 {
-    MPI_Comm team = _subcomms->Subcomm( _level );
+    MPI_Comm team = _teams->Team( _level );
     if( !_inSourceTeam && !_inTargetTeam )
     {
         _block.type = EMPTY;
@@ -909,7 +909,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource, 2*_yTarget,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           _inSourceTeam && (s==subteam),
                           _inTargetTeam && (t==subteam),
                           sourceRoot, targetRoot );
@@ -934,7 +934,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+1, 2*_yTarget,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           _inSourceTeam && (s==subteam),
                           _inTargetTeam && (t==subteam),
                           sourceRoot, targetRoot );
@@ -959,7 +959,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource, 2*_yTarget+1,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           _inSourceTeam && (s==subteam),
                           _inTargetTeam && (t==subteam),
                           sourceRoot, targetRoot );
@@ -985,7 +985,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+1, 2*_yTarget+1,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           _inSourceTeam && (s==subteam),
                           _inTargetTeam && (t==subteam),
                           sourceRoot, targetRoot );
@@ -1019,7 +1019,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource, 2*_yTarget,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           inLeftSourceTeam, inTopTargetTeam,
                           _sourceRoot, _targetRoot,
                           node.sourceSizes[0]*s, node.targetSizes[0]*t );
@@ -1041,7 +1041,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+1, 2*_yTarget,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           inRightSourceTeam, inTopTargetTeam,
                           _sourceRoot+1, _targetRoot,
                           node.sourceSizes[2]*(s-2), node.targetSizes[0]*t );
@@ -1063,7 +1063,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource, 2*_yTarget+1,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           inLeftSourceTeam, inBottomTargetTeam,
                           _sourceRoot, _targetRoot+1,
                           node.sourceSizes[0]*s, node.targetSizes[2]*(t-2) );
@@ -1086,7 +1086,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+1, 2*_yTarget+1,
-                          *_subcomms, _level+1,
+                          *_teams, _level+1,
                           inRightSourceTeam, inBottomTargetTeam,
                           _sourceRoot+1, _targetRoot+1,
                           node.sourceSizes[2]*(s-2), 
@@ -1115,7 +1115,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                       _zSize,
                       2*_xSource+(s&1), 2*_xTarget+(t&1),
                       2*_ySource+(s/2), 2*_yTarget+(t/2),
-                      *_subcomms, _level+1, 
+                      *_teams, _level+1, 
                       _inSourceTeam, _inTargetTeam,
                       _sourceRoot, _targetRoot,
                       _localSourceOffset+sOffset, 
@@ -1143,7 +1143,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                       _zSize,
                       2*_xSource+(s&1), 2*_xTarget+(t&1),
                       2*_ySource+(s/2), 2*_yTarget+(t/2),
-                      *_subcomms, _level+1, 
+                      *_teams, _level+1, 
                       _inSourceTeam, _inTargetTeam,
                       _sourceRoot, _targetRoot,
                       _localSourceOffset+sOffset, 

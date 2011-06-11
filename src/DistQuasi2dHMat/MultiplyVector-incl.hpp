@@ -586,7 +586,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
 #endif
     // Compute the message sizes for each reduce 
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
@@ -610,7 +610,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -622,7 +622,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
         }
     }
 
-    // Unpack the reduced buffers (only roots of subcommunicators have data)
+    // Unpack the reduced buffers (only roots of teamunicators have data)
     MultiplyVectorSummationsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
@@ -639,7 +639,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
 #endif
     // Compute the message sizes for each reduce 
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
@@ -663,7 +663,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -675,7 +675,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
         }
     }
 
-    // Unpack the reduced buffers (only roots of subcommunicators have data)
+    // Unpack the reduced buffers (only roots of teamunicators have data)
     TransposeMultiplyVectorSummationsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
@@ -870,7 +870,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -917,7 +917,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -965,7 +965,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveSummations
             if( DF.rank != 0 )
             {
                 Vector<Scalar>& z = *context.block.data.z;
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 int teamRank = mpi::CommRank( team );
                 if( teamRank == 0 )
                 {
@@ -1016,7 +1016,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveSummations
             if( DF.rank != 0 )
             {
                 Vector<Scalar>& z = *context.block.data.z;
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 int teamRank = mpi::CommRank( team );
                 if( teamRank == 0 )
                 {
@@ -1072,7 +1072,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
 
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
         if( teamSize == 2 )
@@ -1210,7 +1210,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
                 ( bufferSize );
         std::vector<byte> buffer( bufferSize );
 
-        MPI_Comm comm = _subcomms->Subcomm(0);
+        MPI_Comm comm = _teams->Team(0);
         if( _inSourceTeam )
         {
             byte* head = &buffer[0];
@@ -1243,8 +1243,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
         z.Resize( DF.rank );
         if( DF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm comm = _teams->Team( 0 );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -1264,7 +1264,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
         z.Resize( SF.rank );
         if( SF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
                 mpi::Send( z.LockedBuffer(), SF.rank, _targetRoot, 0, comm );
             else
@@ -1278,7 +1278,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
         z.Resize( Height() );
         if( Height() != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
                 mpi::Send( z.LockedBuffer(), Height(), _targetRoot, 0, comm );
             else
@@ -1443,7 +1443,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
         typename TransposeMultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
 
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
         if( teamSize == 2 )
@@ -1580,7 +1580,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
                 ( bufferSize );
         std::vector<byte> buffer( bufferSize );
 
-        MPI_Comm comm = _subcomms->Subcomm(0);
+        MPI_Comm comm = _teams->Team(0);
         if( _inTargetTeam )
         {
             byte* head = &buffer[0];
@@ -1614,8 +1614,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
         z.Resize( DF.rank );
         if( DF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm comm = _teams->Team( 0 );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -1635,7 +1635,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
         z.Resize( SF.rank );
         if( SF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inTargetTeam )
                 mpi::Send( z.LockedBuffer(), SF.rank, _sourceRoot, 0, comm );
             else
@@ -1649,7 +1649,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
         z.Resize( Height() );
         if( Height() != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inTargetTeam )
             {
                 Vector<Scalar> xLocalSub;
@@ -1833,14 +1833,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
 #endif
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     MultiplyVectorBroadcastsCount( sizes );
 
     // Pack all of the data to be broadcasted into a single buffer
-    // (only roots of subcommunicators contribute)
+    // (only roots of teamunicators contribute)
     int totalSize = 0;
     for( int i=0; i<numBroadcasts; ++i )
         totalSize += sizes[i];
@@ -1858,7 +1858,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -1880,14 +1880,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
 #endif
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     TransposeMultiplyVectorBroadcastsCount( sizes );
 
     // Pack all of the data to be broadcasted into a single buffer
-    // (only roots of subcommunicators contribute)
+    // (only roots of teamunicators contribute)
     int totalSize = 0;
     for( int i=0; i<numBroadcasts; ++i )
         totalSize += sizes[i];
@@ -1905,7 +1905,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -2021,7 +2021,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
         {
             const DistLowRank& DF = *_block.data.DF;
             const Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -2068,7 +2068,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
         {
             const DistLowRank& DF = *_block.data.DF;
             const Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -2201,7 +2201,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveBroadcasts
             z.Resize( DF.rank );
             if( DF.rank != 0 )
             {
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
             }
         }
@@ -2244,7 +2244,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveBroadcasts
             z.Resize( DF.rank );
             if( DF.rank != 0 )
             {
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
             }
         }

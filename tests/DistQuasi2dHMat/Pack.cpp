@@ -264,9 +264,9 @@ main( int argc, char* argv[] )
         }
 
         // Set up our subcommunicators and compute the packed sizes
-        DistQuasi2d::Subcomms subcomms( MPI_COMM_WORLD );
+        DistQuasi2d::Teams teams( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
-        DistQuasi2d::PackedSizes( packedSizes, H, subcomms ); 
+        DistQuasi2d::PackedSizes( packedSizes, H, teams ); 
         const std::size_t myMaxSize = 
             *(std::max_element( packedSizes.begin(), packedSizes.end() ));
 
@@ -282,7 +282,7 @@ main( int argc, char* argv[] )
         std::vector<psp::byte*> packedPieces( p );
         for( int i=0; i<p; ++i )
             packedPieces[i] = &sendBuffer[i*myMaxSize];
-        DistQuasi2d::Pack( packedPieces, H, subcomms );
+        DistQuasi2d::Pack( packedPieces, H, teams );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double packStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -333,7 +333,7 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double unpackStartTime = psp::mpi::WallTime();
-        DistQuasi2d distH( &recvBuffer[0], subcomms );
+        DistQuasi2d distH( &recvBuffer[0], teams );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double unpackStopTime = psp::mpi::WallTime();
         if( rank == 0 )

@@ -611,7 +611,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
 #endif
     // Compute the message sizes for each reduce 
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
@@ -635,7 +635,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -664,7 +664,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
 #endif
     // Compute the message sizes for each reduce 
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
@@ -688,7 +688,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -913,7 +913,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -967,7 +967,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
         {
             const DistLowRank& DF = *_block.data.DF;
             Dense<Scalar>& Z = *context.block.data.Z;
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -1022,7 +1022,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
             if( DF.rank != 0 )
             {
                 Dense<Scalar>& Z = *context.block.data.Z;
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 int teamRank = mpi::CommRank( team );
                 if( teamRank == 0 )
                     mpi::Reduce
@@ -1072,7 +1072,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
             if( DF.rank != 0 )
             {
                 Dense<Scalar>& Z = *context.block.data.Z;
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 int teamRank = mpi::CommRank( team );
                 if( teamRank == 0 )
                     mpi::Reduce
@@ -1127,7 +1127,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         typename MultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
 
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
         if( teamSize == 2 )
@@ -1265,7 +1265,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         bufferSize *= numRhs;
 
         std::vector<byte> buffer( bufferSize );
-        MPI_Comm comm = _subcomms->Subcomm(0);
+        MPI_Comm comm = _teams->Team(0);
         if( _inSourceTeam )
         {
             byte* head = &buffer[0];
@@ -1296,8 +1296,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         Dense<Scalar>& Z = *context.block.data.Z;
         if( DF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm comm = _teams->Team( 0 );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -1322,7 +1322,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         Dense<Scalar>& Z = *context.block.data.Z;
         if( SF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
                 mpi::Send
                 ( Z.LockedBuffer(), SF.rank*numRhs, _targetRoot, 0, comm );
@@ -1341,7 +1341,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
         Dense<Scalar>& Z = *context.block.data.Z;
         if( Height() != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inSourceTeam )
                 mpi::Send
                 ( Z.LockedBuffer(), Z.Height()*numRhs, _targetRoot, 0, comm );
@@ -1493,7 +1493,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
         typename TransposeMultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
 
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
         if( teamSize == 2 )
@@ -1631,7 +1631,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
         bufferSize *= numRhs;
 
         std::vector<byte> buffer( bufferSize );
-        MPI_Comm comm = _subcomms->Subcomm(0);
+        MPI_Comm comm = _teams->Team(0);
         if( _inTargetTeam )
         {
             byte* head = &buffer[0];
@@ -1663,8 +1663,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
         Dense<Scalar>& Z = *context.block.data.Z;
         if( DF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm comm = _teams->Team( 0 );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -1689,7 +1689,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
         Dense<Scalar>& Z = *context.block.data.Z;
         if( SF.rank != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inTargetTeam )
                 mpi::Send
                 ( Z.LockedBuffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
@@ -1709,7 +1709,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
         Dense<Scalar>& Z = *context.block.data.Z;
         if( height != 0 )
         {
-            MPI_Comm comm = _subcomms->Subcomm( 0 );
+            MPI_Comm comm = _teams->Team( 0 );
             if( _inTargetTeam )
             {
                 Dense<Scalar> XLocalSub;
@@ -1894,7 +1894,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
 #endif
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
@@ -1919,7 +1919,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -1941,7 +1941,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
 #endif
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
@@ -1966,7 +1966,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -2082,7 +2082,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
     case DIST_LOW_RANK:
         if( _inTargetTeam )
         {
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -2131,7 +2131,7 @@ TransposeMultiplyDenseBroadcastsPack
     case DIST_LOW_RANK:
         if( _inSourceTeam )
         {
-            MPI_Comm team = _subcomms->Subcomm( _level );
+            MPI_Comm team = _teams->Team( _level );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
             {
@@ -2282,7 +2282,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
             if( DF.rank != 0 )
             {
                 Z.Resize( DF.rank, numRhs, DF.rank );
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
             }
             else
@@ -2329,7 +2329,7 @@ TransposeMultiplyDenseNaiveBroadcasts
             if( DF.rank != 0 )
             {
                 Z.Resize( DF.rank, numRhs, DF.rank );
-                MPI_Comm team = _subcomms->Subcomm( _level );
+                MPI_Comm team = _teams->Team( _level );
                 mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
             }
             else

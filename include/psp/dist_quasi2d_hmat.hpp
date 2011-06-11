@@ -34,16 +34,16 @@ public:
     /*
      * Public data structures
      */
-    class Subcomms
+    class Teams
     {
     private:
-        std::vector<MPI_Comm> _subcomms;
+        std::vector<MPI_Comm> _teams;
     public:
-        Subcomms( MPI_Comm comm );
-        ~Subcomms();
+        Teams( MPI_Comm comm );
+        ~Teams();
 
         unsigned NumLevels() const;
-        MPI_Comm Subcomm( unsigned level ) const;
+        MPI_Comm Team( unsigned level ) const;
     };
 
     /*
@@ -51,11 +51,11 @@ public:
      */
     static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
-      const Quasi2dHMat<Scalar,Conjugated>& H, const Subcomms& subcomms );
+      const Quasi2dHMat<Scalar,Conjugated>& H, const Teams& teams );
 
     static std::size_t Pack
     ( std::vector<byte*>& packedPieces, 
-      const Quasi2dHMat<Scalar,Conjugated>& H, const Subcomms& subcomms );
+      const Quasi2dHMat<Scalar,Conjugated>& H, const Teams& teams );
 
     static int ComputeLocalHeight
     ( int p, int rank, const Quasi2dHMat<Scalar,Conjugated>& H );
@@ -76,17 +76,17 @@ public:
     /*
      * Public non-static member functions
      */
-    DistQuasi2dHMat( const Subcomms& subcomms );
+    DistQuasi2dHMat( const Teams& teams );
     DistQuasi2dHMat
     ( int numLevels, int maxRank, bool stronglyAdmissible, 
       int sourceOffset, int targetOffset,
       int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
       int zSize, int xSource, int xTarget, int ySource, int yTarget,
-      const Subcomms& subcomms, unsigned level, 
+      const Teams& teams, unsigned level, 
       bool inSourceTeam, bool inTargetTeam, 
       int sourceRoot, int targetRoot,
       int localSourceOffset=0, int localTargetOffset=0 );
-    DistQuasi2dHMat( const byte* packedPiece, const Subcomms& subcomms );
+    DistQuasi2dHMat( const byte* packedPiece, const Teams& teams );
     ~DistQuasi2dHMat();
     void Clear();
 
@@ -112,7 +112,7 @@ public:
 
     // Unpack this process's portion of the DistQuasi2dHMat
     std::size_t Unpack
-    ( const byte* packedDistHMat, const Subcomms& subcomms );
+    ( const byte* packedDistHMat, const Teams& teams );
 
     // Union the structure known in each block row and column at each level.
     void FormGhostNodes();
@@ -442,7 +442,7 @@ private:
     void MScriptWriteLocalStructureRecursion( std::ofstream& file ) const;
     
     // This default constructure is purposely not publically accessible
-    // because many routines are not functional without _subcomms set.
+    // because many routines are not functional without _teams set.
     DistQuasi2dHMat();
 
     void UnpackRecursion( const byte*& head );
@@ -460,6 +460,9 @@ private:
     void GetRank( const BlockId& blockId, int& rank ) const;
     void SetGhostRank( const BlockId& blockId, const int rank );
 
+    //
+    // H-matrix/vector multiplication
+    //
     void MultiplyVectorInitialize
     ( MultiplyVectorContext& context ) const;
     void MultiplyVectorPrecompute
@@ -505,6 +508,9 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
+    //
+    // H-matrix/dense-matrix multiplication
+    //
     void MultiplyDenseInitialize
     ( MultiplyDenseContext& context, int numRhs ) const;
     void MultiplyDensePrecompute
@@ -547,10 +553,19 @@ private:
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal, 
                           Dense<Scalar>& YLocal ) const;
+    // Extra fine-grain routines for use within H-matrix/H-matrix multiplication
+    void MultiplyDensePassDataCount
+    ( std::vector<int>& sizes, int numRhs ) const;
+    void MultiplyDensePassDataPack
+    ( MultiplyDenseContext& context, 
+      std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
+    void MultiplyDensePassDataUnpack
+    ( MultiplyDenseContext& context,
+      const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
 
-    /*
-     * H-matrix/H-matrix multiplication
-     */
+    //
+    // H-matrix/H-matrix multiplication
+    //
     void MultiplyHMatSetUp
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
@@ -627,6 +642,9 @@ private:
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
 
+    //
+    // Transpose H-matrix/vector multiplication
+    //
     void TransposeMultiplyVectorInitialize
     ( TransposeMultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorPrecompute
@@ -673,6 +691,9 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
+    //
+    // Transpose H-matrix/dense-matrix multiplication
+    //
     void TransposeMultiplyDenseInitialize
     ( TransposeMultiplyDenseContext& context, int numRhs ) const;
     void TransposeMultiplyDensePrecompute
@@ -717,6 +738,9 @@ private:
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
 
+    //
+    // Adjoint H-matrix/vector multiplication
+    //
     void AdjointMultiplyVectorInitialize
     ( AdjointMultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorPrecompute
@@ -740,6 +764,9 @@ private:
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
 
+    //
+    // Adjoint H-matrix/dense-matrix multiplication
+    //
     void AdjointMultiplyDenseInitialize
     ( AdjointMultiplyDenseContext& context, int numRhs ) const;
     void AdjointMultiplyDensePrecompute
@@ -778,7 +805,7 @@ private:
     int _ySource, _yTarget;
     Block _block;
 
-    const Subcomms* _subcomms;
+    const Teams* _teams;
     unsigned _level;
     bool _inSourceTeam, _inTargetTeam;
     int _sourceRoot, _targetRoot;
@@ -1186,10 +1213,10 @@ DistQuasi2dHMat<Scalar,Conjugated>::MaxRank() const
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::Subcomms( MPI_Comm comm )
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
 {
 #ifndef RELEASE
-    PushCallStack("Subcomms::Subcomms");
+    PushCallStack("Teams::Teams");
 #endif
     const int rank = mpi::CommRank( comm );
     const int p = mpi::CommSize( comm );
@@ -1208,8 +1235,8 @@ DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::Subcomms( MPI_Comm comm )
         ++numLevels;
     }
 
-    _subcomms.resize( numLevels );
-    mpi::CommDup( comm, _subcomms[0] );
+    _teams.resize( numLevels );
+    mpi::CommDup( comm, _teams[0] );
     teamSize = p;
     for( unsigned i=1; i<numLevels; ++i )
     {
@@ -1219,7 +1246,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::Subcomms( MPI_Comm comm )
             teamSize = 1;
         const int color = rank/teamSize;
         const int key = rank - color*teamSize;
-        mpi::CommSplit( comm, color, key, _subcomms[i] );
+        mpi::CommSplit( comm, color, key, _teams[i] );
     }
 #ifndef RELEASE
     PopCallStack();
@@ -1228,13 +1255,13 @@ DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::Subcomms( MPI_Comm comm )
 
 template<typename Scalar,bool Conjugated>
 inline
-DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::~Subcomms()
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::~Teams()
 {
 #ifndef RELEASE
-    PushCallStack("Subcomms::~Subcomms");
+    PushCallStack("Teams::~Teams");
 #endif
-    for( unsigned i=0; i<_subcomms.size(); ++i )
-        mpi::CommFree( _subcomms[i] );
+    for( unsigned i=0; i<_teams.size(); ++i )
+        mpi::CommFree( _teams[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1242,17 +1269,17 @@ DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::~Subcomms()
 
 template<typename Scalar,bool Conjugated>
 inline unsigned
-DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::NumLevels() const
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::NumLevels() const
 {
-    return _subcomms.size();
+    return _teams.size();
 }
 
 template<typename Scalar,bool Conjugated>
 inline MPI_Comm
-DistQuasi2dHMat<Scalar,Conjugated>::Subcomms::Subcomm
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::Team
 ( unsigned level ) const
 {
-    return _subcomms[std::min(level,(unsigned)_subcomms.size()-1)];
+    return _teams[std::min(level,(unsigned)_teams.size()-1)];
 }
 
 } // namespace psp

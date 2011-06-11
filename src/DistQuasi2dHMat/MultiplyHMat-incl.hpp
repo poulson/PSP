@@ -91,7 +91,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSetUp
     C._xTarget = A._xTarget;
     C._yTarget = A._yTarget;
 
-    C._subcomms = A._subcomms;
+    C._teams = A._teams;
     C._level = A._level;
     C._inSourceTeam = B._inSourceTeam;
     C._inTargetTeam = A._inTargetTeam;
@@ -100,7 +100,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSetUp
     C._localSourceOffset = B._localSourceOffset;
     C._localTargetOffset = A._localTargetOffset;
     
-    MPI_Comm team = _subcomms->Subcomm( _level );
+    MPI_Comm team = _teams->Team( _level );
     const int teamSize = mpi::CommSize( team );
     if( C.Admissible() ) // C is low-rank
     {
@@ -1473,7 +1473,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
 
     // Compute the message sizes for each reduce
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
@@ -1501,7 +1501,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -1513,7 +1513,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
         }
     }
 
-    // Unpack the reduced buffers (only roots of subcommunicators have data)
+    // Unpack the reduced buffers (only roots of teamunicators have data)
     A.MultiplyHMatMainSummationsUnpackA( buffer, offsets );
     B.MultiplyHMatMainSummationsUnpackB( buffer, offsets );
     C.MultiplyHMatMainSummationsUnpackC( buffer, offsets );
@@ -2111,7 +2111,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     // Compute the message sizes for each broadcast
     // (the first and last comms are unneeded)
-    const int numLevels = _subcomms->NumLevels();
+    const int numLevels = _teams->NumLevels();
     const int numBroadcasts = std::max(0,numLevels-2);
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
@@ -2120,7 +2120,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     C.MultiplyHMatMainBroadcastsCountC( sizes );
 
     // Pack all of the data to be broadcast into a single buffer
-    // (only roots of subcommunicators contribute)
+    // (only roots of teamunicators contribute)
     int totalSize = 0;
     for( int i=0; i<numBroadcasts; ++i )
         totalSize += sizes[i];
@@ -2140,7 +2140,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _subcomms->Subcomm( i+1 );
+            MPI_Comm team = _teams->Team( i+1 );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }

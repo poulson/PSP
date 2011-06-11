@@ -32,12 +32,12 @@
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
-( const Subcomms& subcomms )
+( const Teams& teams )
 : _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _subcomms(&subcomms), _level(0),
+  _ySource(0), _yTarget(0), _teams(&teams), _level(0),
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _localSourceOffset(0), _localTargetOffset(0),
@@ -52,7 +52,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   int sourceOffset, int targetOffset,
   int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
   int zSize, int xSource, int xTarget, int ySource, int yTarget,
-  const Subcomms& subcomms, unsigned level, 
+  const Teams& teams, unsigned level, 
   bool inSourceTeam, bool inTargetTeam, 
   int sourceRoot, int targetRoot,
   int localSourceOffset, int localTargetOffset )
@@ -63,7 +63,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _xSizeSource(xSizeSource), _xSizeTarget(xSizeTarget),
   _ySizeSource(ySizeSource), _ySizeTarget(ySizeTarget), _zSize(zSize), 
   _xSource(xSource), _xTarget(xTarget),
-  _ySource(ySource), _yTarget(yTarget), _subcomms(&subcomms), _level(level),
+  _ySource(ySource), _yTarget(yTarget), _teams(&teams), _level(level),
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _sourceRoot(sourceRoot), _targetRoot(targetRoot),
   _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset),
@@ -95,8 +95,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalHeight() const
     int localHeight;
     if( _inTargetTeam )
     {
-        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
         ComputeLocalDimensionRecursion
         ( localHeight, teamSize, teamRank, _xSizeTarget, _ySizeTarget, _zSize );
     }
@@ -118,8 +118,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalWidth() const
     int localWidth;
     if( _inSourceTeam )
     {
-        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
         ComputeLocalDimensionRecursion
         ( localWidth, teamSize, teamRank, _xSizeSource, _ySizeSource, _zSize );
     }
@@ -141,8 +141,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalRow() const
     int firstLocalRow = 0;
     if( _inTargetTeam )
     {
-        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
         ComputeFirstLocalIndexRecursion
         ( firstLocalRow, teamSize, teamRank, 
           _xSizeTarget, _ySizeTarget, _zSize );
@@ -163,8 +163,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalCol() const
     int firstLocalCol = 0;
     if( _inSourceTeam )
     {
-        int teamSize = mpi::CommSize( _subcomms->Subcomm(_level) );
-        int teamRank = mpi::CommRank( _subcomms->Subcomm(_level) );
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
         ComputeFirstLocalIndexRecursion
         ( firstLocalCol, teamSize, teamRank, 
           _xSizeSource, _ySizeSource, _zSize );
@@ -292,7 +292,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LatexWriteLocalStructure
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::LatexWriteLocalStructure");
 #endif
-    MPI_Comm comm = _subcomms->Subcomm( 0 );
+    MPI_Comm comm = _teams->Team( 0 );
     const int commRank = mpi::CommRank( comm );
 
     std::ostringstream os;
@@ -322,7 +322,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MScriptWriteLocalStructure
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MScriptWriteLocalStructure");
 #endif
-    MPI_Comm comm = _subcomms->Subcomm( 0 );
+    MPI_Comm comm = _teams->Team( 0 );
     const int commRank = mpi::CommRank( comm );
 
     std::ostringstream os;
@@ -344,7 +344,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
   _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _subcomms(0), _level(0),
+  _ySource(0), _yTarget(0), _teams(0), _level(0),
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _localSourceOffset(0), _localTargetOffset(0)

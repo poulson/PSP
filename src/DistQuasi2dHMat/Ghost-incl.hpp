@@ -33,7 +33,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Ghosted() const
     {
     case DIST_NODE:
     {
-        MPI_Comm comm = _subcomms->Subcomm( 0 );
+        MPI_Comm comm = _teams->Team( 0 );
         const int commSize = mpi::CommSize( comm );
         const int commRank = mpi::CommRank( comm );
 
@@ -78,7 +78,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FormGhostNodes()
         sourceStructure( _numLevels ), targetStructure( _numLevels );
     FillStructureRecursion( sourceStructure, targetStructure );
     
-    MPI_Comm comm = _subcomms->Subcomm( 0 );
+    MPI_Comm comm = _teams->Team( 0 );
     const int commSize = mpi::CommSize( comm );
 
     // Fill in the local ghosted structure (but without the ghosts' ranks)
@@ -219,7 +219,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FillStructureRecursion
         sourceStructure[_level].insert( _sourceOffset );
         targetStructure[_level].insert( _targetOffset );
 
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
         const Node& node = *_block.data.N;
@@ -312,7 +312,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
     case DIST_NODE:
     {
         Node& node = *_block.data.N;
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         if( teamSize >= 4 )
         {
@@ -355,7 +355,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
               targetStructure[_level].end(), _targetOffset ) )
             break;
                                
-        MPI_Comm team = _subcomms->Subcomm( _level );
+        MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
 
         if( Admissible() )
@@ -400,7 +400,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
                           _zSize,
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+(s/2), 2*_yTarget+(t/2),
-                          *_subcomms, _level+1, false, false, 
+                          *_teams, _level+1, false, false, 
                           sourceRoot, targetRoot );
 
             if( teamSize >= 2 )
