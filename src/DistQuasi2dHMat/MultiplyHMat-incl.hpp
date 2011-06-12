@@ -1917,6 +1917,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
     }
 
     const int key = A._sourceOffset;
+    MPI_Comm team = _teams->Team( _level );
+    const int teamRank = mpi::CommRank( team );
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -2020,13 +2022,320 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             B.TransposeMultiplyDensePassDataCount
             ( sendSizes, recvSizes, DFA.rank );
             break;
+        case DIST_NODE_GHOST:
+            // Pass data for H/F += F H is between other (two) team(s)
+            break;
         case DIST_LOW_RANK:
-        {
-            // LEFT OFF HERE
+            // Pass data for H/F += F F
+            if( teamRank == 0 && (A._inSourceTeam != A._inTargetTeam) )
+            {
+                const DistLowRank& DFB = *B._block.data.DF;
+                if( A._inSourceTeam )
+                    sendSizes[A._targetRoot] += DFA.rank*DFB.rank;
+                if( A._inTargetTeam )
+                    recvSizes[A._sourceRoot] += DFA.rank*DFB.rank;
+            }
+            break;
+        case DIST_LOW_RANK_GHOST:
+            // Pass data for H/F += F F
+            if( teamRank == 0 )
+            {
+                const DistLowRankGhost& DFGB = *B._block.data.DFG;
+                recvSizes[A._sourceRoot] += DFA.rank*DFGB.rank;
+            }
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
             break;
         }
-        }
+        break;
     }
+    case DIST_LOW_RANK_GHOST:
+    {
+        const DistLowRankGhost& DFGA = *A._block.data.DFG;
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataCount
+            ( sendSizes, recvSizes, DFGA.rank );
+            break;
+        case DIST_LOW_RANK:
+            // Pass data for for H/F += F F is between other (two) team(s)
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SFA = *A._block.data.SF;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataCount
+            ( sendSizes, recvSizes, SFA.rank );
+            break;
+        case SPLIT_NODE_GHOST:
+            // Pass data for H/F += F H is between other two processes
+            break;
+        case NODE:
+        case NODE_GHOST:
+            break;
+        case SPLIT_LOW_RANK:
+        {
+            // Pass data for H/D/F += F F
+            // We're either the middle process or both the left and right
+            const SplitLowRank& SFB = *B._block.data.SF;
+            if( A._inSourceTeam )
+                sendSizes[A._targetRoot] += SFA.rank*SFB.rank;
+            else
+                recvSizes[A._sourceRoot] += SFA.rank*SFB.rank;
+            break;
+        }
+        case SPLIT_LOW_RANK_GHOST:
+        {
+            // Pass data for H/D/F += F F
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
+            recvSizes[A._sourceRoot] += SFA.rank*SFGB.rank;
+            break;
+        }
+        case LOW_RANK:
+        {
+            // Pass data for H/D/F += F F
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            sendSizes[A._targetRoot] += SFA.rank*FB.Rank();
+            break;
+        }
+        case LOW_RANK_GHOST:
+        {
+            // Pass data for H/D/F += F F
+            const LowRankGhost& FGB = *B._block.data.FG;
+            recvSizes[A._sourceRoot] += SFA.rank*FGB.rank;
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            // Pass data for D/F += F D
+            if( B._inTargetTeam )
+                sendSizes[B._sourceRoot] += B.Width()*SFA.rank;
+            else
+                recvSizes[B._targetRoot] += B.Width()*SFA.rank;
+            break;
+        }
+        case SPLIT_DENSE_GHOST:
+        case DENSE:
+        case DENSE_GHOST:
+            // Pass data for D/F += F D is in other process
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK_GHOST:
+    {
+        const SplitLowRankGhost& SFGA = *A._block.data.SFG; 
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataCount
+            ( sendSizes, recvSizes, SFGA.rank );
+            break;
+        case SPLIT_LOW_RANK:
+            // Pass data for H/D/F += F F is between other two processes
+            break;
+        case SPLIT_DENSE:
+            // Pass data for D/F += F D
+            recvSizes[B._targetRoot] += B.Width()*SFGA.rank;
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case LOW_RANK:
+    {
+        const LowRank<Scalar,Conjugated>& FA = *A._block.data.F;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataCount
+            ( sendSizes, recvSizes, FA.Rank() );
+            break;
+        case NODE:
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+            // There is no pass data
+            break;
+        case SPLIT_DENSE:
+            // Pass data for D/F += F D
+            sendSizes[B._sourceRoot] += B.Width()*FA.Rank();
+            break;
+        case DENSE:
+            // There is no pass data
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case LOW_RANK_GHOST:
+    {
+        const LowRankGhost& FGA = *A._block.data.FG;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataCount
+            ( sendSizes, recvSizes, FGA.rank );
+            break;
+        case SPLIT_LOW_RANK:
+            // Pass data for H/D/F += F F is in other process
+            break;
+        case SPLIT_DENSE:
+            // Pass data for D/F += F D
+            recvSizes[B._targetRoot] += B.Width()*FGA.rank;
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDense& SDA = *A._block.data.SD;
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+        {
+            // Pass data for D/F += D F
+            const SplitLowRank& SFB = *B._block.data.SF;
+            if( A._inSourceTeam )
+                sendSizes[A._targetRoot] += A.Height()*SFB.rank;
+            else
+                recvSizes[A._sourceRoot] += A.Height()*SFB.rank;
+            break;
+        }
+        case SPLIT_LOW_RANK_GHOST:
+        {
+            // Pass data for D/F += D F
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
+            recvSizes[A._sourceRoot] += A.Height()*SFGB.rank;
+            break;
+        }
+        case LOW_RANK:
+        {
+            // Pass data for D/F += D F
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            sendSizes[A._targetRoot] += A.Height()*FB.Rank();
+            break;
+        }
+        case LOW_RANK_GHOST:
+        {
+            // Pass data for D/F += D F
+            const LowRankGhost& FGB = *B._block.data.FG;
+            recvSizes[A._sourceRoot] += A.Height()*FGB.rank;
+            break;
+        }
+        case SPLIT_DENSE:
+            // Pass data for D/F += D D
+            if( B._inSourceTeam )
+                recvSizes[B._targetRoot] += A.Height()*A.Width();
+            else
+                sendSizes[B._sourceRoot] += A.Height()*A.Width();
+            break;
+        case SPLIT_DENSE_GHOST:
+        case DENSE:
+        case DENSE_GHOST:
+            // These pass data do not exist or do not involve us
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_DENSE_GHOST:
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            break;
+        case SPLIT_DENSE:
+            recvSizes[B._targetRoot] += A.Height()*A.Width();
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    case DENSE:
+    {
+        const Dense<Scalar>& DA = *A._block.data.D;
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            break;
+        case LOW_RANK:
+            break;
+        case SPLIT_DENSE:
+            sendSizes[B._sourceRoot] += A.Height()*A.Width();
+            break;
+        case DENSE:
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case DENSE_GHOST:
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            break;
+        case SPLIT_DENSE:
+            recvSizes[B._targetRoot] += A.Height()*A.Width();
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    case EMPTY:
+#ifndef RELEASE
+        throw std::logic_error("A should not be empty");
+#endif
+        break;
     }
 #ifndef RELEASE
     PopCallStack();
