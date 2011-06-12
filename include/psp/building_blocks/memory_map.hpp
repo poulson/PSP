@@ -33,9 +33,6 @@ public:
     //       will cause a memory leak.
     T2*& operator[]( T1 key ) { return _baseMap[key]; }
 
-    std::map<T1,T2*>& BaseMap() { return _baseMap; }
-    const std::map<T1,T2*>& BaseMap() const { return _baseMap; }
-
     ~MemoryMap()
     {   
         typename std::map<T1,T2*>::iterator it; 

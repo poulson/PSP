@@ -100,7 +100,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSetUp
     C._localSourceOffset = B._localSourceOffset;
     C._localTargetOffset = A._localTargetOffset;
     
-    MPI_Comm team = _teams->Team( _level );
+    MPI_Comm team = _teams->Team( A._level );
     const int teamSize = mpi::CommSize( team );
     if( C.Admissible() ) // C is low-rank
     {
@@ -283,7 +283,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
     if( C._block.type == EMPTY )
         A.MultiplyHMatSetUp( B, C );
 
-
     // Handle all H H cases here
     const bool admissibleC = C.Admissible();
     if( !admissibleC )
@@ -454,14 +453,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // Start H/F += H F
             const DistLowRank& DFB = *B._block.data.DF;
             C._UMap[key] = new Dense<Scalar>( C.LocalHeight(), DFB.rank );
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( densePair.second, DFB.rank );
+            A.MultiplyDenseInitialize( context, DFB.rank );
             A.MultiplyDensePrecompute
-            ( densePair.second, alpha, DFB.ULocal, *C._UMap[key] );
+            ( context, alpha, DFB.ULocal, *C._UMap[key] );
             break;
         }
         case DIST_LOW_RANK_GHOST:
@@ -469,11 +467,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // Start H/F += H F
             // We must be in the left team
             const DistLowRankGhost& DFGB = *B._block.data.DFG;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
 
-            A.MultiplyDenseInitialize( densePair.second, DFGB.rank );
+            A.MultiplyDenseInitialize( context, DFGB.rank );
             break;
         }
         default:
@@ -501,23 +498,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             if( C._inTargetTeam )
             {
                 // Our process owns the left and right sides
-                C._densePairMap[key] = new MultiplyDensePair;
-                MultiplyDensePair& densePair = *C._densePairMap[key];
-                densePair.first = &A;
+                C._denseContextMap[key] = new MultiplyDenseContext;
+                MultiplyDenseContext& context = *C._denseContextMap[key];
 
-                A.MultiplyDenseInitialize( densePair.second, SFB.rank );
+                A.MultiplyDenseInitialize( context, SFB.rank );
             }
             else
             {
                 // We are the middle process
-                C._densePairMap[key] = new MultiplyDensePair;
-                MultiplyDensePair& densePair = *C._densePairMap[key];
-                densePair.first = &A;
+                C._denseContextMap[key] = new MultiplyDenseContext;
+                MultiplyDenseContext& context = *C._denseContextMap[key];
 
                 Dense<Scalar> dummy( A.Height(), SFB.rank );
-                A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                A.MultiplyDensePrecompute
-                ( densePair.second, alpha, SFB.D, dummy );
+                A.MultiplyDenseInitialize( context, SFB.rank );
+                A.MultiplyDensePrecompute( context, alpha, SFB.D, dummy );
             }
             break;
         }
@@ -526,10 +520,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // Start H/F += H F
             // We are the left process
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-            A.MultiplyDenseInitialize( densePair.second, SFGB.rank );
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
+
+            A.MultiplyDenseInitialize( context, SFGB.rank );
             break;
         }
         case LOW_RANK:
@@ -537,13 +531,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // Start H/F += H F
             // We are the middle and right processes
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
 
             Dense<Scalar> dummy( A.Height(), FB.U.Width() );
-            A.MultiplyDenseInitialize( densePair.second, FB.Rank() );
-            A.MultiplyDensePrecompute( densePair.second, alpha, FB.U, dummy );
+            A.MultiplyDenseInitialize( context, FB.Rank() );
+            A.MultiplyDensePrecompute( context, alpha, FB.U, dummy );
             break;
         }
         case LOW_RANK_GHOST:
@@ -551,10 +544,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // Start H/F += H F
             // We are the left process
             const LowRankGhost& FGB = *B._block.data.FG;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-            A.MultiplyDenseInitialize( densePair.second, FGB.rank );
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
+
+            A.MultiplyDenseInitialize( context, FGB.rank );
             break;
         }
         default:
@@ -578,14 +571,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // We are the left and middle processes
             const SplitLowRank& SFB = *B._block.data.SF;
             C._UMap[key] = new Dense<Scalar>( C.Height(), SFB.rank );
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-            A.MultiplyDensePrecompute
-            ( densePair.second, alpha, SFB.D, *C._UMap[key] );
+            A.MultiplyDenseInitialize( context, SFB.rank );
+            A.MultiplyDensePrecompute( context, alpha, SFB.D, *C._UMap[key] );
             break;
         }
         case LOW_RANK:
@@ -594,14 +585,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // We own all of A, B, and C
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
             C._UMap[key] = new Dense<Scalar>( C.Height(), FB.Rank() );
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
 
             hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( densePair.second, FB.Rank() );
-            A.MultiplyDensePrecompute
-            ( densePair.second, alpha, FB.U, *C._UMap[key] );
+            A.MultiplyDenseInitialize( context, FB.Rank() );
+            A.MultiplyDensePrecompute( context, alpha, FB.U, *C._UMap[key] );
             break;
         }
         default:
@@ -627,26 +616,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             C._VMap[key] = new Dense<Scalar>( C.LocalWidth(), DFA.rank );
 
             hmat_tools::Scale( (Scalar)0, *C._VMap[key] );
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
             {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, DFA.rank );
+                B.AdjointMultiplyDenseInitialize( context, DFA.rank );
                 B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), DFA.VLocal, *C._VMap[key] );
+                ( context, Conj(alpha), DFA.VLocal, *C._VMap[key] );
             }
             else
             {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, DFA.rank );
+                B.TransposeMultiplyDenseInitialize( context, DFA.rank );
                 B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, DFA.VLocal, *C._VMap[key] );
+                ( context, alpha, DFA.VLocal, *C._VMap[key] );
             }
             break;
         }
@@ -688,23 +670,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // Start H/F += F H
             // We are in the right team
             const DistLowRankGhost& DFGA = *A._block.data.DFG;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, DFGA.rank );
-            }
+                B.AdjointMultiplyDenseInitialize( context, DFGA.rank );
             else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, DFGA.rank );
-            }
+                B.TransposeMultiplyDenseInitialize( context, DFGA.rank );
             break;
         }
         case DIST_LOW_RANK:
@@ -728,51 +699,29 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             if( A._inSourceTeam )
             {
                 Dense<Scalar> dummy( B.Width(), SFA.rank );
+                C._denseContextMap[key] = new MultiplyDenseContext;
+                MultiplyDenseContext& context = *C._denseContextMap[key];
                 if( Conjugated )
                 {
-                    C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                    AdjointMultiplyDensePair& pair = 
-                        *C._adjointDensePairMap[key];
-                    pair.first = &B;
-
-                    B.AdjointMultiplyDenseInitialize( pair.second, SFA.rank );
+                    B.AdjointMultiplyDenseInitialize( context, SFA.rank );
                     B.AdjointMultiplyDensePrecompute
-                    ( pair.second, Conj(alpha), SFA.D, dummy );
+                    ( context, Conj(alpha), SFA.D, dummy );
                 }
                 else
                 {
-                    C._transposeDensePairMap[key] = 
-                        new TransposeMultiplyDensePair;
-                    TransposeMultiplyDensePair& pair = 
-                        *C._transposeDensePairMap[key];
-                    pair.first = &B;
-
-                    B.TransposeMultiplyDenseInitialize( pair.second, SFA.rank );
+                    B.TransposeMultiplyDenseInitialize( context, SFA.rank );
                     B.TransposeMultiplyDensePrecompute
-                    ( pair.second, alpha, SFA.D, dummy );
+                    ( context, alpha, SFA.D, dummy );
                 }
             }
             else
             {
+                C._denseContextMap[key] = new MultiplyDenseContext;
+                MultiplyDenseContext& context = *C._denseContextMap[key];
                 if( Conjugated )
-                {
-                    C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                    AdjointMultiplyDensePair& pair = 
-                        *C._adjointDensePairMap[key];
-                    pair.first = &B;
-
-                    B.AdjointMultiplyDenseInitialize( pair.second, SFA.rank );
-                }
+                    B.AdjointMultiplyDenseInitialize( context, SFA.rank );
                 else
-                {
-                    C._transposeDensePairMap[key] = 
-                        new TransposeMultiplyDensePair;
-                    TransposeMultiplyDensePair& pair = 
-                        *C._transposeDensePairMap[key];
-                    pair.first = &B;
-
-                    B.TransposeMultiplyDenseInitialize( pair.second, SFA.rank );
-                }
+                    B.TransposeMultiplyDenseInitialize( context, SFA.rank );
             }
             break;
         }
@@ -783,26 +732,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             Dense<Scalar>& CV = *C._VMap[key];
                 
             hmat_tools::Scale( (Scalar)0, CV );
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
             {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, SFA.rank );
+                B.AdjointMultiplyDenseInitialize( context, SFA.rank );
                 B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), SFA.D, CV );
+                ( context, Conj(alpha), SFA.D, CV );
             }
             else
             {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, SFA.rank );
-                B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, SFA.D, CV );
+                B.TransposeMultiplyDenseInitialize( context, SFA.rank );
+                B.TransposeMultiplyDensePrecompute( context, alpha, SFA.D, CV );
             }
             break;
         }
@@ -877,23 +818,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case SPLIT_NODE:
         {
             const SplitLowRankGhost& SFGA = *A._block.data.SFG;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, SFGA.rank );
-            }
+                B.AdjointMultiplyDenseInitialize( context, SFGA.rank );
             else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, SFGA.rank );
-            }
+                B.TransposeMultiplyDenseInitialize( context, SFGA.rank );
             break;
         }
         case SPLIT_LOW_RANK:
@@ -916,26 +846,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // We must be the left and middle process
             Dense<Scalar> dummy( B.Width(), FA.Rank() );
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
             {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, FA.Rank() );
+                B.AdjointMultiplyDenseInitialize( context, FA.Rank() );
                 B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), FA.V, dummy );
+                ( context, Conj(alpha), FA.V, dummy );
             }
             else
             {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, FA.Rank() );
+                B.TransposeMultiplyDenseInitialize( context, FA.Rank() );
                 B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, FA.V, dummy );
+                ( context, alpha, FA.V, dummy );
             }
             break;
         }
@@ -945,26 +868,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             C._VMap[key] = new Dense<Scalar>( B.Width(), FA.Rank() );
                 
             hmat_tools::Scale( (Scalar)0, *C._VMap[key] );
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
             {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, FA.Rank() );
+                B.AdjointMultiplyDenseInitialize( context, FA.Rank() );
                 B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), FA.V, *C._VMap[key] );
+                ( context, Conj(alpha), FA.V, *C._VMap[key] );
             }
             else
             {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, FA.Rank() );
+                B.TransposeMultiplyDenseInitialize( context, FA.Rank() );
                 B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, FA.V, *C._VMap[key] );
+                ( context, alpha, FA.V, *C._VMap[key] );
             }
             break;
         }
@@ -1033,23 +949,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case SPLIT_NODE:
         {
             const LowRankGhost& FGA = *A._block.data.FG;
+            C._denseContextMap[key] = new MultiplyDenseContext;
+            MultiplyDenseContext& context = *C._denseContextMap[key];
             if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, FGA.rank );
-            }
+                B.AdjointMultiplyDenseInitialize( context, FGA.rank );
             else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, FGA.rank );
-            }
+                B.TransposeMultiplyDenseInitialize( context, FGA.rank );
             break;
         }
         case SPLIT_LOW_RANK:
@@ -1201,9 +1106,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
     case DENSE_GHOST:
         break;
     case EMPTY:
-#ifndef RELEASE
-        throw std::logic_error("A should not be empty");
-#endif
         break;
     }
 #ifndef RELEASE
@@ -1230,7 +1132,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     A.MultiplyHMatMainSummationsCountA( sizes );
     B.MultiplyHMatMainSummationsCountB( sizes );
-    C.MultiplyHMatMainSummationsCountC( sizes );
+    A.MultiplyHMatMainSummationsCountC( B, C, sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -1242,7 +1144,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
         offsets[i] = offset;
     A.MultiplyHMatMainSummationsPackA( buffer, offsets );
     B.MultiplyHMatMainSummationsPackB( buffer, offsets );
-    C.MultiplyHMatMainSummationsPackC( buffer, offsets );
+    A.MultiplyHMatMainSummationsPackC( B, C, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -1267,7 +1169,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     // Unpack the reduced buffers (only roots of teamunicators have data)
     A.MultiplyHMatMainSummationsUnpackA( buffer, offsets );
     B.MultiplyHMatMainSummationsUnpackB( buffer, offsets );
-    C.MultiplyHMatMainSummationsUnpackC( buffer, offsets );
+    A.MultiplyHMatMainSummationsUnpackC( B, C, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1461,86 +1363,62 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
-( std::vector<int>& sizes ) const
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+  const DistQuasi2dHMat<Scalar,Conjugated>& C,
+  std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountC");
 #endif
-    switch( _block.type )
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
     {
     case DIST_NODE:
-    case DIST_NODE_GHOST:
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            if( !admissibleC )
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                const Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatMainSummationsCountC
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
+            }
+            break;
+        case DIST_LOW_RANK:
+        {
+            const DistLowRank& DFB = *B._block.data.DF;
+            A.MultiplyDenseSummationsCount( sizes, DFB.rank );
+            break;
+        }
+        default:
+            break;
+        }
     case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
-    {
-        // Handle the distributed summations at this level
+        switch( B._block.type )
         {
-            const std::map<int,Dense<Scalar>*>& baseMap = _ZMap.BaseMap();
-            typename std::map<int,Dense<Scalar>*>::const_iterator itr;
-            for( itr=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            { 
-                const Dense<Scalar>& Z = *(*itr).second;
-                sizes[_level-1] += Z.Height()*Z.Width();
-            }
-        }
-
-        // Handle the H-mat/dense multiplications
+        case DIST_NODE:
         {
-            const std::map<int,MultiplyDensePair*>& baseMap = 
-                _densePairMap.BaseMap();
-            typename std::map<int,MultiplyDensePair*>::const_iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                const MultiplyDensePair& pair = *(*itr).second;
-                pair.first->MultiplyDenseSummationsCount
-                ( sizes, pair.second.numRhs );
-            }
+            const DistLowRank& DFA = *A._block.data.DF;
+            B.TransposeMultiplyDenseSummationsCount( sizes, DFA.rank );
+            break;
         }
-
-        // Handle the transposed H-mat/dense multiplications
+        case DIST_LOW_RANK:
         {
-            const std::map<int,TransposeMultiplyDensePair*>& baseMap = 
-                _transposeDensePairMap.BaseMap();
-            typename 
-                std::map<int,TransposeMultiplyDensePair*>::const_iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                const TransposeMultiplyDensePair& pair = *(*itr).second;
-                pair.first->TransposeMultiplyDenseSummationsCount
-                ( sizes, pair.second.numRhs );
-            }
+            const DistLowRank& DFA = *A._block.data.DF;
+            const DistLowRank& DFB = *B._block.data.DF;
+            if( A._inSourceTeam )
+                sizes[A._level-1] += DFA.rank*DFB.rank;
+            break;
         }
-
-        // Handle the adjoint H-mat/dense multiplications
-        {
-            const std::map<int,AdjointMultiplyDensePair*>& baseMap = 
-                _adjointDensePairMap.BaseMap();
-            typename 
-                std::map<int,AdjointMultiplyDensePair*>::const_iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                const AdjointMultiplyDensePair& pair = *(*itr).second;
-                pair.first->TransposeMultiplyDenseSummationsCount
-                ( sizes, pair.second.numRhs );
-            }
+        default:
+            break;
         }
-        break;
-    }
-    default:
-        break;
-    }
-
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsCountC( sizes );
-        break;
-    }
     default:
         break;
     }
@@ -1552,103 +1430,66 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
-( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const DistQuasi2dHMat<Scalar,Conjugated>& B, 
+  const DistQuasi2dHMat<Scalar,Conjugated>& C,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackC");
 #endif
-    switch( _block.type )
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int key = A._sourceOffset;
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
     {
     case DIST_NODE:
-    case DIST_NODE_GHOST:
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            if( !admissibleC )
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                const Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatMainSummationsPackC
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              buffer, offsets );
+            }
+            break;
+        case DIST_LOW_RANK:
+            // HERE
+            A.MultiplyDenseSummationsPack
+            ( *C._denseContextMap[key], buffer, offsets );
+            break;
+        default:
+            break;
+        }
     case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
-    {
-        // Handle the distributed summations at this level
+        switch( B._block.type )
         {
-            const std::map<int,Dense<Scalar>*>& baseMap = _ZMap.BaseMap();
-            typename std::map<int,Dense<Scalar>*>::const_iterator itr;
-            for( itr=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            { 
-                const Dense<Scalar>& Z = *(*itr).second;
-                if( Z.Height() == Z.LDim() )
-                {
-                    std::memcpy
-                    ( &buffer[offsets[_level-1]], Z.LockedBuffer(),
-                      Z.Height()*Z.Width()*sizeof(Scalar) );
-                    offsets[_level-1] += Z.Height()*Z.Width();
-                }
-                else
-                {
-                    for( int j=0; j<Z.Width(); ++j )
-                    {
-                        std::memcpy
-                        ( &buffer[offsets[_level-1]], Z.LockedBuffer(0,j),
-                          Z.Height()*sizeof(Scalar) );
-                        offsets[_level-1] += Z.Height();
-                    }
-                }
-            }
-        }
-
-        // Handle the H-mat/dense multiplications
+        case DIST_NODE:
+            B.TransposeMultiplyDenseSummationsPack
+            ( *C._denseContextMap[key], buffer, offsets );
+            break;
+        case DIST_LOW_RANK:
         {
-            const std::map<int,MultiplyDensePair*>& baseMap = 
-                _densePairMap.BaseMap();
-            typename std::map<int,MultiplyDensePair*>::const_iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            const DistLowRank& DFA = *A._block.data.DF;
+            const DistLowRank& DFB = *B._block.data.DF;
+            if( A._inSourceTeam )
             {
-                const MultiplyDensePair& pair = *(*itr).second;
-                pair.first->MultiplyDenseSummationsPack
-                ( pair.second, buffer, offsets );
+                std::memcpy
+                ( &buffer[offsets[A._level-1]], C._ZMap[key]->LockedBuffer(),
+                  DFA.rank*DFB.rank*sizeof(Scalar) );
+                offsets[A._level-1] += DFA.rank*DFB.rank;
             }
+            break;
         }
-
-        // Handle the transposed H-mat/dense multiplications
-        {
-            const std::map<int,TransposeMultiplyDensePair*>& baseMap = 
-                _transposeDensePairMap.BaseMap();
-            typename 
-                std::map<int,TransposeMultiplyDensePair*>::const_iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                const TransposeMultiplyDensePair& pair = *(*itr).second;
-                pair.first->TransposeMultiplyDenseSummationsPack
-                ( pair.second, buffer, offsets );
-            }
+        default:
+            break;
         }
-
-        // Handle the adjoint H-mat/dense multiplications
-        {
-            const std::map<int,AdjointMultiplyDensePair*>& baseMap = 
-                _adjointDensePairMap.BaseMap();
-            typename 
-                std::map<int,AdjointMultiplyDensePair*>::const_iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                const AdjointMultiplyDensePair& pair = *(*itr).second;
-                pair.first->TransposeMultiplyDenseSummationsPack
-                ( pair.second, buffer, offsets );
-            }
-        }
-        break;
-    }
-    default:
-        break;
-    }
-    
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsPackC
-                ( buffer, offsets );
-        break;
-    }
     default:
         break;
     }
@@ -1660,100 +1501,65 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets )
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackC");
 #endif
-    switch( _block.type )
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int key = A._sourceOffset;
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
     {
     case DIST_NODE:
-    case DIST_NODE_GHOST:
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            if( !admissibleC )
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatMainSummationsUnpackC
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              buffer, offsets );
+            }
+            break;
+        case DIST_LOW_RANK:
+            A.MultiplyDenseSummationsUnpack
+            ( *C._denseContextMap[key], buffer, offsets );
+            break;
+        default:
+            break;
+        }
     case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
-    {
-        // Handle the distributed summations at this level
+        switch( B._block.type )
         {
-            std::map<int,Dense<Scalar>*>& baseMap = _ZMap.BaseMap();
-            typename std::map<int,Dense<Scalar>*>::iterator itr;
-            for( itr=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            { 
-                Dense<Scalar>& Z = *(*itr).second;
-                if( Z.Height() == Z.LDim() )
-                {
-                    std::memcpy
-                    ( Z.Buffer(), &buffer[offsets[_level-1]],
-                      Z.Height()*Z.Width()*sizeof(Scalar) );
-                    offsets[_level-1] += Z.Height()*Z.Width();
-                }
-                else
-                {
-                    for( int j=0; j<Z.Width(); ++j )
-                    {
-                        std::memcpy
-                        ( Z.Buffer(0,j), &buffer[offsets[_level-1]],
-                          Z.Height()*sizeof(Scalar) );
-                        offsets[_level-1] += Z.Height();
-                    }
-                }
-            }
-        }
-
-        // Handle the H-mat/dense multiplications
+        case DIST_NODE:
+            B.TransposeMultiplyDenseSummationsUnpack
+            ( *C._denseContextMap[key], buffer, offsets );
+            break;
+        case DIST_LOW_RANK:
         {
-            std::map<int,MultiplyDensePair*>& baseMap = _densePairMap.BaseMap();
-            typename std::map<int,MultiplyDensePair*>::iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
+            const DistLowRank& DFA = *A._block.data.DF;
+            const DistLowRank& DFB = *B._block.data.DF;
+            if( A._inSourceTeam )
             {
-                MultiplyDensePair& pair = *(*itr).second;
-                pair.first->MultiplyDenseSummationsUnpack
-                ( pair.second, buffer, offsets );
+                std::memcpy
+                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level-1]],
+                  DFA.rank*DFB.rank*sizeof(Scalar) );
+                offsets[A._level-1] += DFA.rank*DFB.rank;
             }
+            break;
         }
-
-        // Handle the transposed H-mat/dense multiplications
-        {
-            std::map<int,TransposeMultiplyDensePair*>& baseMap = 
-                _transposeDensePairMap.BaseMap();
-            typename std::map<int,TransposeMultiplyDensePair*>::iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                TransposeMultiplyDensePair& pair = *(*itr).second;
-                pair.first->TransposeMultiplyDenseSummationsUnpack
-                ( pair.second, buffer, offsets );
-            }
+        default:
+            break;
         }
-
-        // Handle the adjoint H-mat/dense multiplications
-        {
-            std::map<int,AdjointMultiplyDensePair*>& baseMap = 
-                _adjointDensePairMap.BaseMap();
-            typename std::map<int,AdjointMultiplyDensePair*>::iterator itr;
-            for( itr!=baseMap.begin(); itr!=baseMap.end(); ++itr )
-            {
-                AdjointMultiplyDensePair& pair = *(*itr).second;
-                pair.first->TransposeMultiplyDenseSummationsUnpack
-                ( pair.second, buffer, offsets );
-            }
-        }
-        break;
-    }
-    default:
-        break;
-    }
-    
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
-        Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsUnpackC
-                ( buffer, offsets );
-        break;
-    }
     default:
         break;
     }
@@ -1799,10 +1605,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     std::vector<int> offsets = sendOffsets;
     A.MultiplyHMatMainPassDataPackA( sendBuffer, offsets );
     B.MultiplyHMatMainPassDataPackB( sendBuffer, offsets );
-    // This needs to be written
-    /*
     A.MultiplyHMatMainPassDataPackC( B, C, sendBuffer, offsets );
-    */
 
     // 4) MPI_Alltoallv
     mpi::AllToAllV
@@ -2027,7 +1830,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const
 {
 #ifndef RELEASE
@@ -2059,7 +1862,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
                 // Start H += H H
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
-                Node& nodeC = *C._block.data.N;
+                const Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
@@ -2286,9 +2089,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         {
             // Pass data for D/F += F D
             if( B._inTargetTeam )
-                sendSizes[B._sourceRoot] += B.Width()*SFA.rank;
+                sendSizes[B._sourceRoot] += B.Height()*SFA.rank;
             else
-                recvSizes[B._targetRoot] += B.Width()*SFA.rank;
+                recvSizes[B._targetRoot] += B.Height()*SFA.rank;
             break;
         }
         case SPLIT_DENSE_GHOST:
@@ -2319,7 +2122,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            recvSizes[B._targetRoot] += B.Width()*SFGA.rank;
+            recvSizes[B._targetRoot] += B.Height()*SFGA.rank;
             break;
         default:
 #ifndef RELEASE
@@ -2346,7 +2149,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            sendSizes[B._sourceRoot] += B.Width()*FA.Rank();
+            sendSizes[B._sourceRoot] += B.Height()*FA.Rank();
             break;
         case DENSE:
             // There is no pass data
@@ -2374,7 +2177,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            recvSizes[B._targetRoot] += B.Width()*FGA.rank;
+            recvSizes[B._targetRoot] += B.Height()*FGA.rank;
             break;
         default:
 #ifndef RELEASE
@@ -2491,9 +2294,385 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
         break;
     case EMPTY:
+        break;
+    }
 #ifndef RELEASE
-        throw std::logic_error("A should not be empty");
+    PopCallStack();
 #endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+  std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackC");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
+    // Take care of the H += H H cases first
+    const int key = A._sourceOffset;
+    const bool admissibleC = C.Admissible();
+    if( !admissibleC )
+    {
+        switch( A._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            switch( B._block.type )
+            {
+            case DIST_NODE:
+            case DIST_NODE_GHOST:
+            case SPLIT_NODE:
+            case SPLIT_NODE_GHOST:
+            case NODE:
+            case NODE_GHOST:
+            {
+                // Start H += H H
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatMainPassDataPackC
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              sendBuffer, offsets );
+                return;
+                break;
+            }
+            default:
+                break;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    MPI_Comm team = _teams->Team( _level );
+    const int teamRank = mpi::CommRank( team );
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+            // The only possibilities are recursion and F += H H, and the latter
+            // is handled in the CountA/CountB subroutines.
+            break;
+        case DIST_LOW_RANK:
+        case DIST_LOW_RANK_GHOST:
+            // Pass data pack for H/F += H F
+            A.MultiplyDensePassDataPack
+            ( *C._denseContextMap[key], sendBuffer, offsets );
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            // The only possibilities are recursion and F += H H, and the latter
+            // is handled in the CountA/CountB subroutines.
+            break;
+        case SPLIT_LOW_RANK:
+        case SPLIT_LOW_RANK_GHOST:
+        case LOW_RANK:
+        case LOW_RANK_GHOST:
+            // Pass data pack for H/F += H F
+            A.MultiplyDensePassDataPack
+            ( *C._denseContextMap[key], sendBuffer, offsets );
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case NODE:
+        // The only possiblities are recursion, F += H H, and H/F += H F; the
+        // first two are not handled here, and the last does not require any
+        // work here because the precompute step handled everything.
+        break;
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+        // The only non-recursive possibilities are H/F += H F and F += H H;
+        // the former does not require our participation here and the latter
+        // is handled by CountA and CountB.
+        break;
+    case DIST_LOW_RANK:
+    {
+        const DistLowRank& DFA = *A._block.data.DF;
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            // Pass data for H/F += F H
+            if( A._inSourceTeam )
+                B.TransposeMultiplyDensePassDataPack
+                ( *C._denseContextMap[key], DFA.VLocal, sendBuffer, offsets );
+            break;
+        case DIST_NODE_GHOST:
+            // Pass data for H/F += F H is between other (two) team(s)
+            break;
+        case DIST_LOW_RANK:
+            // Pass data for H/F += F F
+            if( teamRank == 0 && (A._inSourceTeam != A._inTargetTeam) )
+            {
+                const DistLowRank& DFB = *B._block.data.DF;
+                if( A._inSourceTeam )
+                {
+                    Dense<Scalar>& ZC = *C._ZMap[key];
+                    std::memcpy
+                    ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(),
+                      DFA.rank*DFB.rank*sizeof(Scalar) );
+                    offsets[A._targetRoot] += DFA.rank*DFB.rank;
+                    ZC.Clear();
+                }
+            }
+            break;
+        case DIST_LOW_RANK_GHOST:
+            // Pass data for H/F += F F is only receiving here
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK_GHOST:
+        // We, at most, receive here
+        break;
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SFA = *A._block.data.SF;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            if( A._inSourceTeam )
+                B.TransposeMultiplyDensePassDataPack
+                ( *C._denseContextMap[key], SFA.D, sendBuffer, offsets );
+            break;
+        case SPLIT_NODE_GHOST:
+            // Pass data for H/F += F H is between other two processes
+            break;
+        case NODE:
+        case NODE_GHOST:
+            break;
+        case SPLIT_LOW_RANK:
+        {
+            // Pass data for H/D/F += F F
+            // We're either the middle process or both the left and right
+            const SplitLowRank& SFB = *B._block.data.SF;
+            if( A._inSourceTeam )
+            {
+                Dense<Scalar>& ZC = *C._ZMap[key];
+                std::memcpy
+                ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(),
+                  SFA.rank*SFB.rank*sizeof(Scalar) );
+                offsets[A._targetRoot] += SFA.rank*SFB.rank;
+                ZC.Clear();
+            }
+            break;
+        }
+        case SPLIT_LOW_RANK_GHOST:
+            // Pass data for H/D/F += F F is just a receive for us
+            break;
+        case LOW_RANK:
+        {
+            // Pass data for H/D/F += F F
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            std::memcpy
+            ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(),
+              SFA.rank*FB.Rank()*sizeof(Scalar) );
+            offsets[A._targetRoot] += SFA.rank*FB.Rank();
+            ZC.Clear();
+            break;
+        }
+        case LOW_RANK_GHOST:
+            // Pass data for H/D/F += F F is just a receive for us
+            break;
+        case SPLIT_DENSE:
+        {
+            // Pass data for D/F += F D
+            if( B._inTargetTeam )
+            {
+                std::memcpy
+                ( &sendBuffer[offsets[B._sourceRoot]], SFA.D.LockedBuffer(),
+                  B.Height()*SFA.rank*sizeof(Scalar) );
+                offsets[B._sourceRoot] += B.Height()*SFA.rank;
+            }
+            break;
+        }
+        case SPLIT_DENSE_GHOST:
+        case DENSE:
+        case DENSE_GHOST:
+            // Pass data for D/F += F D is in other process
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK_GHOST:
+        break;
+    case LOW_RANK:
+    {
+        const LowRank<Scalar,Conjugated>& FA = *A._block.data.F;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataPack
+            ( *C._denseContextMap[key], FA.V, sendBuffer, offsets );
+            break;
+        case NODE:
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+            // There is no pass data
+            break;
+        case SPLIT_DENSE:
+        {
+            // Pass data for D/F += F D
+            std::memcpy
+            ( &sendBuffer[offsets[B._sourceRoot]], FA.V.LockedBuffer(),
+              B.Height()*FA.Rank()*sizeof(Scalar) );
+            offsets[B._sourceRoot] += B.Height()*FA.Rank();
+            break;
+        }
+        case DENSE:
+            // There is no pass data
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case LOW_RANK_GHOST:
+        break;
+    case SPLIT_DENSE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+        {
+            // Pass data for D/F += D F
+            const SplitLowRank& SFB = *B._block.data.SF;
+            if( A._inSourceTeam )
+            {
+                Dense<Scalar>& ZC = *C._ZMap[key];
+                std::memcpy
+                ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(),
+                  A.Height()*SFB.rank*sizeof(Scalar) );
+                offsets[A._targetRoot] += A.Height()*SFB.rank;
+                ZC.Clear();
+            }
+            break;
+        }
+        case SPLIT_LOW_RANK_GHOST:
+            break;
+        case LOW_RANK:
+        {
+            // Pass data for D/F += D F
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            std::memcpy
+            ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(), 
+              A.Height()*FB.Rank()*sizeof(Scalar) );
+            offsets[A._targetRoot] += A.Height()*FB.Rank();
+            ZC.Clear();
+            break;
+        }
+        case LOW_RANK_GHOST:
+            break;
+        case SPLIT_DENSE:
+            // Pass data for D/F += D D
+            if( B._inTargetTeam )
+            {
+                const SplitDense& SDA = *A._block.data.SD;
+                std::memcpy
+                ( &sendBuffer[offsets[B._sourceRoot]], SDA.D.LockedBuffer(),
+                  A.Height()*A.Width()*sizeof(Scalar) );
+                offsets[B._sourceRoot] += A.Height()*A.Width();
+            }
+            break;
+        case SPLIT_DENSE_GHOST:
+        case DENSE:
+        case DENSE_GHOST:
+            // These pass data do not exist or do not involve us
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_DENSE_GHOST:
+        break;
+    case DENSE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            break;
+        case LOW_RANK:
+            break;
+        case SPLIT_DENSE:
+        {
+            const Dense<Scalar>& DA = *A._block.data.D;
+            std::memcpy
+            ( &sendBuffer[offsets[B._sourceRoot]], DA.LockedBuffer(),
+              A.Height()*A.Width()*sizeof(Scalar) );
+            offsets[B._sourceRoot] += A.Height()*A.Width();
+            break;
+        }
+        case DENSE:
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case DENSE_GHOST:
+        break;
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
@@ -2566,34 +2745,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCountC");
 #endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
-    {
-        // HERE
-        break;
-    }
-    default:
-        break;
-    }
-
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    case DIST_NODE_GHOST:
-    {
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainBroadcastsCountC( sizes );
-        break;
-    }
-    default:
-        break;
-    }
+    // TODO
 #ifndef RELEASE
     PopCallStack();
 #endif
