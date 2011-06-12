@@ -567,56 +567,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case SPLIT_LOW_RANK:
         {
             // We are either the middle process or both the left and right
+            // Start H/F += H F
             const SplitLowRank& SFB = *B._block.data.SF;
-            if( admissibleC )
+            if( C._inTargetTeam )
             {
-                // Start F += H F
-                if( C._inTargetTeam )
-                {
-                    // Our process owns the left and right sides
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
+                // Our process owns the left and right sides
+                C._densePairMap[key] = new MultiplyDensePair;
+                MultiplyDensePair& densePair = *C._densePairMap[key];
+                densePair.first = &A;
 
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                }
-                else
-                {
-                    // We are the middle process
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
-
-                    Dense<Scalar> dummy( A.Height(), SFB.rank );
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                    A.MultiplyDensePrecompute
-                    ( densePair.second, alpha, SFB.D, dummy );
-                }
+                A.MultiplyDenseInitialize( densePair.second, SFB.rank );
             }
             else
             {
-                // Start H += H F
-                if( C._inTargetTeam )
-                {
-                    // Our process owns the left and right sides
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
+                // We are the middle process
+                C._densePairMap[key] = new MultiplyDensePair;
+                MultiplyDensePair& densePair = *C._densePairMap[key];
+                densePair.first = &A;
 
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                }
-                else
-                {
-                    // We are the middle process
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
-
-                    Dense<Scalar> dummy( A.Height(), SFB.rank );
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                    A.MultiplyDensePrecompute
-                    ( densePair.second, alpha, SFB.D, dummy );
-                }
+                Dense<Scalar> dummy( A.Height(), SFB.rank );
+                A.MultiplyDenseInitialize( densePair.second, SFB.rank );
+                A.MultiplyDensePrecompute
+                ( densePair.second, alpha, SFB.D, dummy );
             }
             break;
         }
@@ -2168,7 +2140,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
     // HERE: Need to carefully think about possiblity of cases where there
     //       was no computation in the Precompute phase, but data still needs
     //       to be passed here.
-    /*
     const int key = A._sourceOffset;
     switch( A._block.type )
     {
@@ -2178,33 +2149,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         {
         case DIST_NODE:
         case DIST_NODE_GHOST:
+            // The only possibilities are recursion and F += H H, and the latter
+            // is handled in the CountA/CountB subroutines.
             break;
         case DIST_LOW_RANK:
         {
-            // HERE
-            // Start H/F += H F
+            // Pass data count for H/F += H F
             const DistLowRank& DFB = *B._block.data.DF;
-            C._UMap[key] = new Dense<Scalar>( C.LocalHeight(), DFB.rank );
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-
-            hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( densePair.second, DFB.rank );
-            A.MultiplyDensePrecompute
-            ( densePair.second, alpha, DFB.ULocal, *C._UMap[key] );
+            A.MultiplyDensePassDataCount( sendSizes, recvSizes, DFB.rank );
             break;
         }
         case DIST_LOW_RANK_GHOST:
         {
-            // Start H/F += H F
-            // We must be in the left team
+            // Pass data count for H/F += H F. This should only contribute
+            // to the recv sizes.
             const DistLowRankGhost& DFGB = *B._block.data.DFG;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-
-            A.MultiplyDenseInitialize( densePair.second, DFGB.rank );
+            A.MultiplyDensePassDataCount( sendSizes, recvSizes, DFGB.rank );
             break;
         }
         default:
@@ -2215,8 +2175,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
         break;
     }
-    case DIST_NODE_GHOST:
-        break;
     case SPLIT_NODE:
     {
         switch( B._block.type )
@@ -2225,97 +2183,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         case SPLIT_NODE_GHOST:
         case NODE:
         case NODE_GHOST:
+            // The only possibilities are recursion and F += H H, and the latter
+            // is handled in the CountA/CountB subroutines.
             break;
         case SPLIT_LOW_RANK:
         {
-            // We are either the middle process or both the left and right
+            // Pass data for H/F += H F
             const SplitLowRank& SFB = *B._block.data.SF;
-            if( admissibleC )
-            {
-                // Start F += H F
-                if( C._inTargetTeam )
-                {
-                    // Our process owns the left and right sides
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
-
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                }
-                else
-                {
-                    // We are the middle process
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
-
-                    Dense<Scalar> dummy( A.Height(), SFB.rank );
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                    A.MultiplyDensePrecompute
-                    ( densePair.second, alpha, SFB.D, dummy );
-                }
-            }
-            else
-            {
-                // Start H += H F
-                if( C._inTargetTeam )
-                {
-                    // Our process owns the left and right sides
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
-
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                }
-                else
-                {
-                    // We are the middle process
-                    C._densePairMap[key] = new MultiplyDensePair;
-                    MultiplyDensePair& densePair = *C._densePairMap[key];
-                    densePair.first = &A;
-
-                    Dense<Scalar> dummy( A.Height(), SFB.rank );
-                    A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-                    A.MultiplyDensePrecompute
-                    ( densePair.second, alpha, SFB.D, dummy );
-                }
-            }
+            A.MultiplyDensePassDataCount( sendSizes, recvSizes, SFB.rank );
             break;
         }
         case SPLIT_LOW_RANK_GHOST:
         {
-            // Start H/F += H F
-            // We are the left process
+            // Pass datal for H/F += H F
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-            A.MultiplyDenseInitialize( densePair.second, SFGB.rank );
+            A.MultiplyDensePassDataCount( sendSizes, recvSizes, SFGB.rank );
             break;
         }
         case LOW_RANK:
         {
-            // Start H/F += H F
-            // We are the middle and right processes
+            // Pass data for H/F += H F
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-
-            Dense<Scalar> dummy( A.Height(), FB.U.Width() );
-            A.MultiplyDenseInitialize( densePair.second, FB.Rank() );
-            A.MultiplyDensePrecompute( densePair.second, alpha, FB.U, dummy );
+            A.MultiplyDensePassDataCount( sendSizes, recvSizes, FB.Rank() );
             break;
         }
         case LOW_RANK_GHOST:
         {
-            // Start H/F += H F
-            // We are the left process
+            // Pass data for H/F += H F
             const LowRankGhost& FGB = *B._block.data.FG;
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-            A.MultiplyDenseInitialize( densePair.second, FGB.rank );
+            A.MultiplyDensePassDataCount( sendSizes, recvSizes, FGB.rank );
             break;
         }
         default:
@@ -2326,56 +2222,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
         break;
     }
-    case SPLIT_NODE_GHOST:
-        break;
     case NODE:
-    {
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        case NODE:
-            break;
-        case SPLIT_LOW_RANK:
-        {
-            // Start H/F += H F
-            // We are the left and middle processes
-            const SplitLowRank& SFB = *B._block.data.SF;
-            C._UMap[key] = new Dense<Scalar>( C.Height(), SFB.rank );
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-
-            hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( densePair.second, SFB.rank );
-            A.MultiplyDensePrecompute
-            ( densePair.second, alpha, SFB.D, *C._UMap[key] );
-            break;
-        }
-        case LOW_RANK:
-        {
-            // Start H/F += H F
-            // We own all of A, B, and C
-            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            C._UMap[key] = new Dense<Scalar>( C.Height(), FB.Rank() );
-            C._densePairMap[key] = new MultiplyDensePair;
-            MultiplyDensePair& densePair = *C._densePairMap[key];
-            densePair.first = &A;
-
-            hmat_tools::Scale( (Scalar)0, *C._UMap[key] );
-            A.MultiplyDenseInitialize( densePair.second, FB.Rank() );
-            A.MultiplyDensePrecompute
-            ( densePair.second, alpha, FB.U, *C._UMap[key] );
-            break;
-        }
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
+        // The only possiblities are recursion, F += H H, and H/F += H F; the
+        // first two are not handled here, and the last does not require any
+        // work here because the precompute step handled everything.
         break;
-    }
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
     case NODE_GHOST:
+        // The only non-recursive possibilities are H/F += H F and F += H H;
+        // the former does not require our participation here and the latter
+        // is handled by CountA and CountB.
         break;
     case DIST_LOW_RANK:
     {
@@ -2383,36 +2240,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         switch( B._block.type )
         {
         case DIST_NODE:
-        {
-            // Start H/F += F H
-            C._VMap[key] = new Dense<Scalar>( C.LocalWidth(), DFA.rank );
-
-            hmat_tools::Scale( (Scalar)0, *C._VMap[key] );
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, DFA.rank );
-                B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), DFA.VLocal, *C._VMap[key] );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, DFA.rank );
-                B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, DFA.VLocal, *C._VMap[key] );
-            }
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataCount
+            ( sendSizes, recvSizes, DFA.rank );
             break;
-        }
         case DIST_LOW_RANK:
         {
+            // LEFT OFF HERE
+            break;
+        }
+        }
+    }
+    }
+    /*
             // Start H/F += F F
             if( A._inSourceTeam )
             {
