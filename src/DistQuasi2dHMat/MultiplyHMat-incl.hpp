@@ -1782,16 +1782,41 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     A.MultiplyHMatMainPassDataCountC( B, C, sendSizes, recvSizes );
 
     // 2) Allocate buffers
-    // TODO
+    int totalSendSize=0, totalRecvSize=0;
+    for( int i=0; i<p; ++i )
+    {
+        totalSendSize += sendSizes[i];
+        totalRecvSize += recvSizes[i];
+    }
+    std::vector<Scalar> sendBuffer(totalSendSize), recvBuffer(totalRecvSize);
+    std::vector<int> sendOffsets( p ), recvOffsets( p );
+    for( int i=0,offset=0; i<p; offset+=sendSizes[i],++i )
+        sendOffsets[i] = offset;
+    for( int i=0,offset=0; i<p; offset+=recvSizes[i],++i )
+        recvOffsets[i] = offset;
 
     // 3) Pack sends
-    // TODO
+    std::vector<int> offsets = sendOffsets;
+    A.MultiplyHMatMainPassDataPackA( sendBuffer, offsets );
+    B.MultiplyHMatMainPassDataPackB( sendBuffer, offsets );
+    // This needs to be written
+    /*
+    A.MultiplyHMatMainPassDataPackC( B, C, sendBuffer, offsets );
+    */
 
     // 4) MPI_Alltoallv
-    // TODO
+    mpi::AllToAllV
+    ( &sendBuffer[0], &sendSizes[0], &sendOffsets[0],
+      &recvBuffer[0], &recvSizes[0], &recvOffsets[0], comm );
 
     // 5) Unpack recvs
-    // TODO
+    offsets = recvOffsets;
+    A.MultiplyHMatMainPassDataUnpackA( recvBuffer, offsets );
+    B.MultiplyHMatMainPassDataUnpackB( recvBuffer, offsets );
+    // This needs to be written
+    /*
+    A.MultiplyHMatMainPassDataUnpackC( B, C, recvBuffer, offsets );
+    */
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1831,6 +1856,81 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
 
 template<typename Scalar,bool Conjugated>
 void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
+( std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackA");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        if( _beganRowSpaceComp )
+        {
+            if( _inTargetTeam )
+            {
+                TransposeMultiplyDensePassDataPack
+                ( _T2Context, _Omega2, sendBuffer, offsets );
+            }
+            else
+            {
+                Dense<Scalar> dummy( LocalHeight(), _T2Context.numRhs );
+                TransposeMultiplyDensePassDataPack
+                ( _T2Context, dummy, sendBuffer, offsets );
+            }
+        }
+
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainPassDataPackA
+                ( sendBuffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
+( const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackA");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        if( _beganRowSpaceComp )
+            TransposeMultiplyDensePassDataUnpack
+            ( _T2Context, recvBuffer, offsets );
+
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainPassDataUnpackA
+                ( recvBuffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
 ( std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const
 {
@@ -1851,6 +1951,68 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatMainPassDataCountB
                 ( sendSizes, recvSizes );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
+( std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackB");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        if( _beganColSpaceComp )
+            MultiplyDensePassDataPack( _T1Context, sendBuffer, offsets );
+
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainPassDataPackB
+                ( sendBuffer, offsets );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
+( const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackB");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        if( _beganColSpaceComp )
+            MultiplyDensePassDataUnpack( _T1Context, recvBuffer, offsets );
+
+        const Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatMainPassDataUnpackB
+                ( recvBuffer, offsets );
         break;
     }
     default:
@@ -1916,7 +2078,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
     }
 
-    const int key = A._sourceOffset;
     MPI_Comm team = _teams->Team( _level );
     const int teamRank = mpi::CommRank( team );
     switch( A._block.type )
@@ -2225,7 +2386,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
     }
     case SPLIT_DENSE:
     {
-        const SplitDense& SDA = *A._block.data.SD;
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
@@ -2296,7 +2456,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         break;
     case DENSE:
     {
-        const Dense<Scalar>& DA = *A._block.data.D;
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
