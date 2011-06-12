@@ -272,8 +272,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPrecompute");
 #endif
-    const int paddedRank = C.MaxRank() + 4;
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int key = A._sourceOffset;
+    const int paddedRank = C.MaxRank() + 4;
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
         C._block.type = EMPTY;
@@ -282,10 +283,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
     if( C._block.type == EMPTY )
         A.MultiplyHMatSetUp( B, C );
 
-    // Take care of the H += H H cases first
+
+    // Handle all H H cases here
     const bool admissibleC = C.Admissible();
     if( !admissibleC )
     {
+        // Take care of the H += H H cases first
         switch( A._block.type )
         {
         case DIST_NODE:
@@ -323,8 +326,120 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
     }
+    else
+    {
+        // Handle precomputation of A's row space
+        if( !A._beganRowSpaceComp )
+        {
+            switch( A._block.type )
+            {
+            case DIST_NODE:
+            case SPLIT_NODE:
+            case NODE:
+                switch( B._block.type )
+                {
+                case DIST_NODE:
+                case DIST_NODE_GHOST:
+                case SPLIT_NODE:
+                case SPLIT_NODE_GHOST:
+                case NODE:
+                case NODE_GHOST:
+                {
+                    if( A._inTargetTeam )
+                    {
+                        A._Omega2.Resize( A.LocalHeight(), paddedRank );
+                        ParallelGaussianRandomVectors( A._Omega2 );
+                    }
+                    if( A._inSourceTeam )
+                    {
+                        A._T2.Resize( A.LocalWidth(), paddedRank );
+                        hmat_tools::Scale( (Scalar)0, A._T2 );
+                    }
+                    A.AdjointMultiplyDenseInitialize
+                    ( A._T2Context, paddedRank );
+                    if( A._inSourceTeam && A._inTargetTeam )
+                    {
+                        A.AdjointMultiplyDensePrecompute
+                        ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                    }
+                    else if( A._inSourceTeam )
+                    {
+                        Dense<Scalar> dummy( A.LocalHeight(), paddedRank );
+                        A.AdjointMultiplyDensePrecompute
+                        ( A._T2Context, Conj(alpha), dummy, A._T2 );
+                    }
+                    else // A._inTargetTeam
+                    {
+                        Dense<Scalar> dummy( A.LocalWidth(), paddedRank );
+                        A.AdjointMultiplyDensePrecompute
+                        ( A._T2Context, Conj(alpha), A._Omega2, dummy );
+                    }
+                    A._beganRowSpaceComp = true;
+                    break;
+                }
+                default:
+                    break;
+                }
+                break;
+            default:
+                break;
+            }
+        }
+        if( !B._beganColSpaceComp )
+        {
+            switch( A._block.type )
+            {
+            case DIST_NODE:
+            case DIST_NODE_GHOST:
+            case SPLIT_NODE:
+            case SPLIT_NODE_GHOST:
+            case NODE:
+            case NODE_GHOST:
+                switch( B._block.type )
+                {
+                case DIST_NODE:
+                case SPLIT_NODE:
+                case NODE:
+                    if( B._inSourceTeam )
+                    {
+                        B._Omega1.Resize( B.LocalWidth(), paddedRank ); 
+                        ParallelGaussianRandomVectors( B._Omega1 );
+                    }
+                    if( B._inTargetTeam )
+                    {
+                        B._T1.Resize( B.LocalHeight(), paddedRank );
+                        hmat_tools::Scale( (Scalar)0, B._T1 );
+                    }
+                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
+                    if( B._inSourceTeam && B._inTargetTeam )
+                    {
+                        B.MultiplyDensePrecompute
+                        ( B._T1Context, alpha, B._Omega1, B._T1 );
+                    }
+                    else if( B._inSourceTeam )
+                    {
+                        Dense<Scalar> dummy( B.LocalHeight(), paddedRank );
+                        B.MultiplyDensePrecompute
+                        ( B._T1Context, alpha, B._Omega1, dummy );
+                    }
+                    else // B._inTargetTeam
+                    {
+                        Dense<Scalar> dummy( B.LocalWidth(), paddedRank );
+                        B.MultiplyDensePrecompute
+                        ( B._T1Context, alpha, dummy, B._T1 );
+                    }
+                    B._beganColSpaceComp = true;
+                    break;
+                default:
+                    break;
+                }
+                break;
+            default:
+                break;
+            }
+        }
+    }
 
-    const int key = A._sourceOffset;
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -332,59 +447,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         switch( B._block.type )
         {
         case DIST_NODE:
-        {
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.LocalHeight(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-                    A._T2.Resize( A.LocalWidth(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
-                    A._beganRowSpaceComp = true;
-                }
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.LocalWidth(), paddedRank ); 
-                    ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.LocalHeight(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, B._T1 );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
         case DIST_NODE_GHOST:
-        {
-            // We must be in the left team
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.LocalHeight(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-
-                    Dense<Scalar> dummy( A.LocalWidth(), paddedRank );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, Conj(alpha), A._Omega2, dummy );
-                    A._beganRowSpaceComp = true;
-                }
-            }
             break;
-        }
         case DIST_LOW_RANK:
         {
             // Start H/F += H F
@@ -420,150 +484,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         }
         break;
     }
-    case DIST_NODE_GHOST:
-    {
-        switch( B._block.type )
-        {
-        case DIST_NODE:
-        {
-            // We must be in the right team
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.LocalWidth(), paddedRank ); 
-                    ParallelGaussianRandomVectors( B._Omega1 );
-
-                    Dense<Scalar> dummy( B.LocalHeight(), paddedRank );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, dummy );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
-
-        case DIST_LOW_RANK:
-            // We must be in the right team, so there is nothing to do yet
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
     case SPLIT_NODE:
     {
         switch( B._block.type )
         {
         case SPLIT_NODE:
-        {
-            // We must be the middle process or both the left and right process
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.LocalHeight(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-                    A._T2.Resize( A.LocalWidth(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
-                    A._beganRowSpaceComp = true;
-                }
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.LocalWidth(), paddedRank );
-                    ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.LocalHeight(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, B._T1 );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
         case SPLIT_NODE_GHOST:
-        {
-            // We must be in the left team
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.Height(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-
-                    Dense<Scalar> dummy( A.Width(), paddedRank );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, Conj(alpha), A._Omega2, dummy );
-                    A._beganRowSpaceComp = true;
-                }
-            }
-            break;
-        }
         case NODE:
-        {
-            // We must be in the middle and right teams
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A._beganRowSpaceComp = true;
-                }
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.Width(), paddedRank );
-                    ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.Height(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, B._T1 );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
         case NODE_GHOST:
-        {
-            // We must be in the left team
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.Height(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-
-                    Dense<Scalar> dummy( A.Width(), paddedRank );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, Conj(alpha), A._Omega2, dummy );
-                    A._beganRowSpaceComp = true;
-                }
-            }
             break;
-        }
         case SPLIT_LOW_RANK:
         {
             // We are either the middle process or both the left and right
@@ -636,106 +565,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         }
         break;
     }
-    case SPLIT_NODE_GHOST:
-    {
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        {
-            // We must be the right process
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.Width(), paddedRank );
-                    ParallelGaussianRandomVectors( B._Omega1 );
-
-                    Dense<Scalar> dummy( B.Height(), paddedRank );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, dummy );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
-
-        case SPLIT_LOW_RANK:
-            // We are the right process, so there is nothing to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
     case NODE:
     {
         switch( B._block.type )
         {
         case SPLIT_NODE:
-        {
-            // We must be in the left and middle teams
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.Height(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-                    A._T2.Resize( A.Width(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, alpha, A._Omega2, A._T2 );
-                    A._beganRowSpaceComp = true;
-                }
-                if( !B._beganColSpaceComp )
-                {
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
         case NODE:
-        {
-            // We own all of A, B, and C
-            if( admissibleC )
-            {
-                // Start the F += H H update
-                if( !A._beganRowSpaceComp )
-                {
-                    A._Omega2.Resize( A.Height(), paddedRank );
-                    ParallelGaussianRandomVectors( A._Omega2 );
-                    A._T2.Resize( A.Width(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, A._T2 );
-                    A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
-                    A.AdjointMultiplyDensePrecompute
-                    ( A._T2Context, alpha, A._Omega2, A._T2 );
-                }
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.Width(), paddedRank );
-                    ParallelGaussianRandomVectors( B._Omega1 );
-                    B._T1.Resize( B.Height(), paddedRank );
-
-                    hmat_tools::Scale( (Scalar)0, B._T1 );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, B._T1 );
-                }
-            }
             break;
-        }
         case SPLIT_LOW_RANK:
         {
             // Start H/F += H F
@@ -776,43 +612,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         }
         break;
     }
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
     case NODE_GHOST:
-    {
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        {
-            // We must be the right process
-            if( admissibleC )
-            {
-                // Start F += H H
-                if( !B._beganColSpaceComp )
-                {
-                    B._Omega1.Resize( B.Width(), paddedRank );
-                    ParallelGaussianRandomVectors( B._Omega1 );
-
-                    Dense<Scalar> dummy( B.Height(), paddedRank );
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
-                    B.MultiplyDensePrecompute
-                    ( B._T1Context, alpha, B._Omega1, dummy );
-                    B._beganColSpaceComp = true;
-                }
-            }
-            break;
-        }
-
-        case SPLIT_LOW_RANK:
-            // We are the right process, so there is nothing to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
         break;
-    }
     case DIST_LOW_RANK:
     {
         const DistLowRank& DFA = *A._block.data.DF;
@@ -865,12 +668,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             }
             break;
         }
-
         case DIST_NODE_GHOST:
         case DIST_LOW_RANK_GHOST:
-            // We're in the left team, so there is nothing to do
             break;
-
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -907,11 +707,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             }
             break;
         }
-
         case DIST_LOW_RANK:
-            // We are in the right team, so there is nothing to do
             break;
-
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -1055,7 +852,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
               (Scalar)0, VC.Buffer(),          VC.LDim() );
             break;
         }
-
         case SPLIT_NODE_GHOST:
         case NODE_GHOST:
         case SPLIT_LOW_RANK_GHOST:
@@ -1065,7 +861,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case DENSE_GHOST:
             // We are the left process, so there is no work to do
             break;
-
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -1101,12 +896,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             }
             break;
         }
-
         case SPLIT_LOW_RANK:
         case SPLIT_DENSE:
-            // There is nothing for us to compute yet
             break;
-
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -1207,11 +999,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         case SPLIT_DENSE:
-        {
             // We must be the left and middle process, but there is no
             // work to be done (split dense owned by right process)
             break;
-        }
         case DENSE:
         {
             // We must own all of A, B, and C
@@ -1262,12 +1052,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             }
             break;
         }
-
         case SPLIT_LOW_RANK:
         case SPLIT_DENSE:
-            // There is nothing to do
             break;
-
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -1330,15 +1117,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             }
             break;
         }
-
         case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK_GHOST:
         case SPLIT_DENSE:
         case SPLIT_DENSE_GHOST:
         case DENSE_GHOST:
-            // There is nothing for us to do
             break;
-
         default:
 #ifndef RELEASE
             throw std::logic_error("Invalid H-matrix combination");
@@ -1348,7 +1132,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         break;
     }
     case SPLIT_DENSE_GHOST:
-        // There is nothing for us to do
         break;
     case DENSE:
     {
@@ -1388,10 +1171,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         case SPLIT_DENSE:
-        {
-            // There is nothing to do
             break;
-        }
         case DENSE:
         {
             const Dense<Scalar>& DB = *B._block.data.D;
@@ -1419,7 +1199,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         break;
     }
     case DENSE_GHOST:
-        // There is nothing for us to do
         break;
     case EMPTY:
 #ifndef RELEASE
@@ -2137,9 +1916,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
     }
 
-    // HERE: Need to carefully think about possiblity of cases where there
-    //       was no computation in the Precompute phase, but data still needs
-    //       to be passed here.
     const int key = A._sourceOffset;
     switch( A._block.type )
     {
@@ -2252,586 +2028,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
     }
     }
-    /*
-            // Start H/F += F F
-            if( A._inSourceTeam )
-            {
-                const DistLowRank& DFB = *B._block.data.DF;
-                C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFB.rank );
-                Dense<Scalar>& ZC = *C._ZMap[key];
-
-                const char option = ( Conjugated ? 'C' : 'T' );
-                blas::Gemm
-                ( option, 'N', DFA.rank, DFB.rank, A.LocalWidth(),
-                  (Scalar)1, DFA.VLocal.LockedBuffer(), DFA.VLocal.LDim(),
-                             DFB.ULocal.LockedBuffer(), DFB.ULocal.LDim(),
-                  (Scalar)0, ZC.Buffer(),               ZC.LDim() );
-            }
-            break;
-        }
-
-        case DIST_NODE_GHOST:
-        case DIST_LOW_RANK_GHOST:
-            // We're in the left team, so there is nothing to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case DIST_LOW_RANK_GHOST:
-    {
-        switch( B._block.type )
-        {
-        case DIST_NODE:
-        {
-            // Start H/F += F H
-            // We are in the right team
-            const DistLowRankGhost& DFGA = *A._block.data.DFG;
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, DFGA.rank );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, DFGA.rank );
-            }
-            break;
-        }
-
-        case DIST_LOW_RANK:
-            // We are in the right team, so there is nothing to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case SPLIT_LOW_RANK:
-    {
-        const SplitLowRank& SFA = *A._block.data.SF;
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        {
-            // We are either the middle process or both the left and right
-            if( A._inSourceTeam )
-            {
-                Dense<Scalar> dummy( B.Width(), SFA.rank );
-                if( Conjugated )
-                {
-                    C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                    AdjointMultiplyDensePair& pair = 
-                        *C._adjointDensePairMap[key];
-                    pair.first = &B;
-
-                    B.AdjointMultiplyDenseInitialize( pair.second, SFA.rank );
-                    B.AdjointMultiplyDensePrecompute
-                    ( pair.second, Conj(alpha), SFA.D, dummy );
-                }
-                else
-                {
-                    C._transposeDensePairMap[key] = 
-                        new TransposeMultiplyDensePair;
-                    TransposeMultiplyDensePair& pair = 
-                        *C._transposeDensePairMap[key];
-                    pair.first = &B;
-
-                    B.TransposeMultiplyDenseInitialize( pair.second, SFA.rank );
-                    B.TransposeMultiplyDensePrecompute
-                    ( pair.second, alpha, SFA.D, dummy );
-                }
-            }
-            else
-            {
-                if( Conjugated )
-                {
-                    C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                    AdjointMultiplyDensePair& pair = 
-                        *C._adjointDensePairMap[key];
-                    pair.first = &B;
-
-                    B.AdjointMultiplyDenseInitialize( pair.second, SFA.rank );
-                }
-                else
-                {
-                    C._transposeDensePairMap[key] = 
-                        new TransposeMultiplyDensePair;
-                    TransposeMultiplyDensePair& pair = 
-                        *C._transposeDensePairMap[key];
-                    pair.first = &B;
-
-                    B.TransposeMultiplyDenseInitialize( pair.second, SFA.rank );
-                }
-            }
-            break;
-        }
-        case NODE:
-        {
-            // We are the middle and right process
-            C._VMap[key] = new Dense<Scalar>( B.Width(), SFA.rank );
-            Dense<Scalar>& CV = *C._VMap[key];
-                
-            hmat_tools::Scale( (Scalar)0, CV );
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, SFA.rank );
-                B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), SFA.D, CV );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, SFA.rank );
-                B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, SFA.D, CV );
-            }
-            break;
-        }
-        case SPLIT_LOW_RANK:
-        {
-            // We are either the middle process or both the left and right
-            if( A._inSourceTeam )
-            {
-                const SplitLowRank& SFB = *B._block.data.SF;
-                C._ZMap[key] = new Dense<Scalar>( SFA.rank, SFB.rank );
-                Dense<Scalar>& ZC = *C._ZMap[key];
-                const char option = ( Conjugated ? 'C' : 'T' );
-                blas::Gemm
-                ( option, 'N', SFA.rank, SFB.rank, A.Width(),
-                  (Scalar)1, SFA.D.LockedBuffer(), SFA.D.LDim(),
-                             SFB.D.LockedBuffer(), SFB.D.LDim(),
-                  (Scalar)0, ZC.Buffer(),          ZC.LDim() );
-            }
-            break;
-        }
-        case LOW_RANK:
-        {
-            // We must be the middle and right process
-            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            C._ZMap[key] = new Dense<Scalar>( SFA.rank, FB.Rank() );
-            Dense<Scalar>& ZC = *C._ZMap[key];
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemm
-            ( option, 'N', SFA.rank, FB.Rank(), A.Width(),
-              (Scalar)1, SFA.D.LockedBuffer(), SFA.D.LDim(),
-                         FB.U.LockedBuffer(),  FB.U.LDim(),
-              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
-            break;
-        }
-        case DENSE:
-        {
-            // We must be both the middle and right process
-            C._VMap[key] = new Dense<Scalar>( B.Width(), SFA.rank );
-            const Dense<Scalar>& DB = *B._block.data.D;
-            Dense<Scalar>& VC = *C._VMap[key];
-
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemm
-            ( option, 'N', B.Width(), SFA.rank, B.Height(),
-              (Scalar)1, DB.LockedBuffer(),    DB.LDim(),
-                         SFA.D.LockedBuffer(), SFA.D.LDim(),
-              (Scalar)0, VC.Buffer(),          VC.LDim() );
-            break;
-        }
-
-        case SPLIT_NODE_GHOST:
-        case NODE_GHOST:
-        case SPLIT_LOW_RANK_GHOST:
-        case LOW_RANK_GHOST:
-        case SPLIT_DENSE:
-        case SPLIT_DENSE_GHOST:
-        case DENSE_GHOST:
-            // We are the left process, so there is no work to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case SPLIT_LOW_RANK_GHOST:
-    {
-        // We must be the right process
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        {
-            const SplitLowRankGhost& SFGA = *A._block.data.SFG;
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, SFGA.rank );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, SFGA.rank );
-            }
-            break;
-        }
-
-        case SPLIT_LOW_RANK:
-        case SPLIT_DENSE:
-            // There is nothing for us to compute yet
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case LOW_RANK:
-    {
-        const LowRank<Scalar,Conjugated>& FA = *A._block.data.F;
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        {
-            // We must be the left and middle process
-            Dense<Scalar> dummy( B.Width(), FA.Rank() );
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, FA.Rank() );
-                B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), FA.V, dummy );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, FA.Rank() );
-                B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, FA.V, dummy );
-            }
-            break;
-        }
-        case NODE:
-        {
-            // We must own all of A, B, and C
-            C._VMap[key] = new Dense<Scalar>( B.Width(), FA.Rank() );
-                
-            hmat_tools::Scale( (Scalar)0, *C._VMap[key] );
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, FA.Rank() );
-                B.AdjointMultiplyDensePrecompute
-                ( pair.second, Conj(alpha), FA.V, *C._VMap[key] );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, FA.Rank() );
-                B.TransposeMultiplyDensePrecompute
-                ( pair.second, alpha, FA.V, *C._VMap[key] );
-            }
-            break;
-        }
-        case SPLIT_LOW_RANK:
-        {
-            // We must be the left and middle process
-            const SplitLowRank& SFB = *B._block.data.SF;
-            C._ZMap[key] = new Dense<Scalar>( FA.Rank(), SFB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
-
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemm
-            ( option, 'N', FA.Rank(), SFB.rank, B.Height(),
-              (Scalar)1, FA.V.LockedBuffer(),  FA.V.LDim(),
-                         SFB.D.LockedBuffer(), SFB.D.LDim(),
-              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
-            break;
-        }
-        case LOW_RANK:
-        {
-            // We must own all of A, B, and C
-            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            C._ZMap[key] = new Dense<Scalar>( FA.Rank(), FB.Rank() );
-            Dense<Scalar>& ZC = *C._ZMap[key];
-
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemm
-            ( option, 'N', FA.Rank(), FB.Rank(), B.Height(),
-              (Scalar)1, FA.V.LockedBuffer(), FA.V.LDim(),
-                         FB.U.LockedBuffer(), FB.U.LDim(),
-              (Scalar)0, ZC.Buffer(),         ZC.LDim() );
-            break;
-        }
-        case SPLIT_DENSE:
-        {
-            // We must be the left and middle process, but there is no
-            // work to be done (split dense owned by right process)
-            break;
-        }
-        case DENSE:
-        {
-            // We must own all of A, B, and C
-            C._VMap[key] = new Dense<Scalar>( B.Width(), FA.Rank() );
-            const Dense<Scalar>& DB = *B._block.data.D;
-            Dense<Scalar>& VC = *C._VMap[key];
-
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemm
-            ( option, 'N', B.Width(), FA.Rank(), B.Height(),
-              (Scalar)1, DB.LockedBuffer(),   DB.LDim(),
-                         FA.V.LockedBuffer(), FA.V.LDim(),
-              (Scalar)0, VC.Buffer(),         VC.LDim() );
-            break;
-        }
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case LOW_RANK_GHOST:
-    {
-        // We must be the right process
-        switch( B._block.type )
-        {
-        case SPLIT_NODE:
-        {
-            const LowRankGhost& FGA = *A._block.data.FG;
-            if( Conjugated )
-            {
-                C._adjointDensePairMap[key] = new AdjointMultiplyDensePair;
-                AdjointMultiplyDensePair& pair = *C._adjointDensePairMap[key];
-                pair.first = &B;
-
-                B.AdjointMultiplyDenseInitialize( pair.second, FGA.rank );
-            }
-            else
-            {
-                C._transposeDensePairMap[key] = new TransposeMultiplyDensePair;
-                TransposeMultiplyDensePair& pair = 
-                    *C._transposeDensePairMap[key];
-                pair.first = &B;
-
-                B.TransposeMultiplyDenseInitialize( pair.second, FGA.rank );
-            }
-            break;
-        }
-
-        case SPLIT_LOW_RANK:
-        case SPLIT_DENSE:
-            // There is nothing to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        const SplitDense& SDA = *A._block.data.SD;
-        switch( B._block.type )
-        {
-        case SPLIT_LOW_RANK:
-        {
-            // We are either the middle process or both the left and right
-            if( A._inSourceTeam )
-            {
-                const SplitLowRank& SFB = *B._block.data.SF;
-                C._ZMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
-                Dense<Scalar>& ZC = *C._ZMap[key];
-
-                blas::Gemm
-                ( 'N', 'N', A.Height(), SFB.rank, A.Width(),
-                  alpha,     SDA.D.LockedBuffer(), SDA.D.LDim(),
-                             SFB.D.LockedBuffer(), SFB.D.LDim(),
-                  (Scalar)0, ZC.Buffer(),          ZC.LDim() );
-            }
-            break;
-        }
-        case LOW_RANK:
-        {
-            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            C._ZMap[key] = new Dense<Scalar>( A.Height(), FB.Rank() );
-            Dense<Scalar>& ZC = *C._ZMap[key];
-
-            blas::Gemm
-            ( 'N', 'N', A.Height(), FB.Rank(), A.Width(),
-              alpha,     SDA.D.LockedBuffer(), SDA.D.LDim(),
-                         FB.U.LockedBuffer(),  FB.U.LDim(),
-              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
-            break;
-        }
-        case DENSE:
-        {
-            const Dense<Scalar>& DB = *B._block.data.D;
-            if( admissibleC )
-            {
-                // F += D D
-                C._DMap[key] = new Dense<Scalar>( A.Height(), B.Width() );
-                hmat_tools::Multiply
-                ( alpha, SDA.D, DB, (Scalar)0, *C._DMap[key] );
-            }
-            else
-            {
-                // D += D D
-                SplitDense& SDC = *C._block.data.SD;
-                hmat_tools::Multiply
-                ( alpha, SDA.D, DB, (Scalar)1, SDC.D );
-            }
-            break;
-        }
-
-        case SPLIT_LOW_RANK_GHOST:
-        case LOW_RANK_GHOST:
-        case SPLIT_DENSE:
-        case SPLIT_DENSE_GHOST:
-        case DENSE_GHOST:
-            // There is nothing for us to do
-            break;
-
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case SPLIT_DENSE_GHOST:
-        // There is nothing for us to do
-        break;
-    case DENSE:
-    {
-        const Dense<Scalar>& DA = *A._block.data.D;
-        switch( B._block.type )
-        {
-        case SPLIT_LOW_RANK:
-        {
-            // We are the left and middle process
-            const SplitLowRank& SFB = *B._block.data.SF;
-            C._ZMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
-
-            blas::Gemm
-            ( 'N', 'N', A.Height(), SFB.rank, A.Width(),
-              alpha,     DA.LockedBuffer(),    DA.LDim(),
-                         SFB.D.LockedBuffer(), SFB.D.LDim(),
-              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
-            break;
-        }
-        case LOW_RANK:
-        {
-            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            if( admissibleC )
-            {
-                LowRank<Scalar,Conjugated>& FC = *C._block.data.F;
-                LowRank<Scalar,Conjugated> update;
-                hmat_tools::Multiply( alpha, DA, FB, update );
-                hmat_tools::RoundedUpdate
-                ( C.MaxRank(), (Scalar)1, update, (Scalar)1, FC );
-            }
-            else
-            {
-                Dense<Scalar>& DC = *C._block.data.D;
-                hmat_tools::Multiply( alpha, DA, FB, (Scalar)1, DC );
-            }
-            break;
-        }
-        case SPLIT_DENSE:
-        {
-            // There is nothing to do
-            break;
-        }
-        case DENSE:
-        {
-            const Dense<Scalar>& DB = *B._block.data.D;
-            if( admissibleC )
-            {
-                // F += D D
-                C._DMap[key] = new Dense<Scalar>( A.Height(), B.Width() );
-                hmat_tools::Multiply
-                ( alpha, DA, DB, (Scalar)0, *C._DMap[key] );
-            }
-            else
-            {
-                // D += D D
-                Dense<Scalar>& DC = *C._block.data.D;
-                hmat_tools::Multiply( alpha, DA, DB, (Scalar)1, DC );
-            }
-            break;
-        }
-        default:
-#ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
-#endif
-            break;
-        }
-        break;
-    }
-    case DENSE_GHOST:
-        // There is nothing for us to do
-        break;
-    case EMPTY:
-#ifndef RELEASE
-        throw std::logic_error("A should not be empty");
-#endif
-        break;
-    }
-    */
 #ifndef RELEASE
     PopCallStack();
 #endif
