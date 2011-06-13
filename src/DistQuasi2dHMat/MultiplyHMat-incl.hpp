@@ -1048,14 +1048,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // We are the left and middle process
             const SplitLowRank& SFB = *B._block.data.SF;
-            C._ZMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
+            C._UMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
+            Dense<Scalar>& UC = *C._UMap[key];
 
             blas::Gemm
             ( 'N', 'N', A.Height(), SFB.rank, A.Width(),
               alpha,     DA.LockedBuffer(),    DA.LDim(),
                          SFB.D.LockedBuffer(), SFB.D.LDim(),
-              (Scalar)0, ZC.Buffer(),          ZC.LDim() );
+              (Scalar)0, UC.Buffer(),          UC.LDim() );
             break;
         }
         case LOW_RANK:
@@ -2845,7 +2845,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
     }
     case DIST_LOW_RANK_GHOST:
     {
-        const DistLowRankGhost& DFGA = *A._block.data.DFG;
         switch( B._block.type )
         {
         case DIST_NODE:
@@ -3720,7 +3719,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
-    const int paddedRank = C.MaxRank() + 4;
     
     // Handle all H H recursion here
     const bool admissibleC = C.Admissible();
@@ -3887,7 +3885,34 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
         break;
     }
     case NODE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+        case NODE:
+            break;
+        case SPLIT_LOW_RANK:
+        {
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFB.D, *C._VMap[key] );
+            break;
+        }
+        case LOW_RANK:
+        {
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( FB.V, *C._VMap[key] );
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
         break;
+    }
     case SPLIT_NODE_GHOST:
     case NODE_GHOST:
     {
@@ -3915,21 +3940,594 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
         const DistLowRank& DFA = *A._block.data.DF;
         switch( B._block.type )
         {
-            // HERE
+        case DIST_NODE:
+        {
+            MultiplyDenseContext& context = *C._denseContextMap[key];
+
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( DFA.ULocal, *C._UMap[key] );
+            if( Conjugated )
+                B.AdjointMultiplyDensePostcompute
+                ( context, Conj(alpha), DFA.VLocal, *C._VMap[key] );
+            else
+                B.TransposeMultiplyDensePostcompute
+                ( context, alpha, DFA.VLocal, *C._VMap[key] );
+            context.Clear();
+            break;
+        }
+        case DIST_NODE_GHOST:
+        {
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( DFA.ULocal, *C._UMap[key] );
+            break;
+        }
+        case DIST_LOW_RANK:
+        {
+            const DistLowRank& DFB = *B._block.data.DF;
+            C._UMap[key] = new Dense<Scalar>( A.LocalHeight(), DFB.rank );
+            C._VMap[key] = new Dense<Scalar>;
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            Dense<Scalar>& UC = *C._UMap[key];
+            blas::Gemm
+            ( 'N', 'N', A.LocalHeight(), DFB.rank, DFA.rank,
+              alpha,     DFA.ULocal.LockedBuffer(), DFA.ULocal.LDim(),
+                         ZC.LockedBuffer(),         ZC.LDim(),
+              (Scalar)0, UC.Buffer(),               UC.LDim() );
+            ZC.Clear();
+            hmat_tools::Copy( DFB.VLocal, *C._VMap[key] );
+            break;
+        }
+        case DIST_LOW_RANK_GHOST:
+        {
+            const DistLowRankGhost& DFGB = *B._block.data.DFG; 
+            C._UMap[key] = new Dense<Scalar>( A.LocalHeight(), DFGB.rank );
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            Dense<Scalar>& UC = *C._UMap[key];
+            blas::Gemm
+            ( 'N', 'N', A.LocalHeight(), DFGB.rank, DFA.rank,
+              alpha,     DFA.ULocal.LockedBuffer(), DFA.ULocal.LDim(),
+                         ZC.LockedBuffer(),         ZC.LDim(),
+              (Scalar)0, UC.Buffer(),               UC.LDim() );
+            ZC.Clear();
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
             break;
         }
         break;
     }
     case DIST_LOW_RANK_GHOST:
+    {
+        const DistLowRankGhost& DFGA = *A._block.data.DFG;
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        {
+            MultiplyDenseContext& context = *C._denseContextMap[key];
+            Dense<Scalar> dummy( 0, DFGA.rank );
+            if( Conjugated )
+                B.AdjointMultiplyDensePostcompute
+                ( context, Conj(alpha), dummy, *C._VMap[key] );
+            else
+                B.TransposeMultiplyDensePostcompute
+                ( context, alpha, dummy, *C._VMap[key] );
+            context.Clear();
+            break;
+        }
+        case DIST_LOW_RANK:
+        {
+            const DistLowRank& DFB = *B._block.data.DF;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( DFB.VLocal, *C._VMap[key] );
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SFA = *A._block.data.SF;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // We are either the middle process or both the left and the 
+            // right. The middle process doesn't have any work left.
+            if( A._inTargetTeam )
+            {
+                MultiplyDenseContext& context = *C._denseContextMap[key];
+                C._UMap[key] = new Dense<Scalar>;
+                hmat_tools::Copy( SFA.D, *C._UMap[key] );
+                Dense<Scalar> dummy( 0, SFA.rank );
+                if( Conjugated )
+                    B.AdjointMultiplyDensePostcompute
+                    ( context, Conj(alpha), dummy, *C._VMap[key] );
+                else
+                    B.TransposeMultiplyDensePostcompute
+                    ( context, alpha, dummy, *C._VMap[key] );
+                context.Clear();
+            }
+            break;
+        case SPLIT_NODE_GHOST:
+            // We are the left process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFA.D, *C._UMap[key] );
+            break;
+        case NODE:
+            // The precompute is not needed
+            break;
+        case NODE_GHOST:
+            // We are the left process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFA.D, *C._UMap[key] );
+            break;
+        case SPLIT_LOW_RANK:
+            // We are either the middle process or both the left and right.
+            // The middle process is done.
+            if( A._inTargetTeam )
+            {
+                const SplitLowRank& SFB = *B._block.data.SF;
+                C._UMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
+                C._VMap[key] = new Dense<Scalar>;
+                Dense<Scalar>& UC = *C._UMap[key];
+                Dense<Scalar>& ZC = *C._ZMap[key];
+                blas::Gemm
+                ( 'N', 'N', A.Height(), SFB.rank, SFA.rank,
+                  alpha,     SFA.D.LockedBuffer(), SFA.D.LDim(),
+                             ZC.LockedBuffer(),    ZC.LDim(),
+                  (Scalar)0, UC.Buffer(),          UC.LDim() );
+                ZC.Clear();
+                hmat_tools::Copy( SFB.D, *C._VMap[key] );
+            }
+            break;
+        case SPLIT_LOW_RANK_GHOST:
+        {
+            // We are the left process
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
+            C._UMap[key] = new Dense<Scalar>( A.Height(), SFGB.rank );
+            Dense<Scalar>& UC = *C._UMap[key];
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            blas::Gemm
+            ( 'N', 'N', A.Height(), SFGB.rank, SFA.rank,
+              alpha,     SFA.D.LockedBuffer(), SFA.D.LDim(),
+                         ZC.LockedBuffer(),    ZC.LDim(),
+              (Scalar)0, UC.Buffer(),          UC.LDim() );
+            ZC.Clear();
+            break;
+        }
+        case LOW_RANK:
+        {
+            // We must be the middle and right process
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( FB.V, *C._VMap[key] );
+            break;
+        }
+        case LOW_RANK_GHOST:
+        {
+            // We must be the left process
+            const LowRankGhost& FGB = *B._block.data.FG;
+            C._UMap[key] = new Dense<Scalar>( A.Height(), FGB.rank );
+            Dense<Scalar>& UC = *C._UMap[key];
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            blas::Gemm
+            ( 'N', 'N', A.Height(), FGB.rank, SFA.rank,
+              alpha,     SFA.D.LockedBuffer(), SFA.D.LDim(),
+                         ZC.LockedBuffer(),    ZC.LDim(),
+              (Scalar)0, UC.Buffer(),          UC.LDim() );
+            ZC.Clear();
+            break;
+        }
+        case SPLIT_DENSE:
+            // We are either the middle process or both the left and right
+            if( A._inTargetTeam )
+            {
+                const SplitDense& SDB = *B._block.data.SD;
+                C._UMap[key] = new Dense<Scalar>;
+                C._VMap[key] = new Dense<Scalar>( C.Width(), SFA.rank );
+                hmat_tools::Copy( SFA.D, *C._UMap[key] );
+                Dense<Scalar>& VC = *C._VMap[key];
+                Dense<Scalar>& ZC = *C._ZMap[key];
+                if( Conjugated )
+                    blas::Gemm
+                    ( 'C', 'N', C.Width(), SFA.rank, B.Height(),
+                      Conj(alpha), SDB.D.LockedBuffer(), SDB.D.LDim(),
+                                   ZC.LockedBuffer(),    ZC.LDim(),
+                      (Scalar)0,   VC.Buffer(),          VC.LDim() );
+                else
+                    blas::Gemm
+                    ( 'T', 'N', C.Width(), SFA.rank, B.Height(),
+                      alpha,     SDB.D.LockedBuffer(), SDB.D.LDim(),
+                                 ZC.LockedBuffer(),    ZC.LDim(),
+                      (Scalar)0, VC.Buffer(),          VC.LDim() );
+                ZC.Clear();
+            }
+            break;
+        case SPLIT_DENSE_GHOST:
+            // We are the left process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFA.D, *C._UMap[key] );
+            break;
+        case DENSE:
+            // We are the middle and right process, there is nothing left to do
+            break;
+        case DENSE_GHOST:
+            // We are the left process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFA.D, *C._UMap[key] );
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case SPLIT_LOW_RANK_GHOST:
+    {
+        // We are the right process
+        const SplitLowRankGhost& SFGA = *A._block.data.SFG;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+        {
+            MultiplyDenseContext& context = *C._denseContextMap[key];
+            Dense<Scalar> dummy( 0, SFGA.rank );
+            if( Conjugated )
+                B.AdjointMultiplyDensePostcompute
+                ( context, Conj(alpha), dummy, *C._VMap[key] );
+            else
+                B.TransposeMultiplyDensePostcompute
+                ( context, alpha, dummy, *C._VMap[key] );
+            context.Clear();
+            break;
+        }
+        case SPLIT_LOW_RANK:
+        {
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFB.D, *C._VMap[key] );
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            const SplitDense& SDB = *B._block.data.SD;
+            C._VMap[key] = new Dense<Scalar>( C.Width(), SFGA.rank );
+            Dense<Scalar>& VC = *C._VMap[key];
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( Conjugated )
+                blas::Gemm
+                ( 'C', 'N', C.Width(), SFGA.rank, B.Height(),
+                  Conj(alpha), SDB.D.LockedBuffer(), SDB.D.LDim(),
+                               ZC.LockedBuffer(),    ZC.LDim(),
+                  (Scalar)0,   VC.Buffer(),          VC.LDim() );
+            else
+                blas::Gemm
+                ( 'T', 'N', C.Width(), SFGA.rank, B.Height(),
+                  alpha,     SDB.D.LockedBuffer(), SDB.D.LDim(),
+                             ZC.LockedBuffer(),    ZC.LDim(),
+                  (Scalar)0, VC.Buffer(),          VC.LDim() );
+            ZC.Clear();
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case LOW_RANK:
+    {
+        const LowRank<Scalar,Conjugated>& FA = *A._block.data.F;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // We are the left and middle process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( FA.U, *C._UMap[key] );
+            break;
+        case NODE:
+            // We own all of A, B, and C
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( FA.U, *C._UMap[key] );
+            break;
+        case SPLIT_LOW_RANK:
+        {
+            // We are the left and middle process
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._UMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
+            Dense<Scalar>& UC = *C._UMap[key];
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            blas::Gemm
+            ( 'N', 'N', A.Height(), SFB.rank, A.Width(),
+              alpha,     FA.U.LockedBuffer(), FA.U.LDim(),
+                         ZC.LockedBuffer(),   ZC.LDim(),
+              (Scalar)0, UC.Buffer(),         UC.LDim() );
+            break;
+        }
+        case LOW_RANK:
+        {
+            // We own all of A, B, and C
+            const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
+            C._UMap[key] = new Dense<Scalar>( A.Height(), FB.Rank() );
+            C._VMap[key] = new Dense<Scalar>;
+            Dense<Scalar>& UC = *C._UMap[key];
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            blas::Gemm
+            ( 'N', 'N', A.Height(), FB.Rank(), A.Width(),
+              alpha,     FA.U.LockedBuffer(), FA.U.LDim(),
+                         ZC.LockedBuffer(),   ZC.LDim(),
+              (Scalar)0, UC.Buffer(),         UC.LDim() );
+            hmat_tools::Copy( FB.V, *C._VMap[key] );
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            // We are the left and middle process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( FA.U, *C._UMap[key] );
+            break;
+        }
+        case DENSE:
+        {
+            // We own all of A, B, and C
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( FA.U, *C._UMap[key] );
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case LOW_RANK_GHOST:
+    {
+        // We are the right process
+        const LowRankGhost& FGA = *A._block.data.FG;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+        {
+            MultiplyDenseContext& context = *C._denseContextMap[key];
+            Dense<Scalar> dummy( 0, FGA.rank );
+            if( Conjugated )
+                B.AdjointMultiplyDensePostcompute
+                ( context, Conj(alpha), dummy, *C._VMap[key] );
+            else
+                B.TransposeMultiplyDensePostcompute
+                ( context, alpha, dummy, *C._VMap[key] );
+            context.Clear();
+            break;
+        }
+        case SPLIT_LOW_RANK:
+        {
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFB.D, *C._VMap[key] );
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            const SplitDense& SDB = *B._block.data.SD;
+            C._VMap[key] = new Dense<Scalar>( C.Width(), FGA.rank );
+            Dense<Scalar>& VC = *C._VMap[key];
+            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( Conjugated )
+                blas::Gemm
+                ( 'C', 'N', C.Width(), FGA.rank, B.Height(),
+                  Conj(alpha), SDB.D.LockedBuffer(), SDB.D.LDim(),
+                               ZC.LockedBuffer(),    ZC.LDim(),
+                  (Scalar)0,   VC.Buffer(),          VC.LDim() );
+            else
+                blas::Gemm
+                ( 'T', 'N', C.Width(), FGA.rank, B.Height(),
+                  alpha,     SDB.D.LockedBuffer(), SDB.D.LDim(),
+                             ZC.LockedBuffer(),    ZC.LDim(),
+                  (Scalar)0, VC.Buffer(),          VC.LDim() );
+            ZC.Clear();
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case SPLIT_DENSE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            // We are either the middle process or the left and right
+            if( A._inTargetTeam )
+            {
+                const SplitLowRank& SFB = *B._block.data.SF;
+                C._UMap[key] = new Dense<Scalar>; 
+                C._VMap[key] = new Dense<Scalar>;
+                // TODO: This could be removed by modifying the PassData
+                //       unpacking routine to perform this step.
+                hmat_tools::Copy( *C._ZMap[key], *C._UMap[key] );
+                hmat_tools::Copy( SFB.D, *C._VMap[key] );
+                C._ZMap[key]->Clear();
+            }
+            break;
+        case SPLIT_LOW_RANK_GHOST:
+        {
+            // We are the left process
+            C._UMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( *C._ZMap[key], *C._UMap[key] );
+            C._ZMap[key]->Clear();
+            break;
+        }
+        case LOW_RANK:
+        {
+            // We are the middle and right process
+             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;    
+             C._VMap[key] = new Dense<Scalar>;
+             hmat_tools::Copy( FB.V, *C._VMap[key] );
+             break;
+        }
+        case LOW_RANK_GHOST:
+        {
+            // We are the left process
+            C._UMap[key] = new Dense<Scalar>; 
+            // TODO: This could be removed by modifying the PassData
+            //       unpacking routine to perform this step.
+            hmat_tools::Copy( *C._ZMap[key], *C._UMap[key] );
+            C._ZMap[key]->Clear();
+            break;
+        }
+        case SPLIT_DENSE:
+            if( C._inSourceTeam )
+            {
+                const SplitDense& SDB = *B._block.data.SD;
+                Dense<Scalar>& DC = *C._DMap[key];
+                if( admissibleC )
+                {
+                    Dense<Scalar> D = *C._DMap[key];
+                    blas::Gemm
+                    ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+                      alpha,     D.LockedBuffer(),     D.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)0, DC.Buffer(),          DC.LDim() );
+                }
+                else
+                {
+                    Dense<Scalar>& D = *C._block.data.D;
+                    blas::Gemm
+                    ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+                      alpha,     DC.LockedBuffer(),    DC.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)1, D.Buffer(),           D.LDim() );
+                }
+                DC.Clear();
+            }
+            break;
+        case SPLIT_DENSE_GHOST:
+            // We are the left process.
+            break;
+        case DENSE:
+            // We are the right process and there is nothing left to do.
+            break;
+        case DENSE_GHOST:
+            // We are the left process.
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case SPLIT_DENSE_GHOST:
+    {
+        // We are the right process
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+        {
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFB.D, *C._VMap[key] );
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            const SplitDense& SDB = *B._block.data.SD;
+            Dense<Scalar>& DC = *C._DMap[key];
+            if( admissibleC )
+            {
+                Dense<Scalar> D = *C._DMap[key];
+                blas::Gemm
+                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+                  alpha,     D.LockedBuffer(),     D.LDim(),
+                             SDB.D.LockedBuffer(), SDB.D.LDim(),
+                  (Scalar)0, DC.Buffer(),          DC.LDim() );
+            }
+            else
+            {
+                Dense<Scalar>& D = C._block.data.SD->D;
+                blas::Gemm
+                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+                  alpha,     DC.LockedBuffer(),    DC.LDim(),
+                             SDB.D.LockedBuffer(), SDB.D.LDim(),
+                  (Scalar)1, D.Buffer(),           D.LDim() );
+            }
+            DC.Clear();
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
     case DENSE:
+        break;
     case DENSE_GHOST:
-    default:
+    {
+        // We are the right process
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+        {
+            const SplitLowRank& SFB = *B._block.data.SF;
+            C._VMap[key] = new Dense<Scalar>;
+            hmat_tools::Copy( SFB.D, *C._VMap[key] );
+            break;
+        }
+        case SPLIT_DENSE:
+        {
+            const SplitDense& SDB = *B._block.data.SD;
+            Dense<Scalar>& DC = *C._DMap[key];
+            if( admissibleC )
+            {
+                Dense<Scalar> D = *C._DMap[key];
+                blas::Gemm
+                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+                  alpha,     D.LockedBuffer(),     D.LDim(),
+                             SDB.D.LockedBuffer(), SDB.D.LDim(),
+                  (Scalar)0, DC.Buffer(),          DC.LDim() );
+            }
+            else
+            {
+                Dense<Scalar>& D = C._block.data.SD->D;
+                blas::Gemm
+                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
+                  alpha,     DC.LockedBuffer(),    DC.LDim(),
+                             SDB.D.LockedBuffer(), SDB.D.LDim(),
+                  (Scalar)1, D.Buffer(),           D.LDim() );
+            }
+            DC.Clear();
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case EMPTY:
         break;
     }
 #ifndef RELEASE
