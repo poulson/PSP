@@ -1104,7 +1104,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         break;
     }
     case DENSE_GHOST:
-        break;
     case EMPTY:
         break;
     }
@@ -1399,6 +1398,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
         default:
             break;
         }
+        break;
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
@@ -1419,6 +1419,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
         default:
             break;
         }
+        break;
     default:
         break;
     }
@@ -1466,6 +1467,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
         default:
             break;
         }
+        break;
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
@@ -1489,6 +1491,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
         default:
             break;
         }
+        break;
     default:
         break;
     }
@@ -1536,6 +1539,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
         default:
             break;
         }
+        break;
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
@@ -1559,6 +1563,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
         default:
             break;
         }
+        break;
     default:
         break;
     }
@@ -2258,7 +2263,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
-            break;
         case LOW_RANK:
             break;
         case SPLIT_DENSE:
@@ -2667,7 +2671,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         break;
     }
     case DENSE_GHOST:
-        break;
     case EMPTY:
         break;
     }
@@ -3408,6 +3411,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
         default:
             break;
         }
+        break;
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
@@ -3428,6 +3432,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
         default:
             break;
         }
+        break;
     default:
         break;
     }
@@ -3475,6 +3480,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
         default:
             break;
         }
+        break;
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
@@ -3500,6 +3506,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
         default:
             break;
         }
+        break;
     default:
         break;
     }
@@ -3547,6 +3554,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
         default:
             break;
         }
+        break;
     case DIST_LOW_RANK:
         switch( B._block.type )
         {
@@ -3570,6 +3578,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
         default:
             break;
         }
+        break;
     default:
         break;
     }
