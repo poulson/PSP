@@ -1460,7 +1460,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
             }
             break;
         case DIST_LOW_RANK:
-            // HERE
             A.MultiplyDenseSummationsPack
             ( *C._denseContextMap[key], buffer, offsets );
             break;
@@ -1616,10 +1615,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     offsets = recvOffsets;
     A.MultiplyHMatMainPassDataUnpackA( recvBuffer, offsets );
     B.MultiplyHMatMainPassDataUnpackB( recvBuffer, offsets );
-    // This needs to be written
-    /*
     A.MultiplyHMatMainPassDataUnpackC( B, C, recvBuffer, offsets );
-    */
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2672,6 +2668,457 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
     }
     case DENSE_GHOST:
         break;
+    case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackC");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
+    // Take care of the H += H H cases first
+    const int key = A._sourceOffset;
+    const bool admissibleC = C.Admissible();
+    if( !admissibleC )
+    {
+        switch( A._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            switch( B._block.type )
+            {
+            case DIST_NODE:
+            case DIST_NODE_GHOST:
+            case SPLIT_NODE:
+            case SPLIT_NODE_GHOST:
+            case NODE:
+            case NODE_GHOST:
+            {
+                // Start H += H H
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatMainPassDataUnpackC
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              recvBuffer, offsets );
+                return;
+                break;
+            }
+            default:
+                break;
+            }
+            break;
+        default:
+            break;
+        }
+    }
+
+    MPI_Comm team = _teams->Team( _level );
+    const int teamRank = mpi::CommRank( team );
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+            // The only possibilities are recursion and F += H H, and the latter
+            // is handled in the CountA/CountB subroutines.
+            break;
+        case DIST_LOW_RANK:
+        case DIST_LOW_RANK_GHOST:
+        {
+            // Pass data unpack for H/F += H F
+            A.MultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            // The only possibilities are recursion and F += H H, and the latter
+            // is handled in the UnpackA/UnpackB subroutines.
+            break;
+        case SPLIT_LOW_RANK:
+        case SPLIT_LOW_RANK_GHOST:
+        case LOW_RANK:
+        case LOW_RANK_GHOST:
+        {
+            // Pass data for H/F += H F
+            A.MultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        const DistLowRank& DFA = *A._block.data.DF;
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        case DIST_NODE_GHOST:
+            // Pass data for H/F += F H is between other (two) team(s)
+            break;
+        case DIST_LOW_RANK:
+            // Pass data for H/F += F F
+            if( teamRank == 0 && A._inTargetTeam && !A._inSourceTeam )
+            {
+                const DistLowRank& DFB = *B._block.data.DF;
+                C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
+
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  DFA.rank*DFB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += DFA.rank*DFB.rank;
+            }
+            break;
+        case DIST_LOW_RANK_GHOST:
+            // Pass data for H/F += F F
+            if( teamRank == 0 )
+            {
+                const DistLowRankGhost& DFGB = *B._block.data.DFG;
+                C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFGB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
+
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  DFA.rank*DFGB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += DFA.rank*DFGB.rank;
+            }
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK_GHOST:
+    {
+        const DistLowRankGhost& DFGA = *A._block.data.DFG;
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        case DIST_LOW_RANK:
+            // Pass data for for H/F += F F is between other (two) team(s)
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SFA = *A._block.data.SF;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        case SPLIT_NODE_GHOST:
+            // Pass data for H/F += F H is between other two processes
+            break;
+        case NODE:
+        case NODE_GHOST:
+            break;
+        case SPLIT_LOW_RANK:
+        {
+            // Pass data for H/D/F += F F
+            // We're either the middle process or both the left and right
+            const SplitLowRank& SFB = *B._block.data.SF;
+            if( A._inTargetTeam )
+            {
+                C._ZMap[key] = new Dense<Scalar>( SFA.rank, SFB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
+
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  SFA.rank*SFB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += SFA.rank*SFB.rank;
+            }
+            break;
+        }
+        case SPLIT_LOW_RANK_GHOST:
+        {
+            // Pass data for H/D/F += F F
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
+            C._ZMap[key] = new Dense<Scalar>( SFA.rank, SFGB.rank );
+            Dense<Scalar>& ZC = *C._ZMap[key];
+
+            std::memcpy
+            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+              SFA.rank*SFGB.rank*sizeof(Scalar) );
+            offsets[A._sourceRoot] += SFA.rank*SFGB.rank;
+            break;
+        }
+        case LOW_RANK:
+            // Pass data for H/D/F += F F is a send
+            break;
+        case LOW_RANK_GHOST:
+        {
+            // Pass data for H/D/F += F F
+            const LowRankGhost& FGB = *B._block.data.FG;
+            C._ZMap[key] = new Dense<Scalar>( SFA.rank, FGB.rank );
+            Dense<Scalar>& ZC = *C._ZMap[key];
+
+            std::memcpy
+            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+              SFA.rank*FGB.rank*sizeof(Scalar) );
+            offsets[A._sourceRoot] += SFA.rank*FGB.rank;
+            break;
+        }
+        case SPLIT_DENSE:
+            // Pass data for D/F += F D
+            if( B._inSourceTeam )
+            {
+                C._ZMap[key] = new Dense<Scalar>( B.Height(), SFA.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
+
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                  B.Height()*SFA.rank*sizeof(Scalar) );
+                offsets[B._targetRoot] += B.Height()*SFA.rank;
+            }
+            break;
+        case SPLIT_DENSE_GHOST:
+        case DENSE:
+        case DENSE_GHOST:
+            // Pass data for D/F += F D is in other process
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK_GHOST:
+    {
+        const SplitLowRankGhost& SFGA = *A._block.data.SFG; 
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        case SPLIT_LOW_RANK:
+            // Pass data for H/D/F += F F is between other two processes
+            break;
+        case SPLIT_DENSE:
+            // Pass data for D/F += F D
+            if( B._inSourceTeam )
+            {
+                C._ZMap[key] = new Dense<Scalar>( B.Height(), SFGA.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
+
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                  B.Height()*SFGA.rank*sizeof(Scalar) );
+                offsets[B._targetRoot] += B.Height()*SFGA.rank;
+            }
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case LOW_RANK_GHOST:
+    {
+        const LowRankGhost& FGA = *A._block.data.FG;
+        switch( B._block.type )
+        {
+        case SPLIT_NODE:
+            // Pass data for H/F += F H
+            B.TransposeMultiplyDensePassDataUnpack
+            ( *C._denseContextMap[key], recvBuffer, offsets );
+            break;
+        case SPLIT_LOW_RANK:
+            // Pass data for H/D/F += F F is in other process
+            break;
+        case SPLIT_DENSE:
+        {
+            // Pass data for D/F += F D
+            C._ZMap[key] = new Dense<Scalar>( B.Height(), FGA.rank );
+            Dense<Scalar>& ZC = *C._ZMap[key];
+
+            std::memcpy
+            ( ZC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+              B.Height()*FGA.rank*sizeof(Scalar) );
+            offsets[B._targetRoot] += B.Height()*FGA.rank;
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            // Pass data for D/F += D F
+            if( A._inTargetTeam )
+            {
+                const SplitLowRank& SFB = *B._block.data.SF;
+                C._ZMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
+
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  A.Height()*SFB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += A.Height()*SFB.rank;
+            }
+            break;
+        case SPLIT_LOW_RANK_GHOST:
+        {
+            // Pass data for D/F += D F
+            const SplitLowRankGhost& SFGB = *B._block.data.SFG;
+            C._ZMap[key] = new Dense<Scalar>( A.Height(), SFGB.rank );
+            Dense<Scalar>& ZC = *C._ZMap[key];
+
+            std::memcpy
+            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+              A.Height()*SFGB.rank*sizeof(Scalar) );
+            offsets[A._sourceRoot] += A.Height()*SFGB.rank;
+            break;
+        }
+        case LOW_RANK:
+            break;
+        case LOW_RANK_GHOST:
+        {
+            // Pass data for D/F += D F
+            const LowRankGhost& FGB = *B._block.data.FG;
+            C._ZMap[key] = new Dense<Scalar>( A.Height(), FGB.rank );
+            Dense<Scalar>& ZC = *C._ZMap[key];
+
+            std::memcpy
+            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+              A.Height()*FGB.rank*sizeof(Scalar) );
+            offsets[A._sourceRoot] += A.Height()*FGB.rank;
+            break;
+        }
+        case SPLIT_DENSE:
+            // Pass data for D/F += D D
+            if( B._inSourceTeam )
+            {
+                C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
+                Dense<Scalar>& DC = *C._DMap[key];
+
+                std::memcpy
+                ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                  A.Height()*A.Width()*sizeof(Scalar) );
+                offsets[B._targetRoot] += A.Height()*A.Width();
+            }
+            break;
+        case SPLIT_DENSE_GHOST:
+        case DENSE:
+        case DENSE_GHOST:
+            // These pass data do not exist or do not involve us
+            break;
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case SPLIT_DENSE_GHOST:
+    case DENSE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+            break;
+        case SPLIT_DENSE:
+        {
+            C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
+            Dense<Scalar>& DC = *C._DMap[key];
+
+            std::memcpy
+            ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+              A.Height()*A.Width()*sizeof(Scalar) );
+            offsets[B._targetRoot] += A.Height()*A.Width();
+            break;
+        }
+        default:
+#ifndef RELEASE
+            throw std::logic_error("Invalid H-matrix combination");
+#endif
+            break;
+        }
+        break;
+    }
+    case NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    case LOW_RANK:
+    case DENSE:
     case EMPTY:
         break;
     }
