@@ -607,19 +607,26 @@ private:
     void MultiplyHMatMainBroadcastsPackA
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyHMatMainBroadcastsUnpackA
-    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     // To be called from B
     void MultiplyHMatMainBroadcastsCountB( std::vector<int>& sizes ) const;
     void MultiplyHMatMainBroadcastsPackB
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyHMatMainBroadcastsUnpackB
-    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     // To be called from C
-    void MultiplyHMatMainBroadcastsCountC( std::vector<int>& sizes ) const;
+    void MultiplyHMatMainBroadcastsCountC
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+      const DistQuasi2dHMat<Scalar,Conjugated>& C, 
+      std::vector<int>& sizes ) const;
     void MultiplyHMatMainBroadcastsPackC
-    ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+      const DistQuasi2dHMat<Scalar,Conjugated>& C,
+      std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyHMatMainBroadcastsUnpackC
-    ( const std::vector<Scalar>& buffer, std::vector<int>& offsets );
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+      const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
 
     void MultiplyHMatMainPostcompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
