@@ -631,6 +631,11 @@ private:
     void MultiplyHMatMainPostcompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatMainPostcomputeA() const; // to be called from A
+    void MultiplyHMatMainPostcomputeB() const; // to be called from B
+    void MultiplyHMatMainPostcomputeC
+    ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                          DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
 
     void MultiplyHMatFHHPrecompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,

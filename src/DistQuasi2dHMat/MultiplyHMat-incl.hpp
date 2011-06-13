@@ -49,9 +49,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     A.MultiplyHMatMainPassData( alpha, B, C );
     A.MultiplyHMatMainBroadcasts( B, C );
 
-    /*
     A.MultiplyHMatMainPostcompute( alpha, B, C );
 
+    /*
     A.MultiplyHMatFHHPrecompute( alpha, B, C );
     A.MultiplyHMatFHHPassData( alpha, B, C );
     A.MultiplyHMatFHHPostcompute( alpha, B, C );
@@ -359,19 +359,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     if( A._inSourceTeam && A._inTargetTeam )
                     {
                         A.AdjointMultiplyDensePrecompute
-                        ( A._T2Context, Conj(alpha), A._Omega2, A._T2 );
+                        ( A._T2Context, (Scalar)1, A._Omega2, A._T2 );
                     }
                     else if( A._inSourceTeam )
                     {
                         Dense<Scalar> dummy( A.LocalHeight(), paddedRank );
                         A.AdjointMultiplyDensePrecompute
-                        ( A._T2Context, Conj(alpha), dummy, A._T2 );
+                        ( A._T2Context, (Scalar)1, dummy, A._T2 );
                     }
                     else // A._inTargetTeam
                     {
                         Dense<Scalar> dummy( A.LocalWidth(), paddedRank );
                         A.AdjointMultiplyDensePrecompute
-                        ( A._T2Context, Conj(alpha), A._Omega2, dummy );
+                        ( A._T2Context, (Scalar)1, A._Omega2, dummy );
                     }
                     A._beganRowSpaceComp = true;
                     break;
@@ -384,6 +384,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 break;
             }
         }
+        // Handle precomputation of B's column space
         if( !B._beganColSpaceComp )
         {
             switch( A._block.type )
@@ -413,19 +414,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     if( B._inSourceTeam && B._inTargetTeam )
                     {
                         B.MultiplyDensePrecompute
-                        ( B._T1Context, alpha, B._Omega1, B._T1 );
+                        ( B._T1Context, (Scalar)1, B._Omega1, B._T1 );
                     }
                     else if( B._inSourceTeam )
                     {
                         Dense<Scalar> dummy( B.LocalHeight(), paddedRank );
                         B.MultiplyDensePrecompute
-                        ( B._T1Context, alpha, B._Omega1, dummy );
+                        ( B._T1Context, (Scalar)1, B._Omega1, dummy );
                     }
                     else // B._inTargetTeam
                     {
                         Dense<Scalar> dummy( B.LocalWidth(), paddedRank );
                         B.MultiplyDensePrecompute
-                        ( B._T1Context, alpha, dummy, B._T1 );
+                        ( B._T1Context, (Scalar)1, dummy, B._T1 );
                     }
                     B._beganColSpaceComp = true;
                     break;
@@ -3582,6 +3583,142 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
     default:
         break;
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcompute
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcompute");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
+    A.MultiplyHMatMainPostcomputeA();
+    B.MultiplyHMatMainPostcomputeB();
+    A.MultiplyHMatMainPostcomputeC( alpha, B, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeA");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
+    // Handle postcomputation of A's row space
+    if( A._beganRowSpaceComp )
+    {
+        const int numRhs = A._T2Context.numRhs;
+        if( A._inSourceTeam && A._inTargetTeam )
+        {
+            A.AdjointMultiplyDensePostcompute
+            ( A._T2Context, (Scalar)1, A._Omega2, A._T2 );
+        }
+        else if( A._inSourceTeam )
+        {
+            Dense<Scalar> dummy( A.LocalHeight(), numRhs );
+            A.AdjointMultiplyDensePostcompute
+            ( A._T2Context, (Scalar)1, dummy, A._T2 );
+        }
+        else // A._inTargetTeam
+        {
+            Dense<Scalar> dummy( A.LocalWidth(), numRhs );
+            A.AdjointMultiplyDensePostcompute
+            ( A._T2Context, (Scalar)1, A._Omega2, dummy );
+        }
+    }
+
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        const Node& nodeA = *A._block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                nodeA.Child(t,s).MultiplyHMatMainPostcomputeA();
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeB");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& B = *this;
+
+    // Handle postcomputation of B's column space
+    if( B._beganColSpaceComp )
+    {
+        const int numRhs = B._T1Context.numRhs;
+        if( B._inSourceTeam && B._inTargetTeam )
+        {
+            B.MultiplyDensePostcompute
+            ( B._T1Context, (Scalar)1, B._Omega1, B._T1 );
+        }
+        else if( B._inSourceTeam )
+        {
+            Dense<Scalar> dummy( B.LocalHeight(), numRhs );
+            B.MultiplyDensePostcompute
+            ( B._T1Context, (Scalar)1, B._Omega1, dummy );
+        }
+        else // B._inTargetTeam
+        {
+            Dense<Scalar> dummy( B.LocalWidth(), numRhs );
+            B.MultiplyDensePostcompute
+            ( B._T1Context, (Scalar)1, dummy, B._T1 );
+        }
+    }
+
+    switch( B._block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        const Node& nodeB = *B._block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                nodeB.Child(t,s).MultiplyHMatMainPostcomputeB();
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeC");
+#endif
+    // TODO: This routine should somewhat mirror the precompute step
 #ifndef RELEASE
     PopCallStack();
 #endif
