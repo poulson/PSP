@@ -640,7 +640,13 @@ private:
     void MultiplyHMatFHHPrecompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatFHHSummations
+    ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                          DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
     void MultiplyHMatFHHPassData
+    ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                          DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatFHHBroadcasts
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
     void MultiplyHMatFHHPostcompute
@@ -836,8 +842,8 @@ private:
     // variables are mutable since they do not effect the usage of the logical 
     // state of the class and simply help avoid redundant computation.
     mutable bool _beganRowSpaceComp, _beganColSpaceComp;
-    mutable Dense<Scalar> _Omega1, _Omega2, _T1, _T2;
-    mutable MultiplyDenseContext _T1Context, _T2Context;
+    mutable Dense<Scalar> _OmegaCol, _OmegaRow, _TCol, _TRow, _XCol, _XRow;
+    mutable MultiplyDenseContext _contextCol, _contextRow;
 };
 
 } // namespace psp

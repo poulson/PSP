@@ -44,17 +44,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     C.Clear();
 
     A.MultiplyHMatMainPrecompute( alpha, B, C );
-
     A.MultiplyHMatMainSummations( B, C );
     A.MultiplyHMatMainPassData( alpha, B, C );
     A.MultiplyHMatMainBroadcasts( B, C );
-
     A.MultiplyHMatMainPostcompute( alpha, B, C );
 
-    /*
     A.MultiplyHMatFHHPrecompute( alpha, B, C );
+    A.MultiplyHMatFHHSummations( alpha, B, C );
     A.MultiplyHMatFHHPassData( alpha, B, C );
+    A.MultiplyHMatFHHBroadcasts( alpha, B, C );
     A.MultiplyHMatFHHPostcompute( alpha, B, C );
+    /*
     A.MultiplyHMatFHHFinalize( alpha, B, C );
 
     A.MultiplyHMatRoundedAddition( alpha, B, C );
@@ -346,32 +346,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 {
                     if( A._inTargetTeam )
                     {
-                        A._Omega2.Resize( A.LocalHeight(), paddedRank );
-                        ParallelGaussianRandomVectors( A._Omega2 );
+                        A._OmegaRow.Resize( A.LocalHeight(), paddedRank );
+                        ParallelGaussianRandomVectors( A._OmegaRow );
                     }
                     if( A._inSourceTeam )
                     {
-                        A._T2.Resize( A.LocalWidth(), paddedRank );
-                        hmat_tools::Scale( (Scalar)0, A._T2 );
+                        A._TRow.Resize( A.LocalWidth(), paddedRank );
+                        hmat_tools::Scale( (Scalar)0, A._TRow );
                     }
                     A.AdjointMultiplyDenseInitialize
-                    ( A._T2Context, paddedRank );
+                    ( A._contextRow, paddedRank );
                     if( A._inSourceTeam && A._inTargetTeam )
                     {
                         A.AdjointMultiplyDensePrecompute
-                        ( A._T2Context, (Scalar)1, A._Omega2, A._T2 );
+                        ( A._contextRow, (Scalar)1, A._OmegaRow, A._TRow );
                     }
                     else if( A._inSourceTeam )
                     {
                         Dense<Scalar> dummy( 0, paddedRank );
                         A.AdjointMultiplyDensePrecompute
-                        ( A._T2Context, (Scalar)1, dummy, A._T2 );
+                        ( A._contextRow, (Scalar)1, dummy, A._TRow );
                     }
                     else // A._inTargetTeam
                     {
                         Dense<Scalar> dummy( 0, paddedRank );
                         A.AdjointMultiplyDensePrecompute
-                        ( A._T2Context, (Scalar)1, A._Omega2, dummy );
+                        ( A._contextRow, (Scalar)1, A._OmegaRow, dummy );
                     }
                     A._beganRowSpaceComp = true;
                     break;
@@ -402,31 +402,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 case NODE:
                     if( B._inSourceTeam )
                     {
-                        B._Omega1.Resize( B.LocalWidth(), paddedRank ); 
-                        ParallelGaussianRandomVectors( B._Omega1 );
+                        B._OmegaCol.Resize( B.LocalWidth(), paddedRank ); 
+                        ParallelGaussianRandomVectors( B._OmegaCol );
                     }
                     if( B._inTargetTeam )
                     {
-                        B._T1.Resize( B.LocalHeight(), paddedRank );
-                        hmat_tools::Scale( (Scalar)0, B._T1 );
+                        B._TCol.Resize( B.LocalHeight(), paddedRank );
+                        hmat_tools::Scale( (Scalar)0, B._TCol );
                     }
-                    B.MultiplyDenseInitialize( B._T1Context, paddedRank );
+                    B.MultiplyDenseInitialize( B._contextCol, paddedRank );
                     if( B._inSourceTeam && B._inTargetTeam )
                     {
                         B.MultiplyDensePrecompute
-                        ( B._T1Context, (Scalar)1, B._Omega1, B._T1 );
+                        ( B._contextCol, (Scalar)1, B._OmegaCol, B._TCol );
                     }
                     else if( B._inSourceTeam )
                     {
                         Dense<Scalar> dummy( 0, paddedRank );
                         B.MultiplyDensePrecompute
-                        ( B._T1Context, (Scalar)1, B._Omega1, dummy );
+                        ( B._contextCol, (Scalar)1, B._OmegaCol, dummy );
                     }
                     else // B._inTargetTeam
                     {
                         Dense<Scalar> dummy( 0, paddedRank );
                         B.MultiplyDensePrecompute
-                        ( B._T1Context, (Scalar)1, dummy, B._T1 );
+                        ( B._contextCol, (Scalar)1, dummy, B._TCol );
                     }
                     B._beganColSpaceComp = true;
                     break;
@@ -1189,7 +1189,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseSummationsCount( sizes, _T2Context.numRhs );
+            TransposeMultiplyDenseSummationsCount( sizes, _contextRow.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1219,7 +1219,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseSummationsPack( _T2Context, buffer, offsets );
+            TransposeMultiplyDenseSummationsPack( _contextRow, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1251,7 +1251,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackA
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDenseSummationsUnpack
-            ( _T2Context, buffer, offsets );
+            ( _contextRow, buffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1282,7 +1282,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseSummationsCount( sizes, _T1Context.numRhs );
+            MultiplyDenseSummationsCount( sizes, _contextCol.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1312,7 +1312,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseSummationsPack( _T1Context, buffer, offsets );
+            MultiplyDenseSummationsPack( _contextCol, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1343,7 +1343,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseSummationsUnpack( _T1Context, buffer, offsets );
+            MultiplyDenseSummationsUnpack( _contextCol, buffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1642,7 +1642,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDensePassDataCount
-            ( sendSizes, recvSizes, _T2Context.numRhs );
+            ( sendSizes, recvSizes, _contextRow.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1677,13 +1677,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
             if( _inTargetTeam )
             {
                 TransposeMultiplyDensePassDataPack
-                ( _T2Context, _Omega2, sendBuffer, offsets );
+                ( _contextRow, _OmegaRow, sendBuffer, offsets );
             }
             else
             {
-                Dense<Scalar> dummy( 0, _T2Context.numRhs );
+                Dense<Scalar> dummy( 0, _contextRow.numRhs );
                 TransposeMultiplyDensePassDataPack
-                ( _T2Context, dummy, sendBuffer, offsets );
+                ( _contextRow, dummy, sendBuffer, offsets );
             }
         }
 
@@ -1717,7 +1717,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDensePassDataUnpack
-            ( _T2Context, recvBuffer, offsets );
+            ( _contextRow, recvBuffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1749,7 +1749,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
     {
         if( _beganColSpaceComp )
             MultiplyDensePassDataCount
-            ( sendSizes, recvSizes, _T1Context.numRhs );
+            ( sendSizes, recvSizes, _contextCol.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1780,7 +1780,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
     case SPLIT_NODE:
     {
         if( _beganColSpaceComp )
-            MultiplyDensePassDataPack( _T1Context, sendBuffer, offsets );
+            MultiplyDensePassDataPack( _contextCol, sendBuffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -1811,7 +1811,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
     case SPLIT_NODE:
     {
         if( _beganColSpaceComp )
-            MultiplyDensePassDataUnpack( _T1Context, recvBuffer, offsets );
+            MultiplyDensePassDataUnpack( _contextCol, recvBuffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3201,7 +3201,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseBroadcastsCount( sizes, _T2Context.numRhs );
+            TransposeMultiplyDenseBroadcastsCount( sizes, _contextRow.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3231,7 +3231,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseBroadcastsPack( _T2Context, buffer, offsets );
+            TransposeMultiplyDenseBroadcastsPack( _contextRow, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3263,7 +3263,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackA
     {
         if( _beganRowSpaceComp )
             TransposeMultiplyDenseBroadcastsUnpack
-            ( _T2Context, buffer, offsets );
+            ( _contextRow, buffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3294,7 +3294,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseBroadcastsCount( sizes, _T1Context.numRhs );
+            MultiplyDenseBroadcastsCount( sizes, _contextCol.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3324,7 +3324,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseBroadcastsPack( _T1Context, buffer, offsets );
+            MultiplyDenseBroadcastsPack( _contextCol, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3355,7 +3355,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseBroadcastsUnpack( _T1Context, buffer, offsets );
+            MultiplyDenseBroadcastsUnpack( _contextCol, buffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3618,24 +3618,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA() const
     // Handle postcomputation of A's row space
     if( A._beganRowSpaceComp )
     {
-        const int numRhs = A._T2Context.numRhs;
+        const int numRhs = A._contextRow.numRhs;
         if( A._inSourceTeam && A._inTargetTeam )
         {
             A.AdjointMultiplyDensePostcompute
-            ( A._T2Context, (Scalar)1, A._Omega2, A._T2 );
+            ( A._contextRow, (Scalar)1, A._OmegaRow, A._TRow );
         }
         else if( A._inSourceTeam )
         {
             Dense<Scalar> dummy( 0, numRhs );
             A.AdjointMultiplyDensePostcompute
-            ( A._T2Context, (Scalar)1, dummy, A._T2 );
+            ( A._contextRow, (Scalar)1, dummy, A._TRow );
         }
         else // A._inTargetTeam
         {
             Dense<Scalar> dummy( 0, numRhs );
             A.AdjointMultiplyDensePostcompute
-            ( A._T2Context, (Scalar)1, A._Omega2, dummy );
+            ( A._contextRow, (Scalar)1, A._OmegaRow, dummy );
         }
+        A._contextRow.Clear();
     }
 
     switch( A._block.type )
@@ -3669,24 +3670,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB() const
     // Handle postcomputation of B's column space
     if( B._beganColSpaceComp )
     {
-        const int numRhs = B._T1Context.numRhs;
+        const int numRhs = B._contextCol.numRhs;
         if( B._inSourceTeam && B._inTargetTeam )
         {
             B.MultiplyDensePostcompute
-            ( B._T1Context, (Scalar)1, B._Omega1, B._T1 );
+            ( B._contextCol, (Scalar)1, B._OmegaCol, B._TCol );
         }
         else if( B._inSourceTeam )
         {
             Dense<Scalar> dummy( 0, numRhs );
             B.MultiplyDensePostcompute
-            ( B._T1Context, (Scalar)1, B._Omega1, dummy );
+            ( B._contextCol, (Scalar)1, B._OmegaCol, dummy );
         }
         else // B._inTargetTeam
         {
             Dense<Scalar> dummy( 0, numRhs );
             B.MultiplyDensePostcompute
-            ( B._T1Context, (Scalar)1, dummy, B._T1 );
+            ( B._contextCol, (Scalar)1, dummy, B._TCol );
         }
+        B._contextCol.Clear();
     }
 
     switch( B._block.type )
@@ -4528,6 +4530,253 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
         break;
     }
     case EMPTY:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPrecompute");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int paddedRank = C.MaxRank() + 4;
+
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+        {
+            if( admissibleC )
+            {
+                if( A._inSourceTeam || A._inTargetTeam )
+                {
+                    A._contextCol.numRhs = paddedRank;
+                    if( A._inTargetTeam )
+                    {
+                        A._XCol.Resize( A.LocalHeight(), paddedRank );
+                        hmat_tools::Scale( (Scalar)0, A._XCol );
+                    }
+                    if( A._inSourceTeam && A._inTargetTeam )
+                    {
+                        A.MultiplyDensePrecompute
+                        ( A._contextCol, alpha, B._TCol, A._XCol );
+                    }
+                    else if( A._inSourceTeam )
+                    {
+                        Dense<Scalar> dummy( 0, paddedRank );
+                        A.MultiplyDensePrecompute
+                        ( A._contextCol, alpha, B._TCol, dummy );
+                    }
+                    else // A._inTargetTeam
+                    {
+                        Dense<Scalar> dummy( 0, paddedRank );
+                        A.MultiplyDensePrecompute
+                        ( A._contextCol, alpha, dummy, A._XCol );
+                    }
+                }
+                if( B._inSourceTeam || B._inTargetTeam )
+                {
+                    B._contextRow.numRhs = paddedRank;
+                    if( B._inSourceTeam )
+                    {
+                        B._XRow.Resize( B.LocalWidth(), paddedRank );
+                        hmat_tools::Scale( (Scalar)0, B._XRow );
+                    }
+                    if( B._inSourceTeam && B._inTargetTeam )
+                    {
+                        B.AdjointMultiplyDensePrecompute
+                        ( B._contextRow, Conj(alpha), A._TRow, B._XRow );
+                    }
+                    else if( B._inTargetTeam )
+                    {
+                        Dense<Scalar> dummy( 0, paddedRank );
+                        B.AdjointMultiplyDensePrecompute
+                        ( B._contextRow, Conj(alpha), A._TRow, dummy );
+                    }
+                    else // B._inSourceTeam
+                    {
+                        Dense<Scalar> dummy( 0, paddedRank );
+                        B.AdjointMultiplyDensePrecompute
+                        ( B._contextRow, Conj(alpha), dummy, B._XRow );
+                    }
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatFHHPrecompute
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                return;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummations");
+#endif
+    // HERE
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassData");
+#endif
+    // TODO
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcasts");
+#endif
+    // TODO
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcompute
+( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcompute");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int paddedRank = C.MaxRank() + 4;
+
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+        {
+            if( admissibleC )
+            {
+                if( A._inSourceTeam || A._inTargetTeam )
+                {
+                    if( A._inSourceTeam && A._inTargetTeam )
+                    {
+                        A.MultiplyDensePostcompute
+                        ( A._contextCol, alpha, B._TCol, A._XCol );
+                    }
+                    else if( A._inTargetTeam )
+                    {
+                        Dense<Scalar> dummy( 0, paddedRank );
+                        A.MultiplyDensePostcompute
+                        ( A._contextCol, alpha, dummy, A._XCol );
+                    }
+                }
+                if( B._inSourceTeam || B._inTargetTeam )
+                {
+                    if( B._inSourceTeam && B._inTargetTeam )
+                    {
+                        B.AdjointMultiplyDensePostcompute
+                        ( B._contextRow, Conj(alpha), A._TRow, B._XRow );
+                    }
+                    else if( B._inSourceTeam )
+                    {
+                        Dense<Scalar> dummy( 0, paddedRank );
+                        B.AdjointMultiplyDensePostcompute
+                        ( B._contextRow, Conj(alpha), dummy, B._XRow );
+                    }
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatFHHPostcompute
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                return;
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    default:
         break;
     }
 #ifndef RELEASE
