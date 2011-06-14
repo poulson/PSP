@@ -4759,7 +4759,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int key = A._sourceOffset;
     const int paddedRank = C.MaxRank() + 4;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -4790,6 +4789,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
                             nodeA.Child(t,r).MultiplyHMatFHHSummationsCount
                             ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
             }
+            break;
+        default:
             break;
         }
         break;
@@ -4851,6 +4852,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsPack
                               buffer, offsets );
             }
             break;
+        default:
+            break;
         }
         break;
     }
@@ -4911,6 +4914,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsUnpack
                               buffer, offsets );
             }
             break;
+        default:
+            break;
         }
         break;
     }
@@ -4931,7 +4936,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassData");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    //const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // 1) Compute send and recv sizes
     MPI_Comm comm = _teams->Team( 0 );
@@ -5040,7 +5045,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int key = A._sourceOffset;
     const int paddedRank = C.MaxRank() + 4;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5071,6 +5075,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
                             nodeA.Child(t,r).MultiplyHMatFHHBroadcastsCount
                             ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
             }
+            break;
+        default:
             break;
         }
         break;
@@ -5132,6 +5138,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
                               buffer, offsets );
             }
             break;
+        default:
+            break;
         }
         break;
     }
@@ -5191,6 +5199,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               buffer, offsets );
             }
+            break;
+        default:
             break;
         }
         break;
