@@ -659,6 +659,18 @@ private:
     void MultiplyHMatFHHPassData
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatFHHPassDataCount
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+            std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const;
+    void MultiplyHMatFHHPassDataPack
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+            std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const;
+    void MultiplyHMatFHHPassDataUnpack
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+      const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const;
     void MultiplyHMatFHHBroadcasts
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
