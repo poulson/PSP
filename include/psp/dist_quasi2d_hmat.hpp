@@ -636,6 +636,7 @@ private:
     void MultiplyHMatMainPostcomputeC
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatMainPostcomputeCCleanup(); // to be called from C
 
     void MultiplyHMatFHHPrecompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
@@ -652,6 +653,10 @@ private:
     void MultiplyHMatFHHPostcompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatFHHPostcomputeC
+    ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
+                          DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatFHHPostcomputeCCleanup(); // to be called from C
     void MultiplyHMatFHHFinalize
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
@@ -833,17 +838,20 @@ private:
     int _sourceRoot, _targetRoot;
     int _localSourceOffset, _localTargetOffset;
 
-    // For temporary products in an H-matrix/H-matrix multiplication
-    mutable MemoryMap<int,MultiplyDenseContext> _denseContextMap;
-    mutable MemoryMap<int,Dense<Scalar> > _UMap, _VMap, _DMap, _ZMap;
+    // For temporary products in an H-matrix/H-matrix multiplication. 
+    // These are only needed for the C in C += alpha A B
+    mutable MemoryMap<int,MultiplyDenseContext> 
+        _mainContextMap, _colFHHContextMap, _rowFHHContextMap;
+    mutable MemoryMap<int,Dense<Scalar> > 
+        _UMap, _VMap, _DMap, _ZMap, _colXMap, _rowXMap;
 
     // For the reuse of the computation of T1 = H Omega1 and T2 = H' Omega2 in 
     // order to capture the column and row space, respectively, of H. These 
     // variables are mutable since they do not effect the usage of the logical 
     // state of the class and simply help avoid redundant computation.
     mutable bool _beganRowSpaceComp, _beganColSpaceComp;
-    mutable Dense<Scalar> _OmegaCol, _OmegaRow, _TCol, _TRow, _XCol, _XRow;
-    mutable MultiplyDenseContext _contextCol, _contextRow;
+    mutable Dense<Scalar> _colOmega, _rowOmega, _colT, _rowT;
+    mutable MultiplyDenseContext _colContext, _rowContext;
 };
 
 } // namespace psp

@@ -32,13 +32,19 @@ public:
     // NOTE: Insertion with the same key without manual deletion
     //       will cause a memory leak.
     T2*& operator[]( T1 key ) { return _baseMap[key]; }
-
-    ~MemoryMap()
-    {   
+    
+    void Clear()
+    {
         typename std::map<T1,T2*>::iterator it; 
         for( it=_baseMap.begin(); it!=_baseMap.end(); it++ )
+        {
             delete (*it).second;
-    }   
+            (*it).second = 0;
+        }
+        _baseMap.clear();
+    }
+
+    ~MemoryMap() { Clear(); }
 };  
 
 } // namespace psp
