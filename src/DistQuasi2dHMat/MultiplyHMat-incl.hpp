@@ -1219,7 +1219,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseSummationsPack( _rowContext, buffer, offsets );
+            TransposeMultiplyDenseSummationsPack
+            ( _rowContext, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -4708,10 +4709,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     const int numReduces = std::max(0,numLevels-2);
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    // TODO
-    /*
     A.MultiplyHMatFHHSummationsCount( B, C, sizes );
-    */
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -4721,10 +4719,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    // TODO
-    /*
     A.MultiplyHMatFHHSummationsPack( B, C, buffer, offsets );
-    */
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
@@ -4747,10 +4742,181 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     }
 
     // Unpack the reduced buffers (only roots of communicators have data)
-    // TODO
-    /*
     A.MultiplyHMatFHHSummationsUnpack( B, C, buffer, offsets );
-    */
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+        std::vector<int>& sizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsCount");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int key = A._sourceOffset;
+    const int paddedRank = C.MaxRank() + 4;
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+            if( admissibleC )
+            {
+                if( A._inSourceTeam )
+                    A.MultiplyDenseSummationsCount( sizes, paddedRank );
+                if( B._inTargetTeam )
+                    B.TransposeMultiplyDenseSummationsCount
+                    ( sizes, paddedRank );
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatFHHSummationsCount
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
+            }
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsPack
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+        std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsPack");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int key = A._sourceOffset;
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+            if( admissibleC )
+            {
+                if( A._inSourceTeam )
+                {
+                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
+                    A.MultiplyDenseSummationsPack( context, buffer, offsets );
+                }
+                if( B._inTargetTeam )
+                {
+                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
+                    B.TransposeMultiplyDenseSummationsPack
+                    ( context, buffer, offsets );
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatFHHSummationsPack
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              buffer, offsets );
+            }
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsUnpack
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsUnpack");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int key = A._sourceOffset;
+    const bool admissibleC = C.Admissible();
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+            if( admissibleC )
+            {
+                if( A._inSourceTeam )
+                {
+                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
+                    A.MultiplyDenseSummationsUnpack( context, buffer, offsets );
+                }
+                if( B._inTargetTeam )
+                {
+                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
+                    B.TransposeMultiplyDenseSummationsUnpack
+                    ( context, buffer, offsets );
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatFHHSummationsUnpack
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              buffer, offsets );
+            }
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif

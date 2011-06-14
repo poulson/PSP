@@ -644,6 +644,18 @@ private:
     void MultiplyHMatFHHSummations
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    void MultiplyHMatFHHSummationsCount
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+            std::vector<int>& sizes ) const;
+    void MultiplyHMatFHHSummationsPack
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+            std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
+    void MultiplyHMatFHHSummationsUnpack
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+      const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     void MultiplyHMatFHHPassData
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
