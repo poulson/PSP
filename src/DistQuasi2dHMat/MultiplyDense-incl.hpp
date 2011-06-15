@@ -600,7 +600,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSummations");
@@ -608,6 +608,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     // Compute the message sizes for each reduce 
     const int numLevels = _teams->NumLevels();
     const int numReduces = numLevels-1;
+    if( numReduces == 0 )
+        return;
     std::vector<int> sizes( numReduces, 0 );
     MultiplyDenseSummationsCount( sizes, context.numRhs );
 
@@ -625,19 +627,52 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     // at most log_4(p) reduces.
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numReduces; ++i )
+    if( customCollective )
     {
-        if( sizes[i] != 0 )
+        // Use O(log(p)) custom method: 
+        // - Reduce onto the root of our smallest nontrivial communicator
+        // - Continue using the root teams to finish the reduction
+        MPI_Comm smallTeam = _teams->Team( numLevels-2 );
+        const int smallTeamRank = mpi::CommRank( smallTeam );
+        if( smallTeamRank == 0 )
+            mpi::Reduce
+            ( (const Scalar*)MPI_IN_PLACE, &buffer[0], totalSize,
+              0, MPI_SUM, smallTeam );
+        else
+            mpi::Reduce( &buffer[0], 0, totalSize, 0, MPI_SUM, smallTeam );
+
+        int partialSize = totalSize - sizes[numReduces-1];
+        const int numRootLevels = _teams->NumRootLevels();
+        for( int i=1; i<numRootLevels; ++i )
         {
-            MPI_Comm team = _teams->Team( i );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
+            MPI_Comm rootTeam = _teams->RootTeam( i );
+            const int rootTeamRank = mpi::CommRank( rootTeam );
+            if( rootTeamRank == 0 )
                 mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
-                  0, MPI_SUM, team );
+                ( (const Scalar*)MPI_IN_PLACE, &buffer[0], partialSize,
+                  0, MPI_SUM, rootTeam );
             else
-                mpi::Reduce
-                ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
+                mpi::Reduce( &buffer[0], 0, partialSize, 0, MPI_SUM, rootTeam );
+            partialSize -= sizes[numReduces-1-i];
+        }
+    }
+    else
+    {
+        // Use O(log^2(p)) method that uses (hopefully) optimized collectives
+        for( int i=0; i<numReduces; ++i )
+        {
+            if( sizes[i] != 0 )
+            {
+                MPI_Comm team = _teams->Team( i );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                    mpi::Reduce
+                    ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
+                      0, MPI_SUM, team );
+                else
+                    mpi::Reduce
+                    ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
+            }
         }
     }
 

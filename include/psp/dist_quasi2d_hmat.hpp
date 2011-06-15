@@ -37,13 +37,15 @@ public:
     class Teams
     {
     private:
-        std::vector<MPI_Comm> _teams;
+        std::vector<MPI_Comm> _teams, _rootTeams;
     public:
         Teams( MPI_Comm comm );
         ~Teams();
 
         unsigned NumLevels() const;
+        unsigned NumRootLevels() const;
         MPI_Comm Team( unsigned level ) const;
+        MPI_Comm RootTeam( unsigned inverseLevel ) const;
     };
 
     /*
@@ -489,7 +491,8 @@ private:
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal, 
                           Dense<Scalar>& YLocal ) const;
-    void MultiplyDenseSummations( MultiplyDenseContext& context ) const;
+    void MultiplyDenseSummations
+    ( MultiplyDenseContext& context, bool customCollective=true ) const;
     void MultiplyDenseSummationsCount
     ( std::vector<int>& sizes, int numRhs ) const;
     void MultiplyDenseSummationsPack
@@ -1286,22 +1289,26 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
     if( !(p && !(p & (p-1))) )
         throw std::logic_error("Must use a power of two number of processes");
 
-    // Simple (yet slow) method for computing the number of subcommunicators
-    unsigned numLevels = 1;
-    unsigned teamSize = p;
+    // Simple (yet slow) method for computing the number of teams
+    // (and how many we're the root of)
+    unsigned numLevels=1, numRootLevels=1;
+    unsigned teamSize=p, teamRank=rank;
     while( teamSize != 1 )
     {
+        ++numLevels;
+        if( rank % teamSize == 0 )
+            ++numRootLevels;
+
         if( teamSize >= 4 )
             teamSize >>= 2;
         else // teamSize == 2
             teamSize = 1;
-        ++numLevels;
     }
 
     _teams.resize( numLevels );
     mpi::CommDup( comm, _teams[0] );
     teamSize = p;
-    for( unsigned i=1; i<numLevels; ++i )
+    for( unsigned level=1; level<numLevels; ++level )
     {
         if( teamSize >= 4 )
             teamSize >>= 2;
@@ -1309,7 +1316,28 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
             teamSize = 1;
         const int color = rank/teamSize;
         const int key = rank - color*teamSize;
-        mpi::CommSplit( comm, color, key, _teams[i] );
+        mpi::CommSplit( comm, color, key, _teams[level] );
+    }
+
+    _rootTeams.resize( numRootLevels );
+    mpi::CommDup( _teams[numLevels-1], _rootTeams[0] );
+    for( unsigned inverseLevel=1; inverseLevel<numLevels; ++inverseLevel )
+    {
+        const int level = numLevels-1-inverseLevel;
+        teamSize = mpi::CommSize( _teams[level] );
+        if( inverseLevel < numRootLevels )
+        {
+            const int color = (rank/teamSize) / 4;
+            const int key = (rank/teamSize) % 4;
+            mpi::CommSplit( comm, color, key, _rootTeams[inverseLevel] );
+        }
+        else
+        {
+            const int color = MPI_UNDEFINED;
+            const int key = 0;
+            MPI_Comm dummy;
+            mpi::CommSplit( comm, color, key, dummy );
+        }
     }
 #ifndef RELEASE
     PopCallStack();
@@ -1325,6 +1353,8 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::~Teams()
 #endif
     for( unsigned i=0; i<_teams.size(); ++i )
         mpi::CommFree( _teams[i] );
+    for( unsigned i=0; i<_rootTeams.size(); ++i )
+        mpi::CommFree( _rootTeams[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1338,11 +1368,32 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::NumLevels() const
 }
 
 template<typename Scalar,bool Conjugated>
+inline unsigned
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::NumRootLevels() const
+{
+    return _rootTeams.size();
+}
+
+template<typename Scalar,bool Conjugated>
 inline MPI_Comm
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::Team
 ( unsigned level ) const
 {
     return _teams[std::min(level,(unsigned)_teams.size()-1)];
+}
+
+template<typename Scalar,bool Conjugated>
+inline MPI_Comm
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::RootTeam
+( unsigned inverseLevel ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::Teams::RootTeam");
+    if( inverseLevel >= _rootTeams.size() )
+        throw std::logic_error("Invalid root team request");
+    PopCallStack();
+#endif
+    return _rootTeams[inverseLevel];
 }
 
 } // namespace psp
