@@ -628,56 +628,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    if( customCollective )
-    {
-        // Use O(log(p)) custom method: 
-        // - Reduce onto the root of our smallest nontrivial communicator
-        // - Continue using the root teams to finish the reduction
-        MPI_Comm smallTeam = _teams->Team( numLevels-2 );
-        const int smallTeamRank = mpi::CommRank( smallTeam );
-        if( smallTeamRank == 0 )
-            mpi::Reduce
-            ( (const Scalar*)MPI_IN_PLACE, &buffer[0], totalSize,
-              0, MPI_SUM, smallTeam );
-        else
-            mpi::Reduce( &buffer[0], 0, totalSize, 0, MPI_SUM, smallTeam );
-
-        int partialSize = totalSize - sizes[numReduces-1];
-        const int numRootLevels = _teams->NumRootLevels();
-        for( int i=1; i<numRootLevels; ++i )
-        {
-            if( partialSize == 0 )
-                break;
-            MPI_Comm rootTeam = _teams->RootTeam( i );
-            const int rootTeamRank = mpi::CommRank( rootTeam );
-            if( rootTeamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, &buffer[0], partialSize,
-                  0, MPI_SUM, rootTeam );
-            else
-                mpi::Reduce( &buffer[0], 0, partialSize, 0, MPI_SUM, rootTeam );
-            partialSize -= sizes[numReduces-1-i];
-        }
-    }
-    else
-    {
-        // Use simple O(log^2(p)) method 
-        for( int i=0; i<numReduces; ++i )
-        {
-            if( sizes[i] != 0 )
-            {
-                MPI_Comm team = _teams->Team( i );
-                const int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                    mpi::Reduce
-                    ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], 
-                      sizes[i], 0, MPI_SUM, team );
-                else
-                    mpi::Reduce
-                    ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
-            }
-        }
-    }
+    _teams->TreeSummations( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     MultiplyDenseSummationsUnpack( context, buffer, offsets );
@@ -689,7 +640,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummations");
@@ -711,25 +662,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
         offsets[i] = offset;
     TransposeMultiplyDenseSummationsPack( context, buffer, offsets );
 
-    // Reset the offsets vector and then perform the reduces. There should be
-    // at most log_4(p) reduces.
+    // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numReduces; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
-                  0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
-        }
-    }
+    _teams->TreeSummations( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     TransposeMultiplyDenseSummationsUnpack( context, buffer, offsets );
@@ -741,13 +677,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSummations
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseSummations");
 #endif
     // This unconjugated version is identical
-    TransposeMultiplyDenseSummations( context );
+    TransposeMultiplyDenseSummations( context, customCollective );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2410,7 +2346,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcasts");
@@ -2433,18 +2369,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
         offsets[i] = offset;
     MultiplyDenseBroadcastsPack( context, buffer, offsets );
 
-    // Reset the offsets vector and then perform the broadcasts. There should be
-    // at most log_4(p) broadcasts.
+    // Reset the offsets vector and then perform the broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numBroadcasts; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
-        }
-    }
+    _teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
 
     // Unpack the broadcasted buffers 
     MultiplyDenseBroadcastsUnpack( context, buffer, offsets );
@@ -2456,7 +2384,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcasts");
@@ -2479,18 +2407,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
         offsets[i] = offset;
     TransposeMultiplyDenseBroadcastsPack( context, buffer, offsets );
 
-    // Reset the offsets vector and then perform the broadcasts. There should be
-    // at most log_4(p) broadcasts.
+    // Reset the offsets vector and then perform the broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numBroadcasts; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
-        }
-    }
+    _teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
 
     // Unpack the broadcasted buffers 
     TransposeMultiplyDenseBroadcastsUnpack( context, buffer, offsets );
@@ -2502,13 +2422,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseBroadcasts
-( MultiplyDenseContext& context ) const
+( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDenseBroadcasts( context );
+    TransposeMultiplyDenseBroadcasts( context, customCollective );
 #ifndef RELEASE
     PopCallStack();
 #endif

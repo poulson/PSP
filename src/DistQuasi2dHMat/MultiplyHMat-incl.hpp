@@ -1117,7 +1117,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+        bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummations");
@@ -1149,21 +1150,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     // at most log_4(p) reduces.
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numReduces; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
-                  0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
-        }
-    }
+    A._teams->TreeSummations( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of communicators have data)
     A.MultiplyHMatMainSummationsUnpackA( buffer, offsets );
@@ -3134,7 +3121,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+        bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcasts");
@@ -3167,14 +3155,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     // at most log_4(p) broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numBroadcasts; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
-        }
-    }
+    A._teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
 
     // Unpack the broadcasted buffers
     A.MultiplyHMatMainBroadcastsUnpackA( buffer, offsets );
@@ -4694,7 +4675,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+                      DistQuasi2dHMat<Scalar,Conjugated>& C,
+  bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummations");
@@ -4722,21 +4704,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     // at most log_4(p) reduces.
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numReduces; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-                mpi::Reduce
-                ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
-                  0, MPI_SUM, team );
-            else
-                mpi::Reduce
-                ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
-        }
-    }
+    A._teams->TreeSummations( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of communicators have data)
     A.MultiplyHMatFHHSummationsUnpack( B, C, buffer, offsets );
@@ -5183,7 +5151,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+                      DistQuasi2dHMat<Scalar,Conjugated>& C,
+  bool customCollective ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcasts");
@@ -5212,14 +5181,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     // at most log_4(p) broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    for( int i=0; i<numBroadcasts; ++i )
-    {
-        if( sizes[i] != 0 )
-        {
-            MPI_Comm team = _teams->Team( i );
-            mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
-        }
-    }
+    A._teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
 
     // Unpack the broadcasted buffers
     A.MultiplyHMatFHHBroadcastsUnpack( B, C, buffer, offsets );
