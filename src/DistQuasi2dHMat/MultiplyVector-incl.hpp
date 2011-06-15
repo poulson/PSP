@@ -585,9 +585,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSummations");
 #endif
     // Compute the message sizes for each reduce 
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numReduces = std::max(0,numLevels-2);
+    const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     MultiplyVectorSummationsCount( sizes );
@@ -610,7 +609,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -638,9 +637,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummations");
 #endif
     // Compute the message sizes for each reduce 
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numReduces = std::max(0,numLevels-2);
+    const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     TransposeMultiplyVectorSummationsCount( sizes );
@@ -663,7 +661,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -717,7 +715,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsCount
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank;
+            sizes[_level] += _block.data.DF->rank;
         break;
 
     default:
@@ -748,7 +746,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsCount
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank;
+            sizes[_level] += _block.data.DF->rank;
         break;
 
     default:
@@ -787,9 +785,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
             const DistLowRank& DF = *_block.data.DF;
             const Vector<Scalar>& z = *context.block.data.z;
             std::memcpy
-            ( &buffer[offsets[_level-1]], z.LockedBuffer(), 
+            ( &buffer[offsets[_level]], z.LockedBuffer(), 
               DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank;
+            offsets[_level] += DF.rank;
         }
         break;
 
@@ -829,9 +827,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
             const DistLowRank& DF = *_block.data.DF;
             const Vector<Scalar>& z = *context.block.data.z;
             std::memcpy
-            ( &buffer[offsets[_level-1]], z.LockedBuffer(), 
+            ( &buffer[offsets[_level]], z.LockedBuffer(), 
               DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank;
+            offsets[_level] += DF.rank;
         }
         break;
 
@@ -875,9 +873,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
             if( teamRank == 0 )
             {
                 std::memcpy
-                ( z.Buffer(), &buffer[offsets[_level-1]], 
+                ( z.Buffer(), &buffer[offsets[_level]], 
                   DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank;
+                offsets[_level] += DF.rank;
             }
         }
         break;
@@ -922,9 +920,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
             if( teamRank == 0 )
             {
                 std::memcpy
-                ( z.Buffer(), &buffer[offsets[_level-1]], 
+                ( z.Buffer(), &buffer[offsets[_level]], 
                   DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank;
+                offsets[_level] += DF.rank;
             }
         }
         break;
@@ -1841,9 +1839,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcasts");
 #endif
     // Compute the message sizes for each broadcast
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = std::max(0,numLevels-2);
+    const int numBroadcasts = numLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     MultiplyVectorBroadcastsCount( sizes );
@@ -1867,7 +1864,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -1888,9 +1885,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcasts");
 #endif
     // Compute the message sizes for each broadcast
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = std::max(0,numLevels-2);
+    const int numBroadcasts = numLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     TransposeMultiplyVectorBroadcastsCount( sizes );
@@ -1914,7 +1910,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -1961,7 +1957,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsCount
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank;
+            sizes[_level] += _block.data.DF->rank;
         break;
 
     default:
@@ -1992,7 +1988,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsCount
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank;
+            sizes[_level] += _block.data.DF->rank;
         break;
 
     default:
@@ -2035,9 +2031,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
             if( teamRank == 0 )
             {
                 std::memcpy
-                ( &buffer[offsets[_level-1]], z.LockedBuffer(), 
+                ( &buffer[offsets[_level]], z.LockedBuffer(), 
                   DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank;
+                offsets[_level] += DF.rank;
             }
         }
         break;
@@ -2082,9 +2078,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
             if( teamRank == 0 )
             {
                 std::memcpy
-                ( &buffer[offsets[_level-1]], z.LockedBuffer(), 
+                ( &buffer[offsets[_level]], z.LockedBuffer(), 
                   DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank;
+                offsets[_level] += DF.rank;
             }
         }
         break;
@@ -2126,8 +2122,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsUnpack
             Vector<Scalar>& z = *context.block.data.z;
             z.Resize( DF.rank );
             std::memcpy
-            ( z.Buffer(), &buffer[offsets[_level-1]], DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank;
+            ( z.Buffer(), &buffer[offsets[_level]], DF.rank*sizeof(Scalar) );
+            offsets[_level] += DF.rank;
         }
         break;
 
@@ -2168,8 +2164,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsUnpack
             Vector<Scalar>& z = *context.block.data.z;
             z.Resize( DF.rank );
             std::memcpy
-            ( z.Buffer(), &buffer[offsets[_level-1]], DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank;
+            ( z.Buffer(), &buffer[offsets[_level]], DF.rank*sizeof(Scalar) );
+            offsets[_level] += DF.rank;
         }
         break;
 

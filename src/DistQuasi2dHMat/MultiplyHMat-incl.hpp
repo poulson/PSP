@@ -1125,9 +1125,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numReduces = std::max(0,numLevels-2);
+    const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     A.MultiplyHMatMainSummationsCountA( sizes );
@@ -1154,7 +1153,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -1415,7 +1414,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
             const DistLowRank& DFA = *A._block.data.DF;
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
-                sizes[A._level-1] += DFA.rank*DFB.rank;
+                sizes[A._level] += DFA.rank*DFB.rank;
             break;
         }
         default:
@@ -1484,9 +1483,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
             if( A._inSourceTeam )
             {
                 std::memcpy
-                ( &buffer[offsets[A._level-1]], C._ZMap[key]->LockedBuffer(),
+                ( &buffer[offsets[A._level]], C._ZMap[key]->LockedBuffer(),
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level-1] += DFA.rank*DFB.rank;
+                offsets[A._level] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -1556,9 +1555,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
             if( A._inSourceTeam )
             {
                 std::memcpy
-                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level-1]],
+                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level-1] += DFA.rank*DFB.rank;
+                offsets[A._level] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -3143,9 +3142,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each broadcast
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = std::max(0,numLevels-2);
+    const int numBroadcasts = numLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     A.MultiplyHMatMainBroadcastsCountA( sizes );
@@ -3173,7 +3171,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -3426,7 +3424,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
             const DistLowRank& DFA = *A._block.data.DF;
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inTargetTeam )
-                sizes[A._level-1] += DFA.rank*DFB.rank;
+                sizes[A._level] += DFA.rank*DFB.rank;
             break;
         }
         default:
@@ -3497,9 +3495,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
             if( A._inTargetTeam && teamRank == 0 )
             {
                 std::memcpy
-                ( &buffer[offsets[A._level-1]], C._ZMap[key]->LockedBuffer(),
+                ( &buffer[offsets[A._level]], C._ZMap[key]->LockedBuffer(),
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level-1] += DFA.rank*DFB.rank;
+                offsets[A._level] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -3569,9 +3567,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
             if( A._inTargetTeam )
             {
                 std::memcpy
-                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level-1]],
+                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level-1] += DFA.rank*DFB.rank;
+                offsets[A._level] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -4704,9 +4702,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numReduces = std::max(0,numLevels-2);
+    const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     A.MultiplyHMatFHHSummationsCount( B, C, sizes );
@@ -4729,7 +4726,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -5194,9 +5191,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each broadcast
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = std::max(0,numLevels-2);
+    const int numBroadcasts = numLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     A.MultiplyHMatFHHBroadcastsCount( B, C, sizes );
@@ -5220,7 +5216,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }

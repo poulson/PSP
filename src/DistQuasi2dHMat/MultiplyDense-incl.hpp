@@ -606,9 +606,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSummations");
 #endif
     // Compute the message sizes for each reduce 
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numReduces = std::max(0,numLevels-2);
+    const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces, 0 );
     MultiplyDenseSummationsCount( sizes, context.numRhs );
 
@@ -630,7 +629,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -658,9 +657,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummations");
 #endif
     // Compute the message sizes for each reduce 
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numReduces = std::max(0,numLevels-2);
+    const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     TransposeMultiplyDenseSummationsCount( sizes, context.numRhs );
@@ -683,7 +681,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             const int teamRank = mpi::CommRank( team );
             if( teamRank == 0 )
                 mpi::Reduce
@@ -739,7 +737,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank*numRhs;
+            sizes[_level] += _block.data.DF->rank*numRhs;
         break;
     default:
         break;
@@ -770,7 +768,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank*numRhs;
+            sizes[_level] += _block.data.DF->rank*numRhs;
         break;
     default:
         break;
@@ -810,14 +808,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
             const Dense<Scalar>& Z = *context.block.data.Z;
             if( Z.Height() == Z.LDim() )
                 std::memcpy
-                ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+                ( &buffer[offsets[_level]], Z.LockedBuffer(), 
                   DF.rank*numRhs*sizeof(Scalar) );
             else
                 for( int j=0; j<numRhs; ++j )
                     std::memcpy
-                    ( &buffer[offsets[_level-1]+j*DF.rank], Z.LockedBuffer(0,j),
+                    ( &buffer[offsets[_level]+j*DF.rank], Z.LockedBuffer(0,j),
                       DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*numRhs;
+            offsets[_level] += DF.rank*numRhs;
         }
         break;
     default:
@@ -858,14 +856,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
             const Dense<Scalar>& Z = *context.block.data.Z;
             if( Z.Height() == Z.LDim() )
                 std::memcpy
-                ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+                ( &buffer[offsets[_level]], Z.LockedBuffer(), 
                   DF.rank*numRhs*sizeof(Scalar) );
             else
                 for( int j=0; j<numRhs; ++j )
                     std::memcpy
-                    ( &buffer[offsets[_level-1]+j*DF.rank], Z.LockedBuffer(0,j),
+                    ( &buffer[offsets[_level]+j*DF.rank], Z.LockedBuffer(0,j),
                       DF.rank*sizeof(Scalar) );
-            offsets[_level-1] += DF.rank*numRhs;
+            offsets[_level] += DF.rank*numRhs;
         }
         break;
     default:
@@ -910,14 +908,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
             {
                 if( Z.Height() == Z.LDim() )
                     std::memcpy
-                    ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                    ( Z.Buffer(), &buffer[offsets[_level]], 
                       DF.rank*numRhs*sizeof(Scalar) );
                 else
                     for( int j=0; j<numRhs; ++j )
                         std::memcpy
-                        ( Z.Buffer(0,j), &buffer[offsets[_level-1]+j*DF.rank],
+                        ( Z.Buffer(0,j), &buffer[offsets[_level]+j*DF.rank],
                           DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*numRhs;
+                offsets[_level] += DF.rank*numRhs;
             }
         }
         break;
@@ -963,14 +961,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
             {
                 if( Z.Height() == Z.LDim() )
                     std::memcpy
-                    ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                    ( Z.Buffer(), &buffer[offsets[_level]], 
                       DF.rank*numRhs*sizeof(Scalar) );
                 else
                     for( int j=0; j<numRhs; ++j )
                         std::memcpy
-                        ( Z.Buffer(0,j), &buffer[offsets[_level-1]+j*DF.rank],
+                        ( Z.Buffer(0,j), &buffer[offsets[_level]+j*DF.rank],
                           DF.rank*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*numRhs;
+                offsets[_level] += DF.rank*numRhs;
             }
         }
         break;
@@ -2380,9 +2378,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcasts");
 #endif
     // Compute the message sizes for each broadcast
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = std::max(0,numLevels-2);
+    const int numBroadcasts = numLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     MultiplyDenseBroadcastsCount( sizes, context.numRhs );
@@ -2406,7 +2403,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -2427,9 +2424,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcasts");
 #endif
     // Compute the message sizes for each broadcast
-    // (the first and last comms are unneeded)
     const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = std::max(0,numLevels-2);
+    const int numBroadcasts = numLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     TransposeMultiplyDenseBroadcastsCount( sizes, context.numRhs );
@@ -2453,7 +2449,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     {
         if( sizes[i] != 0 )
         {
-            MPI_Comm team = _teams->Team( i+1 );
+            MPI_Comm team = _teams->Team( i );
             mpi::Broadcast( &buffer[offsets[i]], sizes[i], 0, team );
         }
     }
@@ -2500,7 +2496,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsCount
     }
     case DIST_LOW_RANK:
         if( _inTargetTeam )
-            sizes[_level-1] += _block.data.DF->rank*numRhs;
+            sizes[_level] += _block.data.DF->rank*numRhs;
         break;
     default:
         break;
@@ -2531,7 +2527,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsCount
     }
     case DIST_LOW_RANK:
         if( _inSourceTeam )
-            sizes[_level-1] += _block.data.DF->rank*numRhs;
+            sizes[_level] += _block.data.DF->rank*numRhs;
         break;
     default:
         break;
@@ -2574,9 +2570,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
                 const DistLowRank& DF = *_block.data.DF;
                 const Dense<Scalar>& Z = *context.block.data.Z;
                 std::memcpy
-                ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+                ( &buffer[offsets[_level]], Z.LockedBuffer(), 
                   DF.rank*numRhs*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*numRhs;
+                offsets[_level] += DF.rank*numRhs;
             }
         }
         break;
@@ -2622,9 +2618,9 @@ TransposeMultiplyDenseBroadcastsPack
                 const DistLowRank& DF = *_block.data.DF;
                 const Dense<Scalar>& Z = *context.block.data.Z;
                 std::memcpy
-                ( &buffer[offsets[_level-1]], Z.LockedBuffer(), 
+                ( &buffer[offsets[_level]], Z.LockedBuffer(), 
                   DF.rank*numRhs*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*numRhs;
+                offsets[_level] += DF.rank*numRhs;
             }
         }
         break;
@@ -2668,9 +2664,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
             {
                 Z.Resize( DF.rank, numRhs, DF.rank );
                 std::memcpy
-                ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                ( Z.Buffer(), &buffer[offsets[_level]], 
                   DF.rank*numRhs*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*numRhs;
+                offsets[_level] += DF.rank*numRhs;
             }
         }
         break;
@@ -2715,9 +2711,9 @@ TransposeMultiplyDenseBroadcastsUnpack
             {
                 Z.Resize( DF.rank, numRhs, DF.rank );
                 std::memcpy
-                ( Z.Buffer(), &buffer[offsets[_level-1]], 
+                ( Z.Buffer(), &buffer[offsets[_level]], 
                   DF.rank*numRhs*sizeof(Scalar) );
-                offsets[_level-1] += DF.rank*numRhs;
+                offsets[_level] += DF.rank*numRhs;
             }
         }
         break;
