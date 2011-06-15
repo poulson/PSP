@@ -617,14 +617,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     int totalSize = 0;
     for( int i=0; i<numReduces; ++i )
         totalSize += sizes[i];
+    if( totalSize == 0 )
+        return;
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     MultiplyDenseSummationsPack( context, buffer, offsets );
 
-    // Reset the offsets vector and then perform the reduces. There should be
-    // at most log_4(p) reduces.
+    // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     if( customCollective )
@@ -645,6 +646,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
         const int numRootLevels = _teams->NumRootLevels();
         for( int i=1; i<numRootLevels; ++i )
         {
+            if( partialSize == 0 )
+                break;
             MPI_Comm rootTeam = _teams->RootTeam( i );
             const int rootTeamRank = mpi::CommRank( rootTeam );
             if( rootTeamRank == 0 )
@@ -658,7 +661,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     }
     else
     {
-        // Use O(log^2(p)) method that uses (hopefully) optimized collectives
+        // Use simple O(log^2(p)) method 
         for( int i=0; i<numReduces; ++i )
         {
             if( sizes[i] != 0 )
@@ -667,8 +670,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
                 const int teamRank = mpi::CommRank( team );
                 if( teamRank == 0 )
                     mpi::Reduce
-                    ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], sizes[i],
-                      0, MPI_SUM, team );
+                    ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]], 
+                      sizes[i], 0, MPI_SUM, team );
                 else
                     mpi::Reduce
                     ( &buffer[offsets[i]], 0, sizes[i], 0, MPI_SUM, team );
