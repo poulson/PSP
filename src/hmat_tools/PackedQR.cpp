@@ -133,7 +133,7 @@ std::complex<Real> Householder( const int m, std::complex<Real>* buffer )
     return tau;
 }
 
-}
+} // anonymous namespace
 
 // Perform a QR factorization of size 2r x r where only the upper triangles
 // of the matrix are stored, and the nonzeros are packed columnwise.
@@ -143,7 +143,7 @@ std::complex<Real> Householder( const int m, std::complex<Real>* buffer )
 // NOTE: This has _NOT_ yet been verified/debugged.
 template<typename Scalar>
 void psp::hmat_tools::PackedQR
-( const int r, Scalar* RESTRICT A, Scalar* RESTRICT work )
+( const int r, Scalar* RESTRICT A, Scalar* RESTRICT tau, Scalar* RESTRICT work )
 {
     // Initialize the pointer at the first diagonal value
     Scalar* diag = A;
@@ -151,7 +151,7 @@ void psp::hmat_tools::PackedQR
     for( int j=0; j<r; ++j )
     {
         // Compute the Householder vector, v, and scalar, tau, in-place
-        const Scalar tau = Householder( j+2, &diag[0] );
+        tau[j] = Householder( j+2, &diag[0] );
 
         // Form z := A(I_j,j+1:n-1)' v in the work vector 
         int offset = 1; // start off pointing at lower-triangle of j'th col
@@ -176,7 +176,7 @@ void psp::hmat_tools::PackedQR
         offset = 1; // start off pointing at lower-triangle of j'th col
         for( int i=0; i<(r-(i+1)); ++i )
         {
-            const Scalar scale = Conj(tau)*work[i];
+            const Scalar scale = Conj(tau[j])*work[i];
 
             // Update offset from lower-triangle of (j+i)'th col such that
             // diag[offset] = A(j,j+i+1)
@@ -199,19 +199,97 @@ void psp::hmat_tools::PackedQR
     }
 }
 
+template<typename Scalar>
+void psp::hmat_tools::ApplyPackedQ
+( const int r, const Scalar* RESTRICT A, const Scalar* RESTRICT tau, 
+  Dense<Scalar>& B, Scalar* work )
+{
+#ifndef RELEASE
+    PushCallStack("hmat_tools::ApplyPackedQ");
+    if( B.Type() != GENERAL )
+        throw std::logic_error("B must be a full dense matrix.");
+#endif
+    const int n = B.Width();
+    Scalar* BBuffer = B.Buffer();
+    const int BLDim = B.LDim();
+    for( int j=r-1; j>=0; --j )
+    {
+        // B := B - tau_j v_j v_j' B
+
+        // 1) Form w_j := B' v_j
+        // Since v_j's only nonzero entries are a 1 in the j'th entry and 
+        // arbitrary values in the r:r+j entries, 
+        //     w_j = B(j,:)' + B(r:r+j,:)' v_j(r:r+j)
+        for( int i=0; i<n; ++i )
+            work[i] = Conj(BBuffer[j+i*BLDim]);
+        blas::Gemv
+        ( 'C', j+1, n, 
+          (Scalar)1, &BBuffer[r],       BLDim,
+                     &A[(j*j+j)+(j+1)], 1,
+          (Scalar)1, work,              1 );
+
+        // 2) B := B - tau_j v_j w_j'
+        // Since v_j has the structure described above, we only need to 
+        // subtract tau_j w_j' from the j'th row of B and then perform the
+        // update 
+        //     B(r:r+j,:) -= tau_j v_j(r:r+j) w_j'
+        const Scalar tauj = tau[j];
+        for( int i=0; i<n; ++i )
+            BBuffer[j+i*BLDim] -= tauj*Conj(work[i]);
+        blas::Ger
+        ( j+1, n, 
+          tauj, &A[(j*j+j)+(j+1)], 1,
+                work,              1,
+                &BBuffer[r],       BLDim );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 template void psp::hmat_tools::PackedQR
-( int r, 
+( const int r, 
   float* RESTRICT A, 
+  float* RESTRICT tau,
   float* RESTRICT work );
 template void psp::hmat_tools::PackedQR
-( int r, 
+( const int r, 
   double* RESTRICT A, 
+  double* RESTRICT tau,
   double* RESTRICT work );
 template void psp::hmat_tools::PackedQR
-( int r, 
+( const int r, 
   std::complex<float>* RESTRICT A, 
+  std::complex<float>* RESTRICT tau,
   std::complex<float>* RESTRICT work );
 template void psp::hmat_tools::PackedQR
-( int r, 
+( const int r, 
   std::complex<double>* RESTRICT A, 
+  std::complex<double>* RESTRICT tau,
   std::complex<double>* RESTRICT work );
+
+template void psp::hmat_tools::ApplyPackedQ
+( const int r, 
+  const float* RESTRICT A, 
+  const float* RESTRICT tau,
+        Dense<float>& B, 
+        float* RESTRICT work );
+template void psp::hmat_tools::ApplyPackedQ
+( const int r, 
+  const double* RESTRICT A, 
+  const double* RESTRICT tau,
+        Dense<double>& B, 
+        double* RESTRICT work );
+template void psp::hmat_tools::ApplyPackedQ
+( const int r, 
+  const std::complex<float>* RESTRICT A, 
+  const std::complex<float>* RESTRICT tau,
+        Dense<std::complex<float> >& B,
+        std::complex<float>* RESTRICT work );
+template void psp::hmat_tools::ApplyPackedQ
+( const int r, 
+  const std::complex<double>* RESTRICT A, 
+  const std::complex<double>* RESTRICT tau,
+        Dense<std::complex<double> >& B,
+        std::complex<double>* RESTRICT work );
+

@@ -780,7 +780,14 @@ void Adjoint
  *  matrices with their nonzeros packed columnwise.
  */
 template<typename Scalar>
-void PackedQR( const int r, Scalar* RESTRICT buffer, Scalar* RESTRICT work );
+void PackedQR
+( const int r, Scalar* RESTRICT packedA, Scalar* RESTRICT tau, 
+  Scalar* RESTRICT work );
+
+template<typename Scalar>
+void ApplyPackedQ
+( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+  Dense<Scalar>& B, Scalar* RESTRICT work );
 
 } // namespace hmat_tools
 } // namespace psp

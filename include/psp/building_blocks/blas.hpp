@@ -64,6 +64,30 @@ void BLAS(cscal)
 void BLAS(zscal)
 ( const int* n, const dcomplex* alpha, dcomplex* x, const int* incx );
 
+void BLAS(sger)
+( const int* m, const int* n,
+  const float* alpha, const float* x, const int* incx,
+                      const float* y, const int* incy,
+                            float* A, const int* lda );
+
+void BLAS(dger)
+( const int* m, const int* n,
+  const double* alpha, const double* x, const int* incx,
+                       const double* y, const int* incy,
+                             double* A, const int* lda );
+
+void BLAS(cger)
+( const int* m, const int* n,
+  const scomplex* alpha, const scomplex* x, const int* incx,
+                         const scomplex* y, const int* incy,
+                               scomplex* A, const int* lda );
+
+void BLAS(zger)
+( const int* m, const int* n,
+  const dcomplex* alpha, const dcomplex* x, const int* incx,
+                         const dcomplex* y, const int* incy,
+                               dcomplex* A, const int* lda );
+
 void BLAS(sgemv)
 ( const char* trans, const int* m, const int* n,
   const float* alpha, const float* A, const int* lda,
@@ -250,6 +274,78 @@ inline void Scal
 }
 
 //----------------------------------------------------------------------------//
+// General rank-one update                                                    //
+//----------------------------------------------------------------------------//
+
+inline void Ger
+( int m, int n, 
+  float alpha, const float* x, int incx, 
+               const float* y, int incy,
+                     float* A, int lda )
+{
+#ifndef RELEASE
+    PushCallStack("blas::Ger");
+    if( lda == 0 )
+        throw std::logic_error("lda = 0");
+#endif
+    BLAS(sger)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void Ger
+( int m, int n, 
+  double alpha, const double* x, int incx, 
+                const double* y, int incy,
+                      double* A, int lda )
+{
+#ifndef RELEASE
+    PushCallStack("blas::Ger");
+    if( lda == 0 )
+        throw std::logic_error("lda = 0");
+#endif
+    BLAS(dger)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void Ger
+( int m, int n, 
+  std::complex<float> alpha, const std::complex<float>* x, int incx, 
+                             const std::complex<float>* y, int incy,
+                                   std::complex<float>* A, int lda )
+{
+#ifndef RELEASE
+    PushCallStack("blas::Ger");
+    if( lda == 0 )
+        throw std::logic_error("lda = 0");
+#endif
+    BLAS(cger)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void Ger
+( int m, int n, 
+  std::complex<double> alpha, const std::complex<double>* x, int incx, 
+                              const std::complex<double>* y, int incy,
+                                    std::complex<double>* A, int lda )
+{
+#ifndef RELEASE
+    PushCallStack("blas::Ger");
+    if( lda == 0 )
+        throw std::logic_error("lda = 0");
+#endif
+    BLAS(zger)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+//----------------------------------------------------------------------------//
 // General matrix-vector multiplication                                       //
 //----------------------------------------------------------------------------//
 
@@ -264,8 +360,7 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(sgemv)
-    ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    BLAS(sgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -282,8 +377,7 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(dgemv)
-    ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    BLAS(dgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -300,8 +394,7 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(cgemv)
-    ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    BLAS(cgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -318,8 +411,7 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(zgemv)
-    ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    BLAS(zgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
 #ifndef RELEASE
     PopCallStack();
 #endif
