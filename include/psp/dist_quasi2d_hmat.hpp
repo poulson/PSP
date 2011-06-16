@@ -719,6 +719,9 @@ private:
     // To be called from C
     void MultiplyHMatQR();
     void MultiplyHMatQRLowRankResize( int rank );
+    void MultiplyHMatQRLowRankImport( int rank );
+    void MultiplyHMatQRImportU( int rank, const Dense<Scalar>& U );
+    void MultiplyHMatQRImportV( int rank, const Dense<Scalar>& V );
 
     //
     // Transpose H-matrix/vector multiplication

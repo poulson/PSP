@@ -5518,9 +5518,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQR()
     PushCallStack("DistQuasi2dHMat::MultiplyHMatQR");
 #endif
     MultiplyHMatQRLowRankResize( 0 );
-
-    //MultiplyHMatQRStartComp();
+    MultiplyHMatQRLowRankImport( 0 );
     // HERE
+    //MultiplyHMatQRStartComp();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -5593,20 +5593,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
         // Create the space
         if( _inTargetTeam )
         {
+            const int oldRank = DF.ULocal.Width();
             Dense<Scalar> ULocalCopy;
             hmat_tools::Copy( DF.ULocal, ULocalCopy );
             DF.ULocal.Resize( LocalHeight(), rank );
             std::memcpy
-            ( DF.ULocal.Buffer(), ULocalCopy.LockedBuffer(), 
+            ( DF.ULocal.Buffer(0,rank-oldRank), ULocalCopy.LockedBuffer(), 
               LocalHeight()*rank*sizeof(Scalar) );
         }
         if( _inSourceTeam )
         {
+            const int oldRank = DF.VLocal.Width();
             Dense<Scalar> VLocalCopy;
             hmat_tools::Copy( DF.VLocal, VLocalCopy );
             DF.VLocal.Resize( LocalWidth(), rank );
             std::memcpy
-            ( DF.VLocal.Buffer(), VLocalCopy.LockedBuffer(),
+            ( DF.VLocal.Buffer(0,rank-oldRank), VLocalCopy.LockedBuffer(),
               LocalWidth()*rank*sizeof(Scalar) );
         }
         break;
@@ -5647,20 +5649,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
             // Create the space
             if( _inTargetTeam )
             {
+                const int oldRank = SF.D.Width();
                 Dense<Scalar> UCopy;
                 hmat_tools::Copy( SF.D, UCopy );
                 SF.D.Resize( Height(), rank );
                 std::memcpy
-                ( SF.D.Buffer(), UCopy.LockedBuffer(), 
+                ( SF.D.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
                   Height()*rank*sizeof(Scalar) );
             }
             else
             {
+                const int oldRank = SF.D.Width();
                 Dense<Scalar> VCopy;
                 hmat_tools::Copy( SF.D, VCopy );
                 SF.D.Resize( Width(), rank );
                 std::memcpy
-                ( SF.D.Buffer(), VCopy.LockedBuffer(),
+                ( SF.D.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
                   Width()*rank*sizeof(Scalar) );
             }
         }
@@ -5688,21 +5692,233 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
 
             // Create the space
             {
+                const int oldRank = F.Rank();
+
                 Dense<Scalar> UCopy;
                 hmat_tools::Copy( F.U, UCopy );
                 F.U.Resize( Height(), rank );
                 std::memcpy
-                ( F.U.Buffer(), UCopy.LockedBuffer(), 
+                ( F.U.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
                   Height()*rank*sizeof(Scalar) );
 
                 Dense<Scalar> VCopy;
                 hmat_tools::Copy( F.V, VCopy );
                 F.V.Resize( Width(), rank );
                 std::memcpy
-                ( F.V.Buffer(), VCopy.LockedBuffer(),
+                ( F.V.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
                   Width()*rank*sizeof(Scalar) );
             }
         }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankImport
+( int rank )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRLowRankImport");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        int newRank = rank;
+        if( _inTargetTeam )
+        {
+            _UMap.ResetIterator();
+            const int numEntries = _UMap.Size();
+            for( int i=0; i<numEntries; ++i )
+            {
+                const Dense<Scalar>& U = *_UMap.NextEntry();
+                Dense<Scalar> ULocal; 
+
+                for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+                {
+                    for( int s=0; s<4; ++s )
+                    {
+                        ULocal.LockedView
+                        ( U, tOffset, 0, node.targetSizes[t], U.Width() );
+                        node.Child(t,s).MultiplyHMatQRImportU
+                        ( newRank, ULocal );
+                    }
+                }
+                newRank += U.Width();
+            }
+        }
+        if( _inSourceTeam )
+        {
+            newRank = rank;
+            _VMap.ResetIterator();
+            const int numEntries = _VMap.Size();
+            for( int i=0; i<numEntries; ++i )
+            {
+                const Dense<Scalar>& V = *_VMap.NextEntry();
+                Dense<Scalar> VLocal;
+
+                for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    for( int t=0; t<4; ++t )
+                    {
+                        VLocal.LockedView
+                        ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
+                        node.Child(t,s).MultiplyHMatQRImportV
+                        ( newRank, VLocal );
+                    }
+                }
+                newRank += V.Width();
+            }
+        }
+
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatQRLowRankImport( newRank );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        // HERE
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportU
+( int rank, const Dense<Scalar>& U )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRImportU");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        Dense<Scalar> ULocal;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            for( int s=0; s<4; ++s )
+            {
+                ULocal.LockedView
+                ( U, tOffset, 0, node.targetSizes[t], U.Width() );
+                node.Child(t,s).MultiplyHMatQRImportU( rank, ULocal );
+            }
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        // TODO
+        break;
+    }
+    case DENSE:
+    {
+        // TODO
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportV
+( int rank, const Dense<Scalar>& V )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRImportV");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        Dense<Scalar> VLocal;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            for( int t=0; t<4; ++t )
+            {
+                VLocal.LockedView
+                ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
+                node.Child(t,s).MultiplyHMatQRImportV( rank, VLocal );
+            }
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        // TODO
+        break;
+    }
+    case DENSE:
+    {
+        // TODO
         break;
     }
     default:
