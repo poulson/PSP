@@ -715,13 +715,10 @@ private:
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
     void MultiplyHMatFHHPostcomputeCCleanup(); // to be called from C
-    void MultiplyHMatFHHFinalize
-    ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                          DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
 
-    void MultiplyHMatRoundedAddition
-    ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                          DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
+    // To be called from C
+    void MultiplyHMatQR();
+    void MultiplyHMatQRLowRankResize( int rank );
 
     //
     // Transpose H-matrix/vector multiplication

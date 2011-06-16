@@ -27,11 +27,29 @@ template<typename T1,typename T2>
 class MemoryMap 
 {   
 private:
+    unsigned _currentEntry;
+    typename std::map<T1,T2*>::iterator _it;
     std::map<T1,T2*> _baseMap;
 public:
     // NOTE: Insertion with the same key without manual deletion
     //       will cause a memory leak.
     T2*& operator[]( T1 key ) { return _baseMap[key]; }
+    int Size() const { return _baseMap.size(); }
+    void ResetIterator() { _currentEntry=0; }
+
+    T2*& NextEntry() 
+    {
+#ifndef DEBUG
+        PushCallStack("MemoryMap::NextEntry");
+        if( !(_currentEntry < _baseMap.size()) )
+            throw std::logic_error("Traversed past end of map");
+        PopCallStack();
+#endif
+        T2*& value = (*_it).second;
+        ++_it;
+        ++_currentEntry;
+        return value;
+    }
     
     void Clear()
     {
@@ -44,6 +62,7 @@ public:
         _baseMap.clear();
     }
 
+    MemoryMap() : _currentEntry(0) { }
     ~MemoryMap() { Clear(); }
 };  
 

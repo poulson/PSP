@@ -54,11 +54,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     A.MultiplyHMatFHHPassData( alpha, B, C );
     A.MultiplyHMatFHHBroadcasts( alpha, B, C );
     A.MultiplyHMatFHHPostcompute( alpha, B, C );
-    /*
-    A.MultiplyHMatFHHFinalize( alpha, B, C );
 
-    A.MultiplyHMatRoundedAddition( alpha, B, C );
-    */
+    C.MultiplyHMatQR();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -5503,6 +5500,209 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeCCleanup()
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 nodeC.Child(t,s).MultiplyHMatFHHPostcomputeCCleanup();
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQR()
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatQR");
+#endif
+    MultiplyHMatQRLowRankResize( 0 );
+
+    //MultiplyHMatQRStartComp();
+    // HERE
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRLowRankResize");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        if( _inTargetTeam )
+        {
+            _UMap.ResetIterator();
+            const int numEntries = _UMap.Size();
+            for( int i=0; i<numEntries; ++i )
+                rank += _UMap.NextEntry()->Width();
+        }
+        else if( _inSourceTeam )
+        {
+            _VMap.ResetIterator();
+            const int numEntries = _VMap.Size();
+            for( int i=0; i<numEntries; ++i )
+                rank += _VMap.NextEntry()->Width();
+        }
+
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatQRLowRankResize( rank );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        DistLowRank& DF = *_block.data.DF;
+
+        // Compute the total update rank
+        if( _inTargetTeam )
+        {
+            _colXMap.ResetIterator();
+            int numEntries = _colXMap.Size();
+            for( int i=0; i<numEntries; ++i )
+                rank += _colXMap.NextEntry()->Width();
+
+            _UMap.ResetIterator();
+            numEntries = _UMap.Size();
+            for( int i=0; i<numEntries; ++i )
+                rank += _UMap.NextEntry()->Width();
+        }
+        else if( _inSourceTeam )
+        {
+            _rowXMap.ResetIterator();
+            int numEntries = _rowXMap.Size();
+            for( int i=0; i<numEntries; ++i )
+                rank += _rowXMap.NextEntry()->Width();
+
+            _VMap.ResetIterator();
+            numEntries = _VMap.Size();
+            for( int i=0; i<numEntries; ++i )
+                rank += _VMap.NextEntry()->Width();
+        }
+
+        // Create the space
+        if( _inTargetTeam )
+        {
+            Dense<Scalar> ULocalCopy;
+            hmat_tools::Copy( DF.ULocal, ULocalCopy );
+            DF.ULocal.Resize( LocalHeight(), rank );
+            std::memcpy
+            ( DF.ULocal.Buffer(), ULocalCopy.LockedBuffer(), 
+              LocalHeight()*rank*sizeof(Scalar) );
+        }
+        if( _inSourceTeam )
+        {
+            Dense<Scalar> VLocalCopy;
+            hmat_tools::Copy( DF.VLocal, VLocalCopy );
+            DF.VLocal.Resize( LocalWidth(), rank );
+            std::memcpy
+            ( DF.VLocal.Buffer(), VLocalCopy.LockedBuffer(),
+              LocalWidth()*rank*sizeof(Scalar) );
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        SplitLowRank& SF = *_block.data.SF;
+
+        const int numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 )
+        {
+            // Compute the total update rank
+            if( _inTargetTeam )
+            {
+                _colXMap.ResetIterator();
+                int numEntries = _colXMap.Size();
+                for( int i=0; i<numEntries; ++i )
+                    rank += _colXMap.NextEntry()->Width();
+
+                _UMap.ResetIterator();
+                numEntries = _UMap.Size();
+                for( int i=0; i<numEntries; ++i )
+                    rank += _UMap.NextEntry()->Width();
+            }
+            else 
+            {
+                _rowXMap.ResetIterator();
+                int numEntries = _rowXMap.Size();
+                for( int i=0; i<numEntries; ++i )
+                    rank += _rowXMap.NextEntry()->Width();
+
+                _VMap.ResetIterator();
+                numEntries = _VMap.Size();
+                for( int i=0; i<numEntries; ++i )
+                    rank += _VMap.NextEntry()->Width();
+            }
+
+            // Create the space
+            if( _inTargetTeam )
+            {
+                Dense<Scalar> UCopy;
+                hmat_tools::Copy( SF.D, UCopy );
+                SF.D.Resize( Height(), rank );
+                std::memcpy
+                ( SF.D.Buffer(), UCopy.LockedBuffer(), 
+                  Height()*rank*sizeof(Scalar) );
+            }
+            else
+            {
+                Dense<Scalar> VCopy;
+                hmat_tools::Copy( SF.D, VCopy );
+                SF.D.Resize( Width(), rank );
+                std::memcpy
+                ( SF.D.Buffer(), VCopy.LockedBuffer(),
+                  Width()*rank*sizeof(Scalar) );
+            }
+        }
+        break;
+    }
+    case LOW_RANK:
+    {
+        LowRank<Scalar,Conjugated>& F = *_block.data.F;
+
+        const int numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 )
+        {
+            // Compute the total update rank
+            {
+                _colXMap.ResetIterator();
+                int numEntries = _colXMap.Size();
+                for( int i=0; i<numEntries; ++i )
+                    rank += _colXMap.NextEntry()->Width();
+
+                _UMap.ResetIterator();
+                numEntries = _UMap.Size();
+                for( int i=0; i<numEntries; ++i )
+                    rank += _UMap.NextEntry()->Width();
+            }
+
+            // Create the space
+            {
+                Dense<Scalar> UCopy;
+                hmat_tools::Copy( F.U, UCopy );
+                F.U.Resize( Height(), rank );
+                std::memcpy
+                ( F.U.Buffer(), UCopy.LockedBuffer(), 
+                  Height()*rank*sizeof(Scalar) );
+
+                Dense<Scalar> VCopy;
+                hmat_tools::Copy( F.V, VCopy );
+                F.V.Resize( Width(), rank );
+                std::memcpy
+                ( F.V.Buffer(), VCopy.LockedBuffer(),
+                  Width()*rank*sizeof(Scalar) );
+            }
+        }
         break;
     }
     default:
