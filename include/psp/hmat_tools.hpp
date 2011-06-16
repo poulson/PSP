@@ -778,16 +778,26 @@ void Adjoint
 /*
  *  For computing the in-place QR decomposition of two r x r upper-triangular
  *  matrices with their nonzeros packed columnwise.
+ *
+ * tau should be of length r and work must be of size r-1.
  */
 template<typename Scalar>
 void PackedQR
 ( const int r, Scalar* RESTRICT packedA, Scalar* RESTRICT tau, 
   Scalar* RESTRICT work );
 
+/*
+ * For overwriting B with Q B using the Q from a packed QR decomposition.
+ *
+ * tau should be of length r and work must be of size n.
+ */
 template<typename Scalar>
 void ApplyPackedQ
 ( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* RESTRICT work );
+
+template<typename Scalar>
+void PrintPacked( const int r, const Scalar* packedA, const std::string& msg );
 
 } // namespace hmat_tools
 } // namespace psp

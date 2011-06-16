@@ -140,68 +140,50 @@ std::complex<Real> Householder( const int m, std::complex<Real>* buffer )
 //
 // The work buffer must be of size r-1.
 //
-// NOTE: This has _NOT_ yet been verified/debugged.
+// NOTE: The top of the j'th column is the (j^2+j)'th entry.
 template<typename Scalar>
 void psp::hmat_tools::PackedQR
-( const int r, Scalar* RESTRICT A, Scalar* RESTRICT tau, Scalar* RESTRICT work )
+( const int r, Scalar* RESTRICT packedA, Scalar* RESTRICT tau, 
+  Scalar* RESTRICT work )
 {
-    // Initialize the pointer at the first diagonal value
-    Scalar* diag = A;
-
     for( int j=0; j<r; ++j )
     {
         // Compute the Householder vector, v, and scalar, tau, in-place
-        tau[j] = Householder( j+2, &diag[0] );
+        const int diag = j*(j+2);
+        tau[j] = Householder( j+2, &packedA[diag] );
 
-        // Form z := A(I_j,j+1:n-1)' v in the work vector 
-        int offset = 1; // start off pointing at lower-triangle of j'th col
-        for( int i=0; i<(r-(j+1)); ++i )
+        // Form z := A(I_j,j+1:end)' v in the work vector 
+        for( int i=0; i<r-1-j; ++i )
         {
-            // Update offset from lower-triangle of (j+i)'th col such that
-            // diag[offset] = A(j,j+i+1)
-            offset += (j+i+1) + j;
-
-            // z[i] := Conj(A(j,j+1)) v(0) = Conj(A(j,j+1))
-            work[i] = Conj(diag[offset]);
-
-            // Move to the lower-triangle of the (j+i+1)'th column of A
-            offset += i+1;
+            // z[i] := Conj(A(j,j+i+1)) v(0) = Conj(A(j,j+1))
+            const int right = (j+i+1)*(j+i+2) + j;
+            work[i] = Conj(packedA[right]);
 
             // Traverse over this col of the lower triangle
             for( int k=0; k<j+1; ++k )
-                work[i] += psp::Conj(diag[offset+k])*diag[k+1];
+                work[i] += Conj(packedA[right+(i+2)+k])*packedA[diag+k+1];
         }
 
         // A(I_j,j+1:n-1) -= conj(tau) v z'
-        offset = 1; // start off pointing at lower-triangle of j'th col
-        for( int i=0; i<(r-(i+1)); ++i )
+        for( int i=0; i<r-1-j; ++i )
         {
-            const Scalar scale = Conj(tau[j])*work[i];
-
-            // Update offset from lower-triangle of (j+i)'th col such that
-            // diag[offset] = A(j,j+i+1)
-            offset += (j+i+1) + j;
+            const Scalar scale = Conj(tau[j])*Conj(work[i]);
 
             // A(j,j+i+1) -= conj(tau) v(0) z[k] = conj(tau) z[k]
-            diag[offset] -= scale;
-
-            // Move to the lower-triangle of the (j+i+1)'th column of A
-            offset += i+1;
+            const int right = (j+i+1)*(j+i+2) + j;
+            packedA[right] -= scale;
 
             // Traverse over the relevant piece of this col of the 
             // lower-triangle
             for( int k=0; k<j+1; ++k )
-                diag[offset+k] -= scale*diag[k+1];
+                packedA[right+(i+2)+k] -= scale*packedA[diag+k+1];
         }
-
-        // Move the pointer to the next diagonal value
-        diag += 2*(j+1)+1;
     }
 }
 
 template<typename Scalar>
 void psp::hmat_tools::ApplyPackedQ
-( const int r, const Scalar* RESTRICT A, const Scalar* RESTRICT tau, 
+( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* work )
 {
 #ifndef RELEASE
@@ -224,9 +206,9 @@ void psp::hmat_tools::ApplyPackedQ
             work[i] = Conj(BBuffer[j+i*BLDim]);
         blas::Gemv
         ( 'C', j+1, n, 
-          (Scalar)1, &BBuffer[r],       BLDim,
-                     &A[(j*j+j)+(j+1)], 1,
-          (Scalar)1, work,              1 );
+          (Scalar)1, &BBuffer[r],           BLDim,
+                     &packedA[(j+1)*(j+1)], 1,
+          (Scalar)1, work,                  1 );
 
         // 2) B := B - tau_j v_j w_j'
         // Since v_j has the structure described above, we only need to 
@@ -238,10 +220,42 @@ void psp::hmat_tools::ApplyPackedQ
             BBuffer[j+i*BLDim] -= tauj*Conj(work[i]);
         blas::Ger
         ( j+1, n, 
-          tauj, &A[(j*j+j)+(j+1)], 1,
-                work,              1,
-                &BBuffer[r],       BLDim );
+          -tauj, &packedA[(j*j+j)+(j+1)], 1,
+                 work,                    1,
+                 &BBuffer[r],             BLDim );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar>
+void psp::hmat_tools::PrintPacked
+( const int r, const Scalar* packedA, const std::string& msg )
+{
+#ifndef RELEASE
+    PushCallStack("hmat_tools::PrintPacked");
+#endif
+    std::cout << msg << "\n";
+    // Print the upper triangle
+    for( int i=0; i<r; ++i )
+    {
+        for( int j=0; j<i; ++j )
+            std::cout << "0 ";
+        for( int j=i; j<r; ++j )
+            std::cout << packedA[(j*j+j)+i] << " ";
+        std::cout << "\n";
+    }
+    // Print the lower triangle
+    for( int i=0; i<r; ++i )
+    {
+        for( int j=0; j<i; ++j )
+            std::cout << "0 ";
+        for( int j=i; j<r; ++j )
+            std::cout << packedA[(j*j+j)+(i+j+1)] << " ";
+        std::cout << "\n";
+    }
+    std::cout << std::endl;
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -293,3 +307,11 @@ template void psp::hmat_tools::ApplyPackedQ
         Dense<std::complex<double> >& B,
         std::complex<double>* RESTRICT work );
 
+template void psp::hmat_tools::PrintPacked
+( const int r, const float* packedA, const std::string& msg );
+template void psp::hmat_tools::PrintPacked
+( const int r, const double* packedA, const std::string& msg );
+template void psp::hmat_tools::PrintPacked
+( const int r, const std::complex<float>* packedA, const std::string& msg );
+template void psp::hmat_tools::PrintPacked
+( const int r, const std::complex<double>* packedA, const std::string& msg );

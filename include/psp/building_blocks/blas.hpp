@@ -76,13 +76,13 @@ void BLAS(dger)
                        const double* y, const int* incy,
                              double* A, const int* lda );
 
-void BLAS(cger)
+void BLAS(cgerc)
 ( const int* m, const int* n,
   const scomplex* alpha, const scomplex* x, const int* incx,
                          const scomplex* y, const int* incy,
                                scomplex* A, const int* lda );
 
-void BLAS(zger)
+void BLAS(zgerc)
 ( const int* m, const int* n,
   const dcomplex* alpha, const dcomplex* x, const int* incx,
                          const dcomplex* y, const int* incy,
@@ -322,7 +322,7 @@ inline void Ger
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(cger)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
+    BLAS(cgerc)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -339,7 +339,7 @@ inline void Ger
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(zger)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
+    BLAS(zgerc)( &m, &n, &alpha, x, &incx, y, &incy, A, &lda );
 #ifndef RELEASE
     PopCallStack();
 #endif

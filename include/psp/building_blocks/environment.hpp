@@ -45,7 +45,7 @@ typedef unsigned char byte;
 template<typename Real>
 Real
 Abs( Real alpha )
-{ return alpha; }
+{ return std::abs(alpha); }
 
 template<typename Real>
 Real
