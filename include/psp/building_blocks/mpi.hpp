@@ -1262,9 +1262,9 @@ inline void SendRecv
     SafeMpi(
         MPI_Sendrecv
         ( const_cast<byte*>(sendBuf), 
-          sendCount, dest, sendTag, MPI_UNSIGNED_CHAR,
+          sendCount, MPI_UNSIGNED_CHAR, dest, sendTag,
           recvBuf,
-          recvCount, source, recvTag, MPI_UNSIGNED_CHAR,
+          recvCount, MPI_UNSIGNED_CHAR, source, recvTag,
           comm, &status )
     );
 #ifndef RELEASE
@@ -1284,9 +1284,9 @@ inline void SendRecv
     SafeMpi(
         MPI_Sendrecv
         ( const_cast<int*>(sendBuf), 
-          sendCount, dest, sendTag, MPI_INT,
+          sendCount, MPI_INT, dest, sendTag,
           recvBuf,
-          recvCount, source, recvTag, MPI_INT,
+          recvCount, MPI_INT, source, recvTag, 
           comm, &status )
     );
 #ifndef RELEASE
@@ -1306,9 +1306,9 @@ inline void SendRecv
     SafeMpi(
         MPI_Sendrecv
         ( const_cast<float*>(sendBuf), 
-          sendCount, dest, sendTag, MPI_FLOAT,
+          sendCount, MPI_FLOAT, dest, sendTag, 
           recvBuf,
-          recvCount, source, recvTag, MPI_FLOAT,
+          recvCount, MPI_FLOAT, source, recvTag,
           comm, &status )
     );
 #ifndef RELEASE
@@ -1328,9 +1328,9 @@ inline void SendRecv
     SafeMpi(
         MPI_Sendrecv
         ( const_cast<double*>(sendBuf), 
-          sendCount, dest, sendTag, MPI_DOUBLE,
+          sendCount, MPI_DOUBLE, dest, sendTag,
           recvBuf,
-          recvCount, source, recvTag, MPI_DOUBLE,
+          recvCount, MPI_DOUBLE, source, recvTag,
           comm, &status )
     );
 #ifndef RELEASE
@@ -1350,9 +1350,9 @@ inline void SendRecv
     SafeMpi(
         MPI_Sendrecv
         ( const_cast<std::complex<float>*>(sendBuf), 
-          2*sendCount, dest, sendTag, MPI_FLOAT,
+          2*sendCount, MPI_FLOAT, dest, sendTag,
           recvBuf,
-          2*recvCount, source, recvTag, MPI_FLOAT,
+          2*recvCount, MPI_FLOAT, source, recvTag,
           comm, &status )
     );
 #ifndef RELEASE
@@ -1372,9 +1372,9 @@ inline void SendRecv
     SafeMpi(
         MPI_Sendrecv
         ( const_cast<std::complex<double>*>(sendBuf), 
-          2*sendCount, dest, sendTag, MPI_DOUBLE,
+          2*sendCount, MPI_DOUBLE, dest, sendTag,
           recvBuf,
-          2*recvCount, source, recvTag, MPI_DOUBLE,
+          2*recvCount, MPI_DOUBLE, source, recvTag,
           comm, &status )
     );
 #ifndef RELEASE
