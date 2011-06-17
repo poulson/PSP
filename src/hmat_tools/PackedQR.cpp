@@ -182,12 +182,12 @@ void psp::hmat_tools::PackedQR
 }
 
 template<typename Scalar>
-void psp::hmat_tools::ApplyPackedQ
+void psp::hmat_tools::ApplyPackedQFromLeft
 ( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* work )
 {
 #ifndef RELEASE
-    PushCallStack("hmat_tools::ApplyPackedQ");
+    PushCallStack("hmat_tools::ApplyPackedQFromLeft");
     if( B.Type() != GENERAL )
         throw std::logic_error("B must be a full dense matrix.");
 #endif
@@ -223,6 +223,54 @@ void psp::hmat_tools::ApplyPackedQ
           -tauj, &packedA[(j*j+j)+(j+1)], 1,
                  work,                    1,
                  &BBuffer[r],             BLDim );
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar>
+void psp::hmat_tools::ApplyPackedQAdjointFromLeft
+( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+  Dense<Scalar>& B, Scalar* work )
+{
+#ifndef RELEASE
+    PushCallStack("hmat_tools::ApplyPackedQAdjointFromLeft");
+    if( B.Type() != GENERAL )
+        throw std::logic_error("B must be a full dense matrix.");
+#endif
+    const int n = B.Width();
+    Scalar* BBuffer = B.Buffer();
+    const int BLDim = B.LDim();
+    for( int j=0; j<r; ++j )
+    {
+        // B := B - conj(tau_j) v_j v_j' B
+
+        // 1) Form w_j := B' v_j
+        // Since v_j's only nonzero entries are a 1 in the j'th entry and 
+        // arbitrary values in the r:r+j entries, 
+        //     w_j = B(j,:)' + B(r:r+j,:)' v_j(r:r+j)
+        for( int i=0; i<n; ++i )
+            work[i] = Conj(BBuffer[j+i*BLDim]);
+        blas::Gemv
+        ( 'C', j+1, n, 
+          (Scalar)1, &BBuffer[r],           BLDim,
+                     &packedA[(j+1)*(j+1)], 1,
+          (Scalar)1, work,                  1 );
+
+        // 2) B := B - tau_j v_j w_j'
+        // Since v_j has the structure described above, we only need to 
+        // subtract tau_j w_j' from the j'th row of B and then perform the
+        // update 
+        //     B(r:r+j,:) -= tau_j v_j(r:r+j) w_j'
+        const Scalar conjTauj = Conj(tau[j]);
+        for( int i=0; i<n; ++i )
+            BBuffer[j+i*BLDim] -= conjTauj*Conj(work[i]);
+        blas::Ger
+        ( j+1, n, 
+          -conjTauj, &packedA[(j*j+j)+(j+1)], 1,
+                     work,                    1,
+                     &BBuffer[r],             BLDim );
     }
 #ifndef RELEASE
     PopCallStack();
@@ -282,25 +330,50 @@ template void psp::hmat_tools::PackedQR
   std::complex<double>* RESTRICT tau,
   std::complex<double>* RESTRICT work );
 
-template void psp::hmat_tools::ApplyPackedQ
+template void psp::hmat_tools::ApplyPackedQFromLeft
 ( const int r, 
   const float* RESTRICT A, 
   const float* RESTRICT tau,
         Dense<float>& B, 
         float* RESTRICT work );
-template void psp::hmat_tools::ApplyPackedQ
+template void psp::hmat_tools::ApplyPackedQFromLeft
 ( const int r, 
   const double* RESTRICT A, 
   const double* RESTRICT tau,
         Dense<double>& B, 
         double* RESTRICT work );
-template void psp::hmat_tools::ApplyPackedQ
+template void psp::hmat_tools::ApplyPackedQFromLeft
 ( const int r, 
   const std::complex<float>* RESTRICT A, 
   const std::complex<float>* RESTRICT tau,
         Dense<std::complex<float> >& B,
         std::complex<float>* RESTRICT work );
-template void psp::hmat_tools::ApplyPackedQ
+template void psp::hmat_tools::ApplyPackedQFromLeft
+( const int r, 
+  const std::complex<double>* RESTRICT A, 
+  const std::complex<double>* RESTRICT tau,
+        Dense<std::complex<double> >& B,
+        std::complex<double>* RESTRICT work );
+
+template void psp::hmat_tools::ApplyPackedQAdjointFromLeft
+( const int r, 
+  const float* RESTRICT A, 
+  const float* RESTRICT tau,
+        Dense<float>& B, 
+        float* RESTRICT work );
+template void psp::hmat_tools::ApplyPackedQAdjointFromLeft
+( const int r, 
+  const double* RESTRICT A, 
+  const double* RESTRICT tau,
+        Dense<double>& B, 
+        double* RESTRICT work );
+template void psp::hmat_tools::ApplyPackedQAdjointFromLeft
+( const int r, 
+  const std::complex<float>* RESTRICT A, 
+  const std::complex<float>* RESTRICT tau,
+        Dense<std::complex<float> >& B,
+        std::complex<float>* RESTRICT work );
+template void psp::hmat_tools::ApplyPackedQAdjointFromLeft
 ( const int r, 
   const std::complex<double>* RESTRICT A, 
   const std::complex<double>* RESTRICT tau,

@@ -71,10 +71,13 @@ main( int argc, char* argv[] )
         for( int j=0; j<r; ++j )
             for( int i=0; i<=j; ++i )
                 B.Set( i, j, packedA[j*(j+1)+i] );
-        B.Print( "R" );
+        if( print )
+            B.Print( "R" );
 
-        psp::hmat_tools::ApplyPackedQ( r, &packedA[0], &tau[0], B, &work[0] );
-        B.Print( "QR ~= A" );
+        psp::hmat_tools::ApplyPackedQFromLeft
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "QR ~= A" );
     }
     catch( std::exception& e )
     {
@@ -118,10 +121,13 @@ main( int argc, char* argv[] )
         for( int j=0; j<r; ++j )
             for( int i=0; i<=j; ++i )
                 B.Set( i, j, packedA[j*(j+1)+i] );
-        B.Print( "R" );
+        if( print )
+            B.Print( "R" );
 
-        psp::hmat_tools::ApplyPackedQ( r, &packedA[0], &tau[0], B, &work[0] );
-        B.Print( "QR ~= A" );
+        psp::hmat_tools::ApplyPackedQFromLeft
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "QR ~= A" );
     }
     catch( std::exception& e )
     {

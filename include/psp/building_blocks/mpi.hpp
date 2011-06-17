@@ -183,6 +183,31 @@ void Recv
 void Recv
 ( std::complex<double>* buf, int count, int source, int tag, MPI_Comm comm );
 
+void SendRecv
+( const byte* sendBuf, int sendCount, int dest,   int sendTag,
+        byte* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm );
+void SendRecv
+( const int* sendBuf, int sendCount, int dest,   int sendTag,
+        int* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm );
+void SendRecv
+( const float* sendBuf, int sendCount, int dest,   int sendTag,
+        float* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm );
+void SendRecv
+( const double* sendBuf, int sendCount, int dest,   int sendTag,
+        double* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm );
+void SendRecv
+( const std::complex<float>* sendBuf, int sendCount, int dest,   int sendTag,
+        std::complex<float>* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm );
+void SendRecv
+( const std::complex<double>* sendBuf, int sendCount, int dest,   int sendTag,
+        std::complex<double>* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm );
+
 void Reduce
 ( const int* sendBuf, int* recvBuf, 
   int count, int root, MPI_Op op, MPI_Comm comm );
@@ -1219,6 +1244,138 @@ inline void Recv
     SafeMpi(
         MPI_Recv
         ( buf, 2*count, MPI_DOUBLE, source, tag, comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void SendRecv
+( const byte* sendBuf, int sendCount, int dest,   int sendTag,
+        byte* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::SendRecv");
+#endif
+    MPI_Status status;
+    SafeMpi(
+        MPI_Sendrecv
+        ( const_cast<byte*>(sendBuf), 
+          sendCount, dest, sendTag, MPI_UNSIGNED_CHAR,
+          recvBuf,
+          recvCount, source, recvTag, MPI_UNSIGNED_CHAR,
+          comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void SendRecv
+( const int* sendBuf, int sendCount, int dest,   int sendTag,
+        int* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::SendRecv");
+#endif
+    MPI_Status status;
+    SafeMpi(
+        MPI_Sendrecv
+        ( const_cast<int*>(sendBuf), 
+          sendCount, dest, sendTag, MPI_INT,
+          recvBuf,
+          recvCount, source, recvTag, MPI_INT,
+          comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void SendRecv
+( const float* sendBuf, int sendCount, int dest,   int sendTag,
+        float* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::SendRecv");
+#endif
+    MPI_Status status;
+    SafeMpi(
+        MPI_Sendrecv
+        ( const_cast<float*>(sendBuf), 
+          sendCount, dest, sendTag, MPI_FLOAT,
+          recvBuf,
+          recvCount, source, recvTag, MPI_FLOAT,
+          comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void SendRecv
+( const double* sendBuf, int sendCount, int dest,   int sendTag,
+        double* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::SendRecv");
+#endif
+    MPI_Status status;
+    SafeMpi(
+        MPI_Sendrecv
+        ( const_cast<double*>(sendBuf), 
+          sendCount, dest, sendTag, MPI_DOUBLE,
+          recvBuf,
+          recvCount, source, recvTag, MPI_DOUBLE,
+          comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void SendRecv
+( const std::complex<float>* sendBuf, int sendCount, int dest,   int sendTag,
+        std::complex<float>* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::SendRecv");
+#endif
+    MPI_Status status;
+    SafeMpi(
+        MPI_Sendrecv
+        ( const_cast<std::complex<float>*>(sendBuf), 
+          2*sendCount, dest, sendTag, MPI_FLOAT,
+          recvBuf,
+          2*recvCount, source, recvTag, MPI_FLOAT,
+          comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void SendRecv
+( const std::complex<double>* sendBuf, int sendCount, int dest,   int sendTag,
+        std::complex<double>* recvBuf, int recvCount, int source, int recvTag, 
+  MPI_Comm comm )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::SendRecv");
+#endif
+    MPI_Status status;
+    SafeMpi(
+        MPI_Sendrecv
+        ( const_cast<std::complex<double>*>(sendBuf), 
+          2*sendCount, dest, sendTag, MPI_DOUBLE,
+          recvBuf,
+          2*recvCount, source, recvTag, MPI_DOUBLE,
+          comm, &status )
     );
 #ifndef RELEASE
     PopCallStack();

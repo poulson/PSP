@@ -787,12 +787,30 @@ void PackedQR
   Scalar* RESTRICT work );
 
 /*
- * For overwriting B with Q B using the Q from a packed QR decomposition.
+ * For overwriting B with Q B or Q' B using the Q from a packed QR.
  *
  * tau should be of length r and work must be of size n.
  */
 template<typename Scalar>
-void ApplyPackedQ
+void ApplyPackedQFromLeft
+( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+  Dense<Scalar>& B, Scalar* RESTRICT work );
+template<typename Scalar>
+void ApplyPackedQAdjointFromLeft
+( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+  Dense<Scalar>& B, Scalar* RESTRICT work );
+
+/*
+ * For overwriting B with B Q or B Q' using the Q from a packed QR.
+ *
+ * tau should be of length r and work must be of size n.
+ */
+template<typename Scalar>
+void ApplyPackedQFromRight
+( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+  Dense<Scalar>& B, Scalar* RESTRICT work );
+template<typename Scalar>
+void ApplyPackedQAdjointFromRight
 ( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* RESTRICT work );
 
