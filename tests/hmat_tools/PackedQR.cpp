@@ -78,6 +78,34 @@ main( int argc, char* argv[] )
         ( r, &packedA[0], &tau[0], B, &work[0] );
         if( print )
             B.Print( "QR ~= A" );
+
+        // Create a 2r x 2r identity matrix and then apply Q' Q from the left
+        B.Resize( 2*r, 2*r );
+        work.resize( 2*r );
+        psp::hmat_tools::Scale( 0.0, B );
+        for( int j=0; j<2*r; ++j )
+            B.Set( j, j, 1.0 );
+        psp::hmat_tools::ApplyPackedQFromLeft
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "Q I" );
+        psp::hmat_tools::ApplyPackedQAdjointFromLeft
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "Q' Q I" );
+
+        // Create a 2r x 2r identity matrix and then apply Q' Q from the right
+        psp::hmat_tools::Scale( 0.0, B );
+        for( int j=0; j<2*r; ++j )
+            B.Set( j, j, 1.0 );
+        psp::hmat_tools::ApplyPackedQAdjointFromRight
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "I Q'" );
+        psp::hmat_tools::ApplyPackedQFromRight
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "I Q' Q" );
     }
     catch( std::exception& e )
     {
@@ -128,6 +156,34 @@ main( int argc, char* argv[] )
         ( r, &packedA[0], &tau[0], B, &work[0] );
         if( print )
             B.Print( "QR ~= A" );
+        
+        // Create a 2r x 2r identity matrix and then apply Q' Q from the left
+        B.Resize( 2*r, 2*r );
+        work.resize( 2*r );
+        psp::hmat_tools::Scale( std::complex<double>(0.0,0.0), B );
+        for( int j=0; j<2*r; ++j )
+            B.Set( j, j, std::complex<double>(1.0,0.0) );
+        psp::hmat_tools::ApplyPackedQFromLeft
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "Q I" );
+        psp::hmat_tools::ApplyPackedQAdjointFromLeft
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "Q' Q I" );
+
+        // Create a 2r x 2r identity matrix and then apply Q' Q from the right
+        psp::hmat_tools::Scale( std::complex<double>(0.0,0.0), B );
+        for( int j=0; j<2*r; ++j )
+            B.Set( j, j, std::complex<double>(1.0,0.0) );
+        psp::hmat_tools::ApplyPackedQAdjointFromRight
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "I Q'" );
+        psp::hmat_tools::ApplyPackedQFromRight
+        ( r, &packedA[0], &tau[0], B, &work[0] );
+        if( print )
+            B.Print( "I Q' Q" );
     }
     catch( std::exception& e )
     {
