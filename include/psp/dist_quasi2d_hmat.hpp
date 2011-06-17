@@ -717,11 +717,19 @@ private:
     void MultiplyHMatFHHPostcomputeCCleanup(); // to be called from C
 
     // To be called from C
-    void MultiplyHMatQR();
-    void MultiplyHMatQRLowRankResize( int rank );
-    void MultiplyHMatQRLowRankImport( int rank );
-    void MultiplyHMatQRImportU( int rank, const Dense<Scalar>& U );
-    void MultiplyHMatQRImportV( int rank, const Dense<Scalar>& V );
+    void MultiplyHMatFHHFinalize();
+    void MultiplyHMatFHHFinalizeCounts
+    ( std::vector<int>& qrSizes, std::vector<int>& tauSizes );
+    void MultiplyHMatFHHFinalizeLocalQR
+    ( std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets, 
+      std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+      std::vector<Scalar>& work );
+
+    void MultiplyHMatFinalQR();
+    void MultiplyHMatFinalQRLowRankResize( int rank );
+    void MultiplyHMatFinalQRLowRankImport( int rank );
+    void MultiplyHMatFinalQRImportU( int rank, const Dense<Scalar>& U );
+    void MultiplyHMatFinalQRImportV( int rank, const Dense<Scalar>& V );
 
     //
     // Transpose H-matrix/vector multiplication

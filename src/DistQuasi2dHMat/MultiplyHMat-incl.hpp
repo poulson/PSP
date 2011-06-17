@@ -54,8 +54,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     A.MultiplyHMatFHHPassData( alpha, B, C );
     A.MultiplyHMatFHHBroadcasts( alpha, B, C );
     A.MultiplyHMatFHHPostcompute( alpha, B, C );
+    C.MultiplyHMatFHHFinalize();
 
-    C.MultiplyHMatQR();
+    C.MultiplyHMatFinalQR();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -5512,15 +5513,46 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeCCleanup()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQR()
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatQR");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalize");
 #endif
-    MultiplyHMatQRLowRankResize( 0 );
-    MultiplyHMatQRLowRankImport( 0 );
+    std::vector<int> qrSizes( _numLevels, 0 ), tauSizes( _numLevels, 0 );
+    MultiplyHMatFHHFinalizeCounts( qrSizes, tauSizes );
+
+    // Set up the space for the packed 2r x r matrices.
+    int qrTotalSize = 0;
+    for( int i=0; i<_numLevels; ++i )
+        qrTotalSize += qrSizes[i];
+    std::vector<Scalar> qrBuffer( qrTotalSize );
+    std::vector<int> qrOffsets( _numLevels );
+    for( int i=0,offset=0; i<_numLevels; offset+=qrSizes[i],++i )
+        qrOffsets[i] = offset;
+
+    // Set up space for the tau vectors (including for the first level)
+    int tauTotalSize = 0;
+    for( int i=0; i<_numLevels; ++i )
+        tauTotalSize += tauSizes[i];
+    std::vector<Scalar> tauBuffer( tauTotalSize );
+    std::vector<int> tauOffsets( _numLevels );
+    for( int i=0,offset=0; i<_numLevels; offset+=tauSizes[i],++i )
+        tauOffsets[i] = offset;
+
+    // Allocate a work vector for the local QR's
+    const int paddedRank = MaxRank()+4;
+    std::vector<Scalar> work( lapack::QRWorkSize( paddedRank ) );
+
+    // Perform the large local QR's and pack into the QR buffer as appropriate
+    MultiplyHMatFHHFinalizeLocalQR
+    ( qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
+
     // HERE
-    //MultiplyHMatQRStartComp();
+    const int numSteps = _numLevels-1;
+    for( int i=0; i<numSteps; ++i )
+    {
+
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -5528,10 +5560,200 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQR()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
+( std::vector<int>& qrSizes, std::vector<int>& tauSizes )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRLowRankResize");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeCounts");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatFHHFinalizeCounts
+                ( qrSizes, tauSizes );
+        break;
+    }
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+    {
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        const int log2TeamSize = Log2( teamSize );
+        const int r = MaxRank()+4;
+
+        if( _inTargetTeam )
+        {
+            const int numEntries = _colXMap.Size();
+            qrSizes[_level] += numEntries*log2TeamSize*(r*r+r);
+            tauSizes[_level] += numEntries*(log2TeamSize+1)*r;
+        }
+        if( _inSourceTeam )
+        {
+            const int numEntries = _rowXMap.Size();
+            qrSizes[_level] += numEntries*log2TeamSize*(r*r+r);
+            tauSizes[_level] += numEntries*(log2TeamSize+1)*r;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
+( std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
+  std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+  std::vector<Scalar>& work )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeLocalQR");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatFHHFinalizeLocalQR
+                ( qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
+        break;
+    }
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+    {
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        const int teamSize = mpi::CommSize( team );
+        const int log2TeamSize = Log2( teamSize );
+        const int r = MaxRank()+4;
+
+        if( _inTargetTeam )
+        {
+            _colXMap.ResetIterator();
+            const int numEntries = _colXMap.Size();
+            for( int i=0; i<numEntries; ++i )
+            {
+                Dense<Scalar>& X = *_colXMap.NextEntry();
+                lapack::QR
+                ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
+                  &tauBuffer[tauOffsets[_level]], &work[0], work.size() );
+                tauOffsets[_level] += (log2TeamSize+1)*r;
+                if( log2TeamSize > 0 )
+                {
+                    std::memset
+                    ( &qrBuffer[qrOffsets[_level]], 0, (r*r+r)*sizeof(Scalar) );
+                    if( (teamRank & 1) == 0 )
+                    {
+                        // Copy our R into the upper triangle of the next
+                        // matrix to factor (which is 2r x r)
+                        for( int j=0; j<X.Width(); ++j )
+                            std::memcpy
+                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)],
+                              X.LockedBuffer(0,j), 
+                              std::min(X.Height(),j+1)*sizeof(Scalar) );
+                    }
+                    else
+                    {
+                        // Copy our R into the lower triangle of the next
+                        // matrix to factor (which is 2r x r)
+                        for( int j=0; j<X.Width(); ++j )
+                            std::memcpy
+                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)+(j+1)],
+                              X.LockedBuffer(0,j), 
+                              std::min(X.Height(),j+1)*sizeof(Scalar) );
+                    }
+                }
+                qrOffsets[_level] += log2TeamSize*(r*r+r);
+            }
+        }
+        if( _inSourceTeam )
+        {
+            _rowXMap.ResetIterator();
+            const int numEntries = _rowXMap.Size();
+            for( int i=0; i<numEntries; ++i )
+            {
+                Dense<Scalar>& X = *_rowXMap.NextEntry();
+                lapack::QR
+                ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
+                  &tauBuffer[tauOffsets[_level]], &work[0], work.size() );
+                tauOffsets[_level] += (log2TeamSize+1)*r;
+                if( log2TeamSize > 0 )
+                {
+                    std::memset
+                    ( &qrBuffer[qrOffsets[_level]], 0, (r*r+r)*sizeof(Scalar) );
+                    if( (teamRank & 1) == 0 )
+                    {
+                        // Copy our R into the upper triangle of the next
+                        // matrix to factor (which is 2r x r)
+                        for( int j=0; j<X.Width(); ++j )
+                            std::memcpy
+                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)],
+                              X.LockedBuffer(0,j), 
+                              std::min(X.Height(),j+1)*sizeof(Scalar) );
+                    }
+                    else
+                    {
+                        // Copy our R into the lower triangle of the next
+                        // matrix to factor (which is 2r x r)
+                        for( int j=0; j<X.Width(); ++j )
+                            std::memcpy
+                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)+(j+1)],
+                              X.LockedBuffer(0,j), 
+                              std::min(X.Height(),j+1)*sizeof(Scalar) );
+                    }
+                }
+                qrOffsets[_level] += log2TeamSize*(r*r+r);
+            }
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQR()
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQR");
+#endif
+    MultiplyHMatFinalQRLowRankResize( 0 );
+    MultiplyHMatFinalQRLowRankImport( 0 );
+    // HERE
+    //MultiplyHMatFinalQRStartComp();
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
+( int rank )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRLowRankResize");
 #endif
     switch( _block.type )
     {
@@ -5557,7 +5779,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatQRLowRankResize( rank );
+                node.Child(t,s).MultiplyHMatFinalQRLowRankResize( rank );
         break;
     }
     case DIST_LOW_RANK:
@@ -5721,11 +5943,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankResize( int rank )
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankImport
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
 ( int rank )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRLowRankImport");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRLowRankImport");
 #endif
     switch( _block.type )
     {
@@ -5750,7 +5972,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankImport
                     {
                         ULocal.LockedView
                         ( U, tOffset, 0, node.targetSizes[t], U.Width() );
-                        node.Child(t,s).MultiplyHMatQRImportU
+                        node.Child(t,s).MultiplyHMatFinalQRImportU
                         ( newRank, ULocal );
                     }
                 }
@@ -5773,7 +5995,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankImport
                     {
                         VLocal.LockedView
                         ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
-                        node.Child(t,s).MultiplyHMatQRImportV
+                        node.Child(t,s).MultiplyHMatFinalQRImportV
                         ( newRank, VLocal );
                     }
                 }
@@ -5783,7 +6005,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankImport
 
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatQRLowRankImport( newRank );
+                node.Child(t,s).MultiplyHMatFinalQRLowRankImport( newRank );
         break;
     }
     case DIST_LOW_RANK:
@@ -5811,11 +6033,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRLowRankImport
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportU
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportU
 ( int rank, const Dense<Scalar>& U )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRImportU");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRImportU");
 #endif
     switch( _block.type )
     {
@@ -5831,7 +6053,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportU
             {
                 ULocal.LockedView
                 ( U, tOffset, 0, node.targetSizes[t], U.Width() );
-                node.Child(t,s).MultiplyHMatQRImportU( rank, ULocal );
+                node.Child(t,s).MultiplyHMatFinalQRImportU( rank, ULocal );
             }
         }
         break;
@@ -5871,11 +6093,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportU
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportV
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportV
 ( int rank, const Dense<Scalar>& V )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatQRImportV");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRImportV");
 #endif
     switch( _block.type )
     {
@@ -5891,7 +6113,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatQRImportV
             {
                 VLocal.LockedView
                 ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
-                node.Child(t,s).MultiplyHMatQRImportV( rank, VLocal );
+                node.Child(t,s).MultiplyHMatFinalQRImportV( rank, VLocal );
             }
         }
         break;

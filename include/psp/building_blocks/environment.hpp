@@ -178,6 +178,23 @@ void PushCallStack( const std::string& s );
 void PopCallStack();
 void DumpCallStack();
 
+inline unsigned Log2( unsigned N )
+{
+#ifndef RELEASE
+    PushCallStack("Log2");
+    if( N == 0 )
+        throw std::logic_error("Cannot take integer log2 of 0");
+    PopCallStack();
+#endif
+    int result = 0;
+    if( N >= (1<<16)) { N >>= 16; result += 16; }
+    if( N >= (1<< 8)) { N >>=  8; result +=  8; }
+    if( N >= (1<< 4)) { N >>=  4; result +=  4; }
+    if( N >= (1<< 2)) { N >>=  2; result +=  2; }
+    if( N >= (1<< 1)) { N >>=  1; result +=  1; }
+    return result;
+}
+
 } // namespace psp
 
 #endif // PSP_ENVIRONMENT_HPP
