@@ -1063,10 +1063,10 @@ inline void SVD
 }
 
 //----------------------------------------------------------------------------//
-// Pseudo-inverse (using an SVD)                                              //
+// Adjoint Pseudo-inverse (using an SVD)                                      //
 //----------------------------------------------------------------------------//
 
-inline void PseudoInverse
+inline void AdjointPseudoInverse
 ( int m, int n, 
   float* A, int lda,
   float* s, 
@@ -1075,7 +1075,7 @@ inline void PseudoInverse
   float* work, int lwork )
 {
 #ifndef RELEASE
-    PushCallStack("lapack::PseudoInverse");
+    PushCallStack("lapack::AdjointPseudoInverse");
     if( lda == 0 )
         throw std::logic_error("lda was 0");
     if( ldu == 0 )
@@ -1157,7 +1157,7 @@ inline void PseudoInverse
 #endif
 }
 
-inline void PseudoInverse
+inline void AdjointPseudoInverse
 ( int m, int n, 
   double* A, int lda,
   double* s, 
@@ -1166,7 +1166,7 @@ inline void PseudoInverse
   double* work, int lwork )
 {
 #ifndef RELEASE
-    PushCallStack("lapack::PseudoInverse");
+    PushCallStack("lapack::AdjointPseudoInverse");
     if( lda == 0 )
         throw std::logic_error("lda was 0");
     if( ldu == 0 )
@@ -1248,7 +1248,7 @@ inline void PseudoInverse
 #endif
 }
 
-inline void PseudoInverse
+inline void AdjointPseudoInverse
 ( int m, int n, 
   std::complex<float>* A, int lda,
   float* s, 
@@ -1258,7 +1258,7 @@ inline void PseudoInverse
   float* rwork )
 {
 #ifndef RELEASE
-    PushCallStack("lapack::PseudoInverse");
+    PushCallStack("lapack::AdjointPseudoInverse");
     if( lda == 0 )
         throw std::logic_error("lda was 0");
     if( ldu == 0 )
@@ -1342,7 +1342,7 @@ inline void PseudoInverse
 #endif
 }
 
-inline void PseudoInverse
+inline void AdjointPseudoInverse
 ( int m, int n, 
   std::complex<double>* A, int lda,
   double* s, 
@@ -1352,7 +1352,7 @@ inline void PseudoInverse
   double* rwork )
 {
 #ifndef RELEASE
-    PushCallStack("lapack::PseudoInverse");
+    PushCallStack("lapack::AdjointPseudoInverse");
     if( lda == 0 )
         throw std::logic_error("lda was 0");
     if( ldu == 0 )
