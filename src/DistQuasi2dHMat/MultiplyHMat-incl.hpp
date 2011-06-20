@@ -5556,6 +5556,26 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     std::vector<Scalar> qrBuffer( qrTotalSize ), tauBuffer( tauTotalSize ),
                         work( lapack::QRWorkSize( r ) );
 
+    // Form our contributions to Omega2' (alpha A B Omega1) updates here, 
+    // before we overwrite the _colXMap and _rowXMap results.
+    // The distributed summations will not occur until after the parallel
+    // QR factorizations.
+    std::vector<int> leftOffsets(numLevels), middleOffsets(numLevels), 
+                     rightOffsets(numLevels);
+    int totalAllReduceSize = 0;
+    for( int level=0; level<numLevels; ++level )
+    {
+        leftOffsets[level] = totalAllReduceSize;
+        totalAllReduceSize += numTargetFHH[level]*rShrunk*r;
+        middleOffsets[level] = totalAllReduceSize;
+        totalAllReduceSize += numTargetFHH[level]*r*r;
+        rightOffsets[level] = totalAllReduceSize;
+        totalAllReduceSize += numSourceFHH[level]*rShrunk*r;
+    }
+    std::vector<Scalar> allReduceBuffer( totalAllReduceSize );
+    A.MultiplyHMatFHHFinalizeMiddleUpdates
+    ( B, C, allReduceBuffer, middleOffsets );
+
     // Perform the large local QR's and pack into the QR buffer as appropriate
     C.MultiplyHMatFHHFinalizeLocalQR
     ( Xs, XOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
@@ -5872,7 +5892,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     std::vector<Scalar> svdWorkBuffer( lapack::SVDWorkSize(r,r) );
     std::vector<Real> svdRealWorkBuffer( lapack::SVDRealWorkSize(r,r) ); 
     std::vector<Scalar> applyQWork( rShrunk, 1 );
-    for( int level=0; level<numSteps; ++level )
+    for( int level=0; level<numLevels; ++level )
     {
         MPI_Comm team = C._teams->Team( level );
         const unsigned teamSize = mpi::CommSize( team );
@@ -5888,70 +5908,105 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             const Scalar* lastQrStage = &thisQrPiece[(log2TeamSize-1)*(r*r+r)];
             const Scalar* lastTauStage = &thisTauPiece[log2TeamSize*r];
 
-            // Copy the R from this TSQR factorization into the top r x r 
-            // submatrix of a zeroed 2r x r matrix.
-            std::memset( Z.Buffer(), 0, 2*r*r*sizeof(Scalar) );
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( Z.Buffer(0,j), &lastQrStage[j*j+j], (j+1)*sizeof(Scalar) );
-            // Overwrite the R with the left singular vectors
-            lapack::SVD
-            ( 'O', 'N', r, r, Z.Buffer(), Z.LDim(), &singularValues[0], 
-              0, 1, 0, 1, &svdWorkBuffer[0], svdWorkBuffer.size(), 
-              &svdRealWorkBuffer[0] );
-            // Backtransform the last stage
-            Z.Resize( 2*r, rShrunk );
-            hmat_tools::ApplyPackedQFromLeft
-            ( r, lastQrStage, lastTauStage, Z, &work[0] );
-            // Take care of the middle stages before handling the (potentially)
-            // large original stage.
-            for( unsigned stage=log2TeamSize-1; stage>0; --stage )
+            if( log2TeamSize > 0 )
             {
-                if( teamRank & (1u<<(stage-1)) )
+                // Copy the R from this TSQR factorization into the top r x r 
+                // submatrix of a zeroed 2r x r matrix.
+                std::memset( Z.Buffer(), 0, 2*r*r*sizeof(Scalar) );
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( Z.Buffer(0,j), &lastQrStage[j*j+j], 
+                      (j+1)*sizeof(Scalar) );
+                // Overwrite the R with the left singular vectors
+                lapack::SVD
+                ( 'O', 'N', r, r, Z.Buffer(), Z.LDim(), &singularValues[0], 
+                  0, 1, 0, 1, &svdWorkBuffer[0], svdWorkBuffer.size(), 
+                  &svdRealWorkBuffer[0] );
+                // Backtransform the last stage
+                Z.Resize( 2*r, rShrunk );
+                hmat_tools::ApplyPackedQFromLeft
+                ( r, lastQrStage, lastTauStage, Z, &work[0] );
+                // Take care of the middle stages before handling the large 
+                // original stage.
+                for( unsigned stage=log2TeamSize-1; stage>0; --stage )
                 {
-                    // Move the bottom half to the top half and zero the
-                    // bottom half
-                    for( int j=0; j<rShrunk; ++j )
+                    if( teamRank & (1u<<(stage-1)) )
                     {
-                        std::memcpy
-                        ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
-                          r*sizeof(Scalar) );
-                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        // Move the bottom half to the top half and zero the
+                        // bottom half
+                        for( int j=0; j<rShrunk; ++j )
+                        {
+                            std::memcpy
+                            ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
+                              r*sizeof(Scalar) );
+                            std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        }
                     }
+                    else
+                    {
+                        // Zero the bottom half of Z
+                        for( int j=0; j<rShrunk; ++j )
+                            std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                    }
+                    hmat_tools::ApplyPackedQFromLeft
+                    ( r, &thisQrPiece[(stage-1)*(r*r+r)], 
+                      &thisTauPiece[stage*r], Z, &work[0] );
+                }
+                // Take care of the original stage. Do so by forming Y := X, 
+                // then zeroing X and placing our piece of Z at its top.
+                Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
+                Dense<Scalar> Y;
+                hmat_tools::Copy( X, Y );
+                X.Resize( X.Height(), rShrunk );
+                hmat_tools::Scale( (Scalar)0, X );
+                if( teamRank & 0x1 )
+                {
+                    // Move the bottom half of Z into the top of X
+                    for( int j=0; j<rShrunk; ++j )
+                        std::memcpy
+                        ( X.Buffer(0,j), Z.LockedBuffer(r,j), 
+                          r*sizeof(Scalar) );
                 }
                 else
                 {
-                    // Zero the bottom half of Z
+                    // Move the top half of Z into the top of X
                     for( int j=0; j<rShrunk; ++j )
-                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memcpy
+                        ( X.Buffer(0,j), Z.LockedBuffer(0,j), 
+                          r*sizeof(Scalar) );
                 }
-                hmat_tools::ApplyPackedQFromLeft
-                ( r, &thisQrPiece[(stage-1)*(r*r+r)], &thisTauPiece[stage*r],
-                  Z, &work[0] );
+                work.resize( lapack::ApplyQWorkSize('L',X.Height(),X.Width()) );
+                const int minDim = std::min(Y.Height(),Y.Width());
+                lapack::ApplyQ
+                ( 'L', 'N', X.Height(), X.Width(), minDim,
+                  Y.LockedBuffer(), Y.LDim(), &thisTauPiece[0],
+                  X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
-            // Take care of the original stage. Do so by forming Y := X, 
-            // then zeroing X and placing our piece of Z at its top.
-            Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
-            Dense<Scalar> Y;
-            hmat_tools::Copy( X, Y );
-            X.Resize( X.Height(), rShrunk );
-            hmat_tools::Scale( (Scalar)0, X );
-            if( teamRank & 0x1 )
+            else // this team only contains one process
             {
-                // Move the bottom half of Z into the top of X
-                for( int j=0; j<rShrunk; ++j )
-                    std::memcpy
-                    ( X.Buffer(0,j), Z.LockedBuffer(r,j), r*sizeof(Scalar) );
+                Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
+                const int m = X.Height();
+                const int minDim = std::min(m,r);
+
+                // Make a copy of X and then zero out everything but R in X
+                Dense<Scalar> Y; 
+                Y = X;
+                for( int j=0; j<minDim; ++j )
+                    std::memset( X.Buffer(j+1,j), 0, (m-(j+1))*sizeof(Scalar) );
+                // Overwrite X with the left singular vectors
+                lapack::SVD
+                ( 'O', 'N', minDim, r, X.Buffer(), X.LDim(), 
+                  &singularValues[0], 0, 1, 0, 1, 
+                  &svdWorkBuffer[0], svdWorkBuffer.size(), 
+                  &svdRealWorkBuffer[0] );
+                // Backtransform the last stage
+                X.Resize( m, rShrunk );
+                work.resize( lapack::ApplyQWorkSize('L',m,rShrunk) );
+                lapack::ApplyQ
+                ( 'L', 'N', m, rShrunk, minDim,
+                  Y.LockedBuffer(), Y.LDim(), &thisTauPiece[0],
+                  X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
-            else
-            {
-                // Move the top half of Z into the top of X
-                for( int j=0; j<rShrunk; ++j )
-                    std::memcpy
-                    ( X.Buffer(0,j), Z.LockedBuffer(0,j), r*sizeof(Scalar) );
-            }
-            hmat_tools::ApplyPackedQFromLeft
-            ( r, Y.LockedBuffer(), &thisTauPiece[0], X, &work[0] );
         }
     }
     XOffsets.clear();
@@ -5964,22 +6019,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     svdRealWorkBuffer.clear();
     applyQWork.clear();
 
-    // Buffers for forming the (Q1' Omega2), (Omega2' A B Omega1), etc. udpates
-    std::vector<int> leftOffsets(numLevels), middleOffsets(numLevels), 
-                     rightOffsets(numLevels);
-    int totalAllReduceSize = 0;
-    for( int level=0; level<numSteps; ++level )
-    {
-        leftOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numTargetFHH[level]*rShrunk*r;
-        middleOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numTargetFHH[level]*r*r;
-        rightOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numSourceFHH[level]*r*rShrunk;
-    }
-    std::vector<Scalar> allReduceBuffer( totalAllReduceSize );
-    A.MultiplyHMatFHHFinalizeFormLocalContributions
-    ( B, C, allReduceBuffer, leftOffsets, middleOffsets, rightOffsets );
+    A.MultiplyHMatFHHFinalizeOuterUpdates
+    ( B, C, allReduceBuffer, leftOffsets, rightOffsets );
 
     // TODO: Perform a custom AllReduce on the buffer. Write TreeAllReduce?
 #ifndef RELEASE
@@ -6021,6 +6062,81 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
         {
             numQrs[_level] += _rowXMap.Size();
             ++numSourceFHH[_level];
+        }
+        break;
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::
+MultiplyHMatFHHFinalizeMiddleUpdates
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+        std::vector<Scalar>& allReduceBuffer,
+        std::vector<int>& middleOffsets ) const
+{
+#ifndef RELEASE
+    PushCallStack
+    ("DistQuasi2dHMat::MultiplyHMatFHHFinalizeMiddleUpdates");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int r = C.MaxRank() + 4;
+
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            if( C.Admissible() )
+            {
+                if( C._inTargetTeam ) 
+                {
+                    // Handle the middle update, Omega2' (alpha A B Omega1)
+                    const Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
+                    const Dense<Scalar>& Omega2 = A._rowOmega;
+                    Scalar* middleUpdate = 
+                        &allReduceBuffer[middleOffsets[C._level]];
+                    middleOffsets[C._level] += r*r;
+
+                    blas::Gemm
+                    ( 'C', 'N', r, r, A.LocalHeight(),
+                      (Scalar)1, Omega2.LockedBuffer(), Omega2.LDim(),
+                                 X.LockedBuffer(),      X.LDim(),
+                      (Scalar)0, middleUpdate,          r );
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        nodeA.Child(t,r).
+                        MultiplyHMatFHHFinalizeMiddleUpdates
+                        ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                          allReduceBuffer, middleOffsets );
+            }
+            break;
+        default:
+            break;
         }
         break;
     default:
@@ -6159,23 +6275,90 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatFHHFinalizeFormLocalContributions
+MultiplyHMatFHHFinalizeOuterUpdates
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<Scalar>& allReduceBuffer,
         std::vector<int>& leftOffsets,
-        std::vector<int>& middleOffsets,
         std::vector<int>& rightOffsets ) const
 {
 #ifndef RELEASE
     PushCallStack
-    ("DistQuasi2dHMat::MultiplyHMatFHHFinalizeFormLocalContributions");
+    ("DistQuasi2dHMat::MultiplyHMatFHHFinalizeOuterUpdates");
 #endif
-    // HERE: Traverse the A, B, and C trees and form our contributions to
-    //       the following updates:
-    //       Q1' Omega2
-    //       Omega2' A B Omega1
-    //       Q2' Omega1
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int r = C.MaxRank() + 4;
+    const int rShrunk = C.MaxRank();
+
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            if( C.Admissible() )
+            {
+                if( C._inTargetTeam ) 
+                {
+                    // Handle the left update, Q1' Omega2
+                    const Dense<Scalar>& Q1 = *C._colXMap[A._sourceOffset];
+                    const Dense<Scalar>& Omega2 = A._rowOmega;
+                    Scalar* leftUpdate = 
+                        &allReduceBuffer[leftOffsets[C._level]];
+                    leftOffsets[C._level] += rShrunk*r;
+
+                    blas::Gemm
+                    ( 'C', 'N', rShrunk, r, A.LocalHeight(),
+                      (Scalar)1, Q1.LockedBuffer(),     Q1.LDim(),
+                                 Omega2.LockedBuffer(), Omega2.LDim(),
+                      (Scalar)0, leftUpdate,            rShrunk );
+                }
+                if( C._inSourceTeam )
+                {
+                    // Handle the right update, Q2' Omega1
+                    const Dense<Scalar>& Q2 = *C._rowXMap[A._sourceOffset];
+                    const Dense<Scalar>& Omega1 = B._colOmega;
+                    Scalar* rightUpdate = 
+                        &allReduceBuffer[rightOffsets[C._level]];
+                    rightOffsets[_level] += rShrunk*r;
+
+                    blas::Gemm
+                    ( 'C', 'N', rShrunk, r, B.LocalWidth(),
+                      (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
+                                 Omega1.LockedBuffer(), Omega1.LDim(),
+                      (Scalar)0, rightUpdate,           rShrunk );
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        nodeA.Child(t,r).
+                        MultiplyHMatFHHFinalizeOuterUpdates
+                        ( nodeB.Child(r,s), nodeC.Child(t,s), allReduceBuffer,
+                          leftOffsets, rightOffsets );
+            }
+            break;
+        default:
+            break;
+        }
+        break;
+    default:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
