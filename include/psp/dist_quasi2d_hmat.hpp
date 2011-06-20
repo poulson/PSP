@@ -715,15 +715,25 @@ private:
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
     void MultiplyHMatFHHPostcomputeCCleanup(); // to be called from C
-
+    void MultiplyHMatFHHFinalize
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
     // To be called from C
-    void MultiplyHMatFHHFinalize();
-    void MultiplyHMatFHHFinalizeCounts( std::vector<int>& numQrs );
+    void MultiplyHMatFHHFinalizeCounts
+    ( std::vector<int>& numQrs, 
+      std::vector<int>& numTargetFHH, std::vector<int>& numSourceFHH );
     void MultiplyHMatFHHFinalizeLocalQR
     ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
       std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets, 
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
+    void MultiplyHMatFHHFinalizeFormLocalContributions
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+            std::vector<Scalar>& allReduceBuffer,
+            std::vector<int>& leftOffsets,
+            std::vector<int>& middleOffsets,
+            std::vector<int>& rightOffsets ) const;
 
     void MultiplyHMatFinalQR();
     void MultiplyHMatFinalQRLowRankResize( int rank );
