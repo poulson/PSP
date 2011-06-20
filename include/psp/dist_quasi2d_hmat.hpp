@@ -718,10 +718,10 @@ private:
 
     // To be called from C
     void MultiplyHMatFHHFinalize();
-    void MultiplyHMatFHHFinalizeCounts
-    ( std::vector<int>& qrSizes, std::vector<int>& tauSizes );
+    void MultiplyHMatFHHFinalizeCounts( std::vector<int>& numQrs );
     void MultiplyHMatFHHFinalizeLocalQR
-    ( std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets, 
+    ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
+      std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets, 
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
 

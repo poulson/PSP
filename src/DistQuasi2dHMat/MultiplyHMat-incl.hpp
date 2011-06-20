@@ -5519,60 +5519,60 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalize");
 #endif
     const int r = MaxRank()+4;
+    const int rShrunk = MaxRank();
     const int numLevels = _teams->NumLevels();
-    std::vector<int> qrSizes( numLevels, 0 ), tauSizes( numLevels, 0 );
-    MultiplyHMatFHHFinalizeCounts( qrSizes, tauSizes );
+    std::vector<int> numQrs( numLevels, 0 );
+    MultiplyHMatFHHFinalizeCounts( numQrs );
 
-    // Set up the space for the packed 2r x r matrices.
-    int qrTotalSize = 0;
-    for( int i=0; i<numLevels; ++i )
-        qrTotalSize += qrSizes[i];
-    std::vector<Scalar> qrBuffer( qrTotalSize );
-    std::vector<int> 
-        qrOffsets( numLevels ), qrPieceSizes( numLevels ), numQrs( numLevels );
-    for( int i=0,offset=0; i<numLevels; offset+=qrSizes[i],++i )
-        qrOffsets[i] = offset;
+    // Set up the space for the packed 2r x r matrices and taus.
+    int numTotalQrs=0, qrTotalSize=0, tauTotalSize=0;
+    std::vector<int> XOffsets(numLevels),
+                     qrOffsets(numLevels), qrPieceSizes(numLevels), 
+                     tauOffsets(numLevels), tauPieceSizes(numLevels);
     for( int i=0; i<numLevels; ++i )
     {
         MPI_Comm team = _teams->Team( i );
-        const int teamSize = mpi::CommSize( team );
-        const int log2TeamSize = Log2( teamSize );
+        const unsigned teamSize = mpi::CommSize( team );
+        const unsigned log2TeamSize = Log2( teamSize );
+
+        XOffsets[i] = numTotalQrs;
+        qrOffsets[i] = qrTotalSize;
+        tauOffsets[i] = tauTotalSize;
+
         qrPieceSizes[i] = log2TeamSize*(r*r+r);
-        numQrs[i] = qrSizes[i] / qrPieceSizes[i];
-    }
-
-    // Set up space for the tau vectors (including for the first level)
-    int tauTotalSize = 0;
-    for( int i=0; i<numLevels; ++i )
-        tauTotalSize += tauSizes[i];
-    std::vector<Scalar> tauBuffer( tauTotalSize );
-    std::vector<int> tauOffsets( numLevels ), tauPieceSizes( numLevels );
-    for( int i=0,offset=0; i<numLevels; offset+=tauSizes[i],++i )
-        tauOffsets[i] = offset;
-    for( int i=0; i<numLevels; ++i )
-    {
-        MPI_Comm team = _teams->Team( i );
-        const int teamSize = mpi::CommSize( team );
-        const int log2TeamSize = Log2( teamSize );
         tauPieceSizes[i] = (log2TeamSize+1)*r;
+
+        numTotalQrs += numQrs[i];
+        qrTotalSize += numQrs[i]*qrPieceSizes[i];
+        tauTotalSize += numQrs[i]*tauPieceSizes[i];
     }
 
-    // Allocate a work vector for the local QR's
-    std::vector<Scalar> work( lapack::QRWorkSize( r ) );
+    std::vector<Dense<Scalar>*> Xs( numTotalQrs );
+    std::vector<Scalar> qrBuffer( qrTotalSize ), tauBuffer( tauTotalSize ),
+                        work( lapack::QRWorkSize( r ) );
 
     // Perform the large local QR's and pack into the QR buffer as appropriate
     MultiplyHMatFHHFinalizeLocalQR
-    ( qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
+    ( Xs, XOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
+
+    // Reset the offset vectors
+    numTotalQrs = qrTotalSize = tauTotalSize = 0;
+    for( int i=0; i<numLevels; ++i )
+    {
+        XOffsets[i] = numTotalQrs;
+        qrOffsets[i] = qrTotalSize;
+        tauOffsets[i] = tauTotalSize;
+    }
 
     // Perform the combined distributed TSQR factorizations.
     // This could almost certainly be simplified...
     const int numSteps = numLevels-1;
-    for( int i=0; i<numSteps; ++i )
+    for( int level=0; level<numSteps; ++level )
     {
-        MPI_Comm team = _teams->Team( i );
+        MPI_Comm team = _teams->Team( level );
         const int teamSize = mpi::CommSize( team );
         const unsigned teamRank = mpi::CommRank( team );
-        const bool haveAnotherComm = ( i < numSteps-1 );
+        const bool haveAnotherComm = ( level < numSteps-1 );
         // only valid result if we have a next step...
         const bool rootOfNextStep = teamRank & 0x100; 
 
@@ -5585,38 +5585,38 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
 
             // Count the messages to send/recv to/from firstPartner
             int msgSize = 0;
-            for( int j=0; j<=i; ++j )
+            for( int j=0; j<=level; ++j )
                 msgSize += numQrs[j]*(r*r+r)/2;
 
             // Pack the messages for the firstPartner
             std::vector<Scalar> sendBuffer( msgSize ), recvBuffer( msgSize );
             int sendOffset = 0;
-            for( int j=0; j<=i; ++j )
+            for( int l=0; l<=level; ++l )
             {
-                for( int k=0; k<numQrs[j]; ++k )
+                for( int k=0; k<numQrs[l]; ++k )
                 {
                     if( firstRoot )
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffsets[j]+k*qrPieceSizes[j]+
-                                        2*i*(r*r+r)+(col*col+col)],
-                              (col+1)*sizeof(Scalar) );
-                            sendOffset += col+1;
+                              &qrBuffer[qrOffsets[l]+k*qrPieceSizes[l]+
+                                        2*level*(r*r+r)+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
                         }
                     }
                     else
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffsets[j]+k*qrPieceSizes[j]+
-                                        2*i*(r*r+r)+(col*col+col)+(col+1)],
-                              (col+1)*sizeof(Scalar) );
-                            sendOffset += col+1;
+                              &qrBuffer[qrOffsets[l]+k*qrPieceSizes[l]+
+                                        2*level*(r*r+r)+(j*j+j)+(j+1)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
                         }
                     }
                 }
@@ -5632,35 +5632,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
             // send buffer in a single sweep.
             sendOffset = 0;
             int recvOffset = 0;
-            for( int j=0; j<=i; ++j )
+            for( int l=0; l<=level; ++l )
             {
-                for( int k=0; k<numQrs[j]; ++k )
+                for( int k=0; k<numQrs[l]; ++k )
                 {
                     const unsigned thisQrOffset = 
-                        qrOffsets[j]+k*qrPieceSizes[j]+2*i*(r*r+r);
+                        qrOffsets[l]+k*qrPieceSizes[l]+2*level*(r*r+r);
                     const unsigned thisTauOffset = 
-                        tauOffsets[j]+k*tauPieceSizes[j]+2*i*r;
+                        tauOffsets[l]+k*tauPieceSizes[l]+(2*level+1)*r;
 
                     if( !firstRoot )
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(col*col+col)],
+                            ( &qrBuffer[thisQrOffset+(j*j+j)],
                               &recvBuffer[recvOffset],
-                              (col+1)*sizeof(Scalar) );
-                            recvOffset += col+1;
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
                         }
                     }
                     else
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(col*col+col)+(col+1)],
+                            ( &qrBuffer[thisQrOffset+(j*j+j)+(j+1)],
                               &recvBuffer[recvOffset],
-                              (col+1)*sizeof(Scalar) );
-                            recvOffset += col+1;
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
@@ -5670,35 +5670,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
                     {
                         // Copy into the upper triangle of the next block
                         // and into the send buffer
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(r*r+r)+(col*col+col)],
-                              &qrBuffer[thisQrOffset+(col*col+col)],
-                              (col+1)*sizeof(Scalar) );
+                            ( &qrBuffer[thisQrOffset+(r*r+r)+(j*j+j)],
+                              &qrBuffer[thisQrOffset+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[thisQrOffset+(col*col+col)],
-                              (col+1)*sizeof(Scalar) );
-                            sendOffset += col+1;
+                              &qrBuffer[thisQrOffset+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
                         }
                     }
                     else
                     {
                         // Copy into the lower triangle of the next block
                         // and into the send buffer
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(r*r+r)+(col*col+col)+
-                                        (col+1)],
-                              &qrBuffer[thisQrOffset+(col*col+col)],
-                              (col+1)*sizeof(Scalar) );
+                            ( &qrBuffer[thisQrOffset+(r*r+r)+(j*j+j)+
+                                        (j+1)],
+                              &qrBuffer[thisQrOffset+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[thisQrOffset+(col*col+col)],
-                              (col+1)*sizeof(Scalar) );
-                            sendOffset += col+1;
+                              &qrBuffer[thisQrOffset+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
                         }
                     }
                 }
@@ -5712,35 +5712,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
             // Unpack the recv messages, perform the QR factorizations, and
             // pack the resulting R into the next level when necessary.
             recvOffset = 0;
-            for( int j=0; j<=i; ++j )
+            for( int l=0; l<=level; ++l )
             {
-                for( int k=0; k<numQrs[j]; ++k )
+                for( int k=0; k<numQrs[l]; ++k )
                 {
                     const unsigned thisQrOffset = 
-                        qrOffsets[j]+k*qrPieceSizes[j]+(2*i+1)*(r*r+r);
+                        qrOffsets[l]+k*qrPieceSizes[l]+(2*level+1)*(r*r+r);
                     const unsigned thisTauOffset = 
-                        tauOffsets[j]+k*tauPieceSizes[j]+(2*i+1)*r;
+                        tauOffsets[l]+k*tauPieceSizes[l]+(2*level+2)*r;
 
                     if( !firstRoot )
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(col*col+col)],
+                            ( &qrBuffer[thisQrOffset+(j*j+j)],
                               &recvBuffer[recvOffset],
-                              (col+1)*sizeof(Scalar) );
-                            recvOffset += col+1;
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
                         }
                     }
                     else
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(col*col+col)+(col+1)],
+                            ( &qrBuffer[thisQrOffset+(j*j+j)+(j+1)],
                               &recvBuffer[recvOffset],
-                              (col+1)*sizeof(Scalar) );
-                            recvOffset += col+1;
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
@@ -5751,21 +5751,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
                         if( rootOfNextStep )
                         {
                             // Copy into the upper triangle of the next block
-                            for( int col=0; col<r; ++col )
+                            for( int j=0; j<r; ++j )
                                 std::memcpy
-                                ( &qrBuffer[thisQrOffset+(r*r+r)+(col*col+col)],
-                                  &qrBuffer[thisQrOffset+(col*col+col)],
-                                  (col+1)*sizeof(Scalar) );
+                                ( &qrBuffer[thisQrOffset+(r*r+r)+(j*j+j)],
+                                  &qrBuffer[thisQrOffset+(j*j+j)],
+                                  (j+1)*sizeof(Scalar) );
                         }
                         else
                         {
                             // Copy into the lower triangle of the next block
-                            for( int col=0; col<r; ++col )
+                            for( int j=0; j<r; ++j )
                                 std::memcpy
-                                ( &qrBuffer[thisQrOffset+(r*r+r)+(col*col+col)+
-                                            (col+1)],
-                                  &qrBuffer[thisQrOffset+(col*col+col)],
-                                  (col+1)*sizeof(Scalar) );
+                                ( &qrBuffer[thisQrOffset+(r*r+r)+(j*j+j)+(j+1)],
+                                  &qrBuffer[thisQrOffset+(j*j+j)],
+                                  (j+1)*sizeof(Scalar) );
                         }
                     }
                 }
@@ -5778,38 +5777,38 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
 
             // Count the messages to send/recv to/from partner
             int msgSize = 0;
-            for( int j=0; j<=i; ++j )
-                msgSize += numQrs[j]*(r*r+r)/2;
+            for( int l=0; l<=level; ++l )
+                msgSize += numQrs[l]*(r*r+r)/2;
 
             // Pack the messages for the partner
             std::vector<Scalar> sendBuffer( msgSize ), recvBuffer( msgSize );
             int sendOffset = 0;
-            for( int j=0; j<=i; ++j )
+            for( int l=0; l<=level; ++l )
             {
-                for( int k=0; k<numQrs[j]; ++k )
+                for( int k=0; k<numQrs[l]; ++k )
                 {
                     if( root )
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffsets[j]+k*qrPieceSizes[j]+
-                                        2*i*(r*r+r)+(col*col+col)],
-                              (col+1)*sizeof(Scalar) );
-                            sendOffset += col+1;
+                              &qrBuffer[qrOffsets[l]+k*qrPieceSizes[l]+
+                                        2*level*(r*r+r)+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
                         }
                     }
                     else
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffsets[j]+k*qrPieceSizes[j]+
-                                        2*i*(r*r+r)+(col*col+col)+(col+1)],
-                              (col+1)*sizeof(Scalar) );
-                            sendOffset += col+1;
+                              &qrBuffer[qrOffsets[l]+k*qrPieceSizes[l]+
+                                        2*level*(r*r+r)+(j*j+j)+(j+1)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
                         }
                     }
                 }
@@ -5822,35 +5821,33 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
 
             // Unpack the recv messages and perform the QR factorizations
             int recvOffset = 0;
-            for( int j=0; j<=i; ++j )
+            for( int l=0; l<=level; ++l )
             {
-                for( int k=0; k<numQrs[j]; ++k )
+                for( int k=0; k<numQrs[l]; ++k )
                 {
                     const unsigned thisQrOffset = 
-                        qrOffsets[j]+k*qrPieceSizes[j]+2*i*(r*r+r);
+                        qrOffsets[l]+k*qrPieceSizes[l]+2*level*(r*r+r);
                     const unsigned thisTauOffset = 
-                        tauOffsets[j]+k*tauPieceSizes[j]+2*i*r;
+                        tauOffsets[l]+k*tauPieceSizes[l]+(2*level+1)*r;
 
                     if( !root )
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(col*col+col)],
-                              &recvBuffer[recvOffset],
-                              (col+1)*sizeof(Scalar) );
-                            recvOffset += col+1;
+                            ( &qrBuffer[thisQrOffset+(j*j+j)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
                         }
                     }
                     else
                     {
-                        for( int col=0; col<r; ++col )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQrOffset+(col*col+col)+(col+1)],
-                              &recvBuffer[recvOffset],
-                              (col+1)*sizeof(Scalar) );
-                            recvOffset += col+1;
+                            ( &qrBuffer[thisQrOffset+(j*j+j)+(j+1)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
@@ -5861,7 +5858,97 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
         }
     }
 
-    // HERE: Form the low-rank approximations from the implicit Q's
+    // In order to form the compressed Q's, we need to perform a truncated
+    // SVD on the R's and then backtransform the left singular vectors that
+    // remain after truncation. This step is completely local.
+    typedef typename RealBase<Scalar>::type Real;
+    Dense<Scalar> Z( 2*r, r );
+    std::vector<Real> singularValues( r );
+    std::vector<Scalar> svdWorkBuffer( lapack::SVDWorkSize(r,r) );
+    std::vector<Real> svdRealWorkBuffer( lapack::SVDRealWorkSize(r,r) ); 
+    std::vector<Scalar> applyQWork( rShrunk, 1 );
+    for( int level=0; level<numSteps; ++level )
+    {
+        MPI_Comm team = _teams->Team( level );
+        const unsigned teamSize = mpi::CommSize( team );
+        const unsigned log2TeamSize = Log2( teamSize );
+        const unsigned teamRank = mpi::CommRank( team );
+        const Scalar* thisQrLevel = &qrBuffer[qrOffsets[level]];
+        const Scalar* thisTauLevel = &tauBuffer[tauOffsets[level]];
+
+        for( int k=0; k<numQrs[level]; ++k )
+        {
+            const Scalar* thisQrPiece = &thisQrLevel[k*qrPieceSizes[level]];
+            const Scalar* thisTauPiece = &thisTauLevel[k*tauPieceSizes[level]];
+            const Scalar* lastQrStage = &thisQrPiece[(log2TeamSize-1)*(r*r+r)];
+            const Scalar* lastTauStage = &thisTauPiece[log2TeamSize*r];
+
+            // Copy the R from this TSQR factorization into the top r x r 
+            // submatrix of a zeroed 2r x r matrix.
+            std::memset( Z.Buffer(), 0, 2*r*r*sizeof(Scalar) );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( Z.Buffer(0,j), &lastQrStage[j*j+j], (j+1)*sizeof(Scalar) );
+            // Overwrite the R with the left singular vectors
+            lapack::SVD
+            ( 'O', 'N', r, r, Z.Buffer(), Z.LDim(), &singularValues[0], 
+              0, 1, 0, 1, &svdWorkBuffer[0], svdWorkBuffer.size(), 
+              &svdRealWorkBuffer[0] );
+            // Backtransform the last stage
+            Z.Resize( 2*r, rShrunk );
+            hmat_tools::ApplyPackedQFromLeft
+            ( r, lastQrStage, lastTauStage, Z, &work[0] );
+            // Take care of the middle stages before handling the (potentially)
+            // large original stage.
+            for( unsigned stage=log2TeamSize-1; stage>0; --stage )
+            {
+                if( teamRank & (1u<<(stage-1)) )
+                {
+                    // Move the bottom half to the top half and zero the
+                    // bottom half
+                    for( int j=0; j<rShrunk; ++j )
+                    {
+                        std::memcpy
+                        ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
+                          r*sizeof(Scalar) );
+                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                    }
+                }
+                else
+                {
+                    // Zero the bottom half of Z
+                    for( int j=0; j<rShrunk; ++j )
+                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                }
+                hmat_tools::ApplyPackedQFromLeft
+                ( r, &thisQrPiece[(stage-1)*(r*r+r)], &thisTauPiece[stage*r],
+                  Z, &work[0] );
+            }
+            // Take care of the original stage. Do so by forming Y := X, 
+            // then zeroing X and placing our piece of Z at its top.
+            Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
+            Dense<Scalar> Y;
+            hmat_tools::Copy( X, Y );
+            X.Resize( X.Height(), rShrunk );
+            hmat_tools::Scale( (Scalar)0, X );
+            if( teamRank & 0x1 )
+            {
+                // Move the bottom half of Z into the top of X
+                for( int j=0; j<rShrunk; ++j )
+                    std::memcpy
+                    ( X.Buffer(0,j), Z.LockedBuffer(r,j), r*sizeof(Scalar) );
+            }
+            else
+            {
+                // Move the top half of Z into the top of X
+                for( int j=0; j<rShrunk; ++j )
+                    std::memcpy
+                    ( X.Buffer(0,j), Z.LockedBuffer(0,j), r*sizeof(Scalar) );
+            }
+            hmat_tools::ApplyPackedQFromLeft
+            ( r, Y.LockedBuffer(), &thisTauPiece[0], X, &work[0] );
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -5870,7 +5957,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize()
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
-( std::vector<int>& qrSizes, std::vector<int>& tauSizes )
+( std::vector<int>& numQrs )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeCounts");
@@ -5884,8 +5971,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFHHFinalizeCounts
-                ( qrSizes, tauSizes );
+                node.Child(t,s).MultiplyHMatFHHFinalizeCounts( numQrs );
         break;
     }
     case DIST_LOW_RANK:
@@ -5900,14 +5986,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
         if( _inTargetTeam )
         {
             const int numEntries = _colXMap.Size();
-            qrSizes[_level] += numEntries*log2TeamSize*(r*r+r);
-            tauSizes[_level] += numEntries*(log2TeamSize+1)*r;
+            numQrs[_level] += numEntries;
         }
         if( _inSourceTeam )
         {
             const int numEntries = _rowXMap.Size();
-            qrSizes[_level] += numEntries*log2TeamSize*(r*r+r);
-            tauSizes[_level] += numEntries*(log2TeamSize+1)*r;
+            numQrs[_level] += numEntries;
         }
         break;
     }
@@ -5922,7 +6006,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
-( std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
+( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
+  std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
   std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
   std::vector<Scalar>& work )
 {
@@ -5939,7 +6024,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatFHHFinalizeLocalQR
-                ( qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
+                ( Xs, XOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
+                  work );
         break;
     }
     case DIST_LOW_RANK:
@@ -5959,6 +6045,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
             for( int i=0; i<numEntries; ++i )
             {
                 Dense<Scalar>& X = *_colXMap.NextEntry();
+                Xs[XOffsets[_level]++] = &X;
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
                   &tauBuffer[tauOffsets[_level]], &work[0], work.size() );
@@ -5998,6 +6085,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
             for( int i=0; i<numEntries; ++i )
             {
                 Dense<Scalar>& X = *_rowXMap.NextEntry();
+                Xs[XOffsets[_level]++] = &X;
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
                   &tauBuffer[tauOffsets[_level]], &work[0], work.size() );
