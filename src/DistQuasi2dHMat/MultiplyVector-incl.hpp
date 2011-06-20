@@ -81,8 +81,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MultiplyVectorInitialize( context );
     MultiplyVectorPrecompute( context, alpha, xLocal, yLocal );
 
-    MultiplyVectorSummations( context );
-    //MultiplyVectorNaiveSummations( context );
+    MultiplyVectorSums( context );
+    //MultiplyVectorNaiveSums( context );
 
     MultiplyVectorPassData( context );
 
@@ -111,8 +111,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     TransposeMultiplyVectorInitialize( context );
     TransposeMultiplyVectorPrecompute( context, alpha, xLocal, yLocal );
 
-    TransposeMultiplyVectorSummations( context );
-    //TransposeMultiplyVectorNaiveSummations( context );
+    TransposeMultiplyVectorSums( context );
+    //TransposeMultiplyVectorNaiveSums( context );
 
     TransposeMultiplyVectorPassData( context, xLocal );
 
@@ -141,8 +141,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
     AdjointMultiplyVectorInitialize( context );
     AdjointMultiplyVectorPrecompute( context, alpha, xLocal, yLocal );
 
-    AdjointMultiplyVectorSummations( context );
-    //AdjointMultiplyVectorNaiveSummations( context );
+    AdjointMultiplyVectorSums( context );
+    //AdjointMultiplyVectorNaiveSums( context );
 
     AdjointMultiplyVectorPassData( context, xLocal );
 
@@ -578,18 +578,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSums
 ( MultiplyVectorContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorSummations");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorSums");
 #endif
     // Compute the message sizes for each reduce 
     const int numLevels = _teams->NumLevels();
     const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    MultiplyVectorSummationsCount( sizes );
+    MultiplyVectorSumsCount( sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -599,15 +599,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyVectorSummationsPack( context, buffer, offsets );
+    MultiplyVectorSumsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSummations( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of teamunicators have data)
-    MultiplyVectorSummationsUnpack( context, buffer, offsets );
+    MultiplyVectorSumsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -615,18 +615,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSums
 ( MultiplyVectorContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummations");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSums");
 #endif
     // Compute the message sizes for each reduce 
     const int numLevels = _teams->NumLevels();
     const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    TransposeMultiplyVectorSummationsCount( sizes );
+    TransposeMultiplyVectorSumsCount( sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -636,15 +636,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    TransposeMultiplyVectorSummationsPack( context, buffer, offsets );
+    TransposeMultiplyVectorSumsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSummations( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of teamunicators have data)
-    TransposeMultiplyVectorSummationsUnpack( context, buffer, offsets );
+    TransposeMultiplyVectorSumsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -652,14 +652,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorSums
 ( MultiplyVectorContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorSummations");
+    PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorSums");
 #endif
     // This unconjugated version is identical
-    TransposeMultiplyVectorSummations( context, customCollective );
+    TransposeMultiplyVectorSums( context, customCollective );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -667,11 +667,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsCount
 ( std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorSummationsCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorSumsCount");
 #endif
     switch( _block.type )
     {
@@ -680,7 +680,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorSummationsCount( sizes );
+                node.Child(t,s).MultiplyVectorSumsCount( sizes );
         break;
     }
     case DIST_LOW_RANK:
@@ -698,11 +698,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsCount
 ( std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummationsCount");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSumsCount");
 #endif
     switch( _block.type )
     {
@@ -711,7 +711,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorSummationsCount( sizes );
+                node.Child(t,s).TransposeMultiplyVectorSumsCount( sizes );
         break;
     }
     case DIST_LOW_RANK:
@@ -729,12 +729,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsPack
 ( const MultiplyVectorContext& context, 
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorSummationsPack");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorSumsPack");
 #endif
     switch( _block.type )
     {
@@ -745,7 +745,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorSummationsPack
+                node.Child(t,s).MultiplyVectorSumsPack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -771,12 +771,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsPack
 ( const MultiplyVectorContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummationsPack");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSumsPack");
 #endif
     switch( _block.type )
     {
@@ -787,7 +787,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorSummationsPack
+                node.Child(t,s).TransposeMultiplyVectorSumsPack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -813,12 +813,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsUnpack
 ( MultiplyVectorContext& context,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorSummationsUnpack");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorSumsUnpack");
 #endif
     switch( _block.type )
     {
@@ -829,7 +829,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorSummationsUnpack
+                node.Child(t,s).MultiplyVectorSumsUnpack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -860,12 +860,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSummationsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsUnpack
 ( MultiplyVectorContext& context,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSummationsUnpack");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSumsUnpack");
 #endif
     switch( _block.type )
     {
@@ -876,7 +876,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorSummationsUnpack
+                node.Child(t,s).TransposeMultiplyVectorSumsUnpack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -907,11 +907,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSummationsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveSums
 ( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorNaiveSummations");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorNaiveSums");
 #endif
     switch( _block.type )
     {
@@ -922,7 +922,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveSummations
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorNaiveSummations
+                node.Child(t,s).MultiplyVectorNaiveSums
                 ( nodeContext.Child(t,s) );
         break;
     }
@@ -958,11 +958,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveSums
 ( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorNaiveSummations");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorNaiveSums");
 #endif
     switch( _block.type )
     {
@@ -973,7 +973,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveSummations
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorNaiveSummations
+                node.Child(t,s).TransposeMultiplyVectorNaiveSums
                 ( nodeContext.Child(t,s) );
         break;
     }
@@ -1009,14 +1009,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorNaiveSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorNaiveSums
 ( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorNaiveSummations");
+    PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorNaiveSums");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyVectorNaiveSummations( context );
+    TransposeMultiplyVectorNaiveSums( context );
 #ifndef RELEASE
     PopCallStack();
 #endif

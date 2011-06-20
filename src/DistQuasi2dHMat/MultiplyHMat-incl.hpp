@@ -44,13 +44,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     C.Clear();
 
     A.MultiplyHMatMainPrecompute( alpha, B, C );
-    A.MultiplyHMatMainSummations( B, C );
+    A.MultiplyHMatMainSums( B, C );
     A.MultiplyHMatMainPassData( alpha, B, C );
     A.MultiplyHMatMainBroadcasts( B, C );
     A.MultiplyHMatMainPostcompute( alpha, B, C );
 
     A.MultiplyHMatFHHPrecompute( alpha, B, C );
-    A.MultiplyHMatFHHSummations( alpha, B, C );
+    A.MultiplyHMatFHHSums( alpha, B, C );
     A.MultiplyHMatFHHPassData( alpha, B, C );
     A.MultiplyHMatFHHBroadcasts( alpha, B, C );
     A.MultiplyHMatFHHPostcompute( alpha, B, C );
@@ -1113,13 +1113,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummations");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSums");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
@@ -1128,9 +1128,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    A.MultiplyHMatMainSummationsCountA( sizes );
-    B.MultiplyHMatMainSummationsCountB( sizes );
-    A.MultiplyHMatMainSummationsCountC( B, C, sizes );
+    A.MultiplyHMatMainSumsCountA( sizes );
+    B.MultiplyHMatMainSumsCountB( sizes );
+    A.MultiplyHMatMainSumsCountC( B, C, sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -1140,20 +1140,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A.MultiplyHMatMainSummationsPackA( buffer, offsets );
-    B.MultiplyHMatMainSummationsPackB( buffer, offsets );
-    A.MultiplyHMatMainSummationsPackC( B, C, buffer, offsets );
+    A.MultiplyHMatMainSumsPackA( buffer, offsets );
+    B.MultiplyHMatMainSumsPackB( buffer, offsets );
+    A.MultiplyHMatMainSumsPackC( B, C, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A._teams->TreeSummations( buffer, sizes, offsets, customCollective );
+    A._teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of communicators have data)
-    A.MultiplyHMatMainSummationsUnpackA( buffer, offsets );
-    B.MultiplyHMatMainSummationsUnpackB( buffer, offsets );
-    A.MultiplyHMatMainSummationsUnpackC( B, C, buffer, offsets );
+    A.MultiplyHMatMainSumsUnpackA( buffer, offsets );
+    B.MultiplyHMatMainSumsUnpackB( buffer, offsets );
+    A.MultiplyHMatMainSumsUnpackC( B, C, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1161,11 +1161,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountA
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountA
 ( std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountA");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsCountA");
 #endif
     switch( _block.type )
     {
@@ -1173,12 +1173,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseSummationsCount( sizes, _rowContext.numRhs );
+            TransposeMultiplyDenseSumsCount( sizes, _rowContext.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsCountA( sizes );
+                node.Child(t,s).MultiplyHMatMainSumsCountA( sizes );
         break;
     }
     default:
@@ -1191,11 +1191,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountA
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackA
 ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackA");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsPackA");
 #endif
     switch( _block.type )
     {
@@ -1203,14 +1203,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseSummationsPack
-            ( _rowContext, buffer, offsets );
+            TransposeMultiplyDenseSumsPack( _rowContext, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsPackA
-                ( buffer, offsets );
+                node.Child(t,s).MultiplyHMatMainSumsPackA( buffer, offsets );
         break;
     }
     default:
@@ -1223,11 +1221,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackA
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackA
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackA
 ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackA");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackA");
 #endif
     switch( _block.type )
     {
@@ -1235,14 +1233,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseSummationsUnpack
-            ( _rowContext, buffer, offsets );
+            TransposeMultiplyDenseSumsUnpack( _rowContext, buffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsUnpackA
-                ( buffer, offsets );
+                node.Child(t,s).MultiplyHMatMainSumsUnpackA( buffer, offsets );
         break;
     }
     default:
@@ -1255,11 +1251,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackA
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountB
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountB
 ( std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountB");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsCountB");
 #endif
     switch( _block.type )
     {
@@ -1267,12 +1263,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseSummationsCount( sizes, _colContext.numRhs );
+            MultiplyDenseSumsCount( sizes, _colContext.numRhs );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsCountB( sizes );
+                node.Child(t,s).MultiplyHMatMainSumsCountB( sizes );
         break;
     }
     default:
@@ -1285,11 +1281,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountB
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackB
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackB
 ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackB");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsPackB");
 #endif
     switch( _block.type )
     {
@@ -1297,13 +1293,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseSummationsPack( _colContext, buffer, offsets );
+            MultiplyDenseSumsPack( _colContext, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsPackB
-                ( buffer, offsets );
+                node.Child(t,s).MultiplyHMatMainSumsPackB( buffer, offsets );
         break;
     }
     default:
@@ -1316,11 +1311,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackB
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackB
 ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackB");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackB");
 #endif
     switch( _block.type )
     {
@@ -1328,13 +1323,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
     case DIST_NODE_GHOST:
     {
         if( _beganColSpaceComp )
-            MultiplyDenseSummationsUnpack( _colContext, buffer, offsets );
+            MultiplyDenseSumsUnpack( _colContext, buffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatMainSummationsUnpackB
-                ( buffer, offsets );
+                node.Child(t,s).MultiplyHMatMainSumsUnpackB( buffer, offsets );
         break;
     }
     default:
@@ -1347,13 +1341,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackB
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
   const DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsCountC");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const bool admissibleC = C.Admissible();
@@ -1371,14 +1365,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MultiplyHMatMainSummationsCountC
+                            nodeA.Child(t,r).MultiplyHMatMainSumsCountC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
             }
             break;
         case DIST_LOW_RANK:
         {
             const DistLowRank& DFB = *B._block.data.DF;
-            A.MultiplyDenseSummationsCount( sizes, DFB.rank );
+            A.MultiplyDenseSumsCount( sizes, DFB.rank );
             break;
         }
         default:
@@ -1391,7 +1385,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
         case DIST_NODE:
         {
             const DistLowRank& DFA = *A._block.data.DF;
-            B.TransposeMultiplyDenseSummationsCount( sizes, DFA.rank );
+            B.TransposeMultiplyDenseSumsCount( sizes, DFA.rank );
             break;
         }
         case DIST_LOW_RANK:
@@ -1416,13 +1410,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsCountC
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B, 
   const DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsPackC");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
@@ -1441,14 +1435,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MultiplyHMatMainSummationsPackC
+                            nodeA.Child(t,r).MultiplyHMatMainSumsPackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               buffer, offsets );
             }
             break;
         case DIST_LOW_RANK:
-            A.MultiplyDenseSummationsPack
-            ( *C._mainContextMap[key], buffer, offsets );
+            A.MultiplyDenseSumsPack( *C._mainContextMap[key], buffer, offsets );
             break;
         default:
             break;
@@ -1458,7 +1451,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            B.TransposeMultiplyDenseSummationsPack
+            B.TransposeMultiplyDenseSumsPack
             ( *C._mainContextMap[key], buffer, offsets );
             break;
         case DIST_LOW_RANK:
@@ -1488,13 +1481,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsPackC
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSummationsUnpackC");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
@@ -1513,13 +1506,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MultiplyHMatMainSummationsUnpackC
+                            nodeA.Child(t,r).MultiplyHMatMainSumsUnpackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               buffer, offsets );
             }
             break;
         case DIST_LOW_RANK:
-            A.MultiplyDenseSummationsUnpack
+            A.MultiplyDenseSumsUnpack
             ( *C._mainContextMap[key], buffer, offsets );
             break;
         default:
@@ -1530,7 +1523,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSummationsUnpackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            B.TransposeMultiplyDenseSummationsUnpack
+            B.TransposeMultiplyDenseSumsUnpack
             ( *C._mainContextMap[key], buffer, offsets );
             break;
         case DIST_LOW_RANK:
@@ -4671,13 +4664,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                       DistQuasi2dHMat<Scalar,Conjugated>& C,
   bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummations");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSums");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
@@ -4686,7 +4679,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    A.MultiplyHMatFHHSummationsCount( B, C, sizes );
+    A.MultiplyHMatFHHSumsCount( B, C, sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -4696,16 +4689,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A.MultiplyHMatFHHSummationsPack( B, C, buffer, offsets );
+    A.MultiplyHMatFHHSumsPack( B, C, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A._teams->TreeSummations( buffer, sizes, offsets, customCollective );
+    A._teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of communicators have data)
-    A.MultiplyHMatFHHSummationsUnpack( B, C, buffer, offsets );
+    A.MultiplyHMatFHHSumsUnpack( B, C, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -4713,13 +4706,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int paddedRank = C.MaxRank() + 4;
@@ -4736,9 +4729,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
             if( admissibleC )
             {
                 if( A._inSourceTeam )
-                    A.MultiplyDenseSummationsCount( sizes, paddedRank );
+                    A.MultiplyDenseSumsCount( sizes, paddedRank );
                 if( B._inTargetTeam )
-                    B.TransposeMultiplyDenseSummationsCount
+                    B.TransposeMultiplyDenseSumsCount
                     ( sizes, paddedRank );
             }
             else
@@ -4749,7 +4742,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MultiplyHMatFHHSummationsCount
+                            nodeA.Child(t,r).MultiplyHMatFHHSumsCount
                             ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
             }
             break;
@@ -4768,13 +4761,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsPack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsPack");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsPack");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
@@ -4793,12 +4786,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsPack
                 if( A._inSourceTeam )
                 {
                     MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDenseSummationsPack( context, buffer, offsets );
+                    A.MultiplyDenseSumsPack( context, buffer, offsets );
                 }
                 if( B._inTargetTeam )
                 {
                     MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDenseSummationsPack
+                    B.TransposeMultiplyDenseSumsPack
                     ( context, buffer, offsets );
                 }
             }
@@ -4810,7 +4803,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsPack
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MultiplyHMatFHHSummationsPack
+                            nodeA.Child(t,r).MultiplyHMatFHHSumsPack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               buffer, offsets );
             }
@@ -4830,13 +4823,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSummationsUnpack");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsUnpack");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
@@ -4855,12 +4848,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsUnpack
                 if( A._inSourceTeam )
                 {
                     MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDenseSummationsUnpack( context, buffer, offsets );
+                    A.MultiplyDenseSumsUnpack( context, buffer, offsets );
                 }
                 if( B._inTargetTeam )
                 {
                     MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDenseSummationsUnpack
+                    B.TransposeMultiplyDenseSumsUnpack
                     ( context, buffer, offsets );
                 }
             }
@@ -4872,7 +4865,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSummationsUnpack
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
-                            nodeA.Child(t,r).MultiplyHMatFHHSummationsUnpack
+                            nodeA.Child(t,r).MultiplyHMatFHHSumsUnpack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               buffer, offsets );
             }
@@ -6022,7 +6015,30 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     A.MultiplyHMatFHHFinalizeOuterUpdates
     ( B, C, allReduceBuffer, leftOffsets, rightOffsets );
 
-    // TODO: Perform a custom AllReduce on the buffer. Write TreeAllReduce?
+    // Perform a custom AllReduce on the buffers to finish forming
+    // Q1' Omega2, Omega2' (alpha A B Omega1), and Q2' Omega1
+    {
+        // Reset the left/middle/right offsets and generate offsets and sizes 
+        // for each entire level.
+        std::vector<int> sizes, offsets;
+        totalAllReduceSize = 0;
+        for( int level=0; level<numLevels; ++level )
+        {
+            offsets[level] = totalAllReduceSize;
+            sizes[level] = numTargetFHH[level]*(2*rShrunk*r + r*r);
+
+            leftOffsets[level] = totalAllReduceSize;
+            totalAllReduceSize += numTargetFHH[level]*rShrunk*r;
+            middleOffsets[level] = totalAllReduceSize;
+            totalAllReduceSize += numTargetFHH[level]*r*r;
+            rightOffsets[level] = totalAllReduceSize;
+            totalAllReduceSize += numSourceFHH[level]*rShrunk*r;
+        }
+
+        A._teams->TreeSums( allReduceBuffer, sizes, offsets );
+    }
+
+    // HERE: Finish forming the low-rank approximation
 #ifndef RELEASE
     PopCallStack();
 #endif

@@ -37,7 +37,7 @@ public:
     class Teams
     {
     private:
-        std::vector<MPI_Comm> _teams, _rootTeams;
+        std::vector<MPI_Comm> _teams, _crossTeams, _rootTeams;
     public:
         Teams( MPI_Comm comm );
         ~Teams();
@@ -45,9 +45,16 @@ public:
         unsigned NumLevels() const;
         unsigned NumRootLevels() const;
         MPI_Comm Team( unsigned level ) const;
+        MPI_Comm CrossTeam( unsigned inverseLevel ) const;
         MPI_Comm RootTeam( unsigned inverseLevel ) const;
 
-        void TreeSummations
+        void TreeSums
+        (       std::vector<Scalar>& buffer,
+          const std::vector<int>& sizes,
+          const std::vector<int>& offsets,
+                bool customCollective=true ) const;
+
+        void TreeSumToRoots
         (       std::vector<Scalar>& buffer, 
           const std::vector<int>& sizes,
           const std::vector<int>& offsets,
@@ -465,16 +472,16 @@ private:
     ( MultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal, 
                           Vector<Scalar>& yLocal ) const;
-    void MultiplyVectorSummations
+    void MultiplyVectorSums
     ( MultiplyVectorContext& context, bool customCollective=true ) const;
-    void MultiplyVectorSummationsCount( std::vector<int>& sizes ) const;
-    void MultiplyVectorSummationsPack
+    void MultiplyVectorSumsCount( std::vector<int>& sizes ) const;
+    void MultiplyVectorSumsPack
     ( const MultiplyVectorContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyVectorSummationsUnpack
+    void MultiplyVectorSumsUnpack
     ( MultiplyVectorContext& context, 
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyVectorNaiveSummations( MultiplyVectorContext& context ) const;
+    void MultiplyVectorNaiveSums( MultiplyVectorContext& context ) const;
     void MultiplyVectorPassData( MultiplyVectorContext& context ) const;
     void MultiplyVectorPassDataSplitNodeCount( std::size_t& bufferSize ) const;
     void MultiplyVectorPassDataSplitNodePack
@@ -505,17 +512,16 @@ private:
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal, 
                           Dense<Scalar>& YLocal ) const;
-    void MultiplyDenseSummations
+    void MultiplyDenseSums
     ( MultiplyDenseContext& context, bool customCollective=true ) const;
-    void MultiplyDenseSummationsCount
-    ( std::vector<int>& sizes, int numRhs ) const;
-    void MultiplyDenseSummationsPack
+    void MultiplyDenseSumsCount( std::vector<int>& sizes, int numRhs ) const;
+    void MultiplyDenseSumsPack
     ( const MultiplyDenseContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyDenseSummationsUnpack
+    void MultiplyDenseSumsUnpack
     ( MultiplyDenseContext& context, 
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyDenseNaiveSummations( MultiplyDenseContext& context ) const;
+    void MultiplyDenseNaiveSums( MultiplyDenseContext& context ) const;
     void MultiplyDensePassData( MultiplyDenseContext& context ) const;
     void MultiplyDensePassDataSplitNodePack
     ( MultiplyDenseContext& context, byte*& head ) const;
@@ -557,32 +563,32 @@ private:
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
 
-    void MultiplyHMatMainSummations
+    void MultiplyHMatMainSums
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
             bool customCollective=true ) const;
     // To be called from A
-    void MultiplyHMatMainSummationsCountA( std::vector<int>& sizes ) const;
-    void MultiplyHMatMainSummationsPackA
+    void MultiplyHMatMainSumsCountA( std::vector<int>& sizes ) const;
+    void MultiplyHMatMainSumsPackA
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const; 
-    void MultiplyHMatMainSummationsUnpackA
+    void MultiplyHMatMainSumsUnpackA
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     // To be called from B
-    void MultiplyHMatMainSummationsCountB( std::vector<int>& sizes ) const;
-    void MultiplyHMatMainSummationsPackB
+    void MultiplyHMatMainSumsCountB( std::vector<int>& sizes ) const;
+    void MultiplyHMatMainSumsPackB
     ( std::vector<Scalar>& buffer, std::vector<int>& offsets ) const; 
-    void MultiplyHMatMainSummationsUnpackB
+    void MultiplyHMatMainSumsUnpackB
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
     // To be called from C
-    void MultiplyHMatMainSummationsCountC
+    void MultiplyHMatMainSumsCountC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
       const DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<int>& sizes ) const;
-    void MultiplyHMatMainSummationsPackC
+    void MultiplyHMatMainSumsPackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
       const DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const; 
-    void MultiplyHMatMainSummationsUnpackC
+    void MultiplyHMatMainSumsUnpackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
@@ -661,19 +667,19 @@ private:
     void MultiplyHMatFHHPrecompute
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
-    void MultiplyHMatFHHSummations
+    void MultiplyHMatFHHSums
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C,
       bool customCollective=true ) const;
-    void MultiplyHMatFHHSummationsCount
+    void MultiplyHMatFHHSumsCount
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
             std::vector<int>& sizes ) const;
-    void MultiplyHMatFHHSummationsPack
+    void MultiplyHMatFHHSumsPack
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
             std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void MultiplyHMatFHHSummationsUnpack
+    void MultiplyHMatFHHSumsUnpack
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
@@ -753,17 +759,17 @@ private:
     ( MultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void TransposeMultiplyVectorSummations
+    void TransposeMultiplyVectorSums
     ( MultiplyVectorContext& context, bool customCollective=true ) const;
-    void TransposeMultiplyVectorSummationsCount
+    void TransposeMultiplyVectorSumsCount
     ( std::vector<int>& sizes ) const;
-    void TransposeMultiplyVectorSummationsPack
+    void TransposeMultiplyVectorSumsPack
     ( const MultiplyVectorContext& context, 
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void TransposeMultiplyVectorSummationsUnpack
+    void TransposeMultiplyVectorSumsUnpack
     ( MultiplyVectorContext& context, 
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void TransposeMultiplyVectorNaiveSummations
+    void TransposeMultiplyVectorNaiveSums
     ( MultiplyVectorContext& context ) const;
     void TransposeMultiplyVectorPassData
     ( MultiplyVectorContext& context,
@@ -801,17 +807,17 @@ private:
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
-    void TransposeMultiplyDenseSummations
+    void TransposeMultiplyDenseSums
     ( MultiplyDenseContext& context, bool customCollective=true ) const;
-    void TransposeMultiplyDenseSummationsCount
+    void TransposeMultiplyDenseSumsCount
     ( std::vector<int>& sizes, int numRhs ) const;
-    void TransposeMultiplyDenseSummationsPack
+    void TransposeMultiplyDenseSumsPack
     ( const MultiplyDenseContext& context,
       std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void TransposeMultiplyDenseSummationsUnpack
+    void TransposeMultiplyDenseSumsUnpack
     ( MultiplyDenseContext& context,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
-    void TransposeMultiplyDenseNaiveSummations
+    void TransposeMultiplyDenseNaiveSums
     ( MultiplyDenseContext& context ) const;
     void TransposeMultiplyDensePassData
     ( MultiplyDenseContext& context,
@@ -857,9 +863,9 @@ private:
     ( MultiplyVectorContext& context,
       Scalar alpha, const Vector<Scalar>& xLocal,
                           Vector<Scalar>& yLocal ) const;
-    void AdjointMultiplyVectorSummations
+    void AdjointMultiplyVectorSums
     ( MultiplyVectorContext& context, bool customCollective=true ) const;
-    void AdjointMultiplyVectorNaiveSummations
+    void AdjointMultiplyVectorNaiveSums
     ( MultiplyVectorContext& context ) const;
     void AdjointMultiplyVectorPassData
     ( MultiplyVectorContext& context, const Vector<Scalar>& xLocal ) const;
@@ -881,9 +887,9 @@ private:
     ( MultiplyDenseContext& context,
       Scalar alpha, const Dense<Scalar>& XLocal,
                           Dense<Scalar>& YLocal ) const;
-    void AdjointMultiplyDenseSummations
+    void AdjointMultiplyDenseSums
     ( MultiplyDenseContext& context, bool customCollective=true ) const;
-    void AdjointMultiplyDenseNaiveSummations
+    void AdjointMultiplyDenseNaiveSums
     ( MultiplyDenseContext& context ) const;
     void AdjointMultiplyDensePassData
     ( MultiplyDenseContext& context, const Dense<Scalar>& XLocal ) const;
@@ -1359,6 +1365,18 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
         mpi::CommSplit( comm, color, key, _teams[level] );
     }
 
+    _crossTeams.resize( numLevels );
+    mpi::CommDup( _teams[numLevels-1], _crossTeams[0] );
+    for( unsigned inverseLevel=1; inverseLevel<numLevels; ++inverseLevel )
+    {
+        const int level = numLevels-1-inverseLevel;
+        const int teamRank = mpi::CommRank( _teams[level] );
+        teamSize = mpi::CommSize( _teams[level] );
+        const int color = teamRank;
+        const int key = rank/teamSize;
+        mpi::CommSplit( comm, color, key, _crossTeams[level] );
+    }
+
     _rootTeams.resize( numRootLevels );
     mpi::CommDup( _teams[numLevels-1], _rootTeams[0] );
     for( unsigned inverseLevel=1; inverseLevel<numLevels; ++inverseLevel )
@@ -1393,6 +1411,8 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::~Teams()
 #endif
     for( unsigned i=0; i<_teams.size(); ++i )
         mpi::CommFree( _teams[i] );
+    for( unsigned i=0; i<_crossTeams.size(); ++i )
+        mpi::CommFree( _crossTeams[i] );
     for( unsigned i=0; i<_rootTeams.size(); ++i )
         mpi::CommFree( _rootTeams[i] );
 #ifndef RELEASE
@@ -1424,6 +1444,20 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Team
 
 template<typename Scalar,bool Conjugated>
 inline MPI_Comm
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::CrossTeam
+( unsigned inverseLevel ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::Teams::CrossTeam");
+    if( inverseLevel >= _crossTeams.size() )
+        throw std::logic_error("Invalid cross team request");
+    PopCallStack();
+#endif
+    return _crossTeams[inverseLevel];
+}
+
+template<typename Scalar,bool Conjugated>
+inline MPI_Comm
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::RootTeam
 ( unsigned inverseLevel ) const
 {
@@ -1438,14 +1472,66 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::RootTeam
 
 template<typename Scalar,bool Conjugated>
 inline void
-DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSummations
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
 (       std::vector<Scalar>& buffer, 
   const std::vector<int>& sizes,
   const std::vector<int>& offsets,
         bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::Teams::TreeSummations");
+    PushCallStack("DistQuasi2dHMat::Teams::TreeSums");
+#endif
+    const int numLevels = NumLevels();
+    const int totalSize = buffer.size();
+    if( numLevels == 1 || totalSize == 0 )
+        return;
+
+    const int numAllReduces = numLevels-1;
+    if( customCollective )
+    {
+        // Use O(log(p)) custom method: 
+        // - AllReduce over each cross communicator
+        int partialSize = totalSize;
+        for( int i=0; i<numAllReduces; ++i )
+        {
+            if( partialSize != 0 )
+            {
+                MPI_Comm crossTeam = CrossTeam( i );
+                mpi::AllReduce
+                ( (const Scalar*)MPI_IN_PLACE, &buffer[0], partialSize, MPI_SUM,
+                  crossTeam );
+                partialSize -= sizes[numAllReduces-1-i];
+            }
+        }
+    }
+    else
+    {
+        for( int i=0; i<numAllReduces; ++i )
+        {
+            if( sizes[i] != 0 )
+            {
+                MPI_Comm team = Team( i );
+                mpi::AllReduce
+                ( (const Scalar*)MPI_IN_PLACE, &buffer[offsets[i]],
+                  sizes[i], MPI_SUM, team );
+            }
+        }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+inline void
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
+(       std::vector<Scalar>& buffer, 
+  const std::vector<int>& sizes,
+  const std::vector<int>& offsets,
+        bool customCollective ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::Teams::TreeSumToRoots");
 #endif
     const int numLevels = NumLevels();
     const int totalSize = buffer.size();

@@ -85,8 +85,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MultiplyDenseInitialize( context, XLocal.Width() );
     MultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
-    MultiplyDenseSummations( context );
-    //MultiplyDenseNaiveSummations( context );
+    MultiplyDenseSums( context );
+    //MultiplyDenseNaiveSums( context );
 
     MultiplyDensePassData( context );
 
@@ -117,8 +117,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     TransposeMultiplyDenseInitialize( context, XLocal.Width() );
     TransposeMultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
-    TransposeMultiplyDenseSummations( context );
-    //TransposeMultiplyDenseNaiveSummations( context );
+    TransposeMultiplyDenseSums( context );
+    //TransposeMultiplyDenseNaiveSums( context );
 
     TransposeMultiplyDensePassData( context, XLocal );
 
@@ -149,8 +149,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
     AdjointMultiplyDenseInitialize( context, XLocal.Width() );
     AdjointMultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
-    AdjointMultiplyDenseSummations( context );
-    //AdjointMultiplyDenseNaiveSummations( context );
+    AdjointMultiplyDenseSums( context );
+    //AdjointMultiplyDenseNaiveSums( context );
 
     AdjointMultiplyDensePassData( context, XLocal );
 
@@ -599,11 +599,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSums
 ( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseSummations");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseSums");
 #endif
     // Compute the message sizes for each reduce 
     const int numLevels = _teams->NumLevels();
@@ -611,7 +611,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     if( numReduces == 0 )
         return;
     std::vector<int> sizes( numReduces, 0 );
-    MultiplyDenseSummationsCount( sizes, context.numRhs );
+    MultiplyDenseSumsCount( sizes, context.numRhs );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -623,15 +623,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    MultiplyDenseSummationsPack( context, buffer, offsets );
+    MultiplyDenseSumsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSummations( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    MultiplyDenseSummationsUnpack( context, buffer, offsets );
+    MultiplyDenseSumsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -639,18 +639,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSums
 ( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummations");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSums");
 #endif
     // Compute the message sizes for each reduce 
     const int numLevels = _teams->NumLevels();
     const int numReduces = numLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    TransposeMultiplyDenseSummationsCount( sizes, context.numRhs );
+    TransposeMultiplyDenseSumsCount( sizes, context.numRhs );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -660,15 +660,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
     std::vector<int> offsets( numReduces );
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    TransposeMultiplyDenseSummationsPack( context, buffer, offsets );
+    TransposeMultiplyDenseSumsPack( context, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSummations( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
-    TransposeMultiplyDenseSummationsUnpack( context, buffer, offsets );
+    TransposeMultiplyDenseSumsUnpack( context, buffer, offsets );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -676,14 +676,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSums
 ( MultiplyDenseContext& context, bool customCollective ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseSummations");
+    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseSums");
 #endif
     // This unconjugated version is identical
-    TransposeMultiplyDenseSummations( context, customCollective );
+    TransposeMultiplyDenseSums( context, customCollective );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -691,11 +691,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSumsCount
 ( std::vector<int>& sizes, int numRhs ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseSummationsCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseSumsCount");
 #endif
     switch( _block.type )
     {
@@ -706,7 +706,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseSummationsCount( sizes, numRhs );
+                node.Child(t,s).MultiplyDenseSumsCount( sizes, numRhs );
         break;
     }
     case DIST_LOW_RANK:
@@ -723,11 +723,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSumsCount
 ( std::vector<int>& sizes, int numRhs ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummationsCount");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSumsCount");
 #endif
     switch( _block.type )
     {
@@ -736,7 +736,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDenseSummationsCount
+                node.Child(t,s).TransposeMultiplyDenseSumsCount
                 ( sizes, numRhs );
         break;
     }
@@ -754,12 +754,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSumsPack
 ( const MultiplyDenseContext& context, 
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseSummationsPack");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseSumsPack");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
@@ -771,7 +771,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseSummationsPack
+                node.Child(t,s).MultiplyDenseSumsPack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -802,12 +802,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSumsPack
 ( const MultiplyDenseContext& context,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummationsPack");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSumsPack");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
@@ -819,7 +819,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDenseSummationsPack
+                node.Child(t,s).TransposeMultiplyDenseSumsPack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -850,12 +850,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsPack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSumsUnpack
 ( MultiplyDenseContext& context, 
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseSummationsUnpack");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseSumsUnpack");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
@@ -867,7 +867,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseSummationsUnpack
+                node.Child(t,s).MultiplyDenseSumsUnpack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -903,12 +903,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSummationsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSumsUnpack
 ( MultiplyDenseContext& context,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSummationsUnpack");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSumsUnpack");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
@@ -920,7 +920,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDenseSummationsUnpack
+                node.Child(t,s).TransposeMultiplyDenseSumsUnpack
                 ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
@@ -956,11 +956,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSummationsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSums
 ( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseNaiveSummations");
+    PushCallStack("DistQuasi2dHMat::MultiplyDenseNaiveSums");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
@@ -972,7 +972,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseNaiveSummations
+                node.Child(t,s).MultiplyDenseNaiveSums
                 ( nodeContext.Child(t,s) );
         break;
     }
@@ -1005,11 +1005,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSums
 ( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseNaiveSummations");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseNaiveSums");
 #endif
     const int numRhs = context.numRhs;
     switch( _block.type )
@@ -1021,7 +1021,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDenseNaiveSummations
+                node.Child(t,s).TransposeMultiplyDenseNaiveSums
                 ( nodeContext.Child(t,s) );
         break;
     }
@@ -1054,14 +1054,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSummations
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveSummations
+psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveSums
 ( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseNaiveSummations");
+    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseNaiveSums");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDenseNaiveSummations( context );
+    TransposeMultiplyDenseNaiveSums( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
