@@ -46,6 +46,7 @@ public:
 
         unsigned NumLevels() const;
         unsigned NumRootLevels() const;
+        unsigned TeamLevel( unsigned level ) const;
         MPI_Comm Team( unsigned level ) const;
         MPI_Comm CrossTeam( unsigned inverseLevel ) const;
         MPI_Comm RootTeam( unsigned inverseLevel ) const;
@@ -1451,11 +1452,18 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::NumRootLevels() const
 }
 
 template<typename Scalar,bool Conjugated>
+inline unsigned
+DistQuasi2dHMat<Scalar,Conjugated>::Teams::TeamLevel( unsigned level ) const
+{
+    return std::min(level,(unsigned)_teams.size()-1);
+}
+
+template<typename Scalar,bool Conjugated>
 inline MPI_Comm
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::Team
 ( unsigned level ) const
 {
-    return _teams[std::min(level,(unsigned)_teams.size()-1)];
+    return _teams[TeamLevel(level)];
 }
 
 template<typename Scalar,bool Conjugated>

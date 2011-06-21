@@ -1393,7 +1393,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
             const DistLowRank& DFA = *A._block.data.DF;
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
-                sizes[A._level] += DFA.rank*DFB.rank;
+            {
+                const int teamLevel = A._teams->TeamLevel(A._level);
+                sizes[teamLevel] += DFA.rank*DFB.rank;
+            }
             break;
         }
         default:
@@ -1460,10 +1463,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
             {
+                const int teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
-                ( &buffer[offsets[A._level]], C._ZMap[key]->LockedBuffer(),
+                ( &buffer[offsets[teamLevel]], C._ZMap[key]->LockedBuffer(),
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level] += DFA.rank*DFB.rank;
+                offsets[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -1532,10 +1536,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
             {
+                const int teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
-                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level]],
+                ( C._ZMap[key]->Buffer(), &buffer[offsets[teamLevel]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level] += DFA.rank*DFB.rank;
+                offsets[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -3396,7 +3401,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
             const DistLowRank& DFA = *A._block.data.DF;
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inTargetTeam )
-                sizes[A._level] += DFA.rank*DFB.rank;
+            {
+                const int teamLevel = A._teams->TeamLevel(A._level);
+                sizes[teamLevel] += DFA.rank*DFB.rank;
+            }
             break;
         }
         default:
@@ -3466,10 +3474,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
             const int teamRank = mpi::CommRank( team );
             if( A._inTargetTeam && teamRank == 0 )
             {
+                const int teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
-                ( &buffer[offsets[A._level]], C._ZMap[key]->LockedBuffer(),
+                ( &buffer[offsets[teamLevel]], C._ZMap[key]->LockedBuffer(),
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level] += DFA.rank*DFB.rank;
+                offsets[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -3538,10 +3547,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inTargetTeam )
             {
+                const int teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
-                ( C._ZMap[key]->Buffer(), &buffer[offsets[A._level]],
+                ( C._ZMap[key]->Buffer(), &buffer[offsets[teamLevel]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._level] += DFA.rank*DFB.rank;
+                offsets[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -6056,13 +6066,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
     case LOW_RANK:
         if( _inTargetTeam )
         {
-            numQrs[_level] += _colXMap.Size();
-            ++numTargetFHH[_level];
+            const int teamLevel = _teams->TeamLevel(_level);
+            numQrs[teamLevel] += _colXMap.Size();
+            ++numTargetFHH[teamLevel];
         }
         if( _inSourceTeam )
         {
-            numQrs[_level] += _rowXMap.Size();
-            ++numSourceFHH[_level];
+            const int teamLevel = _teams->TeamLevel(_level);
+            numQrs[teamLevel] += _rowXMap.Size();
+            ++numSourceFHH[teamLevel];
         }
         break;
     default:
@@ -6110,9 +6122,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                     // Handle the middle update, Omega2' (alpha A B Omega1)
                     const Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
                     const Dense<Scalar>& Omega2 = A._rowOmega;
+                    const int teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* middleUpdate = 
-                        &allReduceBuffer[middleOffsets[C._level]];
-                    middleOffsets[C._level] += r*r;
+                        &allReduceBuffer[middleOffsets[teamLevel]];
+                    middleOffsets[teamLevel] += r*r;
 
                     blas::Gemm
                     ( 'C', 'N', r, r, A.LocalHeight(),
@@ -6183,27 +6196,29 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
 
         if( _inTargetTeam )
         {
-            _colXMap.ResetIterator();
             const int numEntries = _colXMap.Size();
+            const int teamLevel = _teams->TeamLevel(_level);
+            _colXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
                 Dense<Scalar>& X = *_colXMap.NextEntry();
-                Xs[XOffsets[_level]++] = &X;
+                Xs[XOffsets[teamLevel]++] = &X;
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
-                  &tauBuffer[tauOffsets[_level]], &work[0], work.size() );
-                tauOffsets[_level] += (log2TeamSize+1)*r;
+                  &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+                tauOffsets[teamLevel] += (log2TeamSize+1)*r;
                 if( log2TeamSize > 0 )
                 {
                     std::memset
-                    ( &qrBuffer[qrOffsets[_level]], 0, (r*r+r)*sizeof(Scalar) );
+                    ( &qrBuffer[qrOffsets[teamLevel]], 0, 
+                      (r*r+r)*sizeof(Scalar) );
                     if( (teamRank & 1) == 0 )
                     {
                         // Copy our R into the upper triangle of the next
                         // matrix to factor (which is 2r x r)
                         for( int j=0; j<X.Width(); ++j )
                             std::memcpy
-                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)],
+                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
                               X.LockedBuffer(0,j), 
                               std::min(X.Height(),j+1)*sizeof(Scalar) );
                     }
@@ -6213,37 +6228,39 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                         // matrix to factor (which is 2r x r)
                         for( int j=0; j<X.Width(); ++j )
                             std::memcpy
-                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)+(j+1)],
+                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
                               X.LockedBuffer(0,j), 
                               std::min(X.Height(),j+1)*sizeof(Scalar) );
                     }
                 }
-                qrOffsets[_level] += log2TeamSize*(r*r+r);
+                qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             }
         }
         if( _inSourceTeam )
         {
-            _rowXMap.ResetIterator();
             const int numEntries = _rowXMap.Size();
+            const int teamLevel = _teams->TeamLevel(_level);
+            _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
                 Dense<Scalar>& X = *_rowXMap.NextEntry();
-                Xs[XOffsets[_level]++] = &X;
+                Xs[XOffsets[teamLevel]++] = &X;
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
-                  &tauBuffer[tauOffsets[_level]], &work[0], work.size() );
-                tauOffsets[_level] += (log2TeamSize+1)*r;
+                  &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+                tauOffsets[teamLevel] += (log2TeamSize+1)*r;
                 if( log2TeamSize > 0 )
                 {
                     std::memset
-                    ( &qrBuffer[qrOffsets[_level]], 0, (r*r+r)*sizeof(Scalar) );
+                    ( &qrBuffer[qrOffsets[teamLevel]], 0, 
+                      (r*r+r)*sizeof(Scalar) );
                     if( (teamRank & 1) == 0 )
                     {
                         // Copy our R into the upper triangle of the next
                         // matrix to factor (which is 2r x r)
                         for( int j=0; j<X.Width(); ++j )
                             std::memcpy
-                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)],
+                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
                               X.LockedBuffer(0,j), 
                               std::min(X.Height(),j+1)*sizeof(Scalar) );
                     }
@@ -6253,12 +6270,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                         // matrix to factor (which is 2r x r)
                         for( int j=0; j<X.Width(); ++j )
                             std::memcpy
-                            ( &qrBuffer[qrOffsets[_level]+(j*j+j)+(j+1)],
+                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
                               X.LockedBuffer(0,j), 
                               std::min(X.Height(),j+1)*sizeof(Scalar) );
                     }
                 }
-                qrOffsets[_level] += log2TeamSize*(r*r+r);
+                qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             }
         }
         break;
@@ -6309,9 +6326,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     // Handle the left update, Q1' Omega2
                     const Dense<Scalar>& Q1 = *C._colXMap[A._sourceOffset];
                     const Dense<Scalar>& Omega2 = A._rowOmega;
+                    const int teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* leftUpdate = 
-                        &allReduceBuffer[leftOffsets[C._level]];
-                    leftOffsets[C._level] += r*r;
+                        &allReduceBuffer[leftOffsets[teamLevel]];
+                    leftOffsets[teamLevel] += r*r;
 
                     blas::Gemm
                     ( 'C', 'N', r, r, A.LocalHeight(),
@@ -6324,9 +6342,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     // Handle the right update, Q2' Omega1
                     const Dense<Scalar>& Q2 = *C._rowXMap[A._sourceOffset];
                     const Dense<Scalar>& Omega1 = B._colOmega;
+                    const int teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* rightUpdate = 
-                        &allReduceBuffer[rightOffsets[C._level]];
-                    rightOffsets[_level] += r*r;
+                        &allReduceBuffer[rightOffsets[teamLevel]];
+                    rightOffsets[teamLevel] += r*r;
 
                     blas::Gemm
                     ( 'C', 'N', r, r, B.LocalWidth(),
@@ -6403,14 +6422,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 {
                     // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     // in the place of X.
+                    const int teamLevel = C._teams->TeamLevel(C._level);
                     Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
 
                     Scalar* leftUpdate = 
-                        &allReduceBuffer[leftOffsets[C._level]];
+                        &allReduceBuffer[leftOffsets[teamLevel]];
                     const Scalar* middleUpdate = 
-                        &allReduceBuffer[middleOffsets[C._level]];
-                    leftOffsets[C._level] += r*r;
-                    middleOffsets[C._level] += r*r;
+                        &allReduceBuffer[middleOffsets[teamLevel]];
+                    leftOffsets[teamLevel] += r*r;
+                    middleOffsets[teamLevel] += r*r;
 
                     lapack::AdjointPseudoInverse
                     ( r, r, leftUpdate, r, &singularValues[0],
@@ -6440,10 +6460,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 {
                     // Form Q2 pinv(Q2' Omega1) or its conjugate
                     Dense<Scalar>& X = *C._rowXMap[A._sourceOffset];
+                    const int teamLevel = C._teams->TeamLevel(C._level);
 
                     Scalar* rightUpdate = 
-                        &allReduceBuffer[rightOffsets[C._level]];
-                    rightOffsets[_level] += r*r;
+                        &allReduceBuffer[rightOffsets[teamLevel]];
+                    rightOffsets[teamLevel] += r*r;
 
                     lapack::AdjointPseudoInverse
                     ( r, r, rightUpdate, r, &singularValues[0],
@@ -6520,15 +6541,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
     {
         if( _inTargetTeam )
         {
-            _UMap.ResetIterator();
             const int numEntries = _UMap.Size();
+            _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
                 rank += _UMap.NextEntry()->Width();
         }
         else if( _inSourceTeam )
         {
-            _VMap.ResetIterator();
             const int numEntries = _VMap.Size();
+            _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
                 rank += _VMap.NextEntry()->Width();
         }
@@ -6546,25 +6567,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
         // Compute the total update rank
         if( _inTargetTeam )
         {
-            _colXMap.ResetIterator();
             int numEntries = _colXMap.Size();
+            _colXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
                 rank += _colXMap.NextEntry()->Width();
 
-            _UMap.ResetIterator();
             numEntries = _UMap.Size();
+            _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
                 rank += _UMap.NextEntry()->Width();
         }
         else if( _inSourceTeam )
         {
-            _rowXMap.ResetIterator();
             int numEntries = _rowXMap.Size();
+            _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
                 rank += _rowXMap.NextEntry()->Width();
 
-            _VMap.ResetIterator();
             numEntries = _VMap.Size();
+            _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
                 rank += _VMap.NextEntry()->Width();
         }
@@ -6602,25 +6623,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
             // Compute the total update rank
             if( _inTargetTeam )
             {
-                _colXMap.ResetIterator();
                 int numEntries = _colXMap.Size();
+                _colXMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                     rank += _colXMap.NextEntry()->Width();
 
-                _UMap.ResetIterator();
                 numEntries = _UMap.Size();
+                _UMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                     rank += _UMap.NextEntry()->Width();
             }
             else 
             {
-                _rowXMap.ResetIterator();
                 int numEntries = _rowXMap.Size();
+                _rowXMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                     rank += _rowXMap.NextEntry()->Width();
 
-                _VMap.ResetIterator();
                 numEntries = _VMap.Size();
+                _VMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                     rank += _VMap.NextEntry()->Width();
             }
@@ -6658,13 +6679,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
         {
             // Compute the total update rank
             {
-                _colXMap.ResetIterator();
                 int numEntries = _colXMap.Size();
+                _colXMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                     rank += _colXMap.NextEntry()->Width();
 
-                _UMap.ResetIterator();
                 numEntries = _UMap.Size();
+                _UMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                     rank += _UMap.NextEntry()->Width();
             }
@@ -6716,8 +6737,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
         int newRank = rank;
         if( _inTargetTeam )
         {
-            _UMap.ResetIterator();
             const int numEntries = _UMap.Size();
+            _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
                 const Dense<Scalar>& U = *_UMap.NextEntry();
@@ -6739,8 +6760,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
         if( _inSourceTeam )
         {
             newRank = rank;
-            _VMap.ResetIterator();
             const int numEntries = _VMap.Size();
+            _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
                 const Dense<Scalar>& V = *_VMap.NextEntry();
