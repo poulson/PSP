@@ -1124,8 +1124,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
-    const int numLevels = _teams->NumLevels();
-    const int numReduces = numLevels-1;
+    const unsigned numTeamLevels = _teams->NumLevels();
+    const unsigned numReduces = numTeamLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     A.MultiplyHMatMainSumsCountA( sizes );
@@ -1134,11 +1134,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
-    for( int i=0; i<numReduces; ++i )
+    for( unsigned i=0; i<numReduces; ++i )
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numReduces );
-    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     A.MultiplyHMatMainSumsPackA( buffer, offsets );
     B.MultiplyHMatMainSumsPackB( buffer, offsets );
@@ -1146,7 +1146,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
-    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     A._teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
@@ -1394,7 +1394,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
             {
-                const int teamLevel = A._teams->TeamLevel(A._level);
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
                 sizes[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
@@ -1463,7 +1463,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
             {
-                const int teamLevel = A._teams->TeamLevel(A._level);
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
                 ( &buffer[offsets[teamLevel]], C._ZMap[key]->LockedBuffer(),
                   DFA.rank*DFB.rank*sizeof(Scalar) );
@@ -1536,7 +1536,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inSourceTeam )
             {
-                const int teamLevel = A._teams->TeamLevel(A._level);
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
                 ( C._ZMap[key]->Buffer(), &buffer[offsets[teamLevel]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
@@ -3126,8 +3126,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each broadcast
-    const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = numLevels-1;
+    const unsigned numTeamLevels = _teams->NumLevels();
+    const unsigned numBroadcasts = numTeamLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     A.MultiplyHMatMainBroadcastsCountA( sizes );
@@ -3137,11 +3137,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     // Pack all of the data to be broadcast into a single buffer
     // (only roots of communicators contribute)
     int totalSize = 0;
-    for( int i=0; i<numBroadcasts; ++i )
+    for( unsigned i=0; i<numBroadcasts; ++i )
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numBroadcasts );
-    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     A.MultiplyHMatMainBroadcastsPackA( buffer, offsets );
     B.MultiplyHMatMainBroadcastsPackB( buffer, offsets );
@@ -3149,7 +3149,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
-    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     A._teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
 
@@ -3402,7 +3402,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inTargetTeam )
             {
-                const int teamLevel = A._teams->TeamLevel(A._level);
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
                 sizes[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
@@ -3474,7 +3474,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
             const int teamRank = mpi::CommRank( team );
             if( A._inTargetTeam && teamRank == 0 )
             {
-                const int teamLevel = A._teams->TeamLevel(A._level);
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
                 ( &buffer[offsets[teamLevel]], C._ZMap[key]->LockedBuffer(),
                   DFA.rank*DFB.rank*sizeof(Scalar) );
@@ -3547,7 +3547,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
             const DistLowRank& DFB = *B._block.data.DF;
             if( A._inTargetTeam )
             {
-                const int teamLevel = A._teams->TeamLevel(A._level);
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
                 std::memcpy
                 ( C._ZMap[key]->Buffer(), &buffer[offsets[teamLevel]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
@@ -4685,25 +4685,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
-    const int numLevels = _teams->NumLevels();
-    const int numReduces = numLevels-1;
+    const unsigned numTeamLevels = _teams->NumLevels();
+    const unsigned numReduces = numTeamLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     A.MultiplyHMatFHHSumsCount( B, C, sizes );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
-    for( int i=0; i<numReduces; ++i )
+    for( unsigned i=0; i<numReduces; ++i )
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numReduces );
-    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     A.MultiplyHMatFHHSumsPack( B, C, buffer, offsets );
 
     // Reset the offsets vector and then perform the reduces. There should be
     // at most log_4(p) reduces.
-    for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     A._teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
 
@@ -5161,8 +5161,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each broadcast
-    const int numLevels = _teams->NumLevels();
-    const int numBroadcasts = numLevels-1;
+    const unsigned numTeamLevels = _teams->NumLevels();
+    const unsigned numBroadcasts = numTeamLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     A.MultiplyHMatFHHBroadcastsCount( B, C, sizes );
@@ -5170,17 +5170,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     // Pack all of the data to be broadcast into a single buffer
     // (only roots of communicators contribute)
     int totalSize = 0;
-    for( int i=0; i<numBroadcasts; ++i )
+    for( unsigned i=0; i<numBroadcasts; ++i )
         totalSize += sizes[i];
     std::vector<Scalar> buffer( totalSize );
     std::vector<int> offsets( numBroadcasts );
-    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     A.MultiplyHMatFHHBroadcastsPack( B, C, buffer, offsets );
 
     // Reset the offsets vector and then perform the broadcasts. There should be
     // at most log_4(p) broadcasts.
-    for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
+    for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     A._teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
 
@@ -5526,17 +5526,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     const int r = SampleRank( C.MaxRank() );
-    const int numLevels = C._teams->NumLevels();
-    std::vector<int> numQrs(numLevels,0), 
-                     numTargetFHH(numLevels,0), numSourceFHH(numLevels,0);
+    const unsigned numTeamLevels = C._teams->NumLevels();
+    std::vector<int> numQrs(numTeamLevels,0), 
+                     numTargetFHH(numTeamLevels,0), 
+                     numSourceFHH(numTeamLevels,0);
     C.MultiplyHMatFHHFinalizeCounts( numQrs, numTargetFHH, numSourceFHH );
 
     // Set up the space for the packed 2r x r matrices and taus.
     int numTotalQrs=0, qrTotalSize=0, tauTotalSize=0;
-    std::vector<int> XOffsets(numLevels),
-                     qrOffsets(numLevels), qrPieceSizes(numLevels), 
-                     tauOffsets(numLevels), tauPieceSizes(numLevels);
-    for( int i=0; i<numLevels; ++i )
+    std::vector<int> XOffsets(numTeamLevels),
+                     qrOffsets(numTeamLevels), qrPieceSizes(numTeamLevels), 
+                     tauOffsets(numTeamLevels), tauPieceSizes(numTeamLevels);
+    for( unsigned i=0; i<numTeamLevels; ++i )
     {
         MPI_Comm team = C._teams->Team( i );
         const unsigned teamSize = mpi::CommSize( team );
@@ -5562,17 +5563,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     // before we overwrite the _colXMap and _rowXMap results.
     // The distributed summations will not occur until after the parallel
     // QR factorizations.
-    std::vector<int> leftOffsets(numLevels), middleOffsets(numLevels), 
-                     rightOffsets(numLevels);
+    std::vector<int> leftOffsets(numTeamLevels), middleOffsets(numTeamLevels), 
+                     rightOffsets(numTeamLevels);
     int totalAllReduceSize = 0;
-    for( int level=0; level<numLevels; ++level )
+    for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
     {
-        leftOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numTargetFHH[level]*r*r;
-        middleOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numTargetFHH[level]*r*r;
-        rightOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numSourceFHH[level]*r*r;
+        leftOffsets[teamLevel] = totalAllReduceSize;
+        totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
+        middleOffsets[teamLevel] = totalAllReduceSize;
+        totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
+        rightOffsets[teamLevel] = totalAllReduceSize;
+        totalAllReduceSize += numSourceFHH[teamLevel]*r*r;
     }
     std::vector<Scalar> allReduceBuffer( totalAllReduceSize );
     A.MultiplyHMatFHHFinalizeMiddleUpdates
@@ -5584,7 +5585,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
     // Reset the offset vectors
     numTotalQrs = qrTotalSize = tauTotalSize = 0;
-    for( int i=0; i<numLevels; ++i )
+    for( unsigned i=0; i<numTeamLevels; ++i )
     {
         XOffsets[i] = numTotalQrs;
         qrOffsets[i] = qrTotalSize;
@@ -5593,7 +5594,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
     // Perform the combined distributed TSQR factorizations.
     // This could almost certainly be simplified...
-    const int numSteps = numLevels-1;
+    const int numSteps = numTeamLevels-1;
     for( int level=0; level<numSteps; ++level )
     {
         MPI_Comm team = C._teams->Team( level );
@@ -5888,19 +5889,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     // Explicitly form the Q's
     Dense<Scalar> Z( 2*r, r );
     std::vector<Scalar> applyQWork( r, 1 );
-    for( int level=0; level<numLevels; ++level )
+    for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
     {
-        MPI_Comm team = C._teams->Team( level );
+        MPI_Comm team = C._teams->Team( teamLevel );
         const unsigned teamSize = mpi::CommSize( team );
         const unsigned log2TeamSize = Log2( teamSize );
         const unsigned teamRank = mpi::CommRank( team );
-        const Scalar* thisQrLevel = &qrBuffer[qrOffsets[level]];
-        const Scalar* thisTauLevel = &tauBuffer[tauOffsets[level]];
+        const Scalar* thisQrLevel = &qrBuffer[qrOffsets[teamLevel]];
+        const Scalar* thisTauLevel = &tauBuffer[tauOffsets[teamLevel]];
 
-        for( int k=0; k<numQrs[level]; ++k )
+        for( int k=0; k<numQrs[teamLevel]; ++k )
         {
-            const Scalar* thisQrPiece = &thisQrLevel[k*qrPieceSizes[level]];
-            const Scalar* thisTauPiece = &thisTauLevel[k*tauPieceSizes[level]];
+            const Scalar* thisQrPiece = &thisQrLevel[k*qrPieceSizes[teamLevel]];
+            const Scalar* thisTauPiece = 
+                &thisTauLevel[k*tauPieceSizes[teamLevel]];
             const Scalar* lastQrStage = &thisQrPiece[(log2TeamSize-1)*(r*r+r)];
             const Scalar* lastTauStage = &thisTauPiece[log2TeamSize*r];
 
@@ -5942,7 +5944,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 }
                 // Take care of the original stage. Do so by forming Y := X, 
                 // then zeroing X and placing our piece of Z at its top.
-                Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
+                Dense<Scalar>& X = *Xs[XOffsets[teamLevel]+k]; 
                 const int m = X.Height();
                 const int minDim = std::min( m, r );
                 Dense<Scalar> Y;
@@ -5974,7 +5976,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             }
             else // this team only contains one process
             {
-                Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
+                Dense<Scalar>& X = *Xs[XOffsets[teamLevel]+k]; 
                 const int m = X.Height();
                 const int minDim = std::min(m,r);
 
@@ -6010,17 +6012,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         // for each entire level.
         std::vector<int> sizes, offsets;
         totalAllReduceSize = 0;
-        for( int level=0; level<numLevels; ++level )
+        for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
         {
-            offsets[level] = totalAllReduceSize;
-            sizes[level] = r*r*(2*numTargetFHH[level]+numSourceFHH[level]);
+            offsets[teamLevel] = totalAllReduceSize;
+            sizes[teamLevel] = r*r*(2*numTargetFHH[teamLevel]+
+                                      numSourceFHH[teamLevel]);
 
-            leftOffsets[level] = totalAllReduceSize;
-            totalAllReduceSize += numTargetFHH[level]*r*r;
-            middleOffsets[level] = totalAllReduceSize;
-            totalAllReduceSize += numTargetFHH[level]*r*r;
-            rightOffsets[level] = totalAllReduceSize;
-            totalAllReduceSize += numSourceFHH[level]*r*r;
+            leftOffsets[teamLevel] = totalAllReduceSize;
+            totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
+            middleOffsets[teamLevel] = totalAllReduceSize;
+            totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
+            rightOffsets[teamLevel] = totalAllReduceSize;
+            totalAllReduceSize += numSourceFHH[teamLevel]*r*r;
         }
 
         A._teams->TreeSums( allReduceBuffer, sizes, offsets );
@@ -6066,13 +6069,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
     case LOW_RANK:
         if( _inTargetTeam )
         {
-            const int teamLevel = _teams->TeamLevel(_level);
+            const unsigned teamLevel = _teams->TeamLevel(_level);
             numQrs[teamLevel] += _colXMap.Size();
             ++numTargetFHH[teamLevel];
         }
         if( _inSourceTeam )
         {
-            const int teamLevel = _teams->TeamLevel(_level);
+            const unsigned teamLevel = _teams->TeamLevel(_level);
             numQrs[teamLevel] += _rowXMap.Size();
             ++numSourceFHH[teamLevel];
         }
@@ -6122,7 +6125,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                     // Handle the middle update, Omega2' (alpha A B Omega1)
                     const Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
                     const Dense<Scalar>& Omega2 = A._rowOmega;
-                    const int teamLevel = C._teams->TeamLevel(C._level);
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* middleUpdate = 
                         &allReduceBuffer[middleOffsets[teamLevel]];
                     middleOffsets[teamLevel] += r*r;
@@ -6196,10 +6199,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
 
         if( _inTargetTeam )
         {
-            const int numEntries = _colXMap.Size();
-            const int teamLevel = _teams->TeamLevel(_level);
+            const unsigned numEntries = _colXMap.Size();
+            const unsigned teamLevel = _teams->TeamLevel(_level);
             _colXMap.ResetIterator();
-            for( int i=0; i<numEntries; ++i )
+            for( unsigned i=0; i<numEntries; ++i )
             {
                 Dense<Scalar>& X = *_colXMap.NextEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
@@ -6239,7 +6242,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
         if( _inSourceTeam )
         {
             const int numEntries = _rowXMap.Size();
-            const int teamLevel = _teams->TeamLevel(_level);
+            const unsigned teamLevel = _teams->TeamLevel(_level);
             _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
@@ -6326,7 +6329,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     // Handle the left update, Q1' Omega2
                     const Dense<Scalar>& Q1 = *C._colXMap[A._sourceOffset];
                     const Dense<Scalar>& Omega2 = A._rowOmega;
-                    const int teamLevel = C._teams->TeamLevel(C._level);
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[teamLevel]];
                     leftOffsets[teamLevel] += r*r;
@@ -6342,7 +6345,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     // Handle the right update, Q2' Omega1
                     const Dense<Scalar>& Q2 = *C._rowXMap[A._sourceOffset];
                     const Dense<Scalar>& Omega1 = B._colOmega;
-                    const int teamLevel = C._teams->TeamLevel(C._level);
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
                     rightOffsets[teamLevel] += r*r;
@@ -6422,7 +6425,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 {
                     // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     // in the place of X.
-                    const int teamLevel = C._teams->TeamLevel(C._level);
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
 
                     Scalar* leftUpdate = 
@@ -6460,7 +6463,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 {
                     // Form Q2 pinv(Q2' Omega1) or its conjugate
                     Dense<Scalar>& X = *C._rowXMap[A._sourceOffset];
-                    const int teamLevel = C._teams->TeamLevel(C._level);
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
 
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
@@ -6516,7 +6519,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQR()
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQR");
 #endif
-    MultiplyHMatFinalQRLowRankResize( 0 );
+    const unsigned numTeamLevels = _teams->NumLevels();
+
+    // Count the number of nodes which we are in the target team of that are
+    // low rank, and likewise for source teams
+    std::vector<int> numTargetNodes(numTeamLevels,0), 
+                     numSourceNodes(numTeamLevels,0);
+    MultiplyHMatFinalQRCountNodes( numTargetNodes, numSourceNodes );
+
+    int totalTargetNodes=0, totalSourceNodes=0;
+    std::vector<int> targetOffsets(numTeamLevels), sourceOffsets(numTeamLevels);
+    for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
+    {
+        targetOffsets[teamLevel] = totalTargetNodes;        
+        sourceOffsets[teamLevel] = totalSourceNodes;
+        totalTargetNodes += numTargetNodes[teamLevel];
+        totalSourceNodes += numSourceNodes[teamLevel];
+    }
+    std::vector<int> targetRanks(totalTargetNodes), 
+                     sourceRanks(totalSourceNodes);
+    MultiplyHMatFinalQRLowRankCountAndResize
+    ( targetRanks, targetOffsets, sourceRanks, sourceOffsets, 0 );
+
     MultiplyHMatFinalQRLowRankImport( 0 );
     // HERE
     //MultiplyHMatFinalQRStartComp();
@@ -6527,11 +6551,52 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQR()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
-( int rank )
+psp::DistQuasi2dHMat<Scalar,Conjugated>::
+MultiplyHMatFinalQRCountNodes
+( std::vector<int>& numTargetNodes, std::vector<int>& numSourceNodes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRLowRankResize");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRCountNodes");
+#endif
+    const unsigned teamLevel = _teams->TeamLevel( _level );
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatFinalQRCountNodes
+                ( numTargetNodes, numSourceNodes );
+        break;
+    }
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+        if( _inTargetTeam )
+            ++numTargetNodes[teamLevel];
+        if( _inSourceTeam )
+            ++numSourceNodes[teamLevel];
+        break;
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::
+MultiplyHMatFinalQRLowRankCountAndResize
+( std::vector<int>& targetRanks, std::vector<int>& targetOffsets,
+  std::vector<int>& sourceRanks, std::vector<int>& sourceOffsets, int rank )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRLowRankCountAndResize");
 #endif
     switch( _block.type )
     {
@@ -6557,7 +6622,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFinalQRLowRankResize( rank );
+                node.Child(t,s).MultiplyHMatFinalQRLowRankCountAndResize
+                ( targetRanks, targetOffsets, 
+                  sourceRanks, sourceOffsets, rank );
         break;
     }
     case DIST_LOW_RANK:
@@ -6590,9 +6657,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
                 rank += _VMap.NextEntry()->Width();
         }
 
-        // Create the space
+        // Store the rank and create the space
+        const unsigned teamLevel = _teams->TeamLevel( _level );
         if( _inTargetTeam )
         {
+            targetRanks[targetOffsets[teamLevel]++] = rank;
             const int oldRank = DF.ULocal.Width();
             Dense<Scalar> ULocalCopy;
             hmat_tools::Copy( DF.ULocal, ULocalCopy );
@@ -6603,6 +6672,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
         }
         if( _inSourceTeam )
         {
+            sourceRanks[sourceOffsets[teamLevel]++] = rank;
             const int oldRank = DF.VLocal.Width();
             Dense<Scalar> VLocalCopy;
             hmat_tools::Copy( DF.VLocal, VLocalCopy );
@@ -6617,7 +6687,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
     {
         SplitLowRank& SF = *_block.data.SF;
 
-        const int numDenseUpdates = _DMap.Size();
+        const unsigned numDenseUpdates = _DMap.Size();
+        const unsigned teamLevel = _teams->TeamLevel( _level );
         if( numDenseUpdates == 0 )
         {
             // Compute the total update rank
@@ -6646,9 +6717,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
                     rank += _VMap.NextEntry()->Width();
             }
 
-            // Create the space
+            // Store the rank and create the space
             if( _inTargetTeam )
             {
+                targetRanks[targetOffsets[teamLevel]++] = rank;
                 const int oldRank = SF.D.Width();
                 Dense<Scalar> UCopy;
                 hmat_tools::Copy( SF.D, UCopy );
@@ -6659,6 +6731,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
             }
             else
             {
+                sourceRanks[sourceOffsets[teamLevel]++] = rank;
                 const int oldRank = SF.D.Width();
                 Dense<Scalar> VCopy;
                 hmat_tools::Copy( SF.D, VCopy );
@@ -6668,13 +6741,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
                   Width()*rank*sizeof(Scalar) );
             }
         }
+        else
+        {
+            if( _inTargetTeam )
+                targetRanks[targetOffsets[teamLevel]++] = 0;
+            else
+                sourceRanks[sourceOffsets[teamLevel]++] = 0;
+        }
         break;
     }
     case LOW_RANK:
     {
         LowRank<Scalar,Conjugated>& F = *_block.data.F;
 
-        const int numDenseUpdates = _DMap.Size();
+        const unsigned numDenseUpdates = _DMap.Size();
+        const unsigned teamLevel = _teams->TeamLevel( _level );
         if( numDenseUpdates == 0 )
         {
             // Compute the total update rank
@@ -6690,8 +6771,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
                     rank += _UMap.NextEntry()->Width();
             }
 
-            // Create the space
+            // Store the ranks and create the space
             {
+                targetRanks[targetOffsets[teamLevel]++] = rank;
+                sourceRanks[sourceOffsets[teamLevel]++] = rank;
                 const int oldRank = F.Rank();
 
                 Dense<Scalar> UCopy;
@@ -6708,6 +6791,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankResize
                 ( F.V.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
                   Width()*rank*sizeof(Scalar) );
             }
+        }
+        else
+        {
+            targetRanks[targetOffsets[teamLevel]++] = 0;
+            sourceRanks[sourceOffsets[teamLevel]++] = 0;
         }
         break;
     }

@@ -762,7 +762,13 @@ private:
             std::vector<Real>& svdRealWork ) const;
 
     void MultiplyHMatFinalQR();
-    void MultiplyHMatFinalQRLowRankResize( int rank );
+    void MultiplyHMatFinalQRCountNodes
+    ( std::vector<int>& numTargetNodes, 
+      std::vector<int>& numSourceNodes ) const;
+    void MultiplyHMatFinalQRLowRankCountAndResize
+    ( std::vector<int>& targetRanks, std::vector<int>& targetOffsets,
+      std::vector<int>& sourceRanks, std::vector<int>& sourceOffsets, 
+      int rank );
     void MultiplyHMatFinalQRLowRankImport( int rank );
     void MultiplyHMatFinalQRImportU( int rank, const Dense<Scalar>& U );
     void MultiplyHMatFinalQRImportV( int rank, const Dense<Scalar>& V );
