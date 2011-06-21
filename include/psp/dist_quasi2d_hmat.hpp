@@ -31,6 +31,8 @@ template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMat
 {
 public:
+    typedef typename RealBase<Scalar>::type Real;
+
     /*
      * Public data structures
      */
@@ -70,6 +72,8 @@ public:
     /*
      * Public static member functions
      */
+    static int SampleRank( int approxRank ) { return approxRank + 4; }
+
     static std::size_t PackedSizes
     ( std::vector<std::size_t>& packedSizes,
       const Quasi2dHMat<Scalar,Conjugated>& H, const Teams& teams );
@@ -743,6 +747,18 @@ private:
             std::vector<Scalar>& allReduceBuffer,
             std::vector<int>& leftOffsets, 
             std::vector<int>& rightOffsets ) const;
+    void MultiplyHMatFHHFinalizeFormLowRank
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+            DistQuasi2dHMat<Scalar,Conjugated>& C,
+            std::vector<Scalar>& allReduceBuffer,
+            std::vector<int>& leftOffsets,
+            std::vector<int>& middleOffsets,
+            std::vector<int>& rightOffsets,
+            std::vector<Real>& singularValues,
+            std::vector<Scalar>& U,
+            std::vector<Scalar>& VH,
+            std::vector<Scalar>& svdWork,
+            std::vector<Real>& svdRealWork ) const;
 
     void MultiplyHMatFinalQR();
     void MultiplyHMatFinalQRLowRankResize( int rank );

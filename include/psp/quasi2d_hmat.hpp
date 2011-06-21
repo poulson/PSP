@@ -155,6 +155,8 @@ public:
     /*
      * Public static member functions
      */
+    static int SampleRank( int approxRank ) { return approxRank + 4; }
+
     static void BuildNaturalToHierarchicalMap
     ( std::vector<int>& map, int xSize, int ySize, int zSize, int numLevels );
 

@@ -272,7 +272,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
         C._block.type = EMPTY;
@@ -344,16 +344,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 {
                     if( A._inTargetTeam )
                     {
-                        A._rowOmega.Resize( A.LocalHeight(), paddedRank );
+                        A._rowOmega.Resize( A.LocalHeight(), sampleRank );
                         ParallelGaussianRandomVectors( A._rowOmega );
                     }
                     if( A._inSourceTeam )
                     {
-                        A._rowT.Resize( A.LocalWidth(), paddedRank );
+                        A._rowT.Resize( A.LocalWidth(), sampleRank );
                         hmat_tools::Scale( (Scalar)0, A._rowT );
                     }
                     A.AdjointMultiplyDenseInitialize
-                    ( A._rowContext, paddedRank );
+                    ( A._rowContext, sampleRank );
                     if( A._inSourceTeam && A._inTargetTeam )
                     {
                         A.AdjointMultiplyDensePrecompute
@@ -361,13 +361,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     }
                     else if( A._inSourceTeam )
                     {
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         A.AdjointMultiplyDensePrecompute
                         ( A._rowContext, (Scalar)1, dummy, A._rowT );
                     }
                     else // A._inTargetTeam
                     {
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         A.AdjointMultiplyDensePrecompute
                         ( A._rowContext, (Scalar)1, A._rowOmega, dummy );
                     }
@@ -400,15 +400,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 case NODE:
                     if( B._inSourceTeam )
                     {
-                        B._colOmega.Resize( B.LocalWidth(), paddedRank ); 
+                        B._colOmega.Resize( B.LocalWidth(), sampleRank ); 
                         ParallelGaussianRandomVectors( B._colOmega );
                     }
                     if( B._inTargetTeam )
                     {
-                        B._colT.Resize( B.LocalHeight(), paddedRank );
+                        B._colT.Resize( B.LocalHeight(), sampleRank );
                         hmat_tools::Scale( (Scalar)0, B._colT );
                     }
-                    B.MultiplyDenseInitialize( B._colContext, paddedRank );
+                    B.MultiplyDenseInitialize( B._colContext, sampleRank );
                     if( B._inSourceTeam && B._inTargetTeam )
                     {
                         B.MultiplyDensePrecompute
@@ -416,13 +416,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     }
                     else if( B._inSourceTeam )
                     {
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         B.MultiplyDensePrecompute
                         ( B._colContext, (Scalar)1, B._colOmega, dummy );
                     }
                     else // B._inTargetTeam
                     {
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         B.MultiplyDensePrecompute
                         ( B._colContext, (Scalar)1, dummy, B._colT );
                     }
@@ -4550,7 +4550,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
 
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -4577,11 +4577,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
                 {
                     C._colFHHContextMap[key] = new MultiplyDenseContext;
                     MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    context.numRhs = paddedRank;
+                    context.numRhs = sampleRank;
                     if( A._inTargetTeam )
                     {
                         C._colXMap[key] = 
-                            new Dense<Scalar>( A.LocalHeight(), paddedRank );
+                            new Dense<Scalar>( A.LocalHeight(), sampleRank );
                         Dense<Scalar>& X = *C._colXMap[key];
                         hmat_tools::Scale( (Scalar)0, X );
                     }
@@ -4592,14 +4592,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
                     }
                     else if( A._inSourceTeam )
                     {
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         A.MultiplyDensePrecompute
                         ( context, alpha, B._colT, dummy );
                     }
                     else // A._inTargetTeam
                     {
                         Dense<Scalar>& X = *C._colXMap[key];
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         A.MultiplyDensePrecompute( context, alpha, dummy, X );
                     }
                 }
@@ -4607,11 +4607,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
                 {
                     C._rowFHHContextMap[key] = new MultiplyDenseContext;
                     MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    context.numRhs = paddedRank;
+                    context.numRhs = sampleRank;
                     if( B._inSourceTeam )
                     {
                         C._rowXMap[key] = 
-                            new Dense<Scalar>( B.LocalWidth(), paddedRank );
+                            new Dense<Scalar>( B.LocalWidth(), sampleRank );
                         Dense<Scalar>& X = *C._rowXMap[key];
                         hmat_tools::Scale( (Scalar)0, X );
                     }
@@ -4623,14 +4623,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
                     }
                     else if( B._inTargetTeam )
                     {
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         B.AdjointMultiplyDensePrecompute
                         ( context, Conj(alpha), A._rowT, dummy );
                     }
                     else // B._inSourceTeam
                     {
                         Dense<Scalar>& X = *C._rowXMap[key];
-                        Dense<Scalar> dummy( 0, paddedRank );
+                        Dense<Scalar> dummy( 0, sampleRank );
                         B.AdjointMultiplyDensePrecompute
                         ( context, Conj(alpha), dummy, X );
                     }
@@ -4715,7 +4715,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
@@ -4729,10 +4729,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
             if( admissibleC )
             {
                 if( A._inSourceTeam )
-                    A.MultiplyDenseSumsCount( sizes, paddedRank );
+                    A.MultiplyDenseSumsCount( sizes, sampleRank );
                 if( B._inTargetTeam )
                     B.TransposeMultiplyDenseSumsCount
-                    ( sizes, paddedRank );
+                    ( sizes, sampleRank );
             }
             else
             {
@@ -4942,7 +4942,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
 
     switch( A._block.type )
@@ -4962,10 +4962,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
             {
                 if( A._inSourceTeam || A._inTargetTeam )
                     A.MultiplyDensePassDataCount
-                    ( sendSizes, recvSizes, paddedRank );
+                    ( sendSizes, recvSizes, sampleRank );
                 if( B._inSourceTeam || B._inTargetTeam )
                     B.TransposeMultiplyDensePassDataCount
-                    ( sendSizes, recvSizes, paddedRank );
+                    ( sendSizes, recvSizes, sampleRank );
             }
             else
             {
@@ -5005,7 +5005,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
 
     switch( A._block.type )
@@ -5039,7 +5039,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
                 else if( B._inSourceTeam )
                 {
                     MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    Dense<Scalar> dummy( 0, paddedRank );
+                    Dense<Scalar> dummy( 0, sampleRank );
                     B.TransposeMultiplyDensePassDataPack
                     ( context, dummy, sendBuffer, offsets );
                 }
@@ -5192,7 +5192,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
@@ -5206,10 +5206,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
             if( admissibleC )
             {
                 if( A._inTargetTeam )
-                    A.MultiplyDenseBroadcastsCount( sizes, paddedRank );
+                    A.MultiplyDenseBroadcastsCount( sizes, sampleRank );
                 if( B._inSourceTeam )
                     B.TransposeMultiplyDenseBroadcastsCount
-                    ( sizes, paddedRank );
+                    ( sizes, sampleRank );
             }
             else
             {
@@ -5389,7 +5389,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
-    const int paddedRank = C.MaxRank() + 4;
+    const int sampleRank = SampleRank( C.MaxRank() );
 
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5423,7 +5423,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
                 {
                     MultiplyDenseContext& context = *C._colFHHContextMap[key];
                     Dense<Scalar>& X = *C._colXMap[key];
-                    Dense<Scalar> dummy( 0, paddedRank );
+                    Dense<Scalar> dummy( 0, sampleRank );
                     A.MultiplyDensePostcompute( context, alpha, dummy, X );
                 }
 
@@ -5439,7 +5439,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
                 {
                     MultiplyDenseContext& context = *C._rowFHHContextMap[key];
                     Dense<Scalar>& X = *C._rowXMap[key];
-                    Dense<Scalar> dummy( 0, paddedRank );
+                    Dense<Scalar> dummy( 0, sampleRank );
                     B.AdjointMultiplyDensePostcompute
                     ( context, Conj(alpha), dummy, X );
                 }
@@ -5515,8 +5515,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
-    const int r = MaxRank()+4;
-    const int rShrunk = MaxRank();
+    const int r = SampleRank( C.MaxRank() );
     const int numLevels = C._teams->NumLevels();
     std::vector<int> numQrs(numLevels,0), 
                      numTargetFHH(numLevels,0), numSourceFHH(numLevels,0);
@@ -5559,11 +5558,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     for( int level=0; level<numLevels; ++level )
     {
         leftOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numTargetFHH[level]*rShrunk*r;
+        totalAllReduceSize += numTargetFHH[level]*r*r;
         middleOffsets[level] = totalAllReduceSize;
         totalAllReduceSize += numTargetFHH[level]*r*r;
         rightOffsets[level] = totalAllReduceSize;
-        totalAllReduceSize += numSourceFHH[level]*rShrunk*r;
+        totalAllReduceSize += numSourceFHH[level]*r*r;
     }
     std::vector<Scalar> allReduceBuffer( totalAllReduceSize );
     A.MultiplyHMatFHHFinalizeMiddleUpdates
@@ -5876,15 +5875,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         }
     }
 
-    // In order to form the compressed Q's, we need to perform a truncated
-    // SVD on the R's and then backtransform the left singular vectors that
-    // remain after truncation. This step is completely local.
-    typedef typename RealBase<Scalar>::type Real;
+    // Explicitly form the Q's
     Dense<Scalar> Z( 2*r, r );
-    std::vector<Real> singularValues( r );
-    std::vector<Scalar> svdWorkBuffer( lapack::SVDWorkSize(r,r) );
-    std::vector<Real> svdRealWorkBuffer( lapack::SVDRealWorkSize(r,r) ); 
-    std::vector<Scalar> applyQWork( rShrunk, 1 );
+    std::vector<Scalar> applyQWork( r, 1 );
     for( int level=0; level<numLevels; ++level )
     {
         MPI_Comm team = C._teams->Team( level );
@@ -5903,20 +5896,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
             if( log2TeamSize > 0 )
             {
-                // Copy the R from this TSQR factorization into the top r x r 
-                // submatrix of a zeroed 2r x r matrix.
+                // Form the identity matrix in the top r x r submatrix
+                // of a zeroed 2r x r matrix.
                 std::memset( Z.Buffer(), 0, 2*r*r*sizeof(Scalar) );
                 for( int j=0; j<r; ++j )
-                    std::memcpy
-                    ( Z.Buffer(0,j), &lastQrStage[j*j+j], 
-                      (j+1)*sizeof(Scalar) );
-                // Overwrite the R with the left singular vectors
-                lapack::SVD
-                ( 'O', 'N', r, r, Z.Buffer(), Z.LDim(), &singularValues[0], 
-                  0, 1, 0, 1, &svdWorkBuffer[0], svdWorkBuffer.size(), 
-                  &svdRealWorkBuffer[0] );
+                    Z.Set(j,j,(Scalar)1);
                 // Backtransform the last stage
-                Z.Resize( 2*r, rShrunk );
                 hmat_tools::ApplyPackedQFromLeft
                 ( r, lastQrStage, lastTauStage, Z, &work[0] );
                 // Take care of the middle stages before handling the large 
@@ -5927,7 +5912,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                     {
                         // Move the bottom half to the top half and zero the
                         // bottom half
-                        for( int j=0; j<rShrunk; ++j )
+                        for( int j=0; j<r; ++j )
                         {
                             std::memcpy
                             ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
@@ -5938,7 +5923,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                     else
                     {
                         // Zero the bottom half of Z
-                        for( int j=0; j<rShrunk; ++j )
+                        for( int j=0; j<r; ++j )
                             std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
                     }
                     hmat_tools::ApplyPackedQFromLeft
@@ -5950,12 +5935,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
                 Dense<Scalar> Y;
                 hmat_tools::Copy( X, Y );
-                X.Resize( X.Height(), rShrunk );
                 hmat_tools::Scale( (Scalar)0, X );
                 if( teamRank & 0x1 )
                 {
                     // Move the bottom half of Z into the top of X
-                    for( int j=0; j<rShrunk; ++j )
+                    for( int j=0; j<r; ++j )
                         std::memcpy
                         ( X.Buffer(0,j), Z.LockedBuffer(r,j), 
                           r*sizeof(Scalar) );
@@ -5963,7 +5947,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 else
                 {
                     // Move the top half of Z into the top of X
-                    for( int j=0; j<rShrunk; ++j )
+                    for( int j=0; j<r; ++j )
                         std::memcpy
                         ( X.Buffer(0,j), Z.LockedBuffer(0,j), 
                           r*sizeof(Scalar) );
@@ -5981,22 +5965,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 const int m = X.Height();
                 const int minDim = std::min(m,r);
 
-                // Make a copy of X and then zero out everything but R in X
+                // Make a copy of X and then form the left part of identity.
                 Dense<Scalar> Y; 
                 Y = X;
+                hmat_tools::Scale( (Scalar)0, X );
                 for( int j=0; j<minDim; ++j )
-                    std::memset( X.Buffer(j+1,j), 0, (m-(j+1))*sizeof(Scalar) );
-                // Overwrite X with the left singular vectors
-                lapack::SVD
-                ( 'O', 'N', minDim, r, X.Buffer(), X.LDim(), 
-                  &singularValues[0], 0, 1, 0, 1, 
-                  &svdWorkBuffer[0], svdWorkBuffer.size(), 
-                  &svdRealWorkBuffer[0] );
+                    X.Set(j,j,(Scalar)1);
                 // Backtransform the last stage
-                X.Resize( m, rShrunk );
-                work.resize( lapack::ApplyQWorkSize('L',m,rShrunk) );
+                work.resize( lapack::ApplyQWorkSize('L',m,r) );
                 lapack::ApplyQ
-                ( 'L', 'N', m, rShrunk, minDim,
+                ( 'L', 'N', m, r, minDim,
                   Y.LockedBuffer(), Y.LDim(), &thisTauPiece[0],
                   X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
@@ -6007,9 +5985,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     tauOffsets.clear(); tauPieceSizes.clear(); tauBuffer.clear();
     work.clear();
     Z.Clear();
-    singularValues.clear();
-    svdWorkBuffer.clear();
-    svdRealWorkBuffer.clear();
     applyQWork.clear();
 
     A.MultiplyHMatFHHFinalizeOuterUpdates
@@ -6025,20 +6000,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         for( int level=0; level<numLevels; ++level )
         {
             offsets[level] = totalAllReduceSize;
-            sizes[level] = numTargetFHH[level]*(2*rShrunk*r + r*r);
+            sizes[level] = r*r*(2*numTargetFHH[level]+numSourceFHH[level]);
 
             leftOffsets[level] = totalAllReduceSize;
-            totalAllReduceSize += numTargetFHH[level]*rShrunk*r;
+            totalAllReduceSize += numTargetFHH[level]*r*r;
             middleOffsets[level] = totalAllReduceSize;
             totalAllReduceSize += numTargetFHH[level]*r*r;
             rightOffsets[level] = totalAllReduceSize;
-            totalAllReduceSize += numSourceFHH[level]*rShrunk*r;
+            totalAllReduceSize += numSourceFHH[level]*r*r;
         }
 
         A._teams->TreeSums( allReduceBuffer, sizes, offsets );
     }
 
-    // HERE: Finish forming the low-rank approximation
+    // Finish forming the low-rank approximation
+    std::vector<Scalar> U( r*r ), VH( r*r ),
+                        svdWork( lapack::SVDWorkSize(r,r) );
+    std::vector<Real> singularValues( r ), 
+                      svdRealWork( lapack::SVDRealWorkSize(r,r) ); 
+    A.MultiplyHMatFHHFinalizeFormLowRank
+    ( B, C, allReduceBuffer, leftOffsets, middleOffsets, rightOffsets,
+      singularValues, U, VH, svdWork, svdRealWork );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -6090,19 +6072,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatFHHFinalizeMiddleUpdates
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<Scalar>& allReduceBuffer,
         std::vector<int>& middleOffsets ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::MultiplyHMatFHHFinalizeMiddleUpdates");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeMiddleUpdates");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int r = C.MaxRank() + 4;
+    const int r = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
     {
@@ -6196,7 +6176,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
         const int teamRank = mpi::CommRank( team );
         const int teamSize = mpi::CommSize( team );
         const int log2TeamSize = Log2( teamSize );
-        const int r = MaxRank()+4;
+        const int r = SampleRank( MaxRank() );
 
         if( _inTargetTeam )
         {
@@ -6290,8 +6270,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatFHHFinalizeOuterUpdates
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<Scalar>& allReduceBuffer,
@@ -6299,12 +6278,10 @@ MultiplyHMatFHHFinalizeOuterUpdates
         std::vector<int>& rightOffsets ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::MultiplyHMatFHHFinalizeOuterUpdates");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeOuterUpdates");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int r = C.MaxRank() + 4;
-    const int rShrunk = C.MaxRank();
+    const int r = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
     {
@@ -6331,13 +6308,13 @@ MultiplyHMatFHHFinalizeOuterUpdates
                     const Dense<Scalar>& Omega2 = A._rowOmega;
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[C._level]];
-                    leftOffsets[C._level] += rShrunk*r;
+                    leftOffsets[C._level] += r*r;
 
                     blas::Gemm
-                    ( 'C', 'N', rShrunk, r, A.LocalHeight(),
+                    ( 'C', 'N', r, r, A.LocalHeight(),
                       (Scalar)1, Q1.LockedBuffer(),     Q1.LDim(),
                                  Omega2.LockedBuffer(), Omega2.LDim(),
-                      (Scalar)0, leftUpdate,            rShrunk );
+                      (Scalar)0, leftUpdate,            r );
                 }
                 if( C._inSourceTeam )
                 {
@@ -6346,13 +6323,13 @@ MultiplyHMatFHHFinalizeOuterUpdates
                     const Dense<Scalar>& Omega1 = B._colOmega;
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[C._level]];
-                    rightOffsets[_level] += rShrunk*r;
+                    rightOffsets[_level] += r*r;
 
                     blas::Gemm
-                    ( 'C', 'N', rShrunk, r, B.LocalWidth(),
+                    ( 'C', 'N', r, r, B.LocalWidth(),
                       (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
                                  Omega1.LockedBuffer(), Omega1.LDim(),
-                      (Scalar)0, rightUpdate,           rShrunk );
+                      (Scalar)0, rightUpdate,           r );
                 }
             }
             else
@@ -6366,6 +6343,136 @@ MultiplyHMatFHHFinalizeOuterUpdates
                         MultiplyHMatFHHFinalizeOuterUpdates
                         ( nodeB.Child(r,s), nodeC.Child(t,s), allReduceBuffer,
                           leftOffsets, rightOffsets );
+            }
+            break;
+        default:
+            break;
+        }
+        break;
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
+( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+        std::vector<Scalar>& allReduceBuffer,
+        std::vector<int>& leftOffsets,
+        std::vector<int>& middleOffsets,
+        std::vector<int>& rightOffsets,
+        std::vector<Real>& singularValues,
+        std::vector<Scalar>& U,
+        std::vector<Scalar>& VH,
+        std::vector<Scalar>& svdWork,
+        std::vector<Real>& svdRealWork ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeFormLowRank");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int r = SampleRank( C.MaxRank() );
+
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE:
+    case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE:
+        case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
+            if( C.Admissible() )
+            {
+                if( C._inTargetTeam ) 
+                {
+                    // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
+                    // in the place of X.
+                    Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
+                    const Dense<Scalar>& Omega2 = A._rowOmega;
+
+                    Scalar* leftUpdate = 
+                        &allReduceBuffer[leftOffsets[C._level]];
+                    const Scalar* middleUpdate = 
+                        &allReduceBuffer[middleOffsets[C._level]];
+                    leftOffsets[C._level] += r*r;
+                    middleOffsets[C._level] += r*r;
+
+                    lapack::AdjointPseudoInverse
+                    ( r, r, leftUpdate, r, &singularValues[0],
+                      &U[0], r, &VH[0], r, &svdWork[0], svdWork.size(),
+                      &svdRealWork[0] );
+
+                    // We can use the VH space to hold the product 
+                    // pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
+                    blas::Gemm
+                    ( 'N', 'N', r, r, r, 
+                      (Scalar)1, leftUpdate,   r, 
+                                 middleUpdate, r, 
+                      (Scalar)0, &VH[0],       r );
+
+                    // Q1 := X.
+                    Dense<Scalar> Q1;
+                    Q1 = X;
+
+                    // Form X := Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
+                    blas::Gemm
+                    ( 'N', 'N', Q1.Height(), r, r,
+                      (Scalar)1, Q1.LockedBuffer(), Q1.LDim(),
+                                 &VH[0],            r, 
+                      (Scalar)0, X.Buffer(),        X.LDim() );
+                }
+                if( C._inSourceTeam )
+                {
+                    // Form Q2 pinv(Q2' Omega1) or its conjugate
+                    Dense<Scalar>& X = *C._rowXMap[A._sourceOffset];
+                    const Dense<Scalar>& Omega1 = B._colOmega;
+
+                    Scalar* rightUpdate = 
+                        &allReduceBuffer[rightOffsets[C._level]];
+                    rightOffsets[_level] += r*r;
+
+                    lapack::AdjointPseudoInverse
+                    ( r, r, rightUpdate, r, &singularValues[0],
+                      &U[0], r, &VH[0], r, &svdWork[0], svdWork.size(),
+                      &svdRealWork[0] );
+
+                    // Q2 := X
+                    Dense<Scalar> Q2;
+                    Q2 = X;
+
+                    blas::Gemm
+                    ( 'N', 'C', Q2.Height(), r, r,
+                      (Scalar)1, Q2.LockedBuffer(), Q2.LDim(),
+                                 rightUpdate,       r,
+                      (Scalar)0, X.Buffer(),        X.LDim() );
+                    if( !Conjugated )
+                        hmat_tools::Conjugate( X );
+                }
+            }
+            else
+            {
+                const Node& nodeA = *A._block.data.N;
+                const Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        nodeA.Child(t,r).MultiplyHMatFHHFinalizeFormLowRank
+                        ( nodeB.Child(r,s), nodeC.Child(t,s), allReduceBuffer,
+                          leftOffsets, middleOffsets, rightOffsets, 
+                          singularValues, U, VH, svdWork, svdRealWork );
             }
             break;
         default:

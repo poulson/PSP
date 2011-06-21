@@ -94,9 +94,9 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Multiply
         else if( A.IsHierarchical() && B.IsHierarchical() )
         {
             // C.F := alpha H H
-            const int oversampling = 4; // TODO: Lift this definition
+            const int sampleRank = SampleRank( C.MaxRank() );
             hmat_tools::Multiply
-            ( oversampling, alpha, *this, B, *C._block.data.F );
+            ( sampleRank, alpha, *this, B, *C._block.data.F );
         }
         else if( A.IsDense() && B.IsLowRank() )
         {
@@ -298,8 +298,8 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Multiply
         {
             // W := alpha A B
             LowRank<Scalar,Conjugated> W;
-            const int oversampling = 4; // TODO: Lift this definition
-            hmat_tools::Multiply( oversampling, alpha, *this, B, W );
+            const int sampleRank = SampleRank( C.MaxRank() );
+            hmat_tools::Multiply( sampleRank, alpha, *this, B, W );
 
             // C.F :~= W + beta C.F
             hmat_tools::RoundedUpdate

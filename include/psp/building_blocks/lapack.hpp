@@ -1072,7 +1072,8 @@ inline void AdjointPseudoInverse
   float* s, 
   float* U, int ldu, 
   float* VH, int ldvh,
-  float* work, int lwork )
+  float* work, int lwork,
+  float* realWork=0 )
 {
 #ifndef RELEASE
     PushCallStack("lapack::AdjointPseudoInverse");
@@ -1163,7 +1164,8 @@ inline void AdjointPseudoInverse
   double* s, 
   double* U, int ldu, 
   double* VH, int ldvh,
-  double* work, int lwork )
+  double* work, int lwork,
+  double* realWork=0 )
 {
 #ifndef RELEASE
     PushCallStack("lapack::AdjointPseudoInverse");

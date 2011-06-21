@@ -276,14 +276,14 @@ void Multiply
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void Multiply
-( int oversampling,
+( int sampleRank,
   Real alpha, 
   const AbstractHMat<Real>& A,
   const AbstractHMat<Real>& B,
         LowRank<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void Multiply
-( int oversampling,
+( int sampleRank,
   std::complex<Real> alpha, 
   const AbstractHMat< std::complex<Real> >& A,
   const AbstractHMat< std::complex<Real> >& B,
@@ -397,14 +397,14 @@ void TransposeMultiply
 // F := alpha H^T H
 template<typename Real,bool Conjugated>
 void TransposeMultiply
-( int oversampling,
+( int sampleRank,
   Real alpha, 
   const AbstractHMat<Real>& A,
   const AbstractHMat<Real>& B,
         LowRank<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void TransposeMultiply
-( int oversampling,
+( int sampleRank,
   std::complex<Real> alpha, 
   const AbstractHMat< std::complex<Real> >& A,
   const AbstractHMat< std::complex<Real> >& B,
@@ -518,14 +518,14 @@ void AdjointMultiply
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
 void AdjointMultiply
-( int oversampling,
+( int sampleRank,
   Real alpha, 
   const AbstractHMat<Real>& A,
   const AbstractHMat<Real>& B,
         LowRank<Real,Conjugated>& F );
 template<typename Real,bool Conjugated>
 void AdjointMultiply
-( int oversampling,
+( int sampleRank,
   std::complex<Real> alpha, 
   const AbstractHMat< std::complex<Real> >& A,
   const AbstractHMat< std::complex<Real> >& B,
@@ -1592,7 +1592,7 @@ void psp::hmat_tools::Scale
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void psp::hmat_tools::Multiply
-( int oversampling, 
+( int sampleRank, 
   Real alpha, 
   const psp::AbstractHMat<Real>& A, 
   const psp::AbstractHMat<Real>& B,
@@ -1607,7 +1607,7 @@ void psp::hmat_tools::Multiply
     const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
-    Dense<Real> Omega( B.Width(), r+oversampling );
+    Dense<Real> Omega( B.Width(), sampleRank );
     SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A B) on Omega (into Y)
@@ -1617,8 +1617,8 @@ void psp::hmat_tools::Multiply
     A.Multiply( 1, X, Y );
 
     // Create a work vector that is sufficiently large for all operations
-    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
-    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( sampleRank );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), sampleRank );
     const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Real> work( lwork );
 
@@ -1686,7 +1686,7 @@ void psp::hmat_tools::Multiply
 // F := alpha H H,
 template<typename Real,bool Conjugated>
 void psp::hmat_tools::Multiply
-( int oversampling, 
+( int sampleRank, 
   std::complex<Real> alpha, 
   const psp::AbstractHMat< std::complex<Real> >& A, 
   const psp::AbstractHMat< std::complex<Real> >& B,
@@ -1703,7 +1703,7 @@ void psp::hmat_tools::Multiply
     const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
-    Dense<Scalar> Omega( B.Width(), r+oversampling );
+    Dense<Scalar> Omega( B.Width(), sampleRank );
     SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A B) on Omega (into Y)
@@ -1713,10 +1713,10 @@ void psp::hmat_tools::Multiply
     A.Multiply( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
-    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
-    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( r+oversampling );
-    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
-    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), r+oversampling );
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( sampleRank );
+    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( sampleRank );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), sampleRank );
+    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), sampleRank );
     const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Scalar> work( lwork );
     std::vector<Real> rwork( std::max(lrworkPivotedQR,lrworkSVD) );
@@ -1798,7 +1798,7 @@ void psp::hmat_tools::Multiply
 // F := alpha H^T H,
 template<typename Real,bool Conjugated>
 void psp::hmat_tools::TransposeMultiply
-( int oversampling,
+( int sampleRank,
   Real alpha, 
   const psp::AbstractHMat<Real>& A,
   const psp::AbstractHMat<Real>& B,
@@ -1813,7 +1813,7 @@ void psp::hmat_tools::TransposeMultiply
     const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
-    Dense<Real> Omega( B.Width(), r+oversampling );
+    Dense<Real> Omega( B.Width(), sampleRank );
     SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A^T B) on Omega (into Y)
@@ -1823,8 +1823,8 @@ void psp::hmat_tools::TransposeMultiply
     A.TransposeMultiply( 1, X, Y );
 
     // Create a work vector that is sufficiently large for all operations
-    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
-    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( sampleRank );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), sampleRank );
     const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Real> work( lwork );
 
@@ -1892,7 +1892,7 @@ void psp::hmat_tools::TransposeMultiply
 // F := alpha H^T H,
 template<typename Real,bool Conjugated>
 void psp::hmat_tools::TransposeMultiply
-( int oversampling,
+( int sampleRank,
   std::complex<Real> alpha, 
   const psp::AbstractHMat< std::complex<Real> >& A,
   const psp::AbstractHMat< std::complex<Real> >& B,
@@ -1909,7 +1909,7 @@ void psp::hmat_tools::TransposeMultiply
     const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
-    Dense<Scalar> Omega( B.Width(), r+oversampling );
+    Dense<Scalar> Omega( B.Width(), sampleRank );
     SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A^T B) on Omega (into Y)
@@ -1919,10 +1919,10 @@ void psp::hmat_tools::TransposeMultiply
     A.TransposeMultiply( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
-    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
-    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( r+oversampling );
-    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
-    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), r+oversampling );
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( sampleRank );
+    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( sampleRank );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), sampleRank );
+    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), sampleRank );
     const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Scalar> work( lwork );
     std::vector<Real> rwork( std::max(lrworkPivotedQR,lrworkSVD) );
@@ -2009,7 +2009,7 @@ void psp::hmat_tools::TransposeMultiply
 // F := alpha H^H H,
 template<typename Real,bool Conjugated>
 void psp::hmat_tools::AdjointMultiply
-( int oversampling, 
+( int sampleRank, 
   Real alpha, 
   const psp::AbstractHMat<Real>& A,
   const psp::AbstractHMat<Real>& B,
@@ -2018,7 +2018,7 @@ void psp::hmat_tools::AdjointMultiply
 #ifndef RELEASE
     PushCallStack("hmat_tools::AdjointMultiply (F := A^H A)");
 #endif
-    TransposeMultiply( oversampling, alpha, A, B, F );
+    TransposeMultiply( sampleRank, alpha, A, B, F );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2027,7 +2027,7 @@ void psp::hmat_tools::AdjointMultiply
 // F := alpha H^H H
 template<typename Real,bool Conjugated>
 void psp::hmat_tools::AdjointMultiply
-( int oversampling, 
+( int sampleRank, 
   std::complex<Real> alpha, 
   const psp::AbstractHMat< std::complex<Real> >& A,
   const psp::AbstractHMat< std::complex<Real> >& B,
@@ -2044,7 +2044,7 @@ void psp::hmat_tools::AdjointMultiply
     const int r = std::min( std::min(A.MaxRank(),B.MaxRank()), maxRankAB );
 
     // Generate a few more than r Gaussian random vectors
-    Dense<Scalar> Omega( B.Width(), r+oversampling );
+    Dense<Scalar> Omega( B.Width(), sampleRank );
     SerialGaussianRandomVectors( Omega );
 
     // Compute the action of (alpha A^H B) on Omega (into Y)
@@ -2054,10 +2054,10 @@ void psp::hmat_tools::AdjointMultiply
     A.AdjointMultiply( 1, X, Y );
 
     // Create work vectors that are sufficiently large for all operations
-    const int lworkPivotedQR = lapack::PivotedQRWorkSize( r+oversampling );
-    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( r+oversampling );
-    const int lworkSVD = lapack::SVDWorkSize( B.Width(), r+oversampling );
-    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), r+oversampling );
+    const int lworkPivotedQR = lapack::PivotedQRWorkSize( sampleRank );
+    const int lrworkPivotedQR = lapack::PivotedQRRealWorkSize( sampleRank );
+    const int lworkSVD = lapack::SVDWorkSize( B.Width(), sampleRank );
+    const int lrworkSVD = lapack::SVDRealWorkSize( B.Width(), sampleRank );
     const int lwork = std::max( lworkPivotedQR, lworkSVD );
     std::vector<Scalar> work( lwork );
     std::vector<Real> rwork( std::max(lrworkPivotedQR,lrworkSVD) );

@@ -405,7 +405,8 @@ main( int argc, char* argv[] )
             // Perform the iterative inversion
             if( rank == 0 )
             {
-                std::cout << "Schulz inverting the H-matrix...";
+                std::cout << "Performing " << numIterations 
+                          << " Schulz iterations...";
                 std::cout.flush();
             }
             double invertStartTime = psp::mpi::WallTime();
