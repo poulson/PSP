@@ -5933,29 +5933,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 // Take care of the original stage. Do so by forming Y := X, 
                 // then zeroing X and placing our piece of Z at its top.
                 Dense<Scalar>& X = *Xs[XOffsets[level]+k]; 
+                const int m = X.Height();
+                const int minDim = std::min( m, r );
                 Dense<Scalar> Y;
                 hmat_tools::Copy( X, Y );
                 hmat_tools::Scale( (Scalar)0, X );
                 if( teamRank & 0x1 )
                 {
-                    // Move the bottom half of Z into the top of X
+                    // Copy the first minDim rows of the bottom half of Z into 
+                    // the top of X
                     for( int j=0; j<r; ++j )
                         std::memcpy
                         ( X.Buffer(0,j), Z.LockedBuffer(r,j), 
-                          r*sizeof(Scalar) );
+                          minDim*sizeof(Scalar) );
                 }
                 else
                 {
-                    // Move the top half of Z into the top of X
+                    // Copy the first minDim rows of the top half of Z into
+                    // the top of X
                     for( int j=0; j<r; ++j )
                         std::memcpy
                         ( X.Buffer(0,j), Z.LockedBuffer(0,j), 
-                          r*sizeof(Scalar) );
+                          minDim*sizeof(Scalar) );
                 }
-                work.resize( lapack::ApplyQWorkSize('L',X.Height(),X.Width()) );
-                const int minDim = std::min(Y.Height(),Y.Width());
+                work.resize( lapack::ApplyQWorkSize('L',m,r) );
                 lapack::ApplyQ
-                ( 'L', 'N', X.Height(), X.Width(), minDim,
+                ( 'L', 'N', m, r, minDim,
                   Y.LockedBuffer(), Y.LDim(), &thisTauPiece[0],
                   X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
@@ -6401,7 +6404,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                     // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     // in the place of X.
                     Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
-                    const Dense<Scalar>& Omega2 = A._rowOmega;
 
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[C._level]];
@@ -6438,7 +6440,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 {
                     // Form Q2 pinv(Q2' Omega1) or its conjugate
                     Dense<Scalar>& X = *C._rowXMap[A._sourceOffset];
-                    const Dense<Scalar>& Omega1 = B._colOmega;
 
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[C._level]];
