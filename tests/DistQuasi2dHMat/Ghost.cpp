@@ -282,10 +282,6 @@ main( int argc, char* argv[] )
             distH.MScriptWriteLocalStructure("distH_structure");
         }
 
-        // Ensure that our check for ghost nodes fails
-        if( distH.Ghosted() )
-            throw std::logic_error("Ghosted() gave a false positive");
-
         // Form the ghost nodes
         if( rank == 0 )
         {
