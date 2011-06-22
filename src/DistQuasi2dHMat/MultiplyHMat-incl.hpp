@@ -56,7 +56,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     A.MultiplyHMatFHHPostcompute( alpha, B, C );
     A.MultiplyHMatFHHFinalize( B, C );
 
-    C.MultiplyHMatFinalQR();
+    C.MultiplyHMatUpdates();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -6514,18 +6514,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQR()
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQR");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdates");
 #endif
     const unsigned numTeamLevels = _teams->NumLevels();
 
     // Count the number of nodes which we are in the target team of that are
-    // low rank, and likewise for source teams
+    // low rank that do not have dense updates, and likewise for source teams
     std::vector<int> numTargetNodes(numTeamLevels,0), 
                      numSourceNodes(numTeamLevels,0);
-    MultiplyHMatFinalQRCountNodes( numTargetNodes, numSourceNodes );
+    MultiplyHMatUpdatesCountNodes( numTargetNodes, numSourceNodes );
 
     int totalTargetNodes=0, totalSourceNodes=0;
     std::vector<int> targetOffsets(numTeamLevels), sourceOffsets(numTeamLevels);
@@ -6538,12 +6538,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQR()
     }
     std::vector<int> targetRanks(totalTargetNodes), 
                      sourceRanks(totalSourceNodes);
-    MultiplyHMatFinalQRLowRankCountAndResize
+    MultiplyHMatUpdatesLowRankCountAndResize
     ( targetRanks, targetOffsets, sourceRanks, sourceOffsets, 0 );
 
-    MultiplyHMatFinalQRLowRankImport( 0 );
+    MultiplyHMatUpdatesLowRankImport( 0 );
     // HERE
-    //MultiplyHMatFinalQRStartComp();
+    //MultiplyHMatUpdatesStartComp();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -6552,11 +6552,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQR()
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatFinalQRCountNodes
+MultiplyHMatUpdatesCountNodes
 ( std::vector<int>& numTargetNodes, std::vector<int>& numSourceNodes ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRCountNodes");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesCountNodes");
 #endif
     const unsigned teamLevel = _teams->TeamLevel( _level );
     switch( _block.type )
@@ -6568,16 +6568,16 @@ MultiplyHMatFinalQRCountNodes
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFinalQRCountNodes
+                node.Child(t,s).MultiplyHMatUpdatesCountNodes
                 ( numTargetNodes, numSourceNodes );
         break;
     }
     case DIST_LOW_RANK:
     case SPLIT_LOW_RANK:
     case LOW_RANK:
-        if( _inTargetTeam )
+        if( _inTargetTeam && _DMap.Size() == 0 )
             ++numTargetNodes[teamLevel];
-        if( _inSourceTeam )
+        if( _inSourceTeam && _DMap.Size() == 0 )
             ++numSourceNodes[teamLevel];
         break;
     default:
@@ -6591,12 +6591,12 @@ MultiplyHMatFinalQRCountNodes
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatFinalQRLowRankCountAndResize
+MultiplyHMatUpdatesLowRankCountAndResize
 ( std::vector<int>& targetRanks, std::vector<int>& targetOffsets,
   std::vector<int>& sourceRanks, std::vector<int>& sourceOffsets, int rank )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRLowRankCountAndResize");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLowRankCountAndResize");
 #endif
     switch( _block.type )
     {
@@ -6622,7 +6622,7 @@ MultiplyHMatFinalQRLowRankCountAndResize
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFinalQRLowRankCountAndResize
+                node.Child(t,s).MultiplyHMatUpdatesLowRankCountAndResize
                 ( targetRanks, targetOffsets, 
                   sourceRanks, sourceOffsets, rank );
         break;
@@ -6689,64 +6689,57 @@ MultiplyHMatFinalQRLowRankCountAndResize
 
         const unsigned numDenseUpdates = _DMap.Size();
         const unsigned teamLevel = _teams->TeamLevel( _level );
-        if( numDenseUpdates == 0 )
+
+        // Compute the total update rank
+        if( _inTargetTeam )
         {
-            // Compute the total update rank
-            if( _inTargetTeam )
-            {
-                int numEntries = _colXMap.Size();
-                _colXMap.ResetIterator();
-                for( int i=0; i<numEntries; ++i )
-                    rank += _colXMap.NextEntry()->Width();
+            int numEntries = _colXMap.Size();
+            _colXMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+                rank += _colXMap.NextEntry()->Width();
 
-                numEntries = _UMap.Size();
-                _UMap.ResetIterator();
-                for( int i=0; i<numEntries; ++i )
-                    rank += _UMap.NextEntry()->Width();
-            }
-            else 
-            {
-                int numEntries = _rowXMap.Size();
-                _rowXMap.ResetIterator();
-                for( int i=0; i<numEntries; ++i )
-                    rank += _rowXMap.NextEntry()->Width();
+            numEntries = _UMap.Size();
+            _UMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+                rank += _UMap.NextEntry()->Width();
+        }
+        else 
+        {
+            int numEntries = _rowXMap.Size();
+            _rowXMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+                rank += _rowXMap.NextEntry()->Width();
 
-                numEntries = _VMap.Size();
-                _VMap.ResetIterator();
-                for( int i=0; i<numEntries; ++i )
-                    rank += _VMap.NextEntry()->Width();
-            }
+            numEntries = _VMap.Size();
+            _VMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+                rank += _VMap.NextEntry()->Width();
+        }
 
-            // Store the rank and create the space
-            if( _inTargetTeam )
-            {
+        // Create the space and store the rank if we'll need to do a QR
+        if( _inTargetTeam )
+        {
+            if( numDenseUpdates == 0 )
                 targetRanks[targetOffsets[teamLevel]++] = rank;
-                const int oldRank = SF.D.Width();
-                Dense<Scalar> UCopy;
-                hmat_tools::Copy( SF.D, UCopy );
-                SF.D.Resize( Height(), rank );
-                std::memcpy
-                ( SF.D.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
-                  Height()*rank*sizeof(Scalar) );
-            }
-            else
-            {
-                sourceRanks[sourceOffsets[teamLevel]++] = rank;
-                const int oldRank = SF.D.Width();
-                Dense<Scalar> VCopy;
-                hmat_tools::Copy( SF.D, VCopy );
-                SF.D.Resize( Width(), rank );
-                std::memcpy
-                ( SF.D.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
-                  Width()*rank*sizeof(Scalar) );
-            }
+            const int oldRank = SF.D.Width();
+            Dense<Scalar> UCopy;
+            hmat_tools::Copy( SF.D, UCopy );
+            SF.D.Resize( Height(), rank );
+            std::memcpy
+            ( SF.D.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
+              Height()*rank*sizeof(Scalar) );
         }
         else
         {
-            if( _inTargetTeam )
-                targetRanks[targetOffsets[teamLevel]++] = 0;
-            else
-                sourceRanks[sourceOffsets[teamLevel]++] = 0;
+            if( numDenseUpdates == 0 )
+                sourceRanks[sourceOffsets[teamLevel]++] = rank;
+            const int oldRank = SF.D.Width();
+            Dense<Scalar> VCopy;
+            hmat_tools::Copy( SF.D, VCopy );
+            SF.D.Resize( Width(), rank );
+            std::memcpy
+            ( SF.D.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
+              Width()*rank*sizeof(Scalar) );
         }
         break;
     }
@@ -6756,46 +6749,173 @@ MultiplyHMatFinalQRLowRankCountAndResize
 
         const unsigned numDenseUpdates = _DMap.Size();
         const unsigned teamLevel = _teams->TeamLevel( _level );
-        if( numDenseUpdates == 0 )
+        // Compute the total update rank
         {
-            // Compute the total update rank
-            {
-                int numEntries = _colXMap.Size();
-                _colXMap.ResetIterator();
-                for( int i=0; i<numEntries; ++i )
-                    rank += _colXMap.NextEntry()->Width();
+            int numEntries = _colXMap.Size();
+            _colXMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+                rank += _colXMap.NextEntry()->Width();
 
-                numEntries = _UMap.Size();
-                _UMap.ResetIterator();
-                for( int i=0; i<numEntries; ++i )
-                    rank += _UMap.NextEntry()->Width();
-            }
+            numEntries = _UMap.Size();
+            _UMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+                rank += _UMap.NextEntry()->Width();
+        }
 
-            // Store the ranks and create the space
+        // Create the space and store the updates if there is no dense update
+        {
+            if( numDenseUpdates == 0 )
             {
                 targetRanks[targetOffsets[teamLevel]++] = rank;
                 sourceRanks[sourceOffsets[teamLevel]++] = rank;
-                const int oldRank = F.Rank();
+            }
+            const int oldRank = F.Rank();
 
-                Dense<Scalar> UCopy;
-                hmat_tools::Copy( F.U, UCopy );
-                F.U.Resize( Height(), rank );
-                std::memcpy
-                ( F.U.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
-                  Height()*rank*sizeof(Scalar) );
+            Dense<Scalar> UCopy;
+            hmat_tools::Copy( F.U, UCopy );
+            F.U.Resize( Height(), rank );
+            std::memcpy
+            ( F.U.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
+              Height()*rank*sizeof(Scalar) );
 
-                Dense<Scalar> VCopy;
-                hmat_tools::Copy( F.V, VCopy );
-                F.V.Resize( Width(), rank );
-                std::memcpy
-                ( F.V.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
-                  Width()*rank*sizeof(Scalar) );
+            Dense<Scalar> VCopy;
+            hmat_tools::Copy( F.V, VCopy );
+            F.V.Resize( Width(), rank );
+            std::memcpy
+            ( F.V.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
+              Width()*rank*sizeof(Scalar) );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inTargetTeam )
+        {
+            // Combine all of the U's into a single buffer with enough space
+            // for the parent ranks to fit at the beginning
+            const int m = Height();
+            const int numLowRankUpdates = _UMap.Size();
+            _UMap.ResetIterator();
+            for( int update=0; update<numLowRankUpdates; ++update )
+                rank += _UMap.NextEntry()->Width();
+
+            if( numLowRankUpdates == 0 )
+            {
+                _UMap[0] = new Dense<Scalar>( m, rank );
+            }
+            else
+            {
+                _UMap.ResetIterator();
+                Dense<Scalar> firstUCopy;
+                Dense<Scalar> firstU = *_UMap.NextEntry();
+                firstUCopy = firstU;
+                firstU.Resize( m, rank );
+                // Push the original first update into the back
+                int rOffset = rank;
+                {
+                    const int r = firstUCopy.Width();
+                    rOffset -= r;
+                    for( int j=0; j<r; ++j )
+                        std::memcpy
+                        ( firstU.Buffer(0,rOffset+j), 
+                          firstUCopy.LockedBuffer(0,j), m*sizeof(Scalar) );
+                }
+                for( int update=1; update<numLowRankUpdates; ++update )
+                {
+                    Dense<Scalar>& U = *_UMap.NextEntry();
+                    const int r = U.Width();
+                    rOffset -= r;
+                    for( int j=0; j<r; ++j )
+                        std::memcpy
+                        ( firstU.Buffer(0,rOffset+j), U.LockedBuffer(0,j),
+                          m*sizeof(Scalar) );
+                    _UMap.EraseLastEntry();
+                }
             }
         }
         else
         {
-            targetRanks[targetOffsets[teamLevel]++] = 0;
-            sourceRanks[sourceOffsets[teamLevel]++] = 0;
+            // Combine all of the U's into a single buffer with enough space
+            // for the parent ranks to fit at the beginning
+            const int n = Width();
+            const int numLowRankUpdates = _VMap.Size();
+            _VMap.ResetIterator();
+            for( int update=0; update<numLowRankUpdates; ++update )
+                rank += _VMap.NextEntry()->Width();
+
+            if( numLowRankUpdates == 0 )
+            {
+                _VMap[0] = new Dense<Scalar>( n, rank );
+            }
+            else
+            {
+                _VMap.ResetIterator();
+                Dense<Scalar> firstVCopy;
+                Dense<Scalar> firstV = *_VMap.NextEntry();
+                firstVCopy = firstV;
+                firstV.Resize( n, rank );
+                // Push the original first update into the back
+                int rOffset = rank;
+                {
+                    const int r = firstVCopy.Width();
+                    rOffset -= r;
+                    for( int j=0; j<r; ++j )
+                        std::memcpy
+                        ( firstV.Buffer(0,rOffset+j), 
+                          firstVCopy.LockedBuffer(0,j), n*sizeof(Scalar) );
+                }
+                for( int update=1; update<numLowRankUpdates; ++update )
+                {
+                    Dense<Scalar>& V = *_VMap.NextEntry();
+                    const int r = V.Width();
+                    rOffset -= r;
+                    for( int j=0; j<r; ++j )
+                        std::memcpy
+                        ( firstV.Buffer(0,rOffset+j), V.LockedBuffer(0,j),
+                          n*sizeof(Scalar) );
+                    _VMap.EraseLastEntry();
+                }
+            }
+        }
+        break;
+    }
+    case DENSE:
+    {
+        // Condense all of the U's and V's onto the dense matrix
+        Dense<Scalar>& D = *_block.data.D;
+        const int m = Height();
+        const int n = Width();
+        const int numLowRankUpdates = _UMap.Size();
+        _UMap.ResetIterator();
+        _VMap.ResetIterator();
+        for( int update=0; update<numLowRankUpdates; ++update )
+        {
+            const Dense<Scalar>& U = *_UMap.NextEntry();
+            const Dense<Scalar>& V = *_VMap.NextEntry();
+            const int r = U.Width();
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( 'N', option, m, n, r,
+              (Scalar)1, U.LockedBuffer(), U.LDim(),
+                         V.LockedBuffer(), V.LDim(),
+              (Scalar)1, D.Buffer(),       D.LDim() );
+            _UMap.EraseLastEntry();
+            _VMap.EraseLastEntry();
+        }
+
+        const int numDenseUpdates = _DMap.Size();
+        _DMap.ResetIterator();
+        for( int update=0; update<numDenseUpdates; ++update )
+        {
+            const Dense<Scalar>& DUpdate = *_DMap.NextEntry();
+            for( int j=0; j<n; ++j )
+            {
+                const Scalar* DUpdateCol = DUpdate.LockedBuffer(0,j);
+                Scalar* DCol = D.Buffer(0,j);
+                for( int i=0; i<m; ++i )
+                    DCol[i] += DUpdateCol[i];
+            }
+            _DMap.EraseLastEntry();
         }
         break;
     }
@@ -6809,11 +6929,11 @@ MultiplyHMatFinalQRLowRankCountAndResize
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
 ( int rank )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRLowRankImport");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLowRankImport");
 #endif
     switch( _block.type )
     {
@@ -6838,11 +6958,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
                     {
                         ULocal.LockedView
                         ( U, tOffset, 0, node.targetSizes[t], U.Width() );
-                        node.Child(t,s).MultiplyHMatFinalQRImportU
+                        node.Child(t,s).MultiplyHMatUpdatesImportU
                         ( newRank, ULocal );
                     }
                 }
                 newRank += U.Width();
+                _UMap.EraseLastEntry();
             }
         }
         if( _inSourceTeam )
@@ -6861,17 +6982,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
                     {
                         VLocal.LockedView
                         ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
-                        node.Child(t,s).MultiplyHMatFinalQRImportV
+                        node.Child(t,s).MultiplyHMatUpdatesImportV
                         ( newRank, VLocal );
                     }
                 }
                 newRank += V.Width();
+                _VMap.EraseLastEntry();
             }
         }
 
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFinalQRLowRankImport( newRank );
+                node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
         break;
     }
     case DIST_LOW_RANK:
@@ -6880,7 +7002,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
         int newRank = rank;
         if( _inTargetTeam )
         {
-            // HERE: Copy in the U's
+            const int numEntries = _UMap.Size();
+            _UMap.ResetIterator();
+            for( int i=0; i<numEntries; ++i )
+            {
+                Dense<Scalar>& U = *_UMap.NextEntry();
+                const int m = U.Height();
+                const int r = U.Width();
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( DF.ULocal.Buffer(0,newRank+j), U.LockedBuffer(0,j),
+                      m*sizeof(Scalar) );
+                newRank += r;
+                // HERE
+            }
         }
         if( _inSourceTeam )
         {
@@ -6908,11 +7043,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportU
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
 ( int rank, const Dense<Scalar>& U )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRImportU");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesImportU");
 #endif
     switch( _block.type )
     {
@@ -6928,7 +7063,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportU
             {
                 ULocal.LockedView
                 ( U, tOffset, 0, node.targetSizes[t], U.Width() );
-                node.Child(t,s).MultiplyHMatFinalQRImportU( rank, ULocal );
+                node.Child(t,s).MultiplyHMatUpdatesImportU( rank, ULocal );
             }
         }
         break;
@@ -6987,11 +7122,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportU
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportV
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
 ( int rank, const Dense<Scalar>& V )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatFinalQRImportV");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesImportV");
 #endif
     switch( _block.type )
     {
@@ -7007,7 +7142,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportV
             {
                 VLocal.LockedView
                 ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
-                node.Child(t,s).MultiplyHMatFinalQRImportV( rank, VLocal );
+                node.Child(t,s).MultiplyHMatUpdatesImportV( rank, VLocal );
             }
         }
         break;

@@ -27,7 +27,7 @@ template<typename T1,typename T2>
 class MemoryMap 
 {   
 private:
-    unsigned _currentEntry;
+    unsigned _currentIndex;
     typename std::map<T1,T2*>::iterator _it;
     std::map<T1,T2*> _baseMap;
 public:
@@ -35,20 +35,35 @@ public:
     //       will cause a memory leak.
     T2*& operator[]( T1 key ) { return _baseMap[key]; }
     int Size() const { return _baseMap.size(); }
-    void ResetIterator() { _currentEntry=0; }
+    int CurrentIndex() const { return _currentIndex; }
+    void ResetIterator() { _currentIndex=0; _it=_baseMap.begin(); }
 
     T2*& NextEntry() 
     {
 #ifndef DEBUG
         PushCallStack("MemoryMap::NextEntry");
-        if( !(_currentEntry < _baseMap.size()) )
+        if( !(_currentIndex < _baseMap.size()) )
             throw std::logic_error("Traversed past end of map");
         PopCallStack();
 #endif
-        T2*& value = (*_it).second;
+        T2** value = (*_it).second;
         ++_it;
-        ++_currentEntry;
-        return value;
+        ++_currentIndex;
+
+        return *value;
+    }
+
+    void EraseLastEntry()
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::EraseLastEntry");
+        if( _currentIndex == 0 )
+            throw std::logic_error("Cannot erase entry with negative index");
+        PopCallStack();
+#endif
+        --_it;
+        --_currentIndex;
+        _baseMap.erase( _it++ );
     }
     
     void Clear()
@@ -62,7 +77,7 @@ public:
         _baseMap.clear();
     }
 
-    MemoryMap() : _currentEntry(0) { }
+    MemoryMap() : _currentIndex(0) { }
     ~MemoryMap() { Clear(); }
 };  
 
