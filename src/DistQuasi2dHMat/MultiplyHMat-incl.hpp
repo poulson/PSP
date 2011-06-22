@@ -6876,7 +6876,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRLowRankImport
     }
     case DIST_LOW_RANK:
     {
-        // HERE
+        DistLowRank& DF = *_block.data.DF; 
+        int newRank = rank;
+        if( _inTargetTeam )
+        {
+            // HERE: Copy in the U's
+        }
+        if( _inSourceTeam )
+        {
+
+        }
         break;
     }
     case SPLIT_LOW_RANK:
@@ -6926,27 +6935,46 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportU
     }
     case DIST_LOW_RANK:
     {
-        // TODO
+        if( _inTargetTeam )
+        {
+            DistLowRank& DF = *_block.data.DF;
+            const int m = U.Height();
+            const int r = U.Width();
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( DF.ULocal.Buffer(0,rank+j), U.LockedBuffer(0,j),
+                  m*sizeof(Scalar) );
+        }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        // TODO
+        const unsigned numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 && _inTargetTeam )
+        {
+            SplitLowRank& SF = *_block.data.SF;
+            const int m = U.Height();
+            const int r = U.Width();
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( SF.D.Buffer(0,rank+j), U.LockedBuffer(0,j),
+                  m*sizeof(Scalar) );
+        }
         break;
     }
     case LOW_RANK:
     {
-        // TODO
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        // TODO
-        break;
-    }
-    case DENSE:
-    {
-        // TODO
+        const unsigned numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 )
+        {
+            LowRank<Scalar,Conjugated>& F = *_block.data.F;
+            const int m = U.Height();
+            const int r = U.Width();
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( F.U.Buffer(0,rank+j), U.LockedBuffer(0,j),
+                  m*sizeof(Scalar) );
+        }
         break;
     }
     default:
@@ -6986,27 +7014,46 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFinalQRImportV
     }
     case DIST_LOW_RANK:
     {
-        // TODO
+        if( _inSourceTeam )
+        {
+            DistLowRank& DF = *_block.data.DF;
+            const int n = V.Height();
+            const int r = V.Width();
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( DF.VLocal.Buffer(0,rank+j), V.LockedBuffer(0,j),
+                  n*sizeof(Scalar) );
+        }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        // TODO
+        const unsigned numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 && _inSourceTeam )
+        {
+            SplitLowRank& SF = *_block.data.SF;
+            const int n = V.Height();
+            const int r = V.Width();
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( SF.D.Buffer(0,rank+j), V.LockedBuffer(0,j),
+                  n*sizeof(Scalar) );
+        }
         break;
     }
     case LOW_RANK:
     {
-        // TODO
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        // TODO
-        break;
-    }
-    case DENSE:
-    {
-        // TODO
+        const unsigned numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 )
+        {
+            LowRank<Scalar,Conjugated>& F = *_block.data.F;
+            const int n = V.Height();
+            const int r = V.Width();
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( F.V.Buffer(0,rank+j), V.LockedBuffer(0,j),
+                  n*sizeof(Scalar) );
+        }
         break;
     }
     default:
