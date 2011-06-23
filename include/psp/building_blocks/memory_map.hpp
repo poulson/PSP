@@ -46,7 +46,7 @@ public:
             throw std::logic_error("Traversed past end of map");
         PopCallStack();
 #endif
-        T2** value = (*_it).second;
+        T2** value = &(*_it).second;
         ++_it;
         ++_currentIndex;
 

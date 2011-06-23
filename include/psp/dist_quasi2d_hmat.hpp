@@ -762,16 +762,17 @@ private:
             std::vector<Real>& svdRealWork ) const;
 
     void MultiplyHMatUpdates();
-    void MultiplyHMatUpdatesCountNodes
-    ( std::vector<int>& numTargetNodes, 
-      std::vector<int>& numSourceNodes ) const;
+    void MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const;
     void MultiplyHMatUpdatesLowRankCountAndResize
-    ( std::vector<int>& targetRanks, std::vector<int>& targetOffsets,
-      std::vector<int>& sourceRanks, std::vector<int>& sourceOffsets, 
-      int rank );
+    ( std::vector<int>& ranks, std::vector<int>& rankOffsets, int rank );
     void MultiplyHMatUpdatesLowRankImport( int rank );
     void MultiplyHMatUpdatesImportU( int rank, const Dense<Scalar>& U );
     void MultiplyHMatUpdatesImportV( int rank, const Dense<Scalar>& V );
+    void MultiplyHMatUpdatesLocalQR
+    ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
+      std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
+      std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+      std::vector<Scalar>& work );
 
     //
     // Transpose H-matrix/vector multiplication
