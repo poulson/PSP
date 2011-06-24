@@ -1398,7 +1398,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
         teamSize = mpi::CommSize( _teams[level] );
         const int color = teamRank;
         const int key = rank/teamSize;
-        mpi::CommSplit( comm, color, key, _crossTeams[level] );
+        mpi::CommSplit( comm, color, key, _crossTeams[inverseLevel] );
     }
 
     _rootTeams.resize( numRootLevels );
