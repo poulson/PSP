@@ -195,6 +195,20 @@ inline unsigned Log2( unsigned N )
     return result;
 }
 
+inline void AddToMap
+( std::map<int,int>& map, int key, int value )
+{
+    if( value == 0 )
+        return;
+
+    std::map<int,int>::iterator it;
+    it = map.find( key );
+    if( it == map.end() )
+        map[key] = value;
+    else
+        it->second += value;
+}
+
 } // namespace psp
 
 #endif // PSP_ENVIRONMENT_HPP

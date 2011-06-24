@@ -1115,8 +1115,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-        bool customCollective ) const
+        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSums");
@@ -1148,7 +1147,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     // at most log_4(p) reduces.
     for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A._teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
+    A._teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of communicators have data)
     A.MultiplyHMatMainSumsUnpackA( buffer, offsets );
@@ -1569,42 +1568,68 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
 
     // 1) Compute send and recv sizes
     MPI_Comm comm = _teams->Team( 0 );
-    const int p = mpi::CommSize( comm );
-    std::vector<int> sendSizes(p,0), recvSizes(p,0);
+    std::map<int,int> sendSizes, recvSizes;
     A.MultiplyHMatMainPassDataCountA( sendSizes, recvSizes );
     B.MultiplyHMatMainPassDataCountB( sendSizes, recvSizes );
     A.MultiplyHMatMainPassDataCountC( B, C, sendSizes, recvSizes );
 
     // 2) Allocate buffers
     int totalSendSize=0, totalRecvSize=0;
-    for( int i=0; i<p; ++i )
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
-        totalSendSize += sendSizes[i];
-        totalRecvSize += recvSizes[i];
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
     }
-    std::vector<Scalar> sendBuffer(totalSendSize), recvBuffer(totalRecvSize);
-    std::vector<int> sendOffsets( p ), recvOffsets( p );
-    for( int i=0,offset=0; i<p; offset+=sendSizes[i],++i )
-        sendOffsets[i] = offset;
-    for( int i=0,offset=0; i<p; offset+=recvSizes[i],++i )
-        recvOffsets[i] = offset;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
 
-    // 3) Pack sends
-    std::vector<int> offsets = sendOffsets;
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer(totalSendSize);
+    std::map<int,int> offsets = sendOffsets;
     A.MultiplyHMatMainPassDataPackA( sendBuffer, offsets );
     B.MultiplyHMatMainPassDataPackB( sendBuffer, offsets );
     A.MultiplyHMatMainPassDataPackC( B, C, sendBuffer, offsets );
 
-    // 4) MPI_Alltoallv
-    mpi::AllToAllV
-    ( &sendBuffer[0], &sendSizes[0], &sendOffsets[0],
-      &recvBuffer[0], &recvSizes[0], &recvOffsets[0], comm );
+    // Start the non-blocking sends
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
+    }
 
-    // 5) Unpack recvs
-    offsets = recvOffsets;
-    A.MultiplyHMatMainPassDataUnpackA( recvBuffer, offsets );
-    B.MultiplyHMatMainPassDataUnpackB( recvBuffer, offsets );
-    A.MultiplyHMatMainPassDataUnpackC( B, C, recvBuffer, offsets );
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    A.MultiplyHMatMainPassDataUnpackA( recvBuffer, recvOffsets );
+    B.MultiplyHMatMainPassDataUnpackB( recvBuffer, recvOffsets );
+    A.MultiplyHMatMainPassDataUnpackC( B, C, recvBuffer, recvOffsets );
+
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1613,7 +1638,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
-( std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountA");
@@ -1645,7 +1670,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
-( std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+( std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackA");
@@ -1688,7 +1713,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
-( const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackA");
@@ -1720,7 +1745,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
-( std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountB");
@@ -1752,7 +1777,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
-( std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+( std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackB");
@@ -1783,7 +1808,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
-( const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackB");
@@ -1816,7 +1841,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
   const DistQuasi2dHMat<Scalar,Conjugated>& C,
-  std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const
+  std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountC");
@@ -1980,9 +2005,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             {
                 const DistLowRank& DFB = *B._block.data.DF;
                 if( A._inSourceTeam )
-                    sendSizes[A._targetRoot] += DFA.rank*DFB.rank;
+                    AddToMap( sendSizes, A._targetRoot, DFA.rank*DFB.rank );
                 if( A._inTargetTeam )
-                    recvSizes[A._sourceRoot] += DFA.rank*DFB.rank;
+                    AddToMap( recvSizes, A._sourceRoot, DFA.rank*DFB.rank );
             }
             break;
         case DIST_LOW_RANK_GHOST:
@@ -1990,7 +2015,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             if( teamRank == 0 )
             {
                 const DistLowRankGhost& DFGB = *B._block.data.DFG;
-                recvSizes[A._sourceRoot] += DFA.rank*DFGB.rank;
+                AddToMap( recvSizes, A._sourceRoot, DFA.rank*DFGB.rank );
             }
             break;
         default:
@@ -2044,39 +2069,39 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             // We're either the middle process or both the left and right
             const SplitLowRank& SFB = *B._block.data.SF;
             if( A._inSourceTeam )
-                sendSizes[A._targetRoot] += SFA.rank*SFB.rank;
+                AddToMap( sendSizes, A._targetRoot, SFA.rank*SFB.rank );
             else
-                recvSizes[A._sourceRoot] += SFA.rank*SFB.rank;
+                AddToMap( recvSizes, A._sourceRoot, SFA.rank*SFB.rank );
             break;
         }
         case SPLIT_LOW_RANK_GHOST:
         {
             // Pass data for H/D/F += F F
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
-            recvSizes[A._sourceRoot] += SFA.rank*SFGB.rank;
+            AddToMap( recvSizes, A._sourceRoot, SFA.rank*SFGB.rank );
             break;
         }
         case LOW_RANK:
         {
             // Pass data for H/D/F += F F
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            sendSizes[A._targetRoot] += SFA.rank*FB.Rank();
+            AddToMap( sendSizes, A._targetRoot, SFA.rank*FB.Rank() );
             break;
         }
         case LOW_RANK_GHOST:
         {
             // Pass data for H/D/F += F F
             const LowRankGhost& FGB = *B._block.data.FG;
-            recvSizes[A._sourceRoot] += SFA.rank*FGB.rank;
+            AddToMap( recvSizes, A._sourceRoot, SFA.rank*FGB.rank );
             break;
         }
         case SPLIT_DENSE:
         {
             // Pass data for D/F += F D
             if( B._inTargetTeam )
-                sendSizes[B._sourceRoot] += B.Height()*SFA.rank;
+                AddToMap( sendSizes, B._sourceRoot, B.Height()*SFA.rank );
             else
-                recvSizes[B._targetRoot] += B.Height()*SFA.rank;
+                AddToMap( recvSizes, B._targetRoot, B.Height()*SFA.rank );
             break;
         }
         case SPLIT_DENSE_GHOST:
@@ -2107,7 +2132,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            recvSizes[B._targetRoot] += B.Height()*SFGA.rank;
+            AddToMap( recvSizes, B._targetRoot, B.Height()*SFGA.rank );
             break;
         default:
 #ifndef RELEASE
@@ -2134,7 +2159,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            sendSizes[B._sourceRoot] += B.Height()*FA.Rank();
+            AddToMap( sendSizes, B._sourceRoot, B.Height()*FA.Rank() );
             break;
         case DENSE:
             // There is no pass data
@@ -2162,7 +2187,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            recvSizes[B._targetRoot] += B.Height()*FGA.rank;
+            AddToMap( recvSizes, B._targetRoot, B.Height()*FGA.rank );
             break;
         default:
 #ifndef RELEASE
@@ -2181,38 +2206,38 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             // Pass data for D/F += D F
             const SplitLowRank& SFB = *B._block.data.SF;
             if( A._inSourceTeam )
-                sendSizes[A._targetRoot] += A.Height()*SFB.rank;
+                AddToMap( sendSizes, A._targetRoot, A.Height()*SFB.rank );
             else
-                recvSizes[A._sourceRoot] += A.Height()*SFB.rank;
+                AddToMap( recvSizes, A._sourceRoot, A.Height()*SFB.rank );
             break;
         }
         case SPLIT_LOW_RANK_GHOST:
         {
             // Pass data for D/F += D F
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
-            recvSizes[A._sourceRoot] += A.Height()*SFGB.rank;
+            AddToMap( recvSizes, A._sourceRoot, A.Height()*SFGB.rank );
             break;
         }
         case LOW_RANK:
         {
             // Pass data for D/F += D F
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            sendSizes[A._targetRoot] += A.Height()*FB.Rank();
+            AddToMap( sendSizes, A._targetRoot, A.Height()*FB.Rank() );
             break;
         }
         case LOW_RANK_GHOST:
         {
             // Pass data for D/F += D F
             const LowRankGhost& FGB = *B._block.data.FG;
-            recvSizes[A._sourceRoot] += A.Height()*FGB.rank;
+            AddToMap( recvSizes, A._sourceRoot, A.Height()*FGB.rank );
             break;
         }
         case SPLIT_DENSE:
             // Pass data for D/F += D D
             if( B._inSourceTeam )
-                recvSizes[B._targetRoot] += A.Height()*A.Width();
+                AddToMap( recvSizes, B._targetRoot, A.Height()*A.Width() );
             else
-                sendSizes[B._sourceRoot] += A.Height()*A.Width();
+                AddToMap( sendSizes, B._sourceRoot, A.Height()*A.Width() );
             break;
         case SPLIT_DENSE_GHOST:
         case DENSE:
@@ -2233,7 +2258,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         case SPLIT_LOW_RANK:
             break;
         case SPLIT_DENSE:
-            recvSizes[B._targetRoot] += A.Height()*A.Width();
+            AddToMap( recvSizes, B._targetRoot, A.Height()*A.Width() );
             break;
         default:
 #ifndef RELEASE
@@ -2250,7 +2275,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         case LOW_RANK:
             break;
         case SPLIT_DENSE:
-            sendSizes[B._sourceRoot] += A.Height()*A.Width();
+            AddToMap( sendSizes, B._sourceRoot, A.Height()*A.Width() );
             break;
         case DENSE:
             break;
@@ -2268,7 +2293,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         case SPLIT_LOW_RANK:
             break;
         case SPLIT_DENSE:
-            recvSizes[B._targetRoot] += A.Height()*A.Width();
+            AddToMap( recvSizes, B._targetRoot, A.Height()*A.Width() );
             break;
         default:
 #ifndef RELEASE
@@ -2290,7 +2315,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-  std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+  std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackC");
@@ -2426,7 +2451,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             if( teamRank == 0 && (A._inSourceTeam != A._inTargetTeam) )
             {
                 const DistLowRank& DFB = *B._block.data.DF;
-                if( A._inSourceTeam )
+                if( A._inSourceTeam && DFA.rank != 0 && DFB.rank != 0 )
                 {
                     Dense<Scalar>& ZC = *C._ZMap[key];
                     std::memcpy
@@ -2473,7 +2498,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             // Pass data for H/D/F += F F
             // We're either the middle process or both the left and right
             const SplitLowRank& SFB = *B._block.data.SF;
-            if( A._inSourceTeam )
+            if( A._inSourceTeam && SFA.rank != 0 && SFB.rank != 0 )
             {
                 Dense<Scalar>& ZC = *C._ZMap[key];
                 std::memcpy
@@ -2491,12 +2516,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         {
             // Pass data for H/D/F += F F
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            Dense<Scalar>& ZC = *C._ZMap[key];
-            std::memcpy
-            ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(),
-              SFA.rank*FB.Rank()*sizeof(Scalar) );
-            offsets[A._targetRoot] += SFA.rank*FB.Rank();
-            ZC.Clear();
+            if( SFA.rank != 0 && FB.Rank() != 0 )
+            {
+                Dense<Scalar>& ZC = *C._ZMap[key];
+                std::memcpy
+                ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(),
+                  SFA.rank*FB.Rank()*sizeof(Scalar) );
+                offsets[A._targetRoot] += SFA.rank*FB.Rank();
+                ZC.Clear();
+            }
             break;
         }
         case LOW_RANK_GHOST:
@@ -2505,7 +2533,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         case SPLIT_DENSE:
         {
             // Pass data for D/F += F D
-            if( B._inTargetTeam )
+            if( B._inTargetTeam && B.Height() != 0 && SFA.rank != 0 )
             {
                 std::memcpy
                 ( &sendBuffer[offsets[B._sourceRoot]], SFA.D.LockedBuffer(),
@@ -2547,10 +2575,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         case SPLIT_DENSE:
         {
             // Pass data for D/F += F D
-            std::memcpy
-            ( &sendBuffer[offsets[B._sourceRoot]], FA.V.LockedBuffer(),
-              B.Height()*FA.Rank()*sizeof(Scalar) );
-            offsets[B._sourceRoot] += B.Height()*FA.Rank();
+            if( B.Height() != 0 && FA.Rank() != 0 )
+            {
+                std::memcpy
+                ( &sendBuffer[offsets[B._sourceRoot]], FA.V.LockedBuffer(),
+                  B.Height()*FA.Rank()*sizeof(Scalar) );
+                offsets[B._sourceRoot] += B.Height()*FA.Rank();
+            }
             break;
         }
         case DENSE:
@@ -2574,7 +2605,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         {
             // Pass data for D/F += D F
             const SplitLowRank& SFB = *B._block.data.SF;
-            if( A._inSourceTeam )
+            if( A._inSourceTeam && A.Height() != 0 && SFB.rank != 0 )
             {
                 Dense<Scalar>& ZC = *C._ZMap[key];
                 std::memcpy
@@ -2591,19 +2622,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         {
             // Pass data for D/F += D F
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
-            Dense<Scalar>& ZC = *C._ZMap[key];
-            std::memcpy
-            ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(), 
-              A.Height()*FB.Rank()*sizeof(Scalar) );
-            offsets[A._targetRoot] += A.Height()*FB.Rank();
-            ZC.Clear();
+            if( A.Height() != 0 && FB.Rank() != 0 )
+            {
+                Dense<Scalar>& ZC = *C._ZMap[key];
+                std::memcpy
+                ( &sendBuffer[offsets[A._targetRoot]], ZC.LockedBuffer(), 
+                  A.Height()*FB.Rank()*sizeof(Scalar) );
+                offsets[A._targetRoot] += A.Height()*FB.Rank();
+                ZC.Clear();
+            }
             break;
         }
         case LOW_RANK_GHOST:
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += D D
-            if( B._inTargetTeam )
+            if( B._inTargetTeam && A.Height() != 0 && A.Width() != 0 )
             {
                 const SplitDense& SDA = *A._block.data.SD;
                 std::memcpy
@@ -2637,11 +2671,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             break;
         case SPLIT_DENSE:
         {
-            const Dense<Scalar>& DA = *A._block.data.D;
-            std::memcpy
-            ( &sendBuffer[offsets[B._sourceRoot]], DA.LockedBuffer(),
-              A.Height()*A.Width()*sizeof(Scalar) );
-            offsets[B._sourceRoot] += A.Height()*A.Width();
+            if( A.Height() != 0 && A.Width() != 0 )
+            {
+                const Dense<Scalar>& DA = *A._block.data.D;
+                std::memcpy
+                ( &sendBuffer[offsets[B._sourceRoot]], DA.LockedBuffer(),
+                  A.Height()*A.Width()*sizeof(Scalar) );
+                offsets[B._sourceRoot] += A.Height()*A.Width();
+            }
             break;
         }
         case DENSE:
@@ -2668,7 +2705,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+  const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackC");
@@ -2795,13 +2832,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             if( teamRank == 0 && A._inTargetTeam && !A._inSourceTeam )
             {
                 const DistLowRank& DFB = *B._block.data.DF;
-                C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFB.rank );
-                Dense<Scalar>& ZC = *C._ZMap[key];
+                if( DFA.rank != 0 && DFB.rank != 0 )
+                {
+                    C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFB.rank );
+                    Dense<Scalar>& ZC = *C._ZMap[key];
 
-                std::memcpy
-                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-                  DFA.rank*DFB.rank*sizeof(Scalar) );
-                offsets[A._sourceRoot] += DFA.rank*DFB.rank;
+                    std::memcpy
+                    ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                      DFA.rank*DFB.rank*sizeof(Scalar) );
+                    offsets[A._sourceRoot] += DFA.rank*DFB.rank;
+                }
             }
             break;
         case DIST_LOW_RANK_GHOST:
@@ -2809,13 +2849,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             if( teamRank == 0 )
             {
                 const DistLowRankGhost& DFGB = *B._block.data.DFG;
-                C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFGB.rank );
-                Dense<Scalar>& ZC = *C._ZMap[key];
+                if( DFA.rank != 0 && DFGB.rank != 0 )
+                {
+                    C._ZMap[key] = new Dense<Scalar>( DFA.rank, DFGB.rank );
+                    Dense<Scalar>& ZC = *C._ZMap[key];
 
-                std::memcpy
-                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-                  DFA.rank*DFGB.rank*sizeof(Scalar) );
-                offsets[A._sourceRoot] += DFA.rank*DFGB.rank;
+                    std::memcpy
+                    ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                      DFA.rank*DFGB.rank*sizeof(Scalar) );
+                    offsets[A._sourceRoot] += DFA.rank*DFGB.rank;
+                }
             }
             break;
         default:
@@ -2867,7 +2910,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             // Pass data for H/D/F += F F
             // We're either the middle process or both the left and right
             const SplitLowRank& SFB = *B._block.data.SF;
-            if( A._inTargetTeam )
+            if( A._inTargetTeam && SFA.rank != 0 && SFB.rank != 0 )
             {
                 C._ZMap[key] = new Dense<Scalar>( SFA.rank, SFB.rank );
                 Dense<Scalar>& ZC = *C._ZMap[key];
@@ -2883,13 +2926,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
         {
             // Pass data for H/D/F += F F
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
-            C._ZMap[key] = new Dense<Scalar>( SFA.rank, SFGB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( SFA.rank != 0 && SFGB.rank != 0 )
+            {
+                C._ZMap[key] = new Dense<Scalar>( SFA.rank, SFGB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
 
-            std::memcpy
-            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-              SFA.rank*SFGB.rank*sizeof(Scalar) );
-            offsets[A._sourceRoot] += SFA.rank*SFGB.rank;
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  SFA.rank*SFGB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += SFA.rank*SFGB.rank;
+            }
             break;
         }
         case LOW_RANK:
@@ -2899,18 +2945,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
         {
             // Pass data for H/D/F += F F
             const LowRankGhost& FGB = *B._block.data.FG;
-            C._ZMap[key] = new Dense<Scalar>( SFA.rank, FGB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( SFA.rank != 0 && FGB.rank != 0 )
+            {
+                C._ZMap[key] = new Dense<Scalar>( SFA.rank, FGB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
 
-            std::memcpy
-            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-              SFA.rank*FGB.rank*sizeof(Scalar) );
-            offsets[A._sourceRoot] += SFA.rank*FGB.rank;
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  SFA.rank*FGB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += SFA.rank*FGB.rank;
+            }
             break;
         }
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            if( B._inSourceTeam )
+            if( B._inSourceTeam && B.Height() != 0 && SFA.rank != 0 )
             {
                 C._ZMap[key] = new Dense<Scalar>( B.Height(), SFA.rank );
                 Dense<Scalar>& ZC = *C._ZMap[key];
@@ -2949,7 +2998,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         case SPLIT_DENSE:
             // Pass data for D/F += F D
-            if( B._inSourceTeam )
+            if( B._inSourceTeam && B.Height() != 0 && SFGA.rank != 0 )
             {
                 C._ZMap[key] = new Dense<Scalar>( B.Height(), SFGA.rank );
                 Dense<Scalar>& ZC = *C._ZMap[key];
@@ -2984,13 +3033,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
         case SPLIT_DENSE:
         {
             // Pass data for D/F += F D
-            C._ZMap[key] = new Dense<Scalar>( B.Height(), FGA.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( B.Height() != 0 && FGA.rank != 0 )
+            {
+                C._ZMap[key] = new Dense<Scalar>( B.Height(), FGA.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
 
-            std::memcpy
-            ( ZC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
-              B.Height()*FGA.rank*sizeof(Scalar) );
-            offsets[B._targetRoot] += B.Height()*FGA.rank;
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                  B.Height()*FGA.rank*sizeof(Scalar) );
+                offsets[B._targetRoot] += B.Height()*FGA.rank;
+            }
             break;
         }
         default:
@@ -3010,26 +3062,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             if( A._inTargetTeam )
             {
                 const SplitLowRank& SFB = *B._block.data.SF;
-                C._ZMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
-                Dense<Scalar>& ZC = *C._ZMap[key];
+                if( A.Height() != 0 && SFB.rank != 0 )
+                {
+                    C._ZMap[key] = new Dense<Scalar>( A.Height(), SFB.rank );
+                    Dense<Scalar>& ZC = *C._ZMap[key];
 
-                std::memcpy
-                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-                  A.Height()*SFB.rank*sizeof(Scalar) );
-                offsets[A._sourceRoot] += A.Height()*SFB.rank;
+                    std::memcpy
+                    ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                      A.Height()*SFB.rank*sizeof(Scalar) );
+                    offsets[A._sourceRoot] += A.Height()*SFB.rank;
+                }
             }
             break;
         case SPLIT_LOW_RANK_GHOST:
         {
             // Pass data for D/F += D F
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
-            C._ZMap[key] = new Dense<Scalar>( A.Height(), SFGB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( A.Height() != 0 && SFGB.rank != 0 )
+            {
+                C._ZMap[key] = new Dense<Scalar>( A.Height(), SFGB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
 
-            std::memcpy
-            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-              A.Height()*SFGB.rank*sizeof(Scalar) );
-            offsets[A._sourceRoot] += A.Height()*SFGB.rank;
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  A.Height()*SFGB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += A.Height()*SFGB.rank;
+            }
             break;
         }
         case LOW_RANK:
@@ -3038,18 +3096,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
         {
             // Pass data for D/F += D F
             const LowRankGhost& FGB = *B._block.data.FG;
-            C._ZMap[key] = new Dense<Scalar>( A.Height(), FGB.rank );
-            Dense<Scalar>& ZC = *C._ZMap[key];
+            if( A.Height() != 0 && FGB.rank != 0 )
+            {
+                C._ZMap[key] = new Dense<Scalar>( A.Height(), FGB.rank );
+                Dense<Scalar>& ZC = *C._ZMap[key];
 
-            std::memcpy
-            ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
-              A.Height()*FGB.rank*sizeof(Scalar) );
-            offsets[A._sourceRoot] += A.Height()*FGB.rank;
+                std::memcpy
+                ( ZC.Buffer(), &recvBuffer[offsets[A._sourceRoot]],
+                  A.Height()*FGB.rank*sizeof(Scalar) );
+                offsets[A._sourceRoot] += A.Height()*FGB.rank;
+            }
             break;
         }
         case SPLIT_DENSE:
             // Pass data for D/F += D D
-            if( B._inSourceTeam )
+            if( B._inSourceTeam && A.Height() != 0 && A.Width() != 0 )
             {
                 C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
                 Dense<Scalar>& DC = *C._DMap[key];
@@ -3082,13 +3143,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         case SPLIT_DENSE:
         {
-            C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
-            Dense<Scalar>& DC = *C._DMap[key];
+            if( A.Height() != 0 && A.Width() != 0 )
+            {
+                C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
+                Dense<Scalar>& DC = *C._DMap[key];
 
-            std::memcpy
-            ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
-              A.Height()*A.Width()*sizeof(Scalar) );
-            offsets[B._targetRoot] += A.Height()*A.Width();
+                std::memcpy
+                ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                  A.Height()*A.Width()*sizeof(Scalar) );
+                offsets[B._targetRoot] += A.Height()*A.Width();
+            }
             break;
         }
         default:
@@ -3117,8 +3181,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-        bool customCollective ) const
+        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcasts");
@@ -3151,7 +3214,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     // at most log_4(p) broadcasts.
     for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A._teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
+    A._teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers
     A.MultiplyHMatMainBroadcastsUnpackA( buffer, offsets );
@@ -4676,8 +4739,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C,
-  bool customCollective ) const
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSums");
@@ -4705,7 +4767,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
     // at most log_4(p) reduces.
     for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A._teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
+    A._teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of communicators have data)
     A.MultiplyHMatFHHSumsUnpack( B, C, buffer, offsets );
@@ -4906,36 +4968,62 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
 
     // 1) Compute send and recv sizes
     MPI_Comm comm = _teams->Team( 0 );
-    const int p = mpi::CommSize( comm );
-    std::vector<int> sendSizes(p,0), recvSizes(p,0);
+    std::map<int,int> sendSizes, recvSizes;
     A.MultiplyHMatFHHPassDataCount( B, C, sendSizes, recvSizes );
 
     // 2) Allocate buffers
     int totalSendSize=0, totalRecvSize=0;
-    for( int i=0; i<p; ++i )
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
-        totalSendSize += sendSizes[i];
-        totalRecvSize += recvSizes[i];
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
     }
-    std::vector<Scalar> sendBuffer(totalSendSize), recvBuffer(totalRecvSize);
-    std::vector<int> sendOffsets( p ), recvOffsets( p );
-    for( int i=0,offset=0; i<p; offset+=sendSizes[i],++i )
-        sendOffsets[i] = offset;
-    for( int i=0,offset=0; i<p; offset+=recvSizes[i],++i )
-        recvOffsets[i] = offset;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
 
-    // 3) Pack sends
-    std::vector<int> offsets = sendOffsets;
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer(totalSendSize);
+    std::map<int,int> offsets = sendOffsets;
     A.MultiplyHMatFHHPassDataPack( B, C, sendBuffer, offsets );
 
-    // 4) MPI_Alltoallv
-    mpi::AllToAllV
-    ( &sendBuffer[0], &sendSizes[0], &sendOffsets[0],
-      &recvBuffer[0], &recvSizes[0], &recvOffsets[0], comm );
+    // Start the non-blocking sends
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
+    }
 
-    // 5) Unpack recvs
-    offsets = recvOffsets;
-    A.MultiplyHMatFHHPassDataUnpack( B, C, recvBuffer, offsets );
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    A.MultiplyHMatFHHPassDataUnpack( B, C, recvBuffer, recvOffsets );
+
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -4946,7 +5034,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<int>& sendSizes, std::vector<int>& recvSizes ) const
+        std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataCount");
@@ -5008,7 +5096,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<Scalar>& sendBuffer, std::vector<int>& offsets ) const
+        std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataPack");
@@ -5085,7 +5173,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& recvBuffer, std::vector<int>& offsets ) const
+  const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataUnpack");
@@ -5152,8 +5240,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C,
-  bool customCollective ) const
+                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcasts");
@@ -5182,7 +5269,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     // at most log_4(p) broadcasts.
     for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A._teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
+    A._teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers
     A.MultiplyHMatFHHBroadcastsUnpack( B, C, buffer, offsets );

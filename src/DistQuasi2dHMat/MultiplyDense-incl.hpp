@@ -86,12 +86,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
     MultiplyDenseSums( context );
-    //MultiplyDenseNaiveSums( context );
-
     MultiplyDensePassData( context );
-
     MultiplyDenseBroadcasts( context );
-    //MultiplyDenseNaiveBroadcasts( context );
 
     MultiplyDensePostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
@@ -118,12 +114,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     TransposeMultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
     TransposeMultiplyDenseSums( context );
-    //TransposeMultiplyDenseNaiveSums( context );
-
     TransposeMultiplyDensePassData( context, XLocal );
-
     TransposeMultiplyDenseBroadcasts( context );
-    //TransposeMultiplyDenseNaiveBroadcasts( context );
 
     TransposeMultiplyDensePostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
@@ -150,12 +142,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
     AdjointMultiplyDensePrecompute( context, alpha, XLocal, YLocal );
 
     AdjointMultiplyDenseSums( context );
-    //AdjointMultiplyDenseNaiveSums( context );
-
     AdjointMultiplyDensePassData( context, XLocal );
-
     AdjointMultiplyDenseBroadcasts( context );
-    //AdjointMultiplyDenseNaiveBroadcasts( context );
 
     AdjointMultiplyDensePostcompute( context, alpha, XLocal, YLocal );
 #ifndef RELEASE
@@ -600,7 +588,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSums
-( MultiplyDenseContext& context, bool customCollective ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseSums");
@@ -628,7 +616,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSums
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     MultiplyDenseSumsUnpack( context, buffer, offsets );
@@ -640,7 +628,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSums
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSums
-( MultiplyDenseContext& context, bool customCollective ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseSums");
@@ -665,7 +653,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSums
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     TransposeMultiplyDenseSumsUnpack( context, buffer, offsets );
@@ -677,13 +665,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSums
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseSums
-( MultiplyDenseContext& context, bool customCollective ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseSums");
 #endif
     // This unconjugated version is identical
-    TransposeMultiplyDenseSums( context, customCollective );
+    TransposeMultiplyDenseSums( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -956,446 +944,70 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSumsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveSums
-( MultiplyDenseContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseNaiveSums");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseNaiveSums
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
-            {
-                Dense<Scalar>& Z = *context.block.data.Z;
-                MPI_Comm team = _teams->Team( _level );
-                int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                    mpi::Reduce
-                    ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                      DF.rank*numRhs, 0, MPI_SUM, team );
-                else
-                    mpi::Reduce
-                    ( Z.LockedBuffer(), 0, DF.rank*numRhs, 0, MPI_SUM, team );
-            }
-        }
-        break;
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseNaiveSums
-( MultiplyDenseContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseNaiveSums");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDenseNaiveSums
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
-            {
-                Dense<Scalar>& Z = *context.block.data.Z;
-                MPI_Comm team = _teams->Team( _level );
-                int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                    mpi::Reduce
-                    ( (const Scalar*)MPI_IN_PLACE, Z.Buffer(), 
-                      DF.rank*numRhs, 0, MPI_SUM, team );
-                else
-                    mpi::Reduce
-                    ( Z.LockedBuffer(), 0, DF.rank*numRhs, 0, MPI_SUM, team );
-            }
-        }
-        break;
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveSums
-( MultiplyDenseContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseNaiveSums");
-#endif
-    // The unconjugated version should be identical
-    TransposeMultiplyDenseNaiveSums( context );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
 ( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassData");
 #endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
-            *context.block.data.DN;
+    // Constuct maps of the send/recv processes to the send/recv sizes
+    std::map<int,int> sendSizes, recvSizes;
+    MultiplyDensePassDataCount( sendSizes, recvSizes, context.numRhs );
 
-        MPI_Comm team = _teams->Team( _level );
-        const int teamSize = mpi::CommSize( team );
-        const int teamRank = mpi::CommRank( team );
-        if( teamSize == 2 )
-        {
-            if( teamRank == 0 )     
-            {
-                // Take care of the top-left quadrant within our subteams
-                for( int t=0; t<2; ++t )
-                    for( int s=0; s<2; ++s )
-                        node.Child(t,s).MultiplyDensePassData
-                        ( nodeContext.Child(t,s) );
-            }
-            else
-            {
-                // Take care of the bottom-right quadrant within our subteams
-                for( int t=2; t<4; ++t )
-                    for( int s=2; s<4; ++s )
-                        node.Child(t,s).MultiplyDensePassData
-                        ( nodeContext.Child(t,s) );
-            }
-            // Top-right quadrant
-            for( int t=0; t<2; ++t )
-                for( int s=2; s<4; ++s )
-                    node.Child(t,s).MultiplyDensePassData
-                    ( nodeContext.Child(t,s) );
-            // Bottom-left quadrant
-            for( int t=2; t<4; ++t )
-                for( int s=0; s<2; ++s )
-                    node.Child(t,s).MultiplyDensePassData
-                    ( nodeContext.Child(t,s) );
-        }
-        else // teamSize >= 4
-        {
-            const int subteam = teamRank / (teamSize/4);
-            switch( subteam )
-            {
-            case 0:
-                // Take care of the work specific to our subteams
-                node.Child(0,0).MultiplyDensePassData( nodeContext.Child(0,0) );
-                // Interact with subteam 1
-                node.Child(0,1).MultiplyDensePassData( nodeContext.Child(0,1) );
-                node.Child(1,0).MultiplyDensePassData( nodeContext.Child(1,0) );
-                // Interact with subteam 2
-                node.Child(0,2).MultiplyDensePassData( nodeContext.Child(0,2) );
-                node.Child(2,0).MultiplyDensePassData( nodeContext.Child(2,0) );
-                // Interact with subteam 3
-                node.Child(0,3).MultiplyDensePassData( nodeContext.Child(0,3) );
-                node.Child(3,0).MultiplyDensePassData( nodeContext.Child(3,0) );
-                break;
-            case 1:
-                // Take care of the work specific to our subteams
-                node.Child(1,1).MultiplyDensePassData( nodeContext.Child(1,1) );
-                // Interact with subteam 0
-                node.Child(0,1).MultiplyDensePassData( nodeContext.Child(0,1) );
-                node.Child(1,0).MultiplyDensePassData( nodeContext.Child(1,0) );
-                // Interact with subteam 3
-                node.Child(1,3).MultiplyDensePassData( nodeContext.Child(1,3) );
-                node.Child(3,1).MultiplyDensePassData( nodeContext.Child(3,1) );
-                // Interact with subteam 2
-                node.Child(1,2).MultiplyDensePassData( nodeContext.Child(1,2) );
-                node.Child(2,1).MultiplyDensePassData( nodeContext.Child(2,1) );
-                break;
-            case 2:
-                // Take care of the work specific to our subteams
-                node.Child(2,2).MultiplyDensePassData( nodeContext.Child(2,2) );
-                // Interact with subteam 3
-                node.Child(2,3).MultiplyDensePassData( nodeContext.Child(2,3) );
-                node.Child(3,2).MultiplyDensePassData( nodeContext.Child(3,2) );
-                // Interact with subteam 0
-                node.Child(0,2).MultiplyDensePassData( nodeContext.Child(0,2) );
-                node.Child(2,0).MultiplyDensePassData( nodeContext.Child(2,0) );
-                // Interact with subteam 1
-                node.Child(1,2).MultiplyDensePassData( nodeContext.Child(1,2) );
-                node.Child(2,1).MultiplyDensePassData( nodeContext.Child(2,1) );
-                break;
-            case 3:
-                // Take care of the work specific to our subteams
-                node.Child(3,3).MultiplyDensePassData( nodeContext.Child(3,3) );
-                // Interact with subteam 2
-                node.Child(2,3).MultiplyDensePassData( nodeContext.Child(2,3) );
-                node.Child(3,2).MultiplyDensePassData( nodeContext.Child(3,2) );
-                // Interact with subteam 1
-                node.Child(1,3).MultiplyDensePassData( nodeContext.Child(1,3) );
-                node.Child(3,1).MultiplyDensePassData( nodeContext.Child(3,1) );
-                // Interact with subteam 0
-                node.Child(0,3).MultiplyDensePassData( nodeContext.Child(0,3) );
-                node.Child(3,0).MultiplyDensePassData( nodeContext.Child(3,0) );
-                break;
-            default:
-                // This should be impossible
-                break;
-            }
-        }
-        break;
-    }
-    case SPLIT_NODE:
+    // Fill the offset vectors defined by the sizes
+    int totalSendSize=0, totalRecvSize=0;
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::SplitNode& nodeContext = 
-            *context.block.data.SN;
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
+    }
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
 
-        std::size_t bufferSize = 0;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPassDataSplitNodeCount
-                ( bufferSize );
-        bufferSize *= numRhs;
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer( totalSendSize );
+    std::map<int,int> offsets = sendOffsets;
+    MultiplyDensePassDataPack( context, sendBuffer, offsets );
 
-        std::vector<byte> buffer( bufferSize );
-        MPI_Comm comm = _teams->Team(0);
-        if( _inSourceTeam )
-        {
-            byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyDensePassDataSplitNodePack
-                    ( nodeContext.Child(t,s), head );
-            if( bufferSize != 0 )
-                mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
-        }
-        else
-        {
-            if( bufferSize != 0 )
-                mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
-            const byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyDensePassDataSplitNodeUnpack
-                    ( nodeContext.Child(t,s), head );
-        }
-        break;
-    }
-    case DIST_LOW_RANK:
+    // Start the non-blocking sends
+    MPI_Comm comm = _teams->Team( 0 );
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
-        if( _inSourceTeam && _inTargetTeam )
-            break;
-        const DistLowRank& DF = *_block.data.DF;
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( DF.rank != 0 )
-        {
-            MPI_Comm comm = _teams->Team( 0 );
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                if( _inSourceTeam )
-                {
-                    mpi::Send
-                    ( Z.LockedBuffer(), DF.rank*numRhs, _targetRoot, 0, comm );
-                    Z.Clear();
-                }
-                else
-                {
-                    Z.Resize( DF.rank, numRhs, DF.rank );
-                    mpi::Recv
-                    ( Z.Buffer(), DF.rank*numRhs, _sourceRoot, 0, comm );
-                }
-            }
-        }
-        break;
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
     }
-    case SPLIT_LOW_RANK:
-    {
-        const SplitLowRank& SF = *_block.data.SF;
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( SF.rank != 0 )
-        {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inSourceTeam )
-            {
-                mpi::Send
-                ( Z.LockedBuffer(), SF.rank*numRhs, _targetRoot, 0, comm );
-                Z.Clear();
-            }
-            else
-            {
-                Z.Resize( SF.rank, numRhs, SF.rank );
-                mpi::Recv( Z.Buffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
-            }
-        }
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( Height() != 0 )
-        {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inSourceTeam )
-            {
-                mpi::Send
-                ( Z.LockedBuffer(), Z.Height()*numRhs, _targetRoot, 0, comm );
-                Z.Clear();
-            }
-            else
-            {
-                Z.Resize( Height(), numRhs, Height() );
-                mpi::Recv
-                ( Z.Buffer(), Z.Height()*numRhs, _sourceRoot, 0, comm );
-            }
-        }
-        break;
-    }
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
 
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataSplitNodePack
-( MultiplyDenseContext& context, byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataSplitNodePack");
-    if( !_inSourceTeam )
-        throw std::logic_error("Calling process should be in source team");
-#endif
-    switch( _block.type )
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
     {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext =
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDensePassDataSplitNodePack
-                ( nodeContext.Child(t,s), head );
-        break;
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
     }
-    case SPLIT_LOW_RANK:
-    {
-        Dense<Scalar>& Z = *context.block.data.Z;
-        Write( head, Z.LockedBuffer(), Z.Height()*Z.Width() );
-        Z.Clear();
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        Dense<Scalar>& Z = *context.block.data.Z;
-        Write( head, Z.LockedBuffer(), Z.Height()*Z.Width() );
-        Z.Clear();
-        break;
-    }
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
 
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyDensePassDataSplitNodeUnpack
-( MultiplyDenseContext& context, const byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataSplitNodeUnpack");
-    if( !_inTargetTeam )
-        throw std::logic_error("Calling process should be in target team");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext =
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDensePassDataSplitNodeUnpack
-                ( nodeContext.Child(t,s), head );
-        break;
-    }
-    case SPLIT_LOW_RANK:
-    {
-        const SplitLowRank& SF = *_block.data.SF;
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( SF.rank != 0 )
-        {
-            Z.Resize( SF.rank, numRhs, SF.rank );
-            Read( Z.Buffer(), head, Z.Height()*numRhs );
-        }
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( Height() != 0 )
-        {
-            Z.Resize( Height(), numRhs, Height() );
-            Read( Z.Buffer(), head, Z.Height()*numRhs );
-        }
-        break;
-    }
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    MultiplyDensePassDataUnpack( context, recvBuffer, recvOffsets );
+    
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1404,11 +1016,14 @@ MultiplyDensePassDataSplitNodeUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataCount
-( std::vector<int>& sendSizes, std::vector<int>& recvSizes, int numRhs ) const
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataCount");
 #endif
+    if( numRhs == 0 )
+        return;
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1433,9 +1048,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataCount
             if( teamRank == 0 )
             {
                 if( _inSourceTeam )
-                    sendSizes[_targetRoot] += DF.rank*numRhs;
+                    AddToMap( sendSizes, _targetRoot, DF.rank*numRhs );
                 else
-                    recvSizes[_sourceRoot] += DF.rank*numRhs;
+                    AddToMap( recvSizes, _sourceRoot, DF.rank*numRhs );
             }
         }
         break;
@@ -1446,9 +1061,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataCount
         if( SF.rank != 0 )
         {
             if( _inSourceTeam )
-                sendSizes[_targetRoot] += SF.rank*numRhs;
+                AddToMap( sendSizes, _targetRoot, SF.rank*numRhs );
             else
-                recvSizes[_sourceRoot] += SF.rank*numRhs;
+                AddToMap( recvSizes, _sourceRoot, SF.rank*numRhs );
         }
         break;
     }
@@ -1457,9 +1072,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataCount
         if( Height() != 0 )
         {
             if( _inSourceTeam )
-                sendSizes[_targetRoot] += Height()*numRhs;
+                AddToMap( sendSizes, _targetRoot, Height()*numRhs );
             else
-                recvSizes[_sourceRoot] += Height()*numRhs;
+                AddToMap( recvSizes, _sourceRoot, Height()*numRhs );
         }
         break;
     }
@@ -1475,11 +1090,14 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataPack
 ( MultiplyDenseContext& context,
-  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataPack");
 #endif
+    if( context.numRhs == 0 )
+        return;
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1549,12 +1167,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataPack
     {
         if( _inSourceTeam )
         {
-            Dense<Scalar>& Z = *context.block.data.Z;
-            std::memcpy
-            ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
-              Z.Height()*Z.Width()*sizeof(Scalar) );
-            offsets[_targetRoot] += Z.Height()*Z.Width();
-            Z.Clear();
+            if( Height() != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                std::memcpy
+                ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
+                  Z.Height()*Z.Width()*sizeof(Scalar) );
+                offsets[_targetRoot] += Z.Height()*Z.Width();
+                Z.Clear();
+            }
         }
         break;
     }
@@ -1570,12 +1191,15 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataUnpack
 ( MultiplyDenseContext& context,
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  const std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDensePassDataUnpack");
 #endif
     const int numRhs = context.numRhs;
+    if( numRhs == 0 )
+        return;
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1645,12 +1269,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataUnpack
     {
         if( _inTargetTeam )
         {
-            Dense<Scalar>& Z = *context.block.data.Z;
-            Z.Resize( Height(), numRhs, Height() );
-            std::memcpy
-            ( Z.Buffer(), &buffer[offsets[_sourceRoot]],
-              Z.Height()*numRhs*sizeof(Scalar) );
-            offsets[_sourceRoot] += Z.Height()*numRhs;
+            if( Height() != 0 )
+            {
+                Dense<Scalar>& Z = *context.block.data.Z;
+                Z.Resize( Height(), numRhs, Height() );
+                std::memcpy
+                ( Z.Buffer(), &buffer[offsets[_sourceRoot]],
+                  Z.Height()*numRhs*sizeof(Scalar) );
+                offsets[_sourceRoot] += Z.Height()*numRhs;
+            }
         }
         break;
     }
@@ -1670,379 +1297,64 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassData
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassData");
 #endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
-            *context.block.data.DN;
+    // Constuct maps of the send/recv processes to the send/recv sizes
+    std::map<int,int> sendSizes, recvSizes;
+    TransposeMultiplyDensePassDataCount( sendSizes, recvSizes, context.numRhs );
 
-        MPI_Comm team = _teams->Team( _level );
-        const int teamSize = mpi::CommSize( team );
-        const int teamRank = mpi::CommRank( team );
-        if( teamSize == 2 )
-        {
-            if( teamRank == 0 )     
-            {
-                // Take care of the top-left quadrant within our subteams
-                for( int t=0; t<2; ++t )
-                    for( int s=0; s<2; ++s )
-                        node.Child(t,s).TransposeMultiplyDensePassData
-                        ( nodeContext.Child(t,s), XLocal );
-            }
-            else
-            {
-                // Take care of the bottom-right quadrant within our subteams
-                for( int t=2; t<4; ++t )
-                    for( int s=2; s<4; ++s )
-                        node.Child(t,s).TransposeMultiplyDensePassData
-                        ( nodeContext.Child(t,s), XLocal );
-            }
-            // Top-right quadrant
-            for( int t=0; t<2; ++t )
-                for( int s=2; s<4; ++s )
-                    node.Child(t,s).TransposeMultiplyDensePassData
-                    ( nodeContext.Child(t,s), XLocal );
-            // Bottom-left quadrant
-            for( int t=2; t<4; ++t )
-                for( int s=0; s<2; ++s )
-                    node.Child(t,s).TransposeMultiplyDensePassData
-                    ( nodeContext.Child(t,s), XLocal );
-        }
-        else // teamSize >= 4
-        {
-            const int subteam = teamRank / (teamSize/4);
-            switch( subteam )
-            {
-            case 0:
-                // Take care of the work specific to our subteams
-                node.Child(0,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,0), XLocal );
-                // Interact with subteam 1
-                node.Child(0,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,1), XLocal );
-                node.Child(1,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,0), XLocal );
-                // Interact with subteam 2
-                node.Child(0,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,2), XLocal );
-                node.Child(2,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,0), XLocal );
-                // Interact with subteam 3
-                node.Child(0,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,3), XLocal );
-                node.Child(3,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,0), XLocal );
-                break;
-            case 1:
-                // Take care of the work specific to our subteams
-                node.Child(1,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,1), XLocal );
-                // Interact with subteam 0
-                node.Child(0,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,1), XLocal );
-                node.Child(1,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,0), XLocal );
-                // Interact with subteam 3
-                node.Child(1,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,3), XLocal ); 
-                node.Child(3,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,1), XLocal );
-                // Interact with subteam 2
-                node.Child(1,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,2), XLocal );
-                node.Child(2,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,1), XLocal );
-                break;
-            case 2:
-                // Take care of the work specific to our subteams
-                node.Child(2,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,2), XLocal );
-                // Interact with subteam 3
-                node.Child(2,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,3), XLocal );
-                node.Child(3,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,2), XLocal );
-                // Interact with subteam 0
-                node.Child(0,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,2), XLocal );
-                node.Child(2,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,0), XLocal );
-                // Interact with subteam 1
-                node.Child(1,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,2), XLocal );
-                node.Child(2,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,1), XLocal );
-                break;
-            case 3:
-                // Take care of the work specific to our subteams
-                node.Child(3,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,3), XLocal );
-                // Interact with subteam 2
-                node.Child(2,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(2,3), XLocal );
-                node.Child(3,2).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,2), XLocal );
-                // Interact with subteam 1
-                node.Child(1,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(1,3), XLocal );
-                node.Child(3,1).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,1), XLocal );
-                // Interact with subteam 0
-                node.Child(0,3).TransposeMultiplyDensePassData
-                ( nodeContext.Child(0,3), XLocal );
-                node.Child(3,0).TransposeMultiplyDensePassData
-                ( nodeContext.Child(3,0), XLocal );
-                break;
-            default:
-                // This should be impossible
-                break;
-            }
-        }
-        break;
-    }
-    case SPLIT_NODE:
+    // Fill the offset vectors defined by the sizes
+    int totalSendSize=0, totalRecvSize=0;
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::SplitNode& nodeContext =
-            *context.block.data.SN;
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
+    }
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
 
-        std::size_t bufferSize = 0;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodeCount
-                ( bufferSize );
-        bufferSize *= numRhs;
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer( totalSendSize );
+    std::map<int,int> offsets = sendOffsets;
+    TransposeMultiplyDensePassDataPack( context, XLocal, sendBuffer, offsets );
 
-        std::vector<byte> buffer( bufferSize );
-        MPI_Comm comm = _teams->Team(0);
-        if( _inTargetTeam )
-        {
-            byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).TransposeMultiplyDensePassDataSplitNodePack
-                    ( nodeContext.Child(t,s), XLocal, head );
-            if( bufferSize != 0 )
-                mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
-        }
-        else
-        {
-            if( bufferSize != 0 )
-                mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
-            const byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).
-                    TransposeMultiplyDensePassDataSplitNodeUnpack
-                    ( nodeContext.Child(t,s), head );
-        }
-        break;
-    }
-    case DIST_LOW_RANK:
+    // Start the non-blocking sends
+    MPI_Comm comm = _teams->Team( 0 );
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
-        if( _inSourceTeam && _inTargetTeam )
-            break;
-        const DistLowRank& DF = *_block.data.DF;
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( DF.rank != 0 )
-        {
-            MPI_Comm comm = _teams->Team( 0 );
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                if( _inTargetTeam )
-                {
-                    mpi::Send
-                    ( Z.LockedBuffer(), DF.rank*numRhs, _sourceRoot, 0, comm );
-                    Z.Clear();
-                }
-                else
-                {
-                    Z.Resize( DF.rank, numRhs, DF.rank );
-                    mpi::Recv
-                    ( Z.Buffer(), DF.rank*numRhs, _targetRoot, 0, comm );
-                }
-            }
-        }
-        break;
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
     }
-    case SPLIT_LOW_RANK:
-    {
-        const SplitLowRank& SF = *_block.data.SF;
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( SF.rank != 0 )
-        {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inTargetTeam )
-            {
-                mpi::Send
-                ( Z.LockedBuffer(), SF.rank*numRhs, _sourceRoot, 0, comm );
-                Z.Clear();
-            }
-            else
-            {
-                Z.Resize( SF.rank, numRhs, SF.rank );
-                mpi::Recv( Z.Buffer(), SF.rank*numRhs, _targetRoot, 0, comm );
-            }
-        }
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        const int height = Height();
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( height != 0 )
-        {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inTargetTeam )
-            {
-                Dense<Scalar> XLocalSub;
-                XLocalSub.LockedView
-                ( XLocal, _localTargetOffset, 0, height, numRhs );
-                if( XLocalSub.LDim() != XLocalSub.Height() )
-                {
-                    // We must pack first
-                    Z.Resize( height, numRhs, height );
-                    for( int j=0; j<numRhs; ++j )
-                        std::memcpy
-                        ( Z.Buffer(0,j), XLocalSub.LockedBuffer(0,j), 
-                          height*sizeof(Scalar) );
-                    mpi::Send
-                    ( Z.LockedBuffer(), height*numRhs, _sourceRoot, 0, comm );
-                    Z.Clear();
-                }
-                else
-                {
-                    mpi::Send
-                    ( XLocalSub.LockedBuffer(), height*numRhs, 
-                      _sourceRoot, 0, comm );
-                }
-            }
-            else
-            {
-                Z.Resize( height, numRhs, height );
-                mpi::Recv( Z.Buffer(), height*numRhs, _targetRoot, 0, comm );
-            }
-        }
-        break;
-    }
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
 
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyDensePassDataSplitNodePack
-( MultiplyDenseContext& context,
-  const Dense<Scalar>& XLocal, byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::TransposeMultiplyDensePassDataSplitNodePack");
-    if( !_inTargetTeam )
-        throw std::logic_error("Calling process should be in target team");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
     {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext =
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDensePassDataSplitNodePack
-                ( nodeContext.Child(t,s), XLocal, head );
-        break;
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
     }
-    case SPLIT_LOW_RANK:
-    {
-        Dense<Scalar>& Z = *context.block.data.Z;
-        Write( head, Z.LockedBuffer(), Z.Height()*Z.Width() );
-        Z.Clear();
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        const int height = Height();
-        for( int j=0; j<numRhs; ++j )
-            Write( head, XLocal.LockedBuffer(_localTargetOffset,j), height );
-        break;
-    }
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
 
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyDensePassDataSplitNodeUnpack
-( MultiplyDenseContext& context, const byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::TransposeMultiplyDensePassDataSplitNodeUnpack");
-    if( !_inSourceTeam )
-        throw std::logic_error("Calling process should be in source team");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext =
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDensePassDataSplitNodeUnpack
-                ( nodeContext.Child(t,s), head );
-        break;
-    }
-    case SPLIT_LOW_RANK:
-    {
-        const SplitLowRank& SF = *_block.data.SF;
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( SF.rank != 0 )
-        {
-            Z.Resize( SF.rank, numRhs, SF.rank );
-            Read( Z.Buffer(), head, Z.Height()*numRhs );
-        }
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        Dense<Scalar>& Z = *context.block.data.Z;
-        if( Height() != 0 )
-        {
-            Z.Resize( Height(), numRhs, Height() );
-            Read( Z.Buffer(), head, Z.Height()*numRhs );
-        }
-        break;
-    }
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    TransposeMultiplyDensePassDataUnpack( context, recvBuffer, recvOffsets );
+    
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2051,11 +1363,14 @@ TransposeMultiplyDensePassDataSplitNodeUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataCount
-( std::vector<int>& sendSizes, std::vector<int>& recvSizes, int numRhs ) const
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes, int numRhs ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataCount");
 #endif
+    if( numRhs == 0 )
+        return;
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2080,9 +1395,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataCount
             if( teamRank == 0 )
             {
                 if( _inTargetTeam )
-                    sendSizes[_sourceRoot] += DF.rank*numRhs;
+                    AddToMap( sendSizes, _sourceRoot, DF.rank*numRhs );
                 else
-                    recvSizes[_targetRoot] += DF.rank*numRhs;
+                    AddToMap( recvSizes, _targetRoot, DF.rank*numRhs );
             }
         }
         break;
@@ -2093,9 +1408,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataCount
         if( SF.rank != 0 )
         {
             if( _inTargetTeam )
-                sendSizes[_sourceRoot] += SF.rank*numRhs;
+                AddToMap( sendSizes, _sourceRoot, SF.rank*numRhs );
             else
-                recvSizes[_targetRoot] += SF.rank*numRhs;
+                AddToMap( recvSizes, _targetRoot, SF.rank*numRhs );
         }
         break;
     }
@@ -2104,9 +1419,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataCount
         if( Height() != 0 )
         {
             if( _inTargetTeam )
-                sendSizes[_sourceRoot] += Height()*numRhs;
+                AddToMap( sendSizes, _sourceRoot, Height()*numRhs );
             else
-                recvSizes[_targetRoot] += Height()*numRhs;
+                AddToMap( recvSizes, _targetRoot, Height()*numRhs );
         }
         break;
     }
@@ -2122,12 +1437,14 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
 ( MultiplyDenseContext& context, const Dense<Scalar>& XLocal,
-  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataPack");
 #endif
     const int numRhs = context.numRhs;
+    if( numRhs == 0 )
+        return;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2198,25 +1515,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
         if( _inTargetTeam )
         {
             const int height = XLocal.Height();
-            if( XLocal.LDim() != height )
+            if( height != 0 )
             {
-                Scalar* start = &buffer[offsets[_sourceRoot]];
-                for( int j=0; j<numRhs; ++j )
+                if( XLocal.LDim() != height )
+                {
+                    Scalar* start = &buffer[offsets[_sourceRoot]];
+                    for( int j=0; j<numRhs; ++j )
+                    {
+                        std::memcpy
+                        ( &start[height*j], 
+                          XLocal.LockedBuffer(_localTargetOffset,j),
+                          height*sizeof(Scalar) );
+                    }
+                }
+                else
                 {
                     std::memcpy
-                    ( &start[height*j], 
-                      XLocal.LockedBuffer(_localTargetOffset,j),
-                      height*sizeof(Scalar) );
+                    ( &buffer[offsets[_sourceRoot]],
+                      XLocal.LockedBuffer(_localTargetOffset,0),
+                      height*numRhs*sizeof(Scalar) );
                 }
+                offsets[_sourceRoot] += height*numRhs;
             }
-            else
-            {
-                std::memcpy
-                ( &buffer[offsets[_sourceRoot]],
-                  XLocal.LockedBuffer(_localTargetOffset,0),
-                  height*numRhs*sizeof(Scalar) );
-            }
-            offsets[_sourceRoot] += height*numRhs;
         }
         break;
     }
@@ -2232,12 +1552,14 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataUnpack
 ( MultiplyDenseContext& context, 
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  const std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataUnpack");
 #endif
     const int numRhs = context.numRhs;
+    if( numRhs == 0 )
+        return;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2346,7 +1668,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
-( MultiplyDenseContext& context, bool customCollective ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyDenseBroadcasts");
@@ -2372,7 +1694,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     // Reset the offsets vector and then perform the broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
+    _teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers 
     MultiplyDenseBroadcastsUnpack( context, buffer, offsets );
@@ -2384,7 +1706,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
-( MultiplyDenseContext& context, bool customCollective ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseBroadcasts");
@@ -2410,7 +1732,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     // Reset the offsets vector and then perform the broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
+    _teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers 
     TransposeMultiplyDenseBroadcastsUnpack( context, buffer, offsets );
@@ -2422,13 +1744,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseBroadcasts
-( MultiplyDenseContext& context, bool customCollective ) const
+( MultiplyDenseContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyDenseBroadcasts( context, customCollective );
+    TransposeMultiplyDenseBroadcasts( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2678,108 +2000,6 @@ TransposeMultiplyDenseBroadcastsUnpack
     default:
         break;
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseNaiveBroadcasts
-( MultiplyDenseContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyDenseNaiveBroadcasts");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyDenseNaiveBroadcasts
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Dense<Scalar>& Z = *context.block.data.Z;
-            if( DF.rank != 0 )
-            {
-                Z.Resize( DF.rank, numRhs, DF.rank );
-                MPI_Comm team = _teams->Team( _level );
-                mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
-            }
-        }
-        break;
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyDenseNaiveBroadcasts
-( MultiplyDenseContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyDenseNaiveBroadcasts");
-#endif
-    const int numRhs = context.numRhs;
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyDenseContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDenseNaiveBroadcasts
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Dense<Scalar>& Z = *context.block.data.Z;
-            if( DF.rank != 0 )
-            {
-                Z.Resize( DF.rank, numRhs, DF.rank );
-                MPI_Comm team = _teams->Team( _level );
-                mpi::Broadcast( Z.Buffer(), DF.rank*numRhs, 0, team );
-            }
-        }
-        break;
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDenseNaiveBroadcasts
-( MultiplyDenseContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyDenseNaiveBroadcasts");
-#endif
-    // The unconjugated version should be identical
-    TransposeMultiplyDenseNaiveBroadcasts( context );
 #ifndef RELEASE
     PopCallStack();
 #endif

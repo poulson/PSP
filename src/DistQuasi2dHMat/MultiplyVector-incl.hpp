@@ -82,12 +82,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MultiplyVectorPrecompute( context, alpha, xLocal, yLocal );
 
     MultiplyVectorSums( context );
-    //MultiplyVectorNaiveSums( context );
-
     MultiplyVectorPassData( context );
-
     MultiplyVectorBroadcasts( context );
-    //MultiplyVectorNaiveBroadcasts( context );
 
     MultiplyVectorPostcompute( context, alpha, xLocal, yLocal );
 #ifndef RELEASE
@@ -112,12 +108,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiply
     TransposeMultiplyVectorPrecompute( context, alpha, xLocal, yLocal );
 
     TransposeMultiplyVectorSums( context );
-    //TransposeMultiplyVectorNaiveSums( context );
-
     TransposeMultiplyVectorPassData( context, xLocal );
-
     TransposeMultiplyVectorBroadcasts( context );
-    //TransposeMultiplyVectorNaiveBroadcasts( context );
 
     TransposeMultiplyVectorPostcompute( context, alpha, xLocal, yLocal );
 #ifndef RELEASE
@@ -142,12 +134,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiply
     AdjointMultiplyVectorPrecompute( context, alpha, xLocal, yLocal );
 
     AdjointMultiplyVectorSums( context );
-    //AdjointMultiplyVectorNaiveSums( context );
-
     AdjointMultiplyVectorPassData( context, xLocal );
-
     AdjointMultiplyVectorBroadcasts( context );
-    //AdjointMultiplyVectorNaiveBroadcasts( context );
 
     AdjointMultiplyVectorPostcompute( context, alpha, xLocal, yLocal );
 #ifndef RELEASE
@@ -579,7 +567,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSums
-( MultiplyVectorContext& context, bool customCollective ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSums");
@@ -604,7 +592,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSums
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of teamunicators have data)
     MultiplyVectorSumsUnpack( context, buffer, offsets );
@@ -616,7 +604,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSums
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSums
-( MultiplyVectorContext& context, bool customCollective ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSums");
@@ -641,7 +629,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSums
     // Reset the offsets vector and then perform the reduces. 
     for( int i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeSumToRoots( buffer, sizes, offsets, customCollective );
+    _teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of teamunicators have data)
     TransposeMultiplyVectorSumsUnpack( context, buffer, offsets );
@@ -653,13 +641,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSums
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorSums
-( MultiplyVectorContext& context, bool customCollective ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorSums");
 #endif
     // This unconjugated version is identical
-    TransposeMultiplyVectorSums( context, customCollective );
+    TransposeMultiplyVectorSums( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -900,123 +888,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsUnpack
     default:
         break;
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveSums
-( MultiplyVectorContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorNaiveSums");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorNaiveSums
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                MPI_Comm team = _teams->Team( _level );
-                int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    mpi::Reduce
-                    ( (const Scalar*)MPI_IN_PLACE, z.Buffer(), 
-                      DF.rank, 0, MPI_SUM, team );
-                }
-                else
-                    mpi::Reduce
-                    ( z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveSums
-( MultiplyVectorContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorNaiveSums");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorNaiveSums
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                MPI_Comm team = _teams->Team( _level );
-                int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    mpi::Reduce
-                    ( (const Scalar*)MPI_IN_PLACE, z.Buffer(), 
-                      DF.rank, 0, MPI_SUM, team );
-                }
-                else
-                    mpi::Reduce
-                    ( z.LockedBuffer(), 0, DF.rank, 0, MPI_SUM, team );
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorNaiveSums
-( MultiplyVectorContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorNaiveSums");
-#endif
-    // The unconjugated version should be identical
-    TransposeMultiplyVectorNaiveSums( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1803,7 +1674,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPassData
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
-( MultiplyVectorContext& context, bool customCollective ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcasts");
@@ -1829,7 +1700,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     // Reset the offsets vector and then perform the broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
+    _teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers 
     MultiplyVectorBroadcastsUnpack( context, buffer, offsets );
@@ -1841,7 +1712,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
-( MultiplyVectorContext& context, bool customCollective ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcasts");
@@ -1867,7 +1738,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     // Reset the offsets vector and then perform the broadcasts.
     for( int i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    _teams->TreeBroadcasts( buffer, sizes, offsets, customCollective );
+    _teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers 
     TransposeMultiplyVectorBroadcastsUnpack( context, buffer, offsets );
@@ -1879,13 +1750,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorBroadcasts
-( MultiplyVectorContext& context, bool customCollective ) const
+( MultiplyVectorContext& context ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorBroadcasts");
 #endif
     // The unconjugated version should be identical
-    TransposeMultiplyVectorBroadcasts( context, customCollective );
+    TransposeMultiplyVectorBroadcasts( context );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -2126,107 +1997,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsUnpack
     default:
         break;
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorNaiveBroadcasts
-( MultiplyVectorContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorNaiveBroadcasts");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorNaiveBroadcasts
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            if( DF.rank != 0 )
-            {
-                MPI_Comm team = _teams->Team( _level );
-                mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorNaiveBroadcasts
-( MultiplyVectorContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorNaiveBroadcasts");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorNaiveBroadcasts
-                ( nodeContext.Child(t,s) );
-        break;
-    }
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            if( DF.rank != 0 )
-            {
-                MPI_Comm team = _teams->Team( _level );
-                mpi::Broadcast( z.Buffer(), DF.rank, 0, team );
-            }
-        }
-        break;
-
-    default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorNaiveBroadcasts
-( MultiplyVectorContext& context ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorNaiveBroadcasts");
-#endif
-    // The unconjugated version should be identical
-    TransposeMultiplyVectorNaiveBroadcasts( context );
 #ifndef RELEASE
     PopCallStack();
 #endif

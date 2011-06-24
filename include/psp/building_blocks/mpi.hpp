@@ -152,23 +152,42 @@ void Gather
   int root, MPI_Comm comm );
 
 void Send
-( const byte* buf, 
-  int count, int dest, int tag, MPI_Comm comm );
+( const byte* buf, int count, 
+  int dest, int tag, MPI_Comm comm );
 void Send
-( const int* buf, 
-  int count, int dest, int tag, MPI_Comm comm );
+( const int* buf, int count, 
+  int dest, int tag, MPI_Comm comm );
 void Send
-( const float* buf, 
-  int count, int dest, int tag, MPI_Comm comm );
+( const float* buf, int count, 
+  int dest, int tag, MPI_Comm comm );
 void Send
-( const double* buf, 
-  int count, int dest, int tag, MPI_Comm comm );
+( const double* buf, int count, 
+  int dest, int tag, MPI_Comm comm );
 void Send
-( const std::complex<float>* buf, 
-  int count, int dest, int tag, MPI_Comm comm );
+( const std::complex<float>* buf, int count, 
+  int dest, int tag, MPI_Comm comm );
 void Send
-( const std::complex<double>* buf, 
-  int count, int dest, int tag, MPI_Comm comm );
+( const std::complex<double>* buf, int count, 
+  int dest, int tag, MPI_Comm comm );
+
+void ISend
+( const byte* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request );
+void ISend
+( const int* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request );
+void ISend
+( const float* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request );
+void ISend
+( const double* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request );
+void ISend
+( const std::complex<float>* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request );
+void ISend
+( const std::complex<double>* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request );
 
 void Recv
 ( byte* buf, int count, int source, int tag, MPI_Comm comm );
@@ -182,6 +201,25 @@ void Recv
 ( std::complex<float>* buf, int count, int source, int tag, MPI_Comm comm );
 void Recv
 ( std::complex<double>* buf, int count, int source, int tag, MPI_Comm comm );
+
+void IRecv
+( byte* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request );
+void IRecv
+( int* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request );
+void IRecv
+( float* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request );
+void IRecv
+( double* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request );
+void IRecv
+( std::complex<float>* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request );
+void IRecv
+( std::complex<double>* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request );
 
 void SendRecv
 ( const byte* sendBuf, int sendCount, int dest,   int sendTag,
@@ -239,6 +277,8 @@ void ReduceScatter
 void ReduceScatter
 ( const std::complex<double>* sendBuf, std::complex<double>* recvBuf, 
   const int* recvCounts, MPI_Op op, MPI_Comm comm );
+
+void Wait( MPI_Request& request );
 
 double WallTime();
 
@@ -1142,6 +1182,122 @@ inline void Send
 #endif
 }
 
+inline void ISend
+( const byte* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::ISend");
+#endif
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<byte*>(buf), count, 
+          MPI_UNSIGNED_CHAR, dest, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void ISend
+( const int* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::ISend");
+#endif
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<int*>(buf), count, 
+          MPI_INT, dest, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void ISend
+( const float* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::ISend");
+#endif
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<float*>(buf), count, 
+          MPI_FLOAT, dest, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void ISend
+( const double* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::ISend");
+#endif
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<double*>(buf), count, 
+          MPI_DOUBLE, dest, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void ISend
+( const std::complex<float>* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::ISend");
+#endif
+    /*
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<std::complex<float>*>(buf), count,
+          MPI_COMPLEX, dest, tag, comm, &request )
+    );
+    */
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<std::complex<float>*>(buf), 2*count,
+          MPI_FLOAT, dest, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void ISend
+( const std::complex<double>* buf, int count, 
+  int dest, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::ISend");
+#endif
+    /*
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<std::complex<double>*>(buf), count,
+          MPI_DOUBLE_COMPLEX, dest, tag, comm, &request )
+    );
+    */
+    SafeMpi(
+        MPI_Isend
+        ( const_cast<std::complex<double>*>(buf), 2*count,
+          MPI_DOUBLE, dest, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 inline void Recv
 ( byte* buf, int count, int source, int tag, MPI_Comm comm )
 {
@@ -1244,6 +1400,107 @@ inline void Recv
     SafeMpi(
         MPI_Recv
         ( buf, 2*count, MPI_DOUBLE, source, tag, comm, &status )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void IRecv
+( byte* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::IRecv");
+#endif
+    SafeMpi(
+        MPI_Irecv
+        ( buf, count, MPI_UNSIGNED_CHAR, source, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void IRecv
+( int* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::IRecv");
+#endif
+    SafeMpi(
+        MPI_Irecv( buf, count, MPI_INT, source, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void IRecv
+( float* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::IRecv");
+#endif
+    SafeMpi(
+        MPI_Irecv( buf, count, MPI_FLOAT, source, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void IRecv
+( double* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::IRecv");
+#endif
+    SafeMpi(
+        MPI_Irecv( buf, count, MPI_DOUBLE, source, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void IRecv
+( std::complex<float>* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::IRecv");
+#endif
+    /*
+    SafeMpi(
+        MPI_Irecv( buf, count, MPI_COMPLEX, source, tag, comm, &request )
+    );
+    */
+    SafeMpi(
+        MPI_Irecv( buf, 2*count, MPI_FLOAT, source, tag, comm, &request )
+    );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void IRecv
+( std::complex<double>* buf, int count, 
+  int source, int tag, MPI_Comm comm, MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::IRecv");
+#endif
+    /*
+    SafeMpi(
+        MPI_Irecv( buf, count, MPI_DOUBLE_COMPLEX, source, tag, comm, &request )
+    );
+    */
+    SafeMpi(
+        MPI_Irecv( buf, 2*count, MPI_DOUBLE, source, tag, comm, &request )
     );
 #ifndef RELEASE
     PopCallStack();
@@ -1619,6 +1876,18 @@ inline void ReduceScatter
               comm ) 
         );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+inline void Wait( MPI_Request& request )
+{
+#ifndef RELEASE
+    PushCallStack("mpi::Wait");
+#endif
+    MPI_Status status;
+    SafeMpi( MPI_Wait( &request, &status ) );
 #ifndef RELEASE
     PopCallStack();
 #endif
