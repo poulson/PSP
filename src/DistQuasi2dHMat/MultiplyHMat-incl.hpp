@@ -5602,7 +5602,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         const unsigned teamRank = mpi::CommRank( team );
         const bool haveAnotherComm = ( step < numSteps-1 );
         // only valid result if we have a next step...
-        const bool rootOfNextStep = teamRank & 0x100; 
+        const bool rootOfNextStep = !(teamRank & 0x100); 
         const int passes = 2*step;
 
         // Flip the first bit of our rank in this team to get our partner,
@@ -5889,9 +5889,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 ( r, lastQRStage, lastTauStage, Z, &work[0] );
                 // Take care of the middle stages before handling the large 
                 // original stage.
-                for( unsigned stage=log2TeamSize-1; stage>0; --stage )
+                for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
                 {
-                    if( teamRank & (1u<<(stage-1)) )
+                    const bool rootOfLastStage = 
+                        !(teamRank & (1u<<(commStage+1)));
+                    if( rootOfLastStage )
+                    {
+                        // Zero the bottom half of Z
+                        for( int j=0; j<r; ++j )
+                            std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                    }
+                    else
                     {
                         // Move the bottom half to the top half and zero the
                         // bottom half
@@ -5903,15 +5911,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                             std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
                         }
                     }
-                    else
-                    {
-                        // Zero the bottom half of Z
-                        for( int j=0; j<r; ++j )
-                            std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
-                    }
                     hmat_tools::ApplyPackedQFromLeft
-                    ( r, &thisQRPiece[(stage-1)*(r*r+r)], 
-                      &thisTauPiece[stage*r], Z, &work[0] );
+                    ( r, &thisQRPiece[commStage*(r*r+r)], 
+                      &thisTauPiece[(commStage+1)*r], Z, &work[0] );
                 }
                 // Take care of the original stage. Do so by forming Y := X, 
                 // then zeroing X and placing our piece of Z at its top.
@@ -5921,22 +5923,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 Dense<Scalar> Y;
                 hmat_tools::Copy( X, Y );
                 hmat_tools::Scale( (Scalar)0, X );
-                if( teamRank & 0x1 )
-                {
-                    // Copy the first minDim rows of the bottom half of Z into 
-                    // the top of X
-                    for( int j=0; j<r; ++j )
-                        std::memcpy
-                        ( X.Buffer(0,j), Z.LockedBuffer(r,j), 
-                          minDim*sizeof(Scalar) );
-                }
-                else
+                const bool rootOfLastStage = !(teamRank & 0x1);
+                if( rootOfLastStage )
                 {
                     // Copy the first minDim rows of the top half of Z into
                     // the top of X
                     for( int j=0; j<r; ++j )
                         std::memcpy
                         ( X.Buffer(0,j), Z.LockedBuffer(0,j), 
+                          minDim*sizeof(Scalar) );
+                }
+                else
+                {
+                    // Copy the first minDim rows of the bottom half of Z into 
+                    // the top of X
+                    for( int j=0; j<r; ++j )
+                        std::memcpy
+                        ( X.Buffer(0,j), Z.LockedBuffer(r,j), 
                           minDim*sizeof(Scalar) );
                 }
                 work.resize( lapack::ApplyQWorkSize('L',m,r) );
@@ -6186,7 +6189,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                     std::memset
                     ( &qrBuffer[qrOffsets[teamLevel]], 0, 
                       (r*r+r)*sizeof(Scalar) );
-                    if( (teamRank & 1) == 0 )
+                    const bool root = !(teamRank & 0x1);
+                    if( root )
                     {
                         // Copy our R into the upper triangle of the next
                         // matrix to factor (which is 2r x r)
@@ -6228,7 +6232,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                     std::memset
                     ( &qrBuffer[qrOffsets[teamLevel]], 0, 
                       (r*r+r)*sizeof(Scalar) );
-                    if( (teamRank & 1) == 0 )
+                    const bool root = !(teamRank & 0x1);
+                    if( root )
                     {
                         // Copy our R into the upper triangle of the next
                         // matrix to factor (which is 2r x r)
@@ -6569,7 +6574,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         const unsigned teamRank = mpi::CommRank( team );
         const bool haveAnotherComm = ( step < numSteps-1 );
         // only valid result if we have a next step...
-        const bool rootOfNextStep = teamRank & 0x100; 
+        const bool rootOfNextStep = !(teamRank & 0x100);
         const int passes = 2*step;
 
         // Compute the total message size for this step
@@ -7628,7 +7633,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             {
                 std::memset
                 ( &qrBuffer[qrOffsets[teamLevel]], 0, (r*r+r)*sizeof(Scalar) );
-                if( (teamRank & 1) == 0 )
+                const bool root = !(teamRank & 0x1);
+                if( root )
                 {
                     // Copy our R into the upper triangle of the next
                     // matrix to factor (which is 2r x r)
@@ -7666,7 +7672,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             {
                 std::memset
                 ( &qrBuffer[qrOffsets[teamLevel]], 0, (r*r+r)*sizeof(Scalar) );
-                if( (teamRank & 1) == 0 )
+                const bool root = !(teamRank & 0x1);
+                if( root )
                 {
                     // Copy our R into the upper triangle of the next
                     // matrix to factor (which is 2r x r)
