@@ -1041,41 +1041,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataCount
         if( _inSourceTeam && _inTargetTeam )
             break;
         const DistLowRank& DF = *_block.data.DF;
-        if( DF.rank != 0 )
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                if( _inSourceTeam )
-                    AddToMap( sendSizes, _targetRoot, DF.rank*numRhs );
-                else
-                    AddToMap( recvSizes, _sourceRoot, DF.rank*numRhs );
-            }
+            if( _inSourceTeam )
+                AddToMap( sendSizes, _targetRoot, DF.rank*numRhs );
+            else
+                AddToMap( recvSizes, _sourceRoot, DF.rank*numRhs );
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRank& SF = *_block.data.SF;
-        if( SF.rank != 0 )
-        {
-            if( _inSourceTeam )
-                AddToMap( sendSizes, _targetRoot, SF.rank*numRhs );
-            else
-                AddToMap( recvSizes, _sourceRoot, SF.rank*numRhs );
-        }
+        if( _inSourceTeam )
+            AddToMap( sendSizes, _targetRoot, SF.rank*numRhs );
+        else
+            AddToMap( recvSizes, _sourceRoot, SF.rank*numRhs );
         break;
     }
     case SPLIT_DENSE:
     {
-        if( Height() != 0 )
-        {
-            if( _inSourceTeam )
-                AddToMap( sendSizes, _targetRoot, Height()*numRhs );
-            else
-                AddToMap( recvSizes, _sourceRoot, Height()*numRhs );
-        }
+        if( _inSourceTeam )
+            AddToMap( sendSizes, _targetRoot, Height()*numRhs );
+        else
+            AddToMap( recvSizes, _sourceRoot, Height()*numRhs );
         break;
     }
     default:
@@ -1388,41 +1379,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataCount
         if( _inSourceTeam && _inTargetTeam )
             break;
         const DistLowRank& DF = *_block.data.DF;
-        if( DF.rank != 0 )
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                if( _inTargetTeam )
-                    AddToMap( sendSizes, _sourceRoot, DF.rank*numRhs );
-                else
-                    AddToMap( recvSizes, _targetRoot, DF.rank*numRhs );
-            }
+            if( _inTargetTeam )
+                AddToMap( sendSizes, _sourceRoot, DF.rank*numRhs );
+            else
+                AddToMap( recvSizes, _targetRoot, DF.rank*numRhs );
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRank& SF = *_block.data.SF;
-        if( SF.rank != 0 )
-        {
-            if( _inTargetTeam )
-                AddToMap( sendSizes, _sourceRoot, SF.rank*numRhs );
-            else
-                AddToMap( recvSizes, _targetRoot, SF.rank*numRhs );
-        }
+        if( _inTargetTeam )
+            AddToMap( sendSizes, _sourceRoot, SF.rank*numRhs );
+        else
+            AddToMap( recvSizes, _targetRoot, SF.rank*numRhs );
         break;
     }
     case SPLIT_DENSE:
     {
-        if( Height() != 0 )
-        {
-            if( _inTargetTeam )
-                AddToMap( sendSizes, _sourceRoot, Height()*numRhs );
-            else
-                AddToMap( recvSizes, _targetRoot, Height()*numRhs );
-        }
+        if( _inTargetTeam )
+            AddToMap( sendSizes, _sourceRoot, Height()*numRhs );
+        else
+            AddToMap( recvSizes, _targetRoot, Height()*numRhs );
         break;
     }
     default:
@@ -1514,7 +1496,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
     {
         if( _inTargetTeam )
         {
-            const int height = XLocal.Height();
+            const int height = Height();
             if( height != 0 )
             {
                 if( XLocal.LDim() != height )

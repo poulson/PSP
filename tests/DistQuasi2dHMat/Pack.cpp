@@ -395,7 +395,7 @@ main( int argc, char* argv[] )
         psp::mpi::Barrier( MPI_COMM_WORLD );
         if( rank == 0 )
             std::cout << "done" << std::endl;
-        
+ 
         // Apply the adjoint of distributed H-matrix
         if( rank == 0 )
         {
