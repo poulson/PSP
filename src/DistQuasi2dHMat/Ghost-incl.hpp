@@ -28,7 +28,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Ghosted() const
 #endif
     RequireRoot();
 
-    bool ghosted = false;
+    bool ghosted = true;
     switch( _block.type )
     {
     case DIST_NODE:
@@ -48,13 +48,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Ghosted() const
         break;
     }
 
-    case SPLIT_NODE:
-    case NODE:
-        ghosted = true; 
-        break;
-
     default:
-        throw std::logic_error("Nonsensical top-level block type");
         break;
     }
 #ifndef RELEASE
