@@ -23,8 +23,8 @@
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Multiply");
@@ -37,11 +37,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     if( _level != B._level )
         throw std::logic_error("Mismatched levels");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     A.RequireRoot();
-    if( !A.Ghosted() || !B.Ghosted() )
-        throw std::logic_error("A and B must have their ghost nodes");
+    A.PruneGhostNodes();
+    B.PruneGhostNodes();
     C.Clear();
+
+    A.FormTargetGhostNodes();
+    B.FormSourceGhostNodes();
+
+    A.MultiplyHMatFormGhostRanks( B );
 
     A.MultiplyHMatMainPrecompute( alpha, B, C );
     A.MultiplyHMatMainSums( B, C );
@@ -57,6 +62,78 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     A.MultiplyHMatFHHFinalize( B, C );
 
     C.MultiplyHMatUpdates();
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanks
+( DistQuasi2dHMat<Scalar,Conjugated>& B ) 
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanks");
+#endif
+    std::map<int,int> sendSizes, recvSizes;
+    MultiplyHMatFormGhostRanksCount( B, sendSizes, recvSizes );
+    // HERE
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksCount
+( const DistQuasi2dHMat<Scalar,Conjugated>& B ,
+  std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanksCount");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
+    // HERE
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE_GHOST:
+        case NODE_GHOST:
+        {
+
+            break;
+        }
+        case DIST_LOW_RANK_GHOST:
+        {
+
+            break;
+        }
+        case SPLIT_LOW_RANK_GHOST:
+        {
+
+            break;
+        }
+        case LOW_RANK_GHOST:
+        {
+
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -264,13 +341,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSetUp
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPrecompute");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
@@ -304,8 +381,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             case NODE_GHOST:
             {
                 // Start H += H H
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -1114,13 +1191,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B, DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSums");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
     const unsigned numTeamLevels = _teams->NumLevels();
@@ -1221,7 +1297,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackA
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackA");
@@ -1311,7 +1387,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackB
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackB");
@@ -1414,7 +1490,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B, 
-  const DistQuasi2dHMat<Scalar,Conjugated>& C,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -1433,7 +1509,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
-                const Node& nodeC = *C._block.data.N;
+                Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
@@ -1487,7 +1563,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const 
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackC");
@@ -1558,13 +1634,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassData");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // 1) Compute send and recv sizes
     MPI_Comm comm = _teams->Team( 0 );
@@ -1670,7 +1746,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
-( std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
+( std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) 
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackA");
@@ -1695,7 +1771,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
             }
         }
 
-        const Node& node = *_block.data.N;
+        Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatMainPassDataPackA
@@ -1713,7 +1789,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
-( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
+( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) 
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackA");
@@ -1727,7 +1803,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
             TransposeMultiplyDensePassDataUnpack
             ( _rowContext, recvBuffer, offsets );
 
-        const Node& node = *_block.data.N;
+        Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatMainPassDataUnpackA
@@ -1777,7 +1853,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
-( std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
+( std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackB");
@@ -1790,7 +1866,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
         if( _beganColSpaceComp )
             MultiplyDensePassDataPack( _colContext, sendBuffer, offsets );
 
-        const Node& node = *_block.data.N;
+        Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatMainPassDataPackB
@@ -1808,7 +1884,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
-( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
+( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackB");
@@ -1821,7 +1897,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
         if( _beganColSpaceComp )
             MultiplyDensePassDataUnpack( _colContext, recvBuffer, offsets );
 
-        const Node& node = *_block.data.N;
+        Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatMainPassDataUnpackB
@@ -3180,13 +3256,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B,
+  DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcasts");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each broadcast
     const unsigned numTeamLevels = _teams->NumLevels();
@@ -3269,7 +3345,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackA
     case DIST_NODE_GHOST:
     {
         if( _beganRowSpaceComp )
-            TransposeMultiplyDenseBroadcastsPack( _rowContext, buffer, offsets );
+            TransposeMultiplyDenseBroadcastsPack
+            ( _rowContext, buffer, offsets );
 
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
@@ -3289,7 +3366,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackA
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackA
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsUnpackA");
@@ -3382,7 +3459,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackB
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackB
-( const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsUnpackB");
@@ -3486,7 +3563,7 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B, 
-  const DistQuasi2dHMat<Scalar,Conjugated>& C,
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
@@ -3505,7 +3582,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
-                const Node& nodeC = *C._block.data.N;
+                Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
@@ -3633,13 +3710,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcompute
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcompute");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     A.MultiplyHMatMainPostcomputeA();
     B.MultiplyHMatMainPostcomputeB();
@@ -3652,12 +3729,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcompute
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA() const
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA()
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeA");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Handle postcomputation of A's row space
     if( A._beganRowSpaceComp )
@@ -3688,7 +3765,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA() const
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        const Node& nodeA = *A._block.data.N;
+        Node& nodeA = *A._block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 nodeA.Child(t,s).MultiplyHMatMainPostcomputeA();
@@ -3704,12 +3781,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA() const
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB() const
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB()
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeB");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& B = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& B = *this;
 
     // Handle postcomputation of B's column space
     if( B._beganColSpaceComp )
@@ -3740,7 +3817,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB() const
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        const Node& nodeB = *B._block.data.N;
+        Node& nodeB = *B._block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 nodeB.Child(t,s).MultiplyHMatMainPostcomputeB();
@@ -4615,13 +4692,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeCCleanup()
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPrecompute");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
 
@@ -4711,8 +4788,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
             }
             else
             {
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -4738,13 +4815,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSums");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each reduce
     const unsigned numTeamLevels = _teams->NumLevels();
@@ -4834,14 +4911,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B,
+  DistQuasi2dHMat<Scalar,Conjugated>& C,
+  std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsPack");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -4869,8 +4946,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
             }
             else
             {
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -4896,14 +4973,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B,
+  DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsUnpack");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -4931,8 +5008,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
             }
             else
             {
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -4958,13 +5035,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassData");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // 1) Compute send and recv sizes
     MPI_Comm comm = _teams->Team( 0 );
@@ -5094,14 +5171,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
 template<typename Scalar,bool Conjugated>
 void 
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B,
+  DistQuasi2dHMat<Scalar,Conjugated>& C,
+  std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataPack");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
@@ -5144,8 +5221,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
             }
             else
             {
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -5171,14 +5248,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
 template<typename Scalar,bool Conjugated>
 void 
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B,
+  DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataUnpack");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
 
@@ -5212,8 +5289,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
             }
             else
             {
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -5239,13 +5316,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcasts");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Compute the message sizes for each broadcast
     const unsigned numTeamLevels = _teams->NumLevels();
@@ -5338,7 +5415,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsPack");
@@ -5398,14 +5475,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
-( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+( DistQuasi2dHMat<Scalar,Conjugated>& B,
+  DistQuasi2dHMat<Scalar,Conjugated>& C,
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsUnpack");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5433,8 +5510,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
             }
             else
             {
-                const Node& nodeA = *A._block.data.N;
-                const Node& nodeB = *B._block.data.N;
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
@@ -5460,13 +5537,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcompute
-( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcompute");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     A.MultiplyHMatFHHPostcomputeC( alpha, B, C );
     C.MultiplyHMatFHHPostcomputeCCleanup();

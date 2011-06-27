@@ -290,7 +290,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStartTime = psp::mpi::WallTime();
-        distH.FormGhostNodes();
+        distH.FormTargetGhostNodes();
+        distH.FormSourceGhostNodes();
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -304,10 +305,6 @@ main( int argc, char* argv[] )
             distH.MScriptWriteLocalStructure("distH_ghosted_structure");
         }
 
-        // Ensure that our check for ghost nodes succeeds
-        if( !distH.Ghosted() )
-            throw std::logic_error("Ghosted() gave a false negative");
-        
         // Form the ghost nodes again
         if( rank == 0 )
         {
@@ -316,7 +313,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStartTime2 = psp::mpi::WallTime();
-        distH.FormGhostNodes();
+        distH.FormTargetGhostNodes();
+        distH.FormSourceGhostNodes();
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStopTime2 = psp::mpi::WallTime();
         if( rank == 0 )
