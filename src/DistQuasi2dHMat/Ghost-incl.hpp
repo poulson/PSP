@@ -72,86 +72,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FormGhostNodes()
         sourceStructure( _numLevels ), targetStructure( _numLevels );
     FillStructureRecursion( sourceStructure, targetStructure );
     
-    MPI_Comm comm = _teams->Team( 0 );
-    const int commSize = mpi::CommSize( comm );
-
     // Fill in the local ghosted structure (but without the ghosts' ranks)
-    std::vector< std::vector<BlockId> > sendBlockIds( commSize );
-    FindGhostNodesRecursion
-    ( sendBlockIds, sourceStructure, targetStructure, 0, 0 );
-
-    // Have every process let every other process know how many blockIds
-    // they will be sending for the rank requests
-    std::vector<int> numSendBlocks( commSize ), numRecvBlocks( commSize );
-    for( int i=0; i<commSize; ++i )
-        numSendBlocks[i] = sendBlockIds[i].size();
-    mpi::AllToAll( &numSendBlocks[0], 1, &numRecvBlocks[0], 1, comm );
-
-    // Set up the send/recv counts/displacement index vectors for the AllToAllV
-    std::vector<int> sendCounts( commSize ), sendDispls( commSize ),
-                     recvCounts( commSize ), recvDispls( commSize );
-    for( int i=0; i<commSize; ++i )
-        sendCounts[i] = numSendBlocks[i]*sizeof(BlockId);
-    sendDispls[0] = 0;
-    for( int i=1; i<commSize; ++i )
-        sendDispls[i] = sendDispls[i-1] + sendCounts[i-1];
-    const int totalSendCount = sendDispls[commSize-1] + sendCounts[commSize-1];
-    for( int i=0; i<commSize; ++i )
-        recvCounts[i] = numRecvBlocks[i]*sizeof(BlockId);
-    recvDispls[0] = 0;
-    for( int i=1; i<commSize; ++i )
-        recvDispls[i] = recvDispls[i-1] + recvCounts[i-1];
-    const int totalRecvCount = recvDispls[commSize-1] + recvCounts[commSize-1];
-
-    // Pack and perform the AllToAllV, then unpack
-    std::vector<byte> sendBuf( totalSendCount ), recvBuf( totalRecvCount );
-    for( int i=0; i<commSize; ++i )
-        std::memcpy
-        ( &sendBuf[sendDispls[i]], &sendBlockIds[i][0], sendCounts[i] );
-    mpi::AllToAllV
-    ( &sendBuf[0], &sendCounts[0], &sendDispls[0],
-      &recvBuf[0], &recvCounts[0], &recvDispls[0], comm );
-    std::vector< std::vector<BlockId> > recvBlockIds( commSize );
-    for( int i=0; i<commSize; ++i )
-        recvBlockIds[i].resize( numRecvBlocks[i] );
-    for( int i=0; i<commSize; ++i )
-        std::memcpy
-        ( &recvBlockIds[i][0], &recvBuf[recvDispls[i]], recvCounts[i] );
-
-    for( int i=0; i<commSize; ++i )
-    {
-        const int numRecvBlocks = recvCounts[i] / sizeof(BlockId);
-        for( int j=0; j<numRecvBlocks; ++j )
-            GetRank
-            ( recvBlockIds[i][j], 
-              *((int*)&recvBuf[recvDispls[i]+j*sizeof(int)]) );
-    }
-
-    // Prepare for sending/recving the ranks. Switch the send/recv buffers
-    // since we're going in the opposite direction now and they are sufficiently
-    // large.
-    for( int i=0; i<commSize; ++i )
-        sendCounts[i] = numRecvBlocks[i]*sizeof(int);
-    sendDispls[0] = 0;
-    for( int i=1; i<commSize; ++i )
-        sendDispls[i] = sendDispls[i-1] + sendCounts[i-1];
-    for( int i=0; i<commSize; ++i )
-        recvCounts[i] = numSendBlocks[i]*sizeof(int);
-    recvDispls[0] = 0;
-    for( int i=1; i<commSize; ++i )
-        recvDispls[i] = recvDispls[i-1] + recvCounts[i-1]; 
-    mpi::AllToAllV
-    ( &recvBuf[0], &sendCounts[0], &sendDispls[0],
-      &sendBuf[0], &recvCounts[0], &recvDispls[0], comm );
-
-    for( int i=0; i<commSize; ++i )
-    {
-        const int numRecvRanks = recvCounts[i] / sizeof(int);
-        for( int j=0; j<numRecvRanks; ++j )
-            SetGhostRank
-            ( sendBlockIds[i][j], 
-              *((int*)&sendBuf[recvDispls[i]+j*sizeof(int)]) );
-    }
+    FindGhostNodesRecursion( sourceStructure, targetStructure, 0, 0 );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -205,7 +127,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FillStructureRecursion
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::FillSourceStructureRecursion");
 #endif
-
     switch( _block.type )
     {
     case DIST_NODE:
@@ -293,8 +214,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FillStructureRecursion
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
-( std::vector< std::vector<BlockId> >& blockIds,
-  const std::vector< std::set<int> >& sourceStructure, 
+( const std::vector< std::set<int> >& sourceStructure, 
   const std::vector< std::set<int> >& targetStructure,
   int sourceRoot, int targetRoot )
 {
@@ -313,7 +233,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).FindGhostNodesRecursion
-                    ( blockIds, sourceStructure, targetStructure, 
+                    ( sourceStructure, targetStructure, 
                       sourceRoot+s*teamSize/4, targetRoot+t*teamSize/4 );
         }
         else // teamSize == 2
@@ -321,7 +241,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).FindGhostNodesRecursion
-                    ( blockIds, sourceStructure, targetStructure,
+                    ( sourceStructure, targetStructure,
                       sourceRoot+s/2, targetRoot+t/2 );
         }
         break;
@@ -334,8 +254,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).FindGhostNodesRecursion
-                ( blockIds, sourceStructure, targetStructure, 
-                  sourceRoot, targetRoot );
+                ( sourceStructure, targetStructure, sourceRoot, targetRoot );
         break;
     }
 
@@ -358,6 +277,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
             {
                 _block.type = DIST_LOW_RANK_GHOST;
                 _block.data.DFG = new DistLowRankGhost;
+                _block.data.DFG->rank = -1;
             }
             else // teamSize == 1
             {
@@ -365,18 +285,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
                 {
                     _block.type = LOW_RANK_GHOST;
                     _block.data.FG = new LowRankGhost;
+                    _block.data.FG->rank = -1;
                 }
                 else
                 {
                     _block.type = SPLIT_LOW_RANK_GHOST;
                     _block.data.SFG = new SplitLowRankGhost;
+                    _block.data.SFG->rank = -1;
                 }
             }
-            BlockId id;
-            id.level = _level;
-            id.sourceOffset = _sourceOffset;
-            id.targetOffset = _targetOffset;
-            blockIds[sourceRoot].push_back( id );
         }
         else if( _numLevels > 1 )
         {
@@ -405,7 +322,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
                     for( int t=0; t<4; ++t )
                         for( int s=0; s<4; ++s )
                             node.Child(t,s).FindGhostNodesRecursion
-                            ( blockIds, sourceStructure, targetStructure,
+                            ( sourceStructure, targetStructure,
                               sourceRoot+s*teamSize/4, 
                               targetRoot+t*teamSize/4 );
                 }
@@ -414,7 +331,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
                     for( int t=0; t<4; ++t ) 
                         for( int s=0; s<4; ++s )
                             node.Child(t,s).FindGhostNodesRecursion
-                            ( blockIds, sourceStructure, targetStructure,
+                            ( sourceStructure, targetStructure,
                               sourceRoot+s/2, targetRoot+t/2 );
                 }
             }
@@ -428,7 +345,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
                         node.Child(t,s).FindGhostNodesRecursion
-                        ( blockIds, sourceStructure, targetStructure,
+                        ( sourceStructure, targetStructure,
                           sourceRoot, targetRoot );
             }
         }
@@ -443,102 +360,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindGhostNodesRecursion
     }
     
     default:
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::GetRank
-( const BlockId& blockId, int& rank ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::GetRank");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE: 
-    case SPLIT_NODE:
-    case NODE:
-    {
-        const Node& node = *_block.data.N;
-        int t=0,tOffset=_targetOffset;
-        for(; t<4; tOffset+=node.targetSizes[t],++t )
-            if( tOffset+node.targetSizes[t] > blockId.targetOffset )
-                break;
-        int s=0,sOffset=_sourceOffset;
-        for(; s<4; sOffset+=node.sourceSizes[s],++s )
-            if( sOffset+node.sourceSizes[s] > blockId.sourceOffset )
-                break;
-        node.Child(t,s).GetRank( blockId, rank );
-        break;
-    }
-    case DIST_LOW_RANK:
-        rank = _block.data.DF->rank;
-        break;
-    case SPLIT_LOW_RANK:
-        rank = _block.data.SF->rank;
-        break;
-    case LOW_RANK:
-        rank = _block.data.F->Rank();
-        break;
-
-    default:
-#ifndef RELEASE
-        throw std::logic_error("Invalid logic in GetRank");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::SetGhostRank
-( const BlockId& blockId, const int rank ) 
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::SetGhostRank");
-#endif
-    switch( _block.type )
-    {
-    case DIST_NODE: 
-    case SPLIT_NODE:
-    case DIST_NODE_GHOST:
-    case SPLIT_NODE_GHOST:
-    case NODE_GHOST:
-    {
-        Node& node = *_block.data.N;
-        int t=0,tOffset=_targetOffset;
-        for(; t<4; tOffset+=node.targetSizes[t],++t )
-            if( tOffset+node.targetSizes[t] > blockId.targetOffset )
-                break;
-        int s=0,sOffset=_sourceOffset;
-        for(; s<4; sOffset+=node.sourceSizes[s],++s )
-            if( sOffset+node.sourceSizes[s] > blockId.sourceOffset )
-                break;
-        node.Child(t,s).SetGhostRank( blockId, rank );
-        break;
-    }
-    case DIST_LOW_RANK_GHOST:
-        _block.data.DFG->rank = rank;
-        break;
-    case SPLIT_LOW_RANK_GHOST:
-        _block.data.SFG->rank = rank;
-        break;
-    case LOW_RANK_GHOST:
-        _block.data.FG->rank = rank;
-        break;
-
-    default:
-#ifndef RELEASE
-        throw std::logic_error("Invalid logic in SetGhostRank");
-#endif
         break;
     }
 #ifndef RELEASE

@@ -138,7 +138,7 @@ public:
     ( const byte* packedDistHMat, const Teams& teams );
 
     // Union the structure known in each block row and column at each level.
-    void FormGhostNodes();
+    void FormGhostNodes(); // form the structure, but not the ranks
 
     // Return to the minimal local structure
     void PruneGhostNodes();
@@ -458,13 +458,9 @@ private:
       std::vector< std::set<int> >& targetStructure ) const;
 
     void FindGhostNodesRecursion
-    ( std::vector< std::vector<BlockId> >& blockIds,
-      const std::vector< std::set<int> >& sourceStructure,
+    ( const std::vector< std::set<int> >& sourceStructure,
       const std::vector< std::set<int> >& targetStructure,
       int sourceRoot, int targetRoot );
-
-    void GetRank( const BlockId& blockId, int& rank ) const;
-    void SetGhostRank( const BlockId& blockId, const int rank );
 
     //
     // H-matrix/vector multiplication
