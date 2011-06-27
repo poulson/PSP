@@ -486,11 +486,14 @@ private:
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
 
     void MultiplyVectorPassData( MultiplyVectorContext& context ) const;
-    void MultiplyVectorPassDataSplitNodeCount( std::size_t& bufferSize ) const;
-    void MultiplyVectorPassDataSplitNodePack
-    ( MultiplyVectorContext& context, byte*& head ) const;
-    void MultiplyVectorPassDataSplitNodeUnpack
-    ( MultiplyVectorContext& context, const byte*& head ) const;
+    void MultiplyVectorPassDataCount
+    ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const;
+    void MultiplyVectorPassDataPack
+    ( MultiplyVectorContext& context, std::vector<Scalar>& sendBuffer, 
+      std::map<int,int>& offsets ) const;
+    void MultiplyVectorPassDataUnpack
+    ( MultiplyVectorContext& context, const std::vector<Scalar>& recvBuffer,
+      std::map<int,int>& recvOffsets ) const;
 
     void MultiplyVectorBroadcasts( MultiplyVectorContext& context ) const;
     void MultiplyVectorBroadcastsCount( std::vector<int>& sizes ) const;
@@ -791,15 +794,15 @@ private:
       const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const;
 
     void TransposeMultiplyVectorPassData
-    ( MultiplyVectorContext& context,
-      const Vector<Scalar>& xLocal ) const;
-    void TransposeMultiplyVectorPassDataSplitNodeCount
-    ( std::size_t& bufferSize ) const;
-    void TransposeMultiplyVectorPassDataSplitNodePack
-    ( MultiplyVectorContext& context,
-      const Vector<Scalar>& xLocal, byte*& head ) const;
-    void TransposeMultiplyVectorPassDataSplitNodeUnpack
-    ( MultiplyVectorContext& context, const byte*& head ) const;
+    ( MultiplyVectorContext& context, const Vector<Scalar>& xLocal ) const;
+     void TransposeMultiplyVectorPassDataCount
+    ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const;
+    void TransposeMultiplyVectorPassDataPack
+    ( MultiplyVectorContext& context, const Vector<Scalar>& xLocal,
+      std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets ) const;
+    void TransposeMultiplyVectorPassDataUnpack
+    ( MultiplyVectorContext& context, const std::vector<Scalar>& recvBuffer,
+      std::map<int,int>& recvOffsets ) const;
 
     void TransposeMultiplyVectorBroadcasts
     ( MultiplyVectorContext& context ) const;

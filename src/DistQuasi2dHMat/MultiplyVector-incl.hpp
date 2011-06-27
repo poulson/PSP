@@ -901,234 +901,218 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassData");
 #endif
+    // Constuct maps of the send/recv processes to the send/recv sizes
+    std::map<int,int> sendSizes, recvSizes;
+    MultiplyVectorPassDataCount( sendSizes, recvSizes );
+
+    // Fill the offset vectors defined by the sizes
+    int totalSendSize=0, totalRecvSize=0;
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
+    }
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
+
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer( totalSendSize );
+    std::map<int,int> offsets = sendOffsets;
+    MultiplyVectorPassDataPack( context, sendBuffer, offsets );
+
+    // Start the non-blocking sends
+    MPI_Comm comm = _teams->Team( 0 );
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
+    }
+
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    MultiplyVectorPassDataUnpack( context, recvBuffer, recvOffsets );
+
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataCount
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataCount");
+#endif
     switch( _block.type )
     {
     case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-
-        MPI_Comm team = _teams->Team( _level );
-        const int teamSize = mpi::CommSize( team );
-        const int teamRank = mpi::CommRank( team );
-        if( teamSize == 2 )
-        {
-            if( teamRank == 0 )     
-            {
-                // Take care of the top-left quadrant within our subteams
-                for( int t=0; t<2; ++t )
-                    for( int s=0; s<2; ++s )
-                        node.Child(t,s).MultiplyVectorPassData
-                        ( nodeContext.Child(t,s) );
-            }
-            else
-            {
-                // Take care of the bottom-right quadrant within our subteams
-                for( int t=2; t<4; ++t )
-                    for( int s=2; s<4; ++s )
-                        node.Child(t,s).MultiplyVectorPassData
-                        ( nodeContext.Child(t,s) );
-            }
-            // Top-right quadrant
-            for( int t=0; t<2; ++t )
-                for( int s=2; s<4; ++s )
-                    node.Child(t,s).MultiplyVectorPassData
-                    ( nodeContext.Child(t,s) );
-
-            // Bottom-left quadrant
-            for( int t=2; t<4; ++t )
-                for( int s=0; s<2; ++s )
-                    node.Child(t,s).MultiplyVectorPassData
-                    ( nodeContext.Child(t,s) );
-        }
-        else // teamSize >= 4
-        {
-            const int subteam = teamRank / (teamSize/4);
-            switch( subteam )
-            {
-            case 0:
-                // Take care of the work specific to our subteams
-                node.Child(0,0).MultiplyVectorPassData
-                ( nodeContext.Child(0,0) );
-                // Interact with subteam 1
-                node.Child(0,1).MultiplyVectorPassData
-                ( nodeContext.Child(0,1) );
-                node.Child(1,0).MultiplyVectorPassData
-                ( nodeContext.Child(1,0) );
-                // Interact with subteam 2
-                node.Child(0,2).MultiplyVectorPassData
-                ( nodeContext.Child(0,2) );
-                node.Child(2,0).MultiplyVectorPassData
-                ( nodeContext.Child(2,0) );
-                // Interact with subteam 3
-                node.Child(0,3).MultiplyVectorPassData
-                ( nodeContext.Child(0,3) );
-                node.Child(3,0).MultiplyVectorPassData
-                ( nodeContext.Child(3,0) );
-                break;
-            case 1:
-                // Take care of the work specific to our subteams
-                node.Child(1,1).MultiplyVectorPassData
-                ( nodeContext.Child(1,1) );
-                // Interact with subteam 0
-                node.Child(0,1).MultiplyVectorPassData
-                ( nodeContext.Child(0,1) );
-                node.Child(1,0).MultiplyVectorPassData
-                ( nodeContext.Child(1,0) );
-                // Interact with subteam 3
-                node.Child(1,3).MultiplyVectorPassData
-                ( nodeContext.Child(1,3) );
-                node.Child(3,1).MultiplyVectorPassData
-                ( nodeContext.Child(3,1) );
-                // Interact with subteam 2
-                node.Child(1,2).MultiplyVectorPassData
-                ( nodeContext.Child(1,2) );
-                node.Child(2,1).MultiplyVectorPassData
-                ( nodeContext.Child(2,1) );
-                break;
-            case 2:
-                // Take care of the work specific to our subteams
-                node.Child(2,2).MultiplyVectorPassData
-                ( nodeContext.Child(2,2) );
-                // Interact with subteam 3
-                node.Child(2,3).MultiplyVectorPassData
-                ( nodeContext.Child(2,3) );
-                node.Child(3,2).MultiplyVectorPassData
-                ( nodeContext.Child(3,2) );
-                // Interact with subteam 0
-                node.Child(0,2).MultiplyVectorPassData
-                ( nodeContext.Child(0,2) );
-                node.Child(2,0).MultiplyVectorPassData
-                ( nodeContext.Child(2,0) );
-                // Interact with subteam 1
-                node.Child(1,2).MultiplyVectorPassData
-                ( nodeContext.Child(1,2) );
-                node.Child(2,1).MultiplyVectorPassData
-                ( nodeContext.Child(2,1) );
-                break;
-            case 3:
-                // Take care of the work specific to our subteams
-                node.Child(3,3).MultiplyVectorPassData
-                ( nodeContext.Child(3,3) );
-                // Interact with subteam 2
-                node.Child(2,3).MultiplyVectorPassData
-                ( nodeContext.Child(2,3) );
-                node.Child(3,2).MultiplyVectorPassData
-                ( nodeContext.Child(3,2) );
-                // Interact with subteam 1
-                node.Child(1,3).MultiplyVectorPassData
-                ( nodeContext.Child(1,3) );
-                node.Child(3,1).MultiplyVectorPassData
-                ( nodeContext.Child(3,1) );
-                // Interact with subteam 0
-                node.Child(0,3).MultiplyVectorPassData
-                ( nodeContext.Child(0,3) );
-                node.Child(3,0).MultiplyVectorPassData
-                ( nodeContext.Child(3,0) );
-                break;
-            default:
-                // This should be impossible
-                break;
-            }
-        }
-        break;
-    }
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::SplitNode& nodeContext = 
-            *context.block.data.SN;
-
-        std::size_t bufferSize = 0;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPassDataSplitNodeCount
-                ( bufferSize );
-        std::vector<byte> buffer( bufferSize );
-
-        MPI_Comm comm = _teams->Team(0);
-        if( _inSourceTeam )
-        {
-            byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyVectorPassDataSplitNodePack
-                    ( nodeContext.Child(t,s), head );
-            if( bufferSize != 0 )
-                mpi::Send( &buffer[0], bufferSize, _targetRoot, 0, comm );
-        }
-        else
-        {
-            if( bufferSize != 0 )
-                mpi::Recv( &buffer[0], bufferSize, _sourceRoot, 0, comm );
-            const byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyVectorPassDataSplitNodeUnpack
-                    ( nodeContext.Child(t,s), head );
-        }
+                node.Child(t,s).MultiplyVectorPassDataCount
+                ( sendSizes, recvSizes );
         break;
     }
     case DIST_LOW_RANK:
     {
         if( _inSourceTeam && _inTargetTeam )
             break;
-
         const DistLowRank& DF = *_block.data.DF;
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( DF.rank );
-        if( DF.rank != 0 )
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            MPI_Comm comm = _teams->Team( 0 );
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                if( _inSourceTeam )
-                {
-                    mpi::Send
-                    ( z.LockedBuffer(), DF.rank, _targetRoot, 0, comm );
-                    z.Clear();
-                }
-                else
-                    mpi::Recv( z.Buffer(), DF.rank, _sourceRoot, 0, comm );
-            }
+            if( _inSourceTeam )
+                AddToMap( sendSizes, _targetRoot, DF.rank );
+            else
+                AddToMap( recvSizes, _sourceRoot, DF.rank );
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRank& SF = *_block.data.SF;
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( SF.rank );
-        if( SF.rank != 0 )
+        if( _inSourceTeam )
+            AddToMap( sendSizes, _targetRoot, SF.rank );
+        else
+            AddToMap( recvSizes, _sourceRoot, SF.rank );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inSourceTeam )
+            AddToMap( sendSizes, _targetRoot, Height() );
+        else
+            AddToMap( recvSizes, _sourceRoot, Height() );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataPack
+( MultiplyVectorContext& context,
+  std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataPack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::DistNode& nodeContext =
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyVectorPassDataPack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::SplitNode& nodeContext =
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyVectorPassDataPack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inSourceTeam )
         {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inSourceTeam )
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
             {
-                mpi::Send( z.LockedBuffer(), SF.rank, _targetRoot, 0, comm );
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Vector<Scalar>& z = *context.block.data.z;
+                    std::memcpy
+                    ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
+                      DF.rank*sizeof(Scalar) );
+                    offsets[_targetRoot] += DF.rank;
+                    z.Clear();
+                }
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        if( _inSourceTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Vector<Scalar>& z = *context.block.data.z;
+                std::memcpy
+                ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
+                  SF.rank*sizeof(Scalar) );
+                offsets[_targetRoot] += SF.rank;
                 z.Clear();
             }
-            else
-                mpi::Recv( z.Buffer(), SF.rank, _sourceRoot, 0, comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( Height() );
-        if( Height() != 0 )
+        if( _inSourceTeam )
         {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inSourceTeam )
+            const int height = Height();
+            if( height != 0 )
             {
-                mpi::Send( z.LockedBuffer(), Height(), _targetRoot, 0, comm );
+                Vector<Scalar>& z = *context.block.data.z;
+                std::memcpy
+                ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
+                  height*sizeof(Scalar) );
+                offsets[_targetRoot] += height;
                 z.Clear();
             }
-            else
-                mpi::Recv( z.Buffer(), Height(), _sourceRoot, 0, comm );
         }
         break;
     }
@@ -1142,128 +1126,96 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeCount
-( std::size_t& bufferSize ) const
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataUnpack
+( MultiplyVectorContext& context,
+  const std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataSplitNodeCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataUnpack");
 #endif
     switch( _block.type )
     {
-    case SPLIT_NODE:
+    case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPassDataSplitNodeCount( bufferSize );
-        break;
-    }
-    case SPLIT_LOW_RANK:
-        bufferSize += _block.data.SF->rank*sizeof(Scalar);
-        break;
-    case SPLIT_DENSE:
-        bufferSize += Height()*sizeof(Scalar);
-        break;
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodePack
-( MultiplyVectorContext& context, byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataSplitNodePack");
-    if( !_inSourceTeam )
-        throw std::logic_error("Calling process should be in source team");
-#endif
-    switch( _block.type )
-    {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
+        typename MultiplyVectorContext::DistNode& nodeContext =
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPassDataSplitNodePack
-                ( nodeContext.Child(t,s), head );
+                node.Child(t,s).MultiplyVectorPassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
         break;
     }
-    case SPLIT_LOW_RANK:
-    {
-        Vector<Scalar>& z = *context.block.data.z;
-        Write( head, z.LockedBuffer(), z.Height() );
-        z.Clear();
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        Vector<Scalar>& z = *context.block.data.z;
-        Write( head, z.LockedBuffer(), z.Height() );
-        z.Clear();
-        break;
-    }
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataSplitNodeUnpack
-( MultiplyVectorContext& context, const byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataSplitNodeUnpack");
-    if( !_inTargetTeam )
-        throw std::logic_error("Calling process should be in target team");
-#endif
-    switch( _block.type )
-    {
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
+        typename MultiplyVectorContext::SplitNode& nodeContext =
+            *context.block.data.SN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPassDataSplitNodeUnpack
-                ( nodeContext.Child(t,s), head );
+                node.Child(t,s).MultiplyVectorPassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inTargetTeam )
+        {
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Vector<Scalar>& z = *context.block.data.z;
+                    z.Resize( DF.rank );
+                    std::memcpy
+                    ( z.Buffer(), &buffer[offsets[_sourceRoot]],
+                      DF.rank*sizeof(Scalar) );
+                    offsets[_sourceRoot] += DF.rank;
+                }
+            }
+        }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( _block.data.SF->rank );
-        Read( z.Buffer(), head, z.Height() );
+        if( _inTargetTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Vector<Scalar>& z = *context.block.data.z;
+                z.Resize( SF.rank );
+                std::memcpy
+                ( z.Buffer(), &buffer[offsets[_sourceRoot]],
+                  SF.rank*sizeof(Scalar) );
+                offsets[_sourceRoot] += SF.rank;
+            }
+        }
         break;
     }
     case SPLIT_DENSE:
     {
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( Height() );
-        Read( z.Buffer(), head, z.Height() );
+        if( _inTargetTeam )
+        {
+            const int height = Height();
+            if( height != 0 )
+            {
+                Vector<Scalar>& z = *context.block.data.z;
+                z.Resize( height );
+                std::memcpy
+                ( z.Buffer(), &buffer[offsets[_sourceRoot]],
+                  height*sizeof(Scalar) );
+                offsets[_sourceRoot] += height;
+            }
+        }
         break;
     }
     default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
         break;
     }
 #ifndef RELEASE
@@ -1279,240 +1231,220 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassData");
 #endif
+    // Constuct maps of the send/recv processes to the send/recv sizes
+    std::map<int,int> sendSizes, recvSizes;
+    TransposeMultiplyVectorPassDataCount( sendSizes, recvSizes );
+
+    // Fill the offset vectors defined by the sizes
+    int totalSendSize=0, totalRecvSize=0;
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
+    }
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
+
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer( totalSendSize );
+    std::map<int,int> offsets = sendOffsets;
+    TransposeMultiplyVectorPassDataPack( context, xLocal, sendBuffer, offsets );
+
+    // Start the non-blocking sends
+    MPI_Comm comm = _teams->Team( 0 );
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
+    }
+
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+      offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    TransposeMultiplyVectorPassDataUnpack( context, recvBuffer, recvOffsets );
+
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataCount
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassDataCount");
+#endif
     switch( _block.type )
     {
     case DIST_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-
-        MPI_Comm team = _teams->Team( _level );
-        const int teamSize = mpi::CommSize( team );
-        const int teamRank = mpi::CommRank( team );
-        if( teamSize == 2 )
-        {
-            if( teamRank == 0 )     
-            {
-                // Take care of the top-left quadrant within our subteams
-                for( int t=0; t<2; ++t )
-                    for( int s=0; s<2; ++s )
-                        node.Child(t,s).TransposeMultiplyVectorPassData
-                        ( nodeContext.Child(t,s), xLocal );
-            }
-            else
-            {
-                // Take care of the bottom-right quadrant within our subteams
-                for( int t=2; t<4; ++t )
-                    for( int s=2; s<4; ++s )
-                        node.Child(t,s).TransposeMultiplyVectorPassData
-                        ( nodeContext.Child(t,s), xLocal );
-            }
-            // Top-right quadrant
-            for( int t=0; t<2; ++t )
-                for( int s=2; s<4; ++s )
-                    node.Child(t,s).TransposeMultiplyVectorPassData
-                    ( nodeContext.Child(t,s), xLocal );
-            // Bottom-left quadrant
-            for( int t=2; t<4; ++t )
-                for( int s=0; s<2; ++s )
-                    node.Child(t,s).TransposeMultiplyVectorPassData
-                    ( nodeContext.Child(t,s), xLocal );
-        }
-        else // teamSize >= 4
-        {
-            const int subteam = teamRank / (teamSize/4);
-            switch( subteam )
-            {
-            case 0:
-                // Take care of the work specific to our subteams
-                node.Child(0,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,0), xLocal );
-                // Interact with subteam 1
-                node.Child(0,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,1), xLocal );
-                node.Child(1,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,0), xLocal );
-                // Interact with subteam 2
-                node.Child(0,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,2), xLocal );
-                node.Child(2,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,0), xLocal );
-                // Interact with subteam 3
-                node.Child(0,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,3), xLocal );
-                node.Child(3,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,0), xLocal );
-                break;
-            case 1:
-                // Take care of the work specific to our subteams
-                node.Child(1,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,1), xLocal );
-                // Interact with subteam 0
-                node.Child(0,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,1), xLocal );
-                node.Child(1,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,0), xLocal );
-                // Interact with subteam 3
-                node.Child(1,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,3), xLocal ); 
-                node.Child(3,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,1), xLocal );
-                // Interact with subteam 2
-                node.Child(1,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,2), xLocal );
-                node.Child(2,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,1), xLocal );
-                break;
-            case 2:
-                // Take care of the work specific to our subteams
-                node.Child(2,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,2), xLocal );
-                // Interact with subteam 3
-                node.Child(2,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,3), xLocal );
-                node.Child(3,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,2), xLocal );
-                // Interact with subteam 0
-                node.Child(0,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,2), xLocal );
-                node.Child(2,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,0), xLocal );
-                // Interact with subteam 1
-                node.Child(1,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,2), xLocal );
-                node.Child(2,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,1), xLocal );
-                break;
-            case 3:
-                // Take care of the work specific to our subteams
-                node.Child(3,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,3), xLocal );
-                // Interact with subteam 2
-                node.Child(2,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(2,3), xLocal );
-                node.Child(3,2).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,2), xLocal );
-                // Interact with subteam 1
-                node.Child(1,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(1,3), xLocal );
-                node.Child(3,1).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,1), xLocal );
-                // Interact with subteam 0
-                node.Child(0,3).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(0,3), xLocal );
-                node.Child(3,0).TransposeMultiplyVectorPassData
-                ( nodeContext.Child(3,0), xLocal );
-                break;
-            default:
-                // This should be impossible
-                break;
-            }
-        }
-        break;
-    }
     case SPLIT_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::SplitNode& nodeContext = 
-            *context.block.data.SN;
-
-        std::size_t bufferSize = 0;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodeCount
-                ( bufferSize );
-        std::vector<byte> buffer( bufferSize );
-
-        MPI_Comm comm = _teams->Team(0);
-        if( _inTargetTeam )
-        {
-            byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodePack
-                    ( nodeContext.Child(t,s), xLocal, head );
-            if( bufferSize != 0 )
-                mpi::Send( &buffer[0], bufferSize, _sourceRoot, 0, comm );
-        }
-        else
-        {
-            if( bufferSize != 0 )
-                mpi::Recv( &buffer[0], bufferSize, _targetRoot, 0, comm );
-            const byte* head = &buffer[0];
-            for( int t=0; t<4; ++t )
-                for( int s=0; s<4; ++s )
-                    node.Child(t,s).
-                    TransposeMultiplyVectorPassDataSplitNodeUnpack
-                    ( nodeContext.Child(t,s), head );
-        }
+                node.Child(t,s).TransposeMultiplyVectorPassDataCount
+                ( sendSizes, recvSizes );
         break;
     }
     case DIST_LOW_RANK:
     {
         if( _inSourceTeam && _inTargetTeam )
             break;
-
         const DistLowRank& DF = *_block.data.DF;
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( DF.rank );
-        if( DF.rank != 0 )
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            MPI_Comm comm = _teams->Team( 0 );
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                if( _inTargetTeam )
-                {
-                    mpi::Send
-                    ( z.LockedBuffer(), DF.rank, _sourceRoot, 0, comm );
-                    z.Clear();
-                }
-                else
-                    mpi::Recv( z.Buffer(), DF.rank, _targetRoot, 0, comm );
-            }
+            if( _inTargetTeam )
+                AddToMap( sendSizes, _sourceRoot, DF.rank );
+            else
+                AddToMap( recvSizes, _targetRoot, DF.rank );
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
         const SplitLowRank& SF = *_block.data.SF;
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( SF.rank );
-        if( SF.rank != 0 )
+        if( _inTargetTeam )
+            AddToMap( sendSizes, _sourceRoot, SF.rank );
+        else
+            AddToMap( recvSizes, _targetRoot, SF.rank );
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inTargetTeam )
+            AddToMap( sendSizes, _sourceRoot, Height() );
+        else
+            AddToMap( recvSizes, _targetRoot, Height() );
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataPack
+( MultiplyVectorContext& context, const Vector<Scalar>& xLocal,
+  std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassDataPack");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::DistNode& nodeContext =
+            *context.block.data.DN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyVectorPassDataPack
+                ( nodeContext.Child(t,s), xLocal, buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::SplitNode& nodeContext =
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyVectorPassDataPack
+                ( nodeContext.Child(t,s), xLocal, buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inTargetTeam )
         {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inTargetTeam )
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
             {
-                mpi::Send( z.LockedBuffer(), SF.rank, _sourceRoot, 0, comm );
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Vector<Scalar>& z = *context.block.data.z;
+                    std::memcpy
+                    ( &buffer[offsets[_sourceRoot]], z.LockedBuffer(),
+                      DF.rank*sizeof(Scalar) );
+                    offsets[_sourceRoot] += DF.rank;
+                    z.Clear();
+                }
+            }
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        if( _inTargetTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Vector<Scalar>& z = *context.block.data.z;
+                std::memcpy
+                ( &buffer[offsets[_sourceRoot]], z.LockedBuffer(),
+                  SF.rank*sizeof(Scalar) );
+                offsets[_sourceRoot] += SF.rank;
                 z.Clear();
             }
-            else
-                mpi::Recv( z.Buffer(), SF.rank, _targetRoot, 0, comm );
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( Height() );
-        if( Height() != 0 )
+        if( _inTargetTeam )
         {
-            MPI_Comm comm = _teams->Team( 0 );
-            if( _inTargetTeam )
+            const int height = Height();
+            if( height != 0 )
             {
-                Vector<Scalar> xLocalSub;
-                xLocalSub.LockedView( xLocal, _localTargetOffset, Height() );
-                mpi::Send
-                ( xLocalSub.LockedBuffer(), Height(), _sourceRoot, 0, comm );
+                std::memcpy
+                ( &buffer[offsets[_sourceRoot]],
+                  xLocal.LockedBuffer(_localTargetOffset),
+                  height*sizeof(Scalar) );
+                offsets[_sourceRoot] += height;
             }
-            else
-                mpi::Recv( z.Buffer(), Height(), _targetRoot, 0, comm );
         }
         break;
     }
-
     default:
         break;
     }
@@ -1523,82 +1455,96 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassData
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyVectorPassDataSplitNodeCount
-( std::size_t& bufferSize ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::TransposeMultiplyVectorPassDataSplitNodeCount");
-#endif
-    switch( _block.type )
-    {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodeCount
-                ( bufferSize );
-        break;
-    }
-    case SPLIT_LOW_RANK:
-        bufferSize += _block.data.SF->rank*sizeof(Scalar);
-        break;
-    case SPLIT_DENSE:
-        bufferSize += Height()*sizeof(Scalar);
-        break;
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyVectorPassDataSplitNodePack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataUnpack
 ( MultiplyVectorContext& context,
-  const Vector<Scalar>& xLocal, byte*& head ) const
+  const std::vector<Scalar>& buffer, std::map<int,int>& offsets ) const
 {
 #ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::TransposeMultiplyVectorPassDataSplitNodePack");
-    if( !_inTargetTeam )
-        throw std::logic_error("Calling process should be in target team");
+    PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassDataUnpack");
 #endif
     switch( _block.type )
     {
-    case SPLIT_NODE:
+    case DIST_NODE:
     {
         const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
+        typename MultiplyVectorContext::DistNode& nodeContext =
             *context.block.data.DN;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodePack
-                ( nodeContext.Child(t,s), xLocal, head );
+                node.Child(t,s).TransposeMultiplyVectorPassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::SplitNode& nodeContext =
+            *context.block.data.SN;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).TransposeMultiplyVectorPassDataUnpack
+                ( nodeContext.Child(t,s), buffer, offsets );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inSourceTeam && _inTargetTeam )
+            break;
+        if( _inSourceTeam )
+       {
+            const DistLowRank& DF = *_block.data.DF;
+            if( DF.rank != 0 )
+            {
+                MPI_Comm team = _teams->Team( _level );
+                const int teamRank = mpi::CommRank( team );
+                if( teamRank == 0 )
+                {
+                    Vector<Scalar>& z = *context.block.data.z;
+                    z.Resize( DF.rank );
+                    std::memcpy
+                    ( z.Buffer(), &buffer[offsets[_targetRoot]],
+                      DF.rank*sizeof(Scalar) );
+                    offsets[_targetRoot] += DF.rank;
+                }
+            }
+        }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        Vector<Scalar>& z = *context.block.data.z;
-        Write( head, z.LockedBuffer(), z.Height() );
-        z.Clear();
+        if( _inSourceTeam )
+        {
+            const SplitLowRank& SF = *_block.data.SF;
+            if( SF.rank != 0 )
+            {
+                Vector<Scalar>& z = *context.block.data.z;
+                z.Resize( SF.rank );
+                std::memcpy
+                ( z.Buffer(), &buffer[offsets[_targetRoot]],
+                  SF.rank*sizeof(Scalar) );
+                offsets[_targetRoot] += SF.rank;
+            }
+        }
         break;
     }
     case SPLIT_DENSE:
-        Write( head, xLocal.LockedBuffer(_localTargetOffset), Height() );
+    {
+        if( _inSourceTeam )
+        {
+            const int height = Height();
+            if( height != 0 )
+            {
+                Vector<Scalar>& z = *context.block.data.z;
+                z.Resize( height );
+                std::memcpy
+                ( z.Buffer(), &buffer[offsets[_targetRoot]],
+                  height*sizeof(Scalar) );
+                offsets[_targetRoot] += height;
+            }
+        }
         break;
+    }
     default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
         break;
     }
 #ifndef RELEASE
@@ -1606,55 +1552,7 @@ TransposeMultiplyVectorPassDataSplitNodePack
 #endif
 }
 
-template<typename Scalar,bool Conjugated>
-void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyVectorPassDataSplitNodeUnpack
-( MultiplyVectorContext& context, const byte*& head ) const
-{
-#ifndef RELEASE
-    PushCallStack
-    ("DistQuasi2dHMat::TransposeMultiplyVectorPassDataSplitNodeUnpack");
-    if( !_inSourceTeam )
-        throw std::logic_error("Calling process should be in source team");
-#endif
-    switch( _block.type )
-    {
-    case SPLIT_NODE:
-    {
-        const Node& node = *_block.data.N;
-        typename MultiplyVectorContext::DistNode& nodeContext = 
-            *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPassDataSplitNodeUnpack
-                ( nodeContext.Child(t,s), head );
-        break;
-    }
-    case SPLIT_LOW_RANK:
-    {
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( _block.data.SF->rank );
-        Read( z.Buffer(), head, z.Height() );
-        break;
-    }
-    case SPLIT_DENSE:
-    {
-        Vector<Scalar>& z = *context.block.data.z;
-        z.Resize( Height() );
-        Read( z.Buffer(), head, z.Height() );
-        break;
-    }
-    default:
-#ifndef RELEASE
-        throw std::logic_error("This should be impossible");
-#endif
-        break;
-    }
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
+// HERE
 
 template<typename Scalar,bool Conjugated>
 void
