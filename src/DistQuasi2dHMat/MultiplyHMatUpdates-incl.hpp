@@ -383,10 +383,69 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     }
 
     // Count the number of entries of R and U that we need to exchange
-    std::map<int,int> RSendRecvSizes, USendSizes, URecvSizes;
-    MultiplyHMatUpdatesExchangeCount( RSendRecvSizes, USendSizes, URecvSizes );
+    std::map<int,int> sendSizes, recvSizes;
+    MultiplyHMatUpdatesExchangeCount( sendSizes, recvSizes );
 
-    // HERE
+    // Compute the offsets
+    int totalSendSize=0, totalRecvSize=0;
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
+    }
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
+
+    // Fill the send buffer
+    std::vector<Scalar> sendBuffer( totalSendSize );
+    std::map<int,int> offsets = sendOffsets;
+    //MultiplyHMatUpdatesExchangePack( sendBuffer, offsets );
+
+    // Start the non-blocking sends
+    MPI_Comm comm = _teams->Team( 0 );
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
+    }
+
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<Scalar> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+
+    // TODO: Figure out how to handle R pieces. Perhaps tauBuffer/qrBuffer
+    //       and tauOffsets/qrOffsets should be passed into the unpack phase.
+    //
+    //MultiplyHMatUpdatesExchangeUnpack
+    //( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets );
+    recvBuffer.clear();
+
+    // Don't continue until we know the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1302,8 +1361,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
-( std::map<int,int>& RSendRecvSizes, 
-  std::map<int,int>& USendSizes, std::map<int,int>& URecvSizes ) 
+( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeCount");
@@ -1317,7 +1375,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesExchangeCount
-                ( RSendRecvSizes, USendSizes, URecvSizes );
+                ( sendSizes, recvSizes );
         break;
     }
     case DIST_LOW_RANK:
@@ -1327,9 +1385,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         const DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
         if( _inTargetTeam )
-            AddToMap( RSendRecvSizes, _sourceRoot, (r*r+r)/2 );
+        {
+            AddToMap( sendSizes, _sourceRoot, (r*r+r)/2 );
+            AddToMap( recvSizes, _sourceRoot, (r*r+r)/2 );
+        }
         else
-            AddToMap( RSendRecvSizes, _targetRoot, (r*r+r)/2 );
+        {
+            AddToMap( sendSizes, _targetRoot, (r*r+r)/2 );
+            AddToMap( recvSizes, _targetRoot, (r*r+r)/2 );
+        }
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1341,17 +1405,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         {
             // Count the exchange R sizes
             if( _inTargetTeam )
-                AddToMap( RSendRecvSizes, _sourceRoot, (r*r+r)/2 );
+            {
+                AddToMap( sendSizes, _sourceRoot, (r*r+r)/2 );
+                AddToMap( recvSizes, _sourceRoot, (r*r+r)/2 );
+            }
             else
-                AddToMap( RSendRecvSizes, _targetRoot, (r*r+r)/2 );
+            {
+                AddToMap( sendSizes, _targetRoot, (r*r+r)/2 );
+                AddToMap( recvSizes, _targetRoot, (r*r+r)/2 );
+            }
         }
         else
         {
             // Count the send/recv U sizes
             if( _inTargetTeam )
-                AddToMap( USendSizes, _sourceRoot, Height()*SF.rank );
+                AddToMap( sendSizes, _sourceRoot, Height()*SF.rank );
             else
-                AddToMap( URecvSizes, _targetRoot, Height()*SF.rank );
+                AddToMap( recvSizes, _targetRoot, Height()*SF.rank );
         }
         break;
     }
@@ -1359,9 +1429,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
     {
         // Count the send/recv sizes of the U's from the low-rank updates
         if( _inTargetTeam )
-            AddToMap( USendSizes, _sourceRoot, Height()*_UMap[0]->Width() );
+            AddToMap( sendSizes, _sourceRoot, Height()*_UMap[0]->Width() );
         else
-            AddToMap( URecvSizes, _targetRoot, Height()*_VMap[0]->Width() );
+            AddToMap( recvSizes, _targetRoot, Height()*_VMap[0]->Width() );
         break;
     }
     default:

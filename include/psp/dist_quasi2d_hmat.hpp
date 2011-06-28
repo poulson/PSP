@@ -938,8 +938,7 @@ private:
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
     void MultiplyHMatUpdatesExchangeCount
-    ( std::map<int,int>& RSendRecvSizes,
-      std::map<int,int>& USendSizes, std::map<int,int>& URecvSizes );
+    ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
 
     /*
      * Private data
