@@ -125,6 +125,10 @@ public:
 
     void RequireRoot() const;
 
+    // If this block is not low rank, throw an error
+    int Rank() const;
+    void SetGhostRank( int rank ); // this block must also be a ghost
+
     /*
      * Routines for visualizing the locally known H-matrix structure
      */
@@ -709,6 +713,16 @@ private:
       std::vector<std::set<std::pair<int,int> > >& markedANodes,
       std::vector<std::set<std::pair<int,int> > >& markedBNodes,
       std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const;
+    void MultiplyHMatFormGhostRanksPack
+    ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+      std::vector<std::set<std::pair<int,int> > >& markedANodes,
+      std::vector<std::set<std::pair<int,int> > >& markedBNodes,
+      std::vector<int>& sendBuffer, std::map<int,int>& offsets ) const;
+    void MultiplyHMatFormGhostRanksUnpack
+    ( DistQuasi2dHMat<Scalar,Conjugated>& B,
+      std::vector<std::set<std::pair<int,int> > >& markedANodes,
+      std::vector<std::set<std::pair<int,int> > >& markedBNodes,
+      const std::vector<int>& recvBuffer, std::map<int,int>& offsets );
 
     void MultiplyHMatMainPrecompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,

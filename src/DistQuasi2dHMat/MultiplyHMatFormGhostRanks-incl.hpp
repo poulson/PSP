@@ -27,15 +27,82 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanks
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanks");
 #endif
-    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     const int numLevels = A._numLevels;
 
+    // Count the send/recv sizes
     std::vector<std::set<std::pair<int,int> > > markedANodes(numLevels),
                                                 markedBNodes(numLevels);
     std::map<int,int> sendSizes, recvSizes;
     A.MultiplyHMatFormGhostRanksCount
     ( B, markedANodes, markedBNodes, sendSizes, recvSizes );
-    // HERE
+    for( int i=0; i<numLevels; ++i )
+    {
+        markedANodes[i].clear();
+        markedBNodes[i].clear();
+    }
+
+    // Compute the offsets
+    int totalSendSize=0, totalRecvSize=0;
+    std::map<int,int> sendOffsets, recvOffsets;
+    std::map<int,int>::iterator it;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        sendOffsets[it->first] = totalSendSize;
+        totalSendSize += it->second;
+    }
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        recvOffsets[it->first] = totalRecvSize;
+        totalRecvSize += it->second;
+    }
+
+    // Fill the send buffer
+    std::vector<int> sendBuffer( totalSendSize );
+    std::map<int,int> offsets = sendOffsets;
+    A.MultiplyHMatFormGhostRanksPack
+    ( B, markedANodes, markedBNodes, sendBuffer, offsets );
+    for( int i=0; i<numLevels; ++i )
+    {
+        markedANodes[i].clear();
+        markedBNodes[i].clear();
+    }
+
+    // Start the non-blocking sends
+    MPI_Comm comm = A._teams->Team( 0 );
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    int offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
+    }
+
+    // Start the non-blocking recvs
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<int> recvBuffer( totalRecvSize );
+    offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    // Unpack as soon as we have received our data
+    for( int i=0; i<numRecvs; ++i )
+        mpi::Wait( recvRequests[i] );
+    A.MultiplyHMatFormGhostRanksUnpack
+    ( B, markedANodes, markedBNodes, recvBuffer, recvOffsets );
+
+    // Don't exit until we know that the data was sent
+    for( int i=0; i<numSends; ++i )
+        mpi::Wait( sendRequests[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -249,6 +316,317 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksCount
                   markedBNodes[B._level].end(), BOffsets ) )
             {
                 AddToMap( recvSizes, A._targetRoot, 1 );
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksPack
+( const DistQuasi2dHMat<Scalar,Conjugated>& B ,
+  std::vector<std::set<std::pair<int,int> > >& markedANodes,
+  std::vector<std::set<std::pair<int,int> > >& markedBNodes,
+  std::vector<int>& sendBuffer, std::map<int,int>& offsets ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanksPack");
+#endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+        return;
+
+    MPI_Comm team = A._teams->Team( A._level );
+    const int teamRank = mpi::CommRank( team );
+    std::pair<int,int> AOffsets( A._targetOffset, A._sourceOffset ),
+                       BOffsets( B._targetOffset, B._sourceOffset );
+
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE_GHOST:
+        case NODE_GHOST:
+        {
+            // Recurse
+            const Node& nodeA = *A._block.data.N;        
+            const Node& nodeB = *B._block.data.N;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    for( int r=0; r<4; ++r )
+                        nodeA.Child(t,r).MultiplyHMatFormGhostRanksPack
+                        ( nodeB.Child(r,s), markedANodes, markedBNodes,
+                          sendBuffer, offsets );
+            break;
+        }
+        case DIST_LOW_RANK:
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+        {
+            // Test if we need to send to A's target root
+            if( B._inSourceTeam && teamRank == 0 &&
+                A._targetRoot != B._targetRoot && 
+                A._targetRoot != B._sourceRoot &&
+                !std::binary_search
+                 ( markedBNodes[B._level].begin(),
+                   markedBNodes[B._level].end(), BOffsets ) )
+            {
+                sendBuffer[offsets[A._targetRoot]++] = B.Rank();
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+    {
+        // Check if we need to send to B's source root
+        if( A._inTargetTeam && teamRank == 0 &&
+            B._sourceRoot != A._targetRoot &&
+            B._sourceRoot != A._sourceRoot &&
+            !std::binary_search
+            ( markedANodes[A._level].begin(),
+              markedANodes[A._level].end(), AOffsets ) )
+        {
+            sendBuffer[offsets[B._sourceRoot]++] = A.Rank();
+            markedANodes[A._level].insert( AOffsets );
+        }
+
+        switch( B._block.type )
+        {
+        case DIST_LOW_RANK:
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+        {
+            // Check if we need to send to A's target root
+            if( B._inSourceTeam && teamRank == 0 &&
+                A._targetRoot != B._targetRoot &&
+                A._targetRoot != B._sourceRoot &&
+                !std::binary_search
+                ( markedBNodes[B._level].begin(),
+                  markedBNodes[B._level].end(), BOffsets ) )
+            {
+                sendBuffer[offsets[A._targetRoot]++] = B.Rank();
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_LOW_RANK:
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+        {
+            // Check if we need to send to A's target root
+            if( B._inSourceTeam && teamRank == 0 &&
+                A._targetRoot != B._targetRoot &&
+                A._targetRoot != B._sourceRoot &&
+                !std::binary_search
+                ( markedBNodes[B._level].begin(),
+                  markedBNodes[B._level].end(), BOffsets ) )
+            {
+                sendBuffer[offsets[A._targetRoot]++] = B.Rank();
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    case SPLIT_DENSE_GHOST:
+    case DENSE:
+    case DENSE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+        {
+            // Check if we need to send to A's target root
+            if( B._inSourceTeam && teamRank == 0 &&
+                A._targetRoot != B._targetRoot &&
+                A._targetRoot != B._sourceRoot &&
+                !std::binary_search
+                ( markedBNodes[B._level].begin(),
+                  markedBNodes[B._level].end(), BOffsets ) )
+            {
+                sendBuffer[offsets[A._targetRoot]++] = B.Rank();
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksUnpack
+( DistQuasi2dHMat<Scalar,Conjugated>& B ,
+  std::vector<std::set<std::pair<int,int> > >& markedANodes,
+  std::vector<std::set<std::pair<int,int> > >& markedBNodes,
+  const std::vector<int>& recvBuffer, std::map<int,int>& offsets )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanksUnpack");
+#endif
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+        return;
+
+    MPI_Comm team = A._teams->Team( A._level );
+    const int teamRank = mpi::CommRank( team );
+    std::pair<int,int> AOffsets( A._targetOffset, A._sourceOffset ),
+                       BOffsets( B._targetOffset, B._sourceOffset );
+
+    switch( A._block.type )
+    {
+    case DIST_NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
+    case NODE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case DIST_NODE:
+        case DIST_NODE_GHOST:
+        case SPLIT_NODE_GHOST:
+        case NODE_GHOST:
+        {
+            // Recurse
+            Node& nodeA = *A._block.data.N;        
+            Node& nodeB = *B._block.data.N;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    for( int r=0; r<4; ++r )
+                        nodeA.Child(t,r).MultiplyHMatFormGhostRanksUnpack
+                        ( nodeB.Child(r,s), markedANodes, markedBNodes,
+                          recvBuffer, offsets );
+            break;
+        }
+        case DIST_LOW_RANK_GHOST:
+        case SPLIT_LOW_RANK_GHOST:
+        case LOW_RANK_GHOST:
+        {
+            // Test if we need to recv from A's target root
+            if( teamRank == 0 &&
+                !std::binary_search
+                 ( markedBNodes[B._level].begin(),
+                   markedBNodes[B._level].end(), BOffsets ) )
+            {
+                B.SetGhostRank( recvBuffer[offsets[A._targetRoot]++] );
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
+    {
+        switch( B._block.type )
+        {
+        case DIST_LOW_RANK_GHOST:
+        case SPLIT_LOW_RANK_GHOST:
+        case LOW_RANK_GHOST:
+        {
+            // Check if we need to recv from A's target root
+            if( teamRank == 0 &&
+                !std::binary_search
+                ( markedBNodes[B._level].begin(),
+                  markedBNodes[B._level].end(), BOffsets ) )
+            {
+                B.SetGhostRank( recvBuffer[offsets[A._targetRoot]++] );
+                markedBNodes[B._level].insert( BOffsets );
+            }
+            break;
+        }
+        default:
+            break;
+        }
+        break;
+    }
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
+    case LOW_RANK_GHOST:
+    {
+        // Check if we need to recv from B's source root
+        if( teamRank == 0 &&
+            !std::binary_search
+            ( markedANodes[A._level].begin(),
+              markedANodes[A._level].end(), AOffsets ) )
+        {
+            A.SetGhostRank( recvBuffer[offsets[B._sourceRoot]++] );
+            markedANodes[A._level].insert( AOffsets );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    case SPLIT_DENSE_GHOST:
+    case DENSE:
+    case DENSE_GHOST:
+    {
+        switch( B._block.type )
+        {
+        case SPLIT_LOW_RANK_GHOST:
+        case LOW_RANK_GHOST:
+        {
+            // Check if we need to recv from A's target root
+            if( teamRank == 0 &&
+                !std::binary_search
+                ( markedBNodes[B._level].begin(),
+                  markedBNodes[B._level].end(), BOffsets ) )
+            {
+                B.SetGhostRank( recvBuffer[offsets[A._targetRoot]++] );
                 markedBNodes[B._level].insert( BOffsets );
             }
             break;

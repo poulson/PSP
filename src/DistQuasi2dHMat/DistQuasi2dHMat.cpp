@@ -190,6 +190,76 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::RequireRoot() const
 }
 
 template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::Rank() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::Rank");
+#endif
+    int rank;
+    switch( _block.type )
+    {
+    case DIST_LOW_RANK:
+        rank = _block.data.DF->rank;
+        break;
+    case DIST_LOW_RANK_GHOST:
+        rank = _block.data.DFG->rank;
+        break;
+    case SPLIT_LOW_RANK:
+        rank = _block.data.SF->rank;
+        break;
+    case SPLIT_LOW_RANK_GHOST:
+        rank = _block.data.SFG->rank;
+        break;
+    case LOW_RANK:
+        rank = _block.data.F->Rank();
+        break;
+    case LOW_RANK_GHOST:
+        rank = _block.data.FG->rank;
+        break;
+    default:
+#ifndef RELEASE
+        throw std::logic_error("Can only request rank of low-rank blocks");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return rank;
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::SetGhostRank( int rank ) 
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::SetGhostRank");
+#endif
+    switch( _block.type )
+    {
+    case DIST_LOW_RANK_GHOST:
+        _block.data.DFG->rank = rank;
+        break;
+    case SPLIT_LOW_RANK_GHOST:
+        _block.data.SFG->rank = rank;
+        break;
+    case LOW_RANK_GHOST:
+        _block.data.FG->rank = rank;
+        break;
+    default:
+#ifndef RELEASE
+        throw std::logic_error
+        ("Can only set ghost rank of ghost low-rank blocks");
+#endif
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::Scale( Scalar alpha )
 {
@@ -371,10 +441,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LatexWriteLocalStructureRecursion
     case NODE:
     case NODE_GHOST:
     {
-        /*
-        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
-        */
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )

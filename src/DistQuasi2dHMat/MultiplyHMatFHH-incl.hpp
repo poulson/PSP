@@ -385,12 +385,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
-    // 1) Compute send and recv sizes
-    MPI_Comm comm = _teams->Team( 0 );
+    // Compute send and recv sizes
     std::map<int,int> sendSizes, recvSizes;
     A.MultiplyHMatFHHPassDataCount( B, C, sendSizes, recvSizes );
 
-    // 2) Allocate buffers
+    // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
     std::map<int,int> sendOffsets, recvOffsets;
     std::map<int,int>::iterator it;
@@ -411,6 +410,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
     A.MultiplyHMatFHHPassDataPack( B, C, sendBuffer, offsets );
 
     // Start the non-blocking sends
+    MPI_Comm comm = _teams->Team( 0 );
     const int numSends = sendSizes.size();
     std::vector<MPI_Request> sendRequests( numSends );
     int offset = 0;
