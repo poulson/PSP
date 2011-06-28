@@ -713,7 +713,7 @@ private:
     void MultiplyHMatMainPrecompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C );
-    void MultiplyHMatSetUp
+    void MultiplyHMatMainSetUp
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
 
