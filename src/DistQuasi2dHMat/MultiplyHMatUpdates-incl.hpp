@@ -382,8 +382,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         }
     }
 
-    // HERE: Need to exchange the R's and send target factors to source teams
-    //       when there are dense matrices involved.
+    // Count the number of entries of R and U that we need to exchange
+    std::map<int,int> RSendRecvSizes, USendSizes, URecvSizes;
+    MultiplyHMatUpdatesExchangeCount( RSendRecvSizes, USendSizes, URecvSizes );
+
+    // HERE
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -555,6 +558,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         // Create the space and store the rank if we'll need to do a QR
         if( _inTargetTeam )
         {
+            const int numDenseUpdates = _DMap.Size();
             if( numDenseUpdates == 0 )
                 ranks[rankOffsets[teamLevel]++] = rank;
             const int oldRank = SF.D.Width();
@@ -1160,31 +1164,29 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             ( m, r, ULocal.Buffer(), ULocal.LDim(), 
               &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
-            if( log2TeamSize > 0 )
+
+            std::memset
+            ( &qrBuffer[qrOffsets[teamLevel]], 0, (r*r+r)*sizeof(Scalar) );
+            const bool root = !(teamRank & 0x1);
+            if( root )
             {
-                std::memset
-                ( &qrBuffer[qrOffsets[teamLevel]], 0, (r*r+r)*sizeof(Scalar) );
-                const bool root = !(teamRank & 0x1);
-                if( root )
-                {
-                    // Copy our R into the upper triangle of the next
-                    // matrix to factor (which is 2r x r)
-                    for( int j=0; j<r; ++j )
-                        std::memcpy
-                        ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
-                          ULocal.LockedBuffer(0,j), 
-                          std::min(m,j+1)*sizeof(Scalar) );
-                }
-                else
-                {
-                    // Copy our R into the lower triangle of the next
-                    // matrix to factor (which is 2r x r)
-                    for( int j=0; j<r; ++j )
-                        std::memcpy
-                        ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
-                          ULocal.LockedBuffer(0,j), 
-                          std::min(m,j+1)*sizeof(Scalar) );
-                }
+                // Copy our R into the upper triangle of the next
+                // matrix to factor (which is 2r x r)
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
+                      ULocal.LockedBuffer(0,j), 
+                      std::min(m,j+1)*sizeof(Scalar) );
+            }
+            else
+            {
+                // Copy our R into the lower triangle of the next
+                // matrix to factor (which is 2r x r)
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
+                      ULocal.LockedBuffer(0,j), 
+                      std::min(m,j+1)*sizeof(Scalar) );
             }
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
         }
@@ -1199,31 +1201,29 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             ( n, r, VLocal.Buffer(), VLocal.LDim(), 
               &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
-            if( log2TeamSize > 0 )
+
+            std::memset
+            ( &qrBuffer[qrOffsets[teamLevel]], 0, (r*r+r)*sizeof(Scalar) );
+            const bool root = !(teamRank & 0x1);
+            if( root )
             {
-                std::memset
-                ( &qrBuffer[qrOffsets[teamLevel]], 0, (r*r+r)*sizeof(Scalar) );
-                const bool root = !(teamRank & 0x1);
-                if( root )
-                {
-                    // Copy our R into the upper triangle of the next
-                    // matrix to factor (which is 2r x r)
-                    for( int j=0; j<r; ++j )
-                        std::memcpy
-                        ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
-                          VLocal.LockedBuffer(0,j), 
-                          std::min(n,j+1)*sizeof(Scalar) );
-                }
-                else
-                {
-                    // Copy our R into the lower triangle of the next
-                    // matrix to factor (which is 2r x r)
-                    for( int j=0; j<r; ++j )
-                        std::memcpy
-                        ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
-                          VLocal.LockedBuffer(0,j), 
-                          std::min(n,j+1)*sizeof(Scalar) );
-                }
+                // Copy our R into the upper triangle of the next
+                // matrix to factor (which is 2r x r)
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
+                      VLocal.LockedBuffer(0,j), 
+                      std::min(n,j+1)*sizeof(Scalar) );
+            }
+            else
+            {
+                // Copy our R into the lower triangle of the next
+                // matrix to factor (which is 2r x r)
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
+                      VLocal.LockedBuffer(0,j), 
+                      std::min(n,j+1)*sizeof(Scalar) );
             }
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
         }
@@ -1289,6 +1289,79 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
               &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
             tauOffsets[teamLevel] += r;
         }
+        break;
+    }
+    default:
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
+( std::map<int,int>& RSendRecvSizes, 
+  std::map<int,int>& USendSizes, std::map<int,int>& URecvSizes ) 
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeCount");
+#endif
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatUpdatesExchangeCount
+                ( RSendRecvSizes, USendSizes, URecvSizes );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inTargetTeam && _inSourceTeam )
+            break;
+        const DistLowRank& DF = *_block.data.DF;
+        const int r = DF.rank;
+        if( _inTargetTeam )
+            AddToMap( RSendRecvSizes, _sourceRoot, (r*r+r)/2 );
+        else
+            AddToMap( RSendRecvSizes, _targetRoot, (r*r+r)/2 );
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        const int r = SF.rank;
+        const int numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 )
+        {
+            // Count the exchange R sizes
+            if( _inTargetTeam )
+                AddToMap( RSendRecvSizes, _sourceRoot, (r*r+r)/2 );
+            else
+                AddToMap( RSendRecvSizes, _targetRoot, (r*r+r)/2 );
+        }
+        else
+        {
+            // Count the send/recv U sizes
+            if( _inTargetTeam )
+                AddToMap( USendSizes, _sourceRoot, Height()*SF.rank );
+            else
+                AddToMap( URecvSizes, _targetRoot, Height()*SF.rank );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        // Count the send/recv sizes of the U's from the low-rank updates
+        if( _inTargetTeam )
+            AddToMap( USendSizes, _sourceRoot, Height()*_UMap[0]->Width() );
+        else
+            AddToMap( URecvSizes, _targetRoot, Height()*_VMap[0]->Width() );
         break;
     }
     default:
