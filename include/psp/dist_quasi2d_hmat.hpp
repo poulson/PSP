@@ -706,6 +706,8 @@ private:
     void MultiplyHMatFormGhostRanks( DistQuasi2dHMat<Scalar,Conjugated>& B );
     void MultiplyHMatFormGhostRanksCount
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
+      std::vector<std::set<std::pair<int,int> > >& markedANodes,
+      std::vector<std::set<std::pair<int,int> > >& markedBNodes,
       std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const;
 
     void MultiplyHMatMainPrecompute

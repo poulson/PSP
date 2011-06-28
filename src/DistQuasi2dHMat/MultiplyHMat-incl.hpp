@@ -75,8 +75,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanks
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanks");
 #endif
+    const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    const int numLevels = A._numLevels;
+
+    std::vector<std::set<std::pair<int,int> > > markedANodes(numLevels),
+                                                markedBNodes(numLevels);
     std::map<int,int> sendSizes, recvSizes;
-    MultiplyHMatFormGhostRanksCount( B, sendSizes, recvSizes );
+    A.MultiplyHMatFormGhostRanksCount
+    ( B, markedANodes, markedBNodes, sendSizes, recvSizes );
     // HERE
 #ifndef RELEASE
     PopCallStack();
@@ -87,14 +93,17 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksCount
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B ,
+  std::vector<std::set<std::pair<int,int> > >& markedANodes,
+  std::vector<std::set<std::pair<int,int> > >& markedBNodes,
   std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFormGhostRanksCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+        return;
 
-    // HERE
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -109,28 +118,77 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksCount
         case SPLIT_NODE_GHOST:
         case NODE_GHOST:
         {
-
+            // Recurse
+            const Node& nodeA = *A._block.data.N;        
+            const Node& nodeB = *B._block.data.N;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    for( int r=0; r<4; ++r )
+                        nodeA.Child(t,r).MultiplyHMatFormGhostRanksCount
+                        ( nodeB.Child(r,s), markedANodes, markedBNodes,
+                          sendSizes, recvSizes );
+            break;
+        }
+        case DIST_LOW_RANK:
+        case SPLIT_LOW_RANK:
+        case LOW_RANK:
+        {
+            // Test if we need to send to A's target root
+            MPI_Comm team = B._teams->Team( B._level );
+            const int teamRank = mpi::CommRank( team );
+            if( B._inSourceTeam && teamRank == 0 &&
+                A._targetRoot != B._targetRoot && 
+                A._targetRoot != B._sourceRoot )
+            {
+                const std::pair<int,int> 
+                    BOffsets( B._targetOffset, B._sourceOffset );
+                if( !std::binary_search
+                    ( markedBNodes[B._level].begin(),
+                      markedBNodes[B._level].end(), BOffsets ) )
+                {
+                    ++sendSizes[A._targetRoot];
+                    markedBNodes[B._level].insert( BOffsets );
+                }
+            }
             break;
         }
         case DIST_LOW_RANK_GHOST:
-        {
-
-            break;
-        }
         case SPLIT_LOW_RANK_GHOST:
-        {
-
-            break;
-        }
         case LOW_RANK_GHOST:
         {
-
+            // Test if we need to recv from A's target root
+            MPI_Comm team = B._teams->Team( B._level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                const std::pair<int,int>
+                    BOffsets( B._targetOffset, B._sourceOffset );
+                if( !std::binary_search
+                    ( markedBNodes[B._level].begin(),
+                      markedBNodes[B._level].end(), BOffsets ) )
+                {
+                    ++recvSizes[A._targetRoot];
+                    markedBNodes[B._level].insert( BOffsets );
+                }
+            }
+            break;
         }
         default:
             break;
         }
         break;
     }
+    case DIST_LOW_RANK:
+    {
+        switch( B._block.type )
+        {
+        // TODO
+        default:
+            break;
+        }
+        break;
+    }
+    // TODO
     default:
         break;
     }
@@ -1923,6 +1981,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
 
     // Take care of the H += H H cases first
     const bool admissibleC = C.Admissible();
@@ -2397,6 +2457,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
 
     // Take care of the H += H H cases first
     const int key = A._sourceOffset;
@@ -2787,6 +2849,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
 
     // Take care of the H += H H cases first
     const int key = A._sourceOffset;
@@ -3498,6 +3562,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
@@ -3570,6 +3637,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -3645,6 +3715,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -3841,6 +3914,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     
     // Handle all H H recursion here
@@ -4699,6 +4775,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPrecompute");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
 
@@ -4864,6 +4943,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -4919,6 +5001,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsPack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -4981,6 +5066,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsUnpack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5117,6 +5205,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
 
@@ -5179,6 +5270,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataPack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
@@ -5256,6 +5350,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataUnpack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
 
@@ -5366,6 +5463,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5421,6 +5521,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsPack");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5483,6 +5586,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsUnpack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -5562,6 +5668,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcomputeC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
 
@@ -6238,6 +6347,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeMiddleUpdates");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int r = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
@@ -6444,6 +6556,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeOuterUpdates");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int r = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
@@ -6541,6 +6656,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeFormLowRank");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( C._block.type == EMPTY )
+        return;
+
     const int r = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
