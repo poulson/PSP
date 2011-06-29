@@ -945,6 +945,15 @@ private:
       std::vector<Scalar>& work ) const;
     void MultiplyHMatUpdatesExchangeCount
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
+    void MultiplyHMatUpdatesExchangePack
+    ( std::vector<Scalar>& sendBuffer, std::map<int,int>& sendOffsets,
+      const std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
+      const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets );
+    void MultiplyHMatUpdatesExchangeUnpack
+    ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
+      const std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
+      const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
+      const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets );
 
     /*
      * Private data
