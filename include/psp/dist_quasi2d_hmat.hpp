@@ -937,6 +937,12 @@ private:
       std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
+    void MultiplyHMatUpdatesParallelQR
+    ( std::vector<int>& numQRs,
+      std::vector<int>& ranks, std::vector<int>& rankOffsets,
+      std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
+      std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+      std::vector<Scalar>& work ) const;
     void MultiplyHMatUpdatesExchangeCount
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
 

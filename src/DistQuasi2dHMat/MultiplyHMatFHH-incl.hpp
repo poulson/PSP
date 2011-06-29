@@ -171,12 +171,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
     std::vector<int> offsets( numReduces );
     for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A.MultiplyHMatFHHSumsPack( B, C, buffer, offsets );
+    std::vector<int> offsetsCopy = offsets;
+    A.MultiplyHMatFHHSumsPack( B, C, buffer, offsetsCopy );
 
-    // Reset the offsets vector and then perform the reduces. There should be
-    // at most log_4(p) reduces.
-    for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
-        offsets[i] = offset;
+    // Perform the reduces with log2(p) messages
     A._teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of communicators have data)
@@ -691,12 +689,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     std::vector<int> offsets( numBroadcasts );
     for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A.MultiplyHMatFHHBroadcastsPack( B, C, buffer, offsets );
+    std::vector<int> offsetsCopy = offsets;
+    A.MultiplyHMatFHHBroadcastsPack( B, C, buffer, offsetsCopy );
 
-    // Reset the offsets vector and then perform the broadcasts. There should be
-    // at most log_4(p) broadcasts.
-    for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
-        offsets[i] = offset;
+    // Perform the broadcasts with log2(p) messages
     A._teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers
@@ -1103,22 +1099,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         totalAllReduceSize += numSourceFHH[teamLevel]*r*r;
     }
     std::vector<Scalar> allReduceBuffer( totalAllReduceSize );
-    A.MultiplyHMatFHHFinalizeMiddleUpdates
-    ( B, C, allReduceBuffer, middleOffsets );
-
-    // Perform the large local QR's and pack into the QR buffer as appropriate
-    C.MultiplyHMatFHHFinalizeLocalQR
-    ( Xs, XOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
-
-    // Reset the offset vectors
-    numTotalQRs = qrTotalSize = tauTotalSize = 0;
-    for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
     {
-        XOffsets[teamLevel] = numTotalQRs;
-        qrOffsets[teamLevel] = qrTotalSize;
-        tauOffsets[teamLevel] = tauTotalSize;
+        std::vector<int> middleOffsetsCopy = middleOffsets;
+
+        A.MultiplyHMatFHHFinalizeMiddleUpdates
+        ( B, C, allReduceBuffer, middleOffsetsCopy );
     }
 
+    // Perform the large local QR's and pack into the QR buffer as appropriate
+    {
+        std::vector<int> XOffsetsCopy, qrOffsetsCopy, tauOffsetsCopy;
+        XOffsetsCopy = XOffsets;
+        qrOffsetsCopy = qrOffsets;
+        tauOffsetsCopy = tauOffsets;
+
+        C.MultiplyHMatFHHFinalizeLocalQR
+        ( Xs, XOffsetsCopy, 
+          qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, work );
+    }
+
+    // TODO: Push this into a subroutine
+    //
     // Perform the combined distributed TSQR factorizations.
     // This could almost certainly be simplified...
     const int numSteps = numTeamLevels-1;
@@ -1503,14 +1504,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     Z.Clear();
     applyQWork.clear();
 
-    A.MultiplyHMatFHHFinalizeOuterUpdates
-    ( B, C, allReduceBuffer, leftOffsets, rightOffsets );
+    // Form our local contributions to Q1' Omega2 and Q2' Omega1
+    {
+        std::vector<int> leftOffsetsCopy, rightOffsetsCopy;
+        leftOffsetsCopy = leftOffsets;
+        rightOffsetsCopy = rightOffsets;
+
+        A.MultiplyHMatFHHFinalizeOuterUpdates
+        ( B, C, allReduceBuffer, leftOffsetsCopy, rightOffsetsCopy );
+    }
 
     // Perform a custom AllReduce on the buffers to finish forming
     // Q1' Omega2, Omega2' (alpha A B Omega1), and Q2' Omega1
     {
-        // Reset the left/middle/right offsets and generate offsets and sizes 
-        // for each entire level.
+        // Generate offsets and sizes for each entire level
         std::vector<int> sizes, offsets;
         totalAllReduceSize = 0;
         for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
@@ -1519,11 +1526,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             sizes[teamLevel] = r*r*(2*numTargetFHH[teamLevel]+
                                       numSourceFHH[teamLevel]);
 
-            leftOffsets[teamLevel] = totalAllReduceSize;
-            totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
-            middleOffsets[teamLevel] = totalAllReduceSize;
-            totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
-            rightOffsets[teamLevel] = totalAllReduceSize;
+            totalAllReduceSize += 2*numTargetFHH[teamLevel]*r*r;
             totalAllReduceSize += numSourceFHH[teamLevel]*r*r;
         }
 

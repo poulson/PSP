@@ -83,303 +83,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     std::vector<Scalar> qrBuffer( qrTotalSize ), tauBuffer( tauTotalSize );
     std::vector<Scalar> work( lapack::QRWorkSize(maxRank) );
 
-    MultiplyHMatUpdatesLocalQR
-    ( Xs, XOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
-    
-    // Reset the offset vectors
-    numTotalQRs = qrTotalSize = tauTotalSize = 0;
-    for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
+    // Make a disposable copy of the offset vectors and perform the local
+    // QR portions of the (distributed) QRs
     {
-        XOffsets[teamLevel] = numTotalQRs;
-        qrOffsets[teamLevel] = qrTotalSize;
-        tauOffsets[teamLevel] = tauTotalSize;
+        std::vector<int> XOffsetsCopy, qrOffsetsCopy, tauOffsetsCopy;
+        XOffsetsCopy = XOffsets;
+        qrOffsetsCopy = qrOffsets;
+        tauOffsetsCopy = tauOffsets;
+
+        MultiplyHMatUpdatesLocalQR
+        ( Xs, XOffsetsCopy, 
+          qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, work );
     }
-
-    // Perform the combined distributed TSQR factorizations.
-    // This could almost certainly be simplified...
-    const int numSteps = numTeamLevels-1;
-    for( int step=0; step<numSteps; ++step )
+    
+    // Perform the parallel portion of the TSQR algorithm
     {
-        MPI_Comm team = _teams->Team( step );
-        const int teamSize = mpi::CommSize( team );
-        const unsigned teamRank = mpi::CommRank( team );
-        const bool haveAnotherComm = ( step < numSteps-1 );
-        // only valid result if we have a next step...
-        const bool rootOfNextStep = !(teamRank & 0x100);
-        const int passes = 2*step;
+        std::vector<int> qrOffsetsCopy, tauOffsetsCopy;
+        qrOffsetsCopy = qrOffsets;
+        tauOffsetsCopy = tauOffsets;
 
-        // Compute the total message size for this step
-        int msgSize = 0;
-        for( int l=0; l<numSteps-step; ++l )
-        {
-            for( int i=0; i<numQRs[l]; ++i )
-            {
-                const int r = ranks[rankOffsets[l]+i];     
-                msgSize += (r*r+r)/2;
-            }
-        }
-        std::vector<Scalar> sendBuffer( msgSize ), recvBuffer( msgSize );
-
-        // Flip the first bit of our rank in this team to get our partner,
-        // and then check if our bit is 0 to see if we're the root
-        const unsigned firstPartner = teamRank ^ 0x1;
-        const unsigned firstRoot = !(teamRank & 0x1);
-
-        // Pack the messages for the firstPartner
-        int sendOffset = 0;
-        for( int l=0; l<numSteps-step; ++l )
-        {
-            int qrOffset = qrOffsets[l];
-            MPI_Comm thisTeam = _teams->Team(l);
-            const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
-
-            for( int k=0; k<numQRs[l]; ++k )
-            {
-                const int r = ranks[rankOffsets[l]+k];
-                if( firstRoot )
-                {
-                    for( int j=0; j<r; ++j )
-                    {
-                        std::memcpy
-                        ( &sendBuffer[sendOffset],
-                          &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                          (j+1)*sizeof(Scalar) );
-                        sendOffset += j+1;
-                    }
-                }
-                else
-                {
-                    for( int j=0; j<r; ++j )
-                    {
-                        std::memcpy
-                        ( &sendBuffer[sendOffset],
-                          &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)+(j+1)],
-                          (j+1)*sizeof(Scalar) );
-                        sendOffset += j+1;
-                    }
-                }
-                qrOffset += log2ThisTeamSize*(r*r+r);
-            }
-        }
-
-        // Exchange with our first partner
-        mpi::SendRecv
-        ( &sendBuffer[0], msgSize, firstPartner, 0,
-          &recvBuffer[0], msgSize, firstPartner, 0, team );
-
-        if( teamSize == 4 )
-        {
-            // Flip the second bit of our rank in this team to get our partner,
-            // and then check if our bit is 0 to see if we're the root
-            const unsigned secondPartner = teamRank ^ 0x10;
-            const bool secondRoot = !(teamRank & 0x10);
-
-            // Unpack the recv messages, perform the QR factorizations, and
-            // pack the resulting R into the next step and into the next 
-            // send buffer in a single sweep.
-            sendOffset = 0;
-            int recvOffset = 0;
-            for( int l=0; l<numSteps-step; ++l )
-            {
-                int qrOffset = qrOffsets[l];
-                int tauOffset = tauOffsets[l];
-                MPI_Comm thisTeam = _teams->Team(l);
-                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
-
-                for( int k=0; k<numQRs[l]; ++k )
-                {
-                    const int r = ranks[rankOffsets[l]+k];
-
-                    if( firstRoot )
-                    {
-                        // Unpack into the bottom since our data was in the top
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)+(j+1)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
-                            recvOffset += j+1;
-                        }
-                    }
-                    else
-                    {
-                        // Unpack into the top since our data was in the bottom
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
-                            recvOffset += j+1;
-                        }
-                    }
-                    hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
-                      &tauBuffer[tauOffset+(passes+1)*r], &work[0] );
-                    if( secondRoot )
-                    {
-                        // Copy into the upper triangle of the next block
-                        // and into the send buffer
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)],
-                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                              (j+1)*sizeof(Scalar) );
-                            std::memcpy
-                            ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                              (j+1)*sizeof(Scalar) );
-                            sendOffset += j+1;
-                        }
-                    }
-                    else
-                    {
-                        // Copy into the lower triangle of the next block
-                        // and into the send buffer
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)+
-                                        (j+1)],
-                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                              (j+1)*sizeof(Scalar) );
-                            std::memcpy
-                            ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                              (j+1)*sizeof(Scalar) );
-                            sendOffset += j+1;
-                        }
-                    }
-                    qrOffset += log2ThisTeamSize*(r*r+r);
-                    tauOffset += (log2ThisTeamSize+1)*r;
-                }
-            }
-            
-            // Exchange with our second partner
-            mpi::SendRecv
-            ( &sendBuffer[0], msgSize, secondPartner, 0,
-              &recvBuffer[0], msgSize, secondPartner, 0, team );
-            
-            // Unpack the recv messages, perform the QR factorizations, and
-            // pack the resulting R into the next step when necessary.
-            recvOffset = 0;
-            for( int l=0; l<numSteps-step; ++l )
-            {
-                int qrOffset = qrOffsets[l];
-                int tauOffset = tauOffsets[l];
-                MPI_Comm thisTeam = _teams->Team(l);
-                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
-
-                for( int k=0; k<numQRs[l]; ++k )
-                {
-                    const int r = ranks[rankOffsets[l]+k];
-
-                    if( secondRoot )
-                    {
-                        // Unpack into the bottom since our data was in the top
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)+
-                                        (j+1)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
-                            recvOffset += j+1;
-                        }
-                    }
-                    else
-                    {
-                        // Unpack into the top since our data was in the bottom
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
-                            recvOffset += j+1;
-                        }
-                    }
-                    hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset+(passes+1)*(r*r+r)], 
-                      &tauBuffer[tauOffset+(passes+2)*r], &work[0] );
-                    if( haveAnotherComm )
-                    {
-                        if( rootOfNextStep )
-                        {
-                            // Copy into the upper triangle of the next block
-                            for( int j=0; j<r; ++j )
-                                std::memcpy
-                                ( &qrBuffer[qrOffset+(passes+2)*(r*r+r)+
-                                            (j*j+j)],
-                                  &qrBuffer[qrOffset+(passes+1)*(r*r+r)+
-                                            (j*j+j)],
-                                  (j+1)*sizeof(Scalar) );
-                        }
-                        else
-                        {
-                            // Copy into the lower triangle of the next block
-                            for( int j=0; j<r; ++j )
-                                std::memcpy
-                                ( &qrBuffer[qrOffset+(passes+2)*(r*r+r)+
-                                            (j*j+j)+(j+1)],
-                                  &qrBuffer[qrOffset+(passes+1)*(r*r+r)+
-                                            (j*j+j)],
-                                  (j+1)*sizeof(Scalar) );
-                        }
-                    }
-                    qrOffset += log2ThisTeamSize*(r*r+r);
-                    tauOffset += (log2ThisTeamSize+1)*r;
-                }
-            }
-        }
-        else // teamSize == 2
-        {
-            // Unpack the recv messages and perform the QR factorizations
-            int recvOffset = 0;
-            for( int l=0; l<numSteps-step; ++l )
-            {
-                int qrOffset = qrOffsets[l];
-                int tauOffset = tauOffsets[l];
-                MPI_Comm thisTeam = _teams->Team(l);
-                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
-
-                for( int k=0; k<numQRs[l]; ++k )
-                {
-                    const int r = ranks[rankOffsets[l]+k];
-
-                    if( firstRoot )
-                    {
-                        // Unpack into the bottom since our data was in the top
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)+(j+1)],
-                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
-                            recvOffset += j+1;
-                        }
-                    }
-                    else
-                    {
-                        // Unpack into the top since our data was in the bottom
-                        for( int j=0; j<r; ++j )
-                        {
-                            std::memcpy
-                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
-                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
-                            recvOffset += j+1;
-                        }
-                    }
-                    hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
-                      &tauBuffer[tauOffset+(passes+1)*r], &work[0] );
-
-                    qrOffset += log2ThisTeamSize*(r*r+r);
-                    tauOffset += (log2ThisTeamSize+1)*r;
-                }
-            }
-        }
+        MultiplyHMatUpdatesParallelQR
+        ( numQRs, ranks, rankOffsets,
+          qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, work );
     }
 
     // Count the number of entries of R and U that we need to exchange
@@ -1352,6 +1077,310 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
     }
     default:
         break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
+( std::vector<int>& numQRs, 
+  std::vector<int>& ranks, std::vector<int>& rankOffsets, 
+  std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
+  std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+  std::vector<Scalar>& work ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesParallelQR");
+#endif
+    // Perform the combined distributed TSQR factorizations.
+    // This could almost certainly be simplified...
+    const int numTeamLevels = _teams->NumLevels();
+    const int numSteps = numTeamLevels-1;
+    for( int step=0; step<numSteps; ++step )
+    {
+        MPI_Comm team = _teams->Team( step );
+        const int teamSize = mpi::CommSize( team );
+        const unsigned teamRank = mpi::CommRank( team );
+        const bool haveAnotherComm = ( step < numSteps-1 );
+        // only valid result if we have a next step...
+        const bool rootOfNextStep = !(teamRank & 0x100);
+        const int passes = 2*step;
+
+        // Compute the total message size for this step
+        int msgSize = 0;
+        for( int l=0; l<numSteps-step; ++l )
+        {
+            for( int i=0; i<numQRs[l]; ++i )
+            {
+                const int r = ranks[rankOffsets[l]+i];     
+                msgSize += (r*r+r)/2;
+            }
+        }
+        std::vector<Scalar> sendBuffer( msgSize ), recvBuffer( msgSize );
+
+        // Flip the first bit of our rank in this team to get our partner,
+        // and then check if our bit is 0 to see if we're the root
+        const unsigned firstPartner = teamRank ^ 0x1;
+        const unsigned firstRoot = !(teamRank & 0x1);
+
+        // Pack the messages for the firstPartner
+        int sendOffset = 0;
+        for( int l=0; l<numSteps-step; ++l )
+        {
+            int qrOffset = qrOffsets[l];
+            MPI_Comm thisTeam = _teams->Team(l);
+            const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+
+            for( int k=0; k<numQRs[l]; ++k )
+            {
+                const int r = ranks[rankOffsets[l]+k];
+                if( firstRoot )
+                {
+                    for( int j=0; j<r; ++j )
+                    {
+                        std::memcpy
+                        ( &sendBuffer[sendOffset],
+                          &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                          (j+1)*sizeof(Scalar) );
+                        sendOffset += j+1;
+                    }
+                }
+                else
+                {
+                    for( int j=0; j<r; ++j )
+                    {
+                        std::memcpy
+                        ( &sendBuffer[sendOffset],
+                          &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)+(j+1)],
+                          (j+1)*sizeof(Scalar) );
+                        sendOffset += j+1;
+                    }
+                }
+                qrOffset += log2ThisTeamSize*(r*r+r);
+            }
+        }
+
+        // Exchange with our first partner
+        mpi::SendRecv
+        ( &sendBuffer[0], msgSize, firstPartner, 0,
+          &recvBuffer[0], msgSize, firstPartner, 0, team );
+
+        if( teamSize == 4 )
+        {
+            // Flip the second bit of our rank in this team to get our partner,
+            // and then check if our bit is 0 to see if we're the root
+            const unsigned secondPartner = teamRank ^ 0x10;
+            const bool secondRoot = !(teamRank & 0x10);
+
+            // Unpack the recv messages, perform the QR factorizations, and
+            // pack the resulting R into the next step and into the next 
+            // send buffer in a single sweep.
+            sendOffset = 0;
+            int recvOffset = 0;
+            for( int l=0; l<numSteps-step; ++l )
+            {
+                int qrOffset = qrOffsets[l];
+                int tauOffset = tauOffsets[l];
+                MPI_Comm thisTeam = _teams->Team(l);
+                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+
+                for( int k=0; k<numQRs[l]; ++k )
+                {
+                    const int r = ranks[rankOffsets[l]+k];
+
+                    if( firstRoot )
+                    {
+                        // Unpack into the bottom since our data was in the top
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)+(j+1)],
+                              &recvBuffer[recvOffset],
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
+                        }
+                    }
+                    else
+                    {
+                        // Unpack into the top since our data was in the bottom
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                              &recvBuffer[recvOffset],
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
+                        }
+                    }
+                    hmat_tools::PackedQR
+                    ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
+                      &tauBuffer[tauOffset+(passes+1)*r], &work[0] );
+                    if( secondRoot )
+                    {
+                        // Copy into the upper triangle of the next block
+                        // and into the send buffer
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)],
+                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            std::memcpy
+                            ( &sendBuffer[sendOffset],
+                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
+                        }
+                    }
+                    else
+                    {
+                        // Copy into the lower triangle of the next block
+                        // and into the send buffer
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)+
+                                        (j+1)],
+                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            std::memcpy
+                            ( &sendBuffer[sendOffset],
+                              &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                              (j+1)*sizeof(Scalar) );
+                            sendOffset += j+1;
+                        }
+                    }
+                    qrOffset += log2ThisTeamSize*(r*r+r);
+                    tauOffset += (log2ThisTeamSize+1)*r;
+                }
+            }
+            
+            // Exchange with our second partner
+            mpi::SendRecv
+            ( &sendBuffer[0], msgSize, secondPartner, 0,
+              &recvBuffer[0], msgSize, secondPartner, 0, team );
+            
+            // Unpack the recv messages, perform the QR factorizations, and
+            // pack the resulting R into the next step when necessary.
+            recvOffset = 0;
+            for( int l=0; l<numSteps-step; ++l )
+            {
+                int qrOffset = qrOffsets[l];
+                int tauOffset = tauOffsets[l];
+                MPI_Comm thisTeam = _teams->Team(l);
+                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+
+                for( int k=0; k<numQRs[l]; ++k )
+                {
+                    const int r = ranks[rankOffsets[l]+k];
+
+                    if( secondRoot )
+                    {
+                        // Unpack into the bottom since our data was in the top
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)+
+                                        (j+1)],
+                              &recvBuffer[recvOffset],
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
+                        }
+                    }
+                    else
+                    {
+                        // Unpack into the top since our data was in the bottom
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+(passes+1)*(r*r+r)+(j*j+j)],
+                              &recvBuffer[recvOffset],
+                              (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
+                        }
+                    }
+                    hmat_tools::PackedQR
+                    ( r, &qrBuffer[qrOffset+(passes+1)*(r*r+r)], 
+                      &tauBuffer[tauOffset+(passes+2)*r], &work[0] );
+                    if( haveAnotherComm )
+                    {
+                        if( rootOfNextStep )
+                        {
+                            // Copy into the upper triangle of the next block
+                            for( int j=0; j<r; ++j )
+                                std::memcpy
+                                ( &qrBuffer[qrOffset+(passes+2)*(r*r+r)+
+                                            (j*j+j)],
+                                  &qrBuffer[qrOffset+(passes+1)*(r*r+r)+
+                                            (j*j+j)],
+                                  (j+1)*sizeof(Scalar) );
+                        }
+                        else
+                        {
+                            // Copy into the lower triangle of the next block
+                            for( int j=0; j<r; ++j )
+                                std::memcpy
+                                ( &qrBuffer[qrOffset+(passes+2)*(r*r+r)+
+                                            (j*j+j)+(j+1)],
+                                  &qrBuffer[qrOffset+(passes+1)*(r*r+r)+
+                                            (j*j+j)],
+                                  (j+1)*sizeof(Scalar) );
+                        }
+                    }
+                    qrOffset += log2ThisTeamSize*(r*r+r);
+                    tauOffset += (log2ThisTeamSize+1)*r;
+                }
+            }
+        }
+        else // teamSize == 2
+        {
+            // Unpack the recv messages and perform the QR factorizations
+            int recvOffset = 0;
+            for( int l=0; l<numSteps-step; ++l )
+            {
+                int qrOffset = qrOffsets[l];
+                int tauOffset = tauOffsets[l];
+                MPI_Comm thisTeam = _teams->Team(l);
+                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+
+                for( int k=0; k<numQRs[l]; ++k )
+                {
+                    const int r = ranks[rankOffsets[l]+k];
+
+                    if( firstRoot )
+                    {
+                        // Unpack into the bottom since our data was in the top
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)+(j+1)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
+                        }
+                    }
+                    else
+                    {
+                        // Unpack into the top since our data was in the bottom
+                        for( int j=0; j<r; ++j )
+                        {
+                            std::memcpy
+                            ( &qrBuffer[qrOffset+passes*(r*r+r)+(j*j+j)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
+                            recvOffset += j+1;
+                        }
+                    }
+                    hmat_tools::PackedQR
+                    ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
+                      &tauBuffer[tauOffset+(passes+1)*r], &work[0] );
+
+                    qrOffset += log2ThisTeamSize*(r*r+r);
+                    tauOffset += (log2ThisTeamSize+1)*r;
+                }
+            }
+        }
     }
 #ifndef RELEASE
     PopCallStack();

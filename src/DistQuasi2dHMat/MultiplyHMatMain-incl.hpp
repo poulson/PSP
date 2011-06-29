@@ -1095,14 +1095,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     std::vector<int> offsets( numReduces );
     for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A.MultiplyHMatMainSumsPackA( buffer, offsets );
-    B.MultiplyHMatMainSumsPackB( buffer, offsets );
-    A.MultiplyHMatMainSumsPackC( B, C, buffer, offsets );
+    std::vector<int> offsetsCopy = offsets;
+    A.MultiplyHMatMainSumsPackA( buffer, offsetsCopy );
+    B.MultiplyHMatMainSumsPackB( buffer, offsetsCopy );
+    A.MultiplyHMatMainSumsPackC( B, C, buffer, offsetsCopy );
 
-    // Reset the offsets vector and then perform the reduces. There should be
-    // at most log_4(p) reduces.
-    for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
-        offsets[i] = offset;
+    // Perform the reduces with log2(p) messages
     A._teams->TreeSumToRoots( buffer, sizes, offsets );
 
     // Unpack the reduced buffers (only roots of communicators have data)
@@ -3168,14 +3166,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     std::vector<int> offsets( numBroadcasts );
     for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
-    A.MultiplyHMatMainBroadcastsPackA( buffer, offsets );
-    B.MultiplyHMatMainBroadcastsPackB( buffer, offsets );
-    A.MultiplyHMatMainBroadcastsPackC( B, C, buffer, offsets );
+    std::vector<int> offsetsCopy = offsets;
+    A.MultiplyHMatMainBroadcastsPackA( buffer, offsetsCopy );
+    B.MultiplyHMatMainBroadcastsPackB( buffer, offsetsCopy );
+    A.MultiplyHMatMainBroadcastsPackC( B, C, buffer, offsetsCopy );
 
-    // Reset the offsets vector and then perform the broadcasts. There should be
-    // at most log_4(p) broadcasts.
-    for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
-        offsets[i] = offset;
+    // Perform the broadcasts with log2(p) messages
     A._teams->TreeBroadcasts( buffer, sizes, offsets );
 
     // Unpack the broadcasted buffers
