@@ -933,8 +933,7 @@ private:
     void MultiplyHMatUpdatesImportU( int rank, const Dense<Scalar>& U );
     void MultiplyHMatUpdatesImportV( int rank, const Dense<Scalar>& V );
     void MultiplyHMatUpdatesLocalQR
-    ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
-      std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
+    ( std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
     void MultiplyHMatUpdatesParallelQR
@@ -947,11 +946,9 @@ private:
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
     void MultiplyHMatUpdatesExchangePack
     ( std::vector<Scalar>& sendBuffer, std::map<int,int>& sendOffsets,
-      const std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets );
     void MultiplyHMatUpdatesExchangeUnpack
     ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
-      const std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
       const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets );
 
