@@ -1188,24 +1188,48 @@ psp::Quasi2dHMat<Scalar,Conjugated>::UpdateWithNodeSymmetric
 #endif
 }
 
+namespace {
+
+void FillBox
+( std::ofstream& file,
+  double hStart, double vStart, double hStop, double vStop,
+  const std::string& fillColor )
+{
+    file << "\\fill[" << fillColor << "] (" << hStart << "," << vStart
+         << ") rectangle (" << hStop << "," << vStop << ");\n";
+}
+
+void DrawBox
+( std::ofstream& file,
+  double hStart, double vStart, double hStop, double vStop,
+  const std::string& drawColor )
+{
+    file << "\\draw[" << drawColor << "] (" << hStart << "," << vStart
+         << ") rectangle (" << hStop << "," << vStop << ");\n";
+}
+
+} // anonymous namespace
+
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMat<Scalar,Conjugated>::LatexWriteStructureRecursion
 ( std::ofstream& file, int globalHeight ) const
 {
     const double invScale = globalHeight; 
-    const double horzStart = _sourceOffset/invScale;
-    const double horzStop  = (_sourceOffset+Width())/invScale;
-    const double vertStart = (globalHeight-(_targetOffset + Height()))/invScale;
-    const double vertStop  = (globalHeight-_targetOffset)/invScale;
+    const double hStart = _sourceOffset/invScale;
+    const double hStop  = (_sourceOffset+Width())/invScale;
+    const double vStart = (globalHeight-(_targetOffset + Height()))/invScale;
+    const double vStop  = (globalHeight-_targetOffset)/invScale;
+
+    const std::string lowRankColor = "green";
+    const std::string lowRankEmptyColor = "cyan";
+    const std::string denseColor = "red";
+    const std::string borderColor = "black";
+
     switch( _block.type )
     {
     case NODE:
     {
-        /*
-        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
-        */
         const Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
@@ -1215,10 +1239,6 @@ psp::Quasi2dHMat<Scalar,Conjugated>::LatexWriteStructureRecursion
     }
     case NODE_SYMMETRIC:
     {
-        /*
-        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
-        */
         const NodeSymmetric& node = *_block.data.NS;
         for( unsigned child=0; child<node.children.size(); ++child )
             node.children[child]->LatexWriteStructureRecursion
@@ -1226,16 +1246,18 @@ psp::Quasi2dHMat<Scalar,Conjugated>::LatexWriteStructureRecursion
         break;
     }
     case LOW_RANK:
-        file << "\\fill[lightgray] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n"
-             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+    {
+        const int rank = _block.data.F->Rank();
+        if( rank == 0 )
+            FillBox( file, hStart, vStart, hStop, vStop, lowRankEmptyColor );
+        else
+            FillBox( file, hStart, vStart, hStop, vStop, lowRankColor );
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
         break;
+    }
     case DENSE:
-        file << "\\fill[darkgray] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n"
-             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        FillBox( file, hStart, vStart, hStop, vStop, denseColor );
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
         break;
     }
 }

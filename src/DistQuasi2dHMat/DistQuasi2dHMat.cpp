@@ -422,23 +422,53 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
     _block.type = EMPTY;
 }
 
+namespace {
+
+void FillBox
+( std::ofstream& file, 
+  double hStart, double vStart, double hStop, double vStop,
+  const std::string& fillColor )
+{
+    file << "\\fill[" << fillColor << "] (" << hStart << "," << vStart
+         << ") rectangle (" << hStop << "," << vStop << ");\n";
+}
+
+void DrawBox
+( std::ofstream& file, 
+  double hStart, double vStart, double hStop, double vStop,
+  const std::string& drawColor )
+{
+    file << "\\draw[" << drawColor << "] (" << hStart << "," << vStart
+         << ") rectangle (" << hStop << "," << vStop << ");\n";
+}
+
+} // anonymous namespace
+
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::LatexWriteLocalStructureRecursion
 ( std::ofstream& file, int globalHeight ) const
 {
     const double invScale = globalHeight;
-    const double horzStart = _sourceOffset/invScale;
-    const double horzStop  = (_sourceOffset+Width())/invScale;
-    const double vertStart = (globalHeight-(_targetOffset + Height()))/invScale;
-    const double vertStop  = (globalHeight-_targetOffset)/invScale;
+    const double hStart = _sourceOffset/invScale;
+    const double hStop  = (_sourceOffset+Width())/invScale;
+    const double vStart = (globalHeight-(_targetOffset + Height()))/invScale;
+    const double vStop  = (globalHeight-_targetOffset)/invScale;
+
+    const std::string lowRankColor = "green";
+    const std::string lowRankEmptyColor = "cyan";
+    const std::string lowRankGhostColor = "lightgray";
+    const std::string denseColor = "red";
+    const std::string denseGhostColor = "gray";
+    const std::string borderColor = "black";
+
     switch( _block.type )
     {
     case DIST_NODE:
-    case DIST_NODE_GHOST:
     case SPLIT_NODE:
-    case SPLIT_NODE_GHOST:
     case NODE:
+    case DIST_NODE_GHOST:
+    case SPLIT_NODE_GHOST:
     case NODE_GHOST:
     {
         const Node& node = *_block.data.N;
@@ -450,30 +480,39 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LatexWriteLocalStructureRecursion
     }
 
     case DIST_LOW_RANK:
-    case DIST_LOW_RANK_GHOST:
     case SPLIT_LOW_RANK:
-    case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK:
+    {
+        const int rank = Rank();
+        if( rank == 0 )
+            FillBox( file, hStart, vStart, hStop, vStop, lowRankEmptyColor );
+        else
+            FillBox( file, hStart, vStart, hStop, vStop, lowRankColor );
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
+        break;
+    }
+
+    case DIST_LOW_RANK_GHOST:
+    case SPLIT_LOW_RANK_GHOST:
     case LOW_RANK_GHOST:
-        file << "\\fill[lightgray] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n"
-             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        FillBox( file, hStart, vStart, hStop, vStop, lowRankGhostColor );
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
         break;
 
     case SPLIT_DENSE:
-    case SPLIT_DENSE_GHOST:
     case DENSE:
+        FillBox( file, hStart, vStart, hStop, vStop, denseColor );
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
+        break;
+    
+    case SPLIT_DENSE_GHOST:
     case DENSE_GHOST:
-        file << "\\fill[darkgray] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n"
-             << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        FillBox( file, hStart, vStart, hStop, vStop, denseGhostColor );
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
         break;
 
     case EMPTY:
-        file << "\\draw[black] (" << horzStart << "," << vertStart << ") "
-             << "rectangle (" << horzStop << "," << vertStop << ");\n";
+        DrawBox( file, hStart, vStart, hStop, vStop, borderColor );
         break;
     }
 }
