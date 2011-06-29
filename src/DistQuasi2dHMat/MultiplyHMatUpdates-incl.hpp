@@ -77,28 +77,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     tauOffsets[numTeamLevels] = tauTotalSize;
 
     std::vector<Scalar> qrBuffer( qrTotalSize ), tauBuffer( tauTotalSize );
-    std::vector<Scalar> work( lapack::QRWorkSize(maxRank) );
-
-    // Make a disposable copy of the offset vectors and perform the local
-    // QR portions of the (distributed) QRs
     {
+        std::vector<Scalar> qrWork( lapack::QRWorkSize(maxRank) );
         std::vector<int> qrOffsetsCopy, tauOffsetsCopy;
+
+        // Make a disposable copy of the offset vectors and perform the local
+        // QR portions of the (distributed) QRs
         qrOffsetsCopy = qrOffsets;
         tauOffsetsCopy = tauOffsets;
-
         MultiplyHMatUpdatesLocalQR
-        ( qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, work );
-    }
-    
-    // Perform the parallel portion of the TSQR algorithm
-    {
-        std::vector<int> qrOffsetsCopy, tauOffsetsCopy;
+        ( qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
+
+        // Perform the parallel portion of the TSQR algorithm
         qrOffsetsCopy = qrOffsets;
         tauOffsetsCopy = tauOffsets;
-
         MultiplyHMatUpdatesParallelQR
         ( numQRs, ranks, rankOffsets,
-          qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, work );
+          qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
     }
 
     // Count the number of entries of R and U that we need to exchange
@@ -160,8 +155,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
 
-    MultiplyHMatUpdatesExchangeUnpack
-    ( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets );
+    const int maxLocalDim = std::max( LocalHeight(), LocalWidth() );
+    const int maxQHeight = std::max( maxLocalDim, 2*maxRank );
+    std::vector<Scalar>  
+        applyQWork( lapack::ApplyQWorkSize('L',maxQHeight,maxRank) );
+    Dense<Scalar> RU( maxRank, maxRank ), 
+                  RV( maxRank, maxRank ), 
+                  W( 2*maxRank, maxRank );
+    MultiplyHMatUpdatesExchangeFinalize
+    ( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
+      RU, RV, W, applyQWork );
 
     // Don't continue until we know the data was sent
     for( int i=0; i<numSends; ++i )
@@ -902,7 +905,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
 ( std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
   std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-  std::vector<Scalar>& work )
+  std::vector<Scalar>& qrWork )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLocalQR");
@@ -917,7 +920,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesLocalQR
-                ( qrBuffer, qrOffsets, tauBuffer, tauOffsets, work );
+                ( qrBuffer, qrOffsets, tauBuffer, tauOffsets, qrWork );
         break;
     }
     case DIST_LOW_RANK:
@@ -935,10 +938,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             Dense<Scalar>& ULocal = DF.ULocal;
             const int m = ULocal.Height();
             const int r = ULocal.Width();
+            if( r <= MaxRank() )
+                break;
 
             lapack::QR
             ( m, r, ULocal.Buffer(), ULocal.LDim(), 
-              &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+              &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
             std::memset
@@ -971,10 +976,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             Dense<Scalar>& VLocal = DF.VLocal;
             const int n = VLocal.Height();
             const int r = VLocal.Width();
+            if( r <= MaxRank() )
+                break;
 
             lapack::QR
             ( n, r, VLocal.Buffer(), VLocal.LDim(), 
-              &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+              &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
             std::memset
@@ -1017,10 +1024,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
                 Dense<Scalar>& U = SF.D;
                 const int m = U.Height();
                 const int r = U.Width();
+                if( r <= MaxRank() )
+                    break;
 
                 lapack::QR
                 ( m, r, U.Buffer(), U.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+                  &tauBuffer[tauOffsets[teamLevel]], 
+                  &qrWork[0], qrWork.size() );
                 tauOffsets[teamLevel] += r;
             }
             else
@@ -1028,10 +1038,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
                 Dense<Scalar>& V = SF.D;
                 const int n = V.Height();
                 const int r = V.Width();
+                if( r <= MaxRank() )
+                    break;
 
                 lapack::QR
                 ( n, r, V.Buffer(), V.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+                  &tauBuffer[tauOffsets[teamLevel]], 
+                  &qrWork[0], qrWork.size() );
                 tauOffsets[teamLevel] += r;
             }
         }
@@ -1049,15 +1062,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             const int m = U.Height();
             const int n = V.Height();
             const int r = U.Width();
+            if( r <= MaxRank() )
+                break;
 
             lapack::QR
             ( m, r, U.Buffer(), U.LDim(), 
-              &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+              &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += r;
 
             lapack::QR
             ( n, r, V.Buffer(), V.LDim(), 
-              &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
+              &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += r;
         }
         break;
@@ -1077,7 +1092,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
   std::vector<int>& ranks, std::vector<int>& rankOffsets, 
   std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
   std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-  std::vector<Scalar>& work ) const
+  std::vector<Scalar>& qrWork ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesParallelQR");
@@ -1204,7 +1219,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     }
                     hmat_tools::PackedQR
                     ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
-                      &tauBuffer[tauOffset+(passes+1)*r], &work[0] );
+                      &tauBuffer[tauOffset+(passes+1)*r], &qrWork[0] );
                     if( secondRoot )
                     {
                         // Copy into the upper triangle of the next block
@@ -1291,7 +1306,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     }
                     hmat_tools::PackedQR
                     ( r, &qrBuffer[qrOffset+(passes+1)*(r*r+r)], 
-                      &tauBuffer[tauOffset+(passes+2)*r], &work[0] );
+                      &tauBuffer[tauOffset+(passes+2)*r], &qrWork[0] );
                     if( haveAnotherComm )
                     {
                         if( rootOfNextStep )
@@ -1361,7 +1376,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     }
                     hmat_tools::PackedQR
                     ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
-                      &tauBuffer[tauOffset+(passes+1)*r], &work[0] );
+                      &tauBuffer[tauOffset+(passes+1)*r], &qrWork[0] );
 
                     qrOffset += log2ThisTeamSize*(r*r+r);
                     tauOffset += (log2ThisTeamSize+1)*r;
@@ -1400,6 +1415,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
             break;
         const DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
+        if( r <= MaxRank() )
+            break;
+
         if( _inTargetTeam )
         {
             AddToMap( sendSizes, _sourceRoot, (r*r+r)/2 );
@@ -1419,6 +1437,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         const int numDenseUpdates = _DMap.Size();
         if( numDenseUpdates == 0 )
         {
+            if( r <= MaxRank() )
+                break;
+
             const int minUDim = std::min( Height(), r );
             const int minVDim = std::min( Width(), r );
             int packedRUSize = 
@@ -1490,15 +1511,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
     {
         if( _inTargetTeam && _inSourceTeam )
             break;
+        const DistLowRank& DF = *_block.data.DF;
+        const int r = DF.rank;
+        if( r <= MaxRank() )
+            break;
+
         MPI_Comm team = _teams->Team( _level );
         const unsigned teamLevel = _teams->TeamLevel( _level );
         const unsigned teamSize = mpi::CommSize( team );
         const unsigned log2TeamSize = Log2( teamSize );
 
-        const DistLowRank& DF = *_block.data.DF;
-        const int r = DF.rank;
         const Scalar* lastQRChunk = 
             &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+
         const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
         const int sendOffset = sendOffsets[partner];
         for( int j=0; j<r; ++j )
@@ -1515,6 +1540,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         const int numDenseUpdates = _DMap.Size();
         if( numDenseUpdates == 0 )
         {
+            if( r <= MaxRank() )
+                break;
+
             // Pack R
             const int minDim = std::min( SF.D.Height(), r );
 
@@ -1572,15 +1600,102 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
-  const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets )
+  const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+  Dense<Scalar>& RU, Dense<Scalar>& RV, Dense<Scalar>& W, 
+  std::vector<Scalar>& applyQWork )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeUnpack");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeFinalize");
 #endif
-    // TODO
+    switch( _block.type )
+    {
+    case DIST_NODE:
+    case SPLIT_NODE:
+    case NODE:
+    {
+        Node& node = *_block.data.N;
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatUpdatesExchangeFinalize
+                ( recvBuffer, recvOffsets, 
+                  qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
+                  RU, RV, W, applyQWork );
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        if( _inTargetTeam && _inSourceTeam )
+            break;
+        /*
+        const DistLowRank& DF = *_block.data.DF;
+        const int r = DF.rank;
+        if( r <= MaxRank() )
+            break;
+
+        MPI_Comm team = _teams->Team( _level );
+        const unsigned teamLevel = _teams->TeamLevel( _level );
+        const unsigned teamSize = mpi::CommSize( team );
+        const unsigned log2TeamSize = Log2( teamSize );
+
+        const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
+
+        const Scalar* qrSection = &qrBuffer[qrOffsets[teamLevel]];
+
+        const int recvOffset = recvOffsets[partner];
+
+        // TODO: Form RU and RV, then RU RV^[T/H], compute its SVD, and
+        //       then backtransform either the left or right singular 
+        //       vectors that we keep
+
+        recvOffsets[partner] += (r*r+r)/2;
+        */
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        /*
+        const SplitLowRank& SF = *_block.data.SF;
+        const int r = SF.rank;
+        const int numDenseUpdates = _DMap.Size();
+        if( numDenseUpdates == 0 )
+        {
+            if( r <= MaxRank() )
+                break;
+            // TODO
+        }
+        else
+        {
+            if( _inSourceTeam )
+            {
+                // TODO
+            }
+        }
+        */
+        break;
+    }
+    case LOW_RANK:
+    {
+        // TODO
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        if( _inSourceTeam )
+        {
+            // TODO
+        }
+    }
+    case DENSE:
+    {
+        // TODO
+        break;
+    }
+    default:
+        break;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
