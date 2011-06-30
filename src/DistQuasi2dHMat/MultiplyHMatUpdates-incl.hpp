@@ -157,14 +157,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 
     const int maxLocalDim = std::max( LocalHeight(), LocalWidth() );
     const int maxQHeight = std::max( maxLocalDim, 2*maxRank );
-    std::vector<Scalar>  
-        applyQWork( lapack::ApplyQWorkSize('L',maxQHeight,maxRank) );
     Dense<Scalar> RU( maxRank, maxRank ), 
                   RV( maxRank, maxRank ), 
                   W( 2*maxRank, maxRank );
+    std::vector<Real> singularValues( maxRank );
+    std::vector<Scalar>  
+        applyQWork( lapack::ApplyQWorkSize('L',maxQHeight,maxRank) );
+    std::vector<Scalar> svdWork( lapack::SVDWorkSize(maxRank,maxRank) );
+    std::vector<Real> svdRealWork( lapack::SVDRealWorkSize(maxRank,maxRank) );
     MultiplyHMatUpdatesExchangeFinalize
     ( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
-      RU, RV, W, applyQWork );
+      RU, RV, singularValues, W, svdWork, svdRealWork, applyQWork );
 
     // Don't continue until we know the data was sent
     for( int i=0; i<numSends; ++i )
@@ -1604,7 +1607,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
   const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-  Dense<Scalar>& RU, Dense<Scalar>& RV, Dense<Scalar>& W, 
+  Dense<Scalar>& RU, Dense<Scalar>& RV, std::vector<Real>& singularValues, 
+  Dense<Scalar>& W, 
+  std::vector<Scalar>& svdWork, std::vector<Real>& svdRealWork,
   std::vector<Scalar>& applyQWork )
 {
 #ifndef RELEASE
@@ -1622,14 +1627,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 node.Child(t,s).MultiplyHMatUpdatesExchangeFinalize
                 ( recvBuffer, recvOffsets, 
                   qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
-                  RU, RV, W, applyQWork );
+                  RU, RV, singularValues, W, svdWork, svdRealWork, applyQWork );
         break;
     }
     case DIST_LOW_RANK:
     {
         if( _inTargetTeam && _inSourceTeam )
             break;
-        /*
         const DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
         if( r <= MaxRank() )
@@ -1642,16 +1646,38 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
         const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
 
-        const Scalar* qrSection = &qrBuffer[qrOffsets[teamLevel]];
+        //const Scalar* qrSection = &qrBuffer[qrOffsets[teamLevel]];
+        const Scalar* lastQRChunk = 
+            &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
 
         const int recvOffset = recvOffsets[partner];
 
         // TODO: Form RU and RV, then RU RV^[T/H], compute its SVD, and
         //       then backtransform either the left or right singular 
         //       vectors that we keep
+        hmat_tools::Scale( (Scalar)0, RU );
+        for( int j=0; j<r; ++j )
+            std::memcpy
+            ( RU.Buffer(0,j), &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
+        for( int j=0; j<r; ++j )
+            std::memcpy
+            ( RV.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+              (j+1)*sizeof(Scalar) );
+        const char option = ( Conjugated ? 'C' : 'T' );
+        // Overwrite RU with RU RV^[T/H]
+        blas::Trmm
+        ( 'R', 'U', option, 'N', r, r, 
+          1, RV.LockedBuffer(), RV.LDim(), RU.Buffer(), RU.LDim() );
+        // Perform an SVD on RU, overwriting RU with the left singular vectors 
+        // and RV with the right singular vectors.
+        lapack::SVD
+        ( 'O', 'S', r, r, RU.Buffer(), RU.LDim(), 
+          &singularValues[0], 0, 1, RV.Buffer(), RV.LDim(), 
+          &svdWork[0], svdWork.size(), &svdRealWork[0] );
+        // Form the compressed U and V
+        // HERE
 
         recvOffsets[partner] += (r*r+r)/2;
-        */
         break;
     }
     case SPLIT_LOW_RANK:

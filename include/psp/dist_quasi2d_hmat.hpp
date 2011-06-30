@@ -951,7 +951,9 @@ private:
     ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
       const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-      Dense<Scalar>& RU, Dense<Scalar>& RV, Dense<Scalar>& W, 
+      Dense<Scalar>& RU, Dense<Scalar>& RV, std::vector<Real>& singularValues,
+      Dense<Scalar>& W, 
+      std::vector<Scalar>& svdWork, std::vector<Real>& svdRealWork,
       std::vector<Scalar>& applyQWork );
 
     /*
