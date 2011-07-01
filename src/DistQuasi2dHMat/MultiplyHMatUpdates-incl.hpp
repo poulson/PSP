@@ -1527,7 +1527,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
             break;
         }
 
-        const Scalar* lastQRChunk = 
+        const Scalar* lastQRStage = 
             &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
         qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
 
@@ -1536,7 +1536,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         for( int j=0; j<r; ++j )
             std::memcpy
             ( &sendBuffer[sendOffset+(j*j+j)/2], 
-              &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
+              &lastQRStage[j*j+j], (j+1)*sizeof(Scalar) );
         sendOffsets[partner] += (r*r+r)/2;
         break;
     }
@@ -1636,7 +1636,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
     }
     case DIST_LOW_RANK:
     {
-        const DistLowRank& DF = *_block.data.DF;
+        DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
         if( r <= MaxRank() )
             break;
@@ -1644,71 +1644,275 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         MPI_Comm team = _teams->Team( _level );
         const unsigned teamLevel = _teams->TeamLevel( _level );
         const unsigned teamSize = mpi::CommSize( team );
+        const unsigned teamRank = mpi::CommRank( team );
         const unsigned log2TeamSize = Log2( teamSize );
 
+        const Scalar* UQRPiece;
+        const Scalar* VQRPiece;
+        const Scalar* UTauPiece;
+        const Scalar* VTauPiece;
+        const Scalar* lastUQRStage;
+        const Scalar* lastVQRStage;
+        const Scalar* lastUTauStage;
+        const Scalar* lastVTauStage;
+
+        // Set up our pointers and form RU and RV
         if( _inTargetTeam && _inSourceTeam )
         {
-            // HERE
-            // Perform local compression
-            qrOffsets[teamLevel] += 2*log2TeamSize*(r*r+r);
-            break;
-        }
+            UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
+            UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
+            lastUQRStage = 
+                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+            lastUTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+            qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
+            tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
-        const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
+            VQRPiece = &qrBuffer[qrOffsets[teamLevel]];
+            VTauPiece = &tauBuffer[tauOffsets[teamLevel]];
+            lastVQRStage =
+                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+            lastVTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+            qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
+            tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
-        //const Scalar* qrSection = &qrBuffer[qrOffsets[teamLevel]];
-        const Scalar* lastQRChunk = 
-            &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
-        qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
-        const int recvOffset = recvOffsets[partner];
-
-        // Form RU and RV. Only RU needs to be explicitly zeroed below the diag
-        hmat_tools::Scale( (Scalar)0, RU );
-        if( _inTargetTeam )
-        {
+            hmat_tools::Scale( (Scalar)0, RU );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RU.Buffer(0,j), &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
+                ( RU.Buffer(0,j), &lastUQRStage[j*j+j], (j+1)*sizeof(Scalar) );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( RV.Buffer(0,j), &lastVQRStage[j*j+j], (j+1)*sizeof(Scalar) );
+        }
+        else if( _inTargetTeam )
+        {
+            UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
+            UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
+            lastUQRStage = 
+                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+            lastUTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+            qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
+            tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+
+            VQRPiece = 0;
+            VTauPiece = 0;
+            lastVQRStage = 0;
+            lastVTauStage = 0;
+
+            const int recvOffset = recvOffsets[_sourceRoot];
+            hmat_tools::Scale( (Scalar)0, RU );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( RU.Buffer(0,j), &lastUQRStage[j*j+j], 
+                  (j+1)*sizeof(Scalar) );
             for( int j=0; j<r; ++j )
                 std::memcpy
                 ( RV.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                   (j+1)*sizeof(Scalar) );
+            recvOffsets[_sourceRoot] += (r*r+r)/2;
         }
-        else
+        else // _inSourceTeam
         {
+            UQRPiece = 0;
+            UTauPiece = 0;
+            lastUQRStage = 0;
+            lastUTauStage = 0;
+
+            VQRPiece = &qrBuffer[qrOffsets[teamLevel]];
+            VTauPiece = &tauBuffer[tauOffsets[teamLevel]];
+            lastVQRStage = 
+                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+            lastVTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+            qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
+            tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+
+            hmat_tools::Scale( (Scalar)0, RU );
+            const int recvOffset = recvOffsets[_targetRoot];
             for( int j=0; j<r; ++j )
                 std::memcpy
                 ( RU.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                   (j+1)*sizeof(Scalar) );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RV.Buffer(0,j), &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
+                ( RV.Buffer(0,j), &lastVQRStage[j*j+j], 
+                  (j+1)*sizeof(Scalar) );
+            recvOffsets[_targetRoot] += (r*r+r)/2;
         }
-        recvOffsets[partner] += (r*r+r)/2;
 
-        const char option = ( Conjugated ? 'C' : 'T' );
         // Overwrite RU with RU RV^[T/H]
+        const char option = ( Conjugated ? 'C' : 'T' );
         blas::Trmm
         ( 'R', 'U', option, 'N', r, r, 
           1, RV.LockedBuffer(), RV.LDim(), RU.Buffer(), RU.LDim() );
+
         // Perform an SVD on RU, overwriting RU with the left singular 
         // vectors and RV with the right singular vectors.
         lapack::SVD
         ( 'O', 'S', r, r, RU.Buffer(), RU.LDim(), 
           &singularValues[0], 0, 1, RV.Buffer(), RV.LDim(), 
           &svdWork[0], svdWork.size(), &svdRealWork[0] );
-        // HERE
+
+        const int maxRank = MaxRank();
+        W.Resize( 2*r, maxRank );
         if( _inTargetTeam )
         {
-            // Form the compressed U
+            // Form the compressed local portion of U.
 
+            // Copy the first maxRank singular vectors, scaled by the singular 
+            // values, into the top of the W buffer
+            hmat_tools::Scale( (Scalar)0, W );
+            for( int j=0; j<maxRank; ++j )
+            {
+                const Real sigma = singularValues[j];
+                const Scalar* RUCol = RU.LockedBuffer(0,j);
+                Scalar* WCol = W.Buffer(0,j);
+                for( int i=0; i<r; ++i )
+                    WCol[i] = sigma*RUCol[i];
+            }
+
+            // Backtransform the last stage
+            hmat_tools::ApplyPackedQFromLeft
+            ( r, lastUQRStage, lastUTauStage, W, &applyQWork[0] );
+
+            // Backtransform using the middle stages
+            for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
+            {
+                const bool rootOfLastStage = !(teamRank & (1u<<(commStage+1)));
+                if( rootOfLastStage )
+                {
+                    // Zero the bottom half of W
+                    for( int j=0; j<maxRank; ++j )
+                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                }
+                else
+                {
+                    // Move the bottom half to the top half and zero the bottom
+                    for( int j=0; j<maxRank; ++j )
+                    {
+                        std::memcpy
+                        ( W.Buffer(0,j), W.LockedBuffer(r,j), 
+                          r*sizeof(Scalar) );
+                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                    }
+                }
+                hmat_tools::ApplyPackedQFromLeft
+                ( r, &UQRPiece[commStage*(r*r+r)],
+                  &UTauPiece[(commStage+1)*r], W, &applyQWork[0] );
+            }
+
+            // Backtransform using the original stage
+            const int m = DF.ULocal.Height();
+            const int minDim = std::min( m, r );
+            Dense<Scalar> ULocalCopy;
+            hmat_tools::Copy( DF.ULocal, ULocalCopy );
+            DF.ULocal.Resize( m, maxRank );
+            hmat_tools::Scale( (Scalar)0, DF.ULocal );
+            const bool rootOfLastStage = !(teamRank & 0x1);
+            if( rootOfLastStage )
+            {
+                // Copy the first minDim rows of the top half of W into the 
+                // top of ULocal
+                for( int j=0; j<maxRank; ++j )
+                    std::memcpy
+                    ( DF.ULocal.Buffer(0,j), W.LockedBuffer(0,j),
+                      minDim*sizeof(Scalar) );
+            }
+            else
+            {
+                // Copy the first minDim rows of the bottom half of W into
+                // the top of ULocal
+                for( int j=0; j<maxRank; ++j )
+                    std::memcpy
+                    ( DF.ULocal.Buffer(0,j), W.LockedBuffer(0,j),
+                      minDim*sizeof(Scalar) );
+            }
+            lapack::ApplyQ
+            ( 'L', 'N', m, maxRank, minDim, 
+              ULocalCopy.LockedBuffer(), ULocalCopy.LDim(), &UTauPiece[0],
+              DF.ULocal.Buffer(),        DF.ULocal.LDim(),  
+              &applyQWork[0], applyQWork.size() );
         }
-        else
+        if( _inSourceTeam )
         {
-            // Form the compressed V
+            // Form the compressed local portion of V.
 
+            // Copy the first maxRank right singular vectors into the top of
+            // the W buffer
+            hmat_tools::Scale( (Scalar)0, W );
+            for( int j=0; j<maxRank; ++j )
+            {
+                const Scalar* RVRow = RV.LockedBuffer(j,0);
+                const int RVLDim = RV.LDim();
+                Scalar* WCol = W.Buffer(0,j);
+                if( Conjugated )
+                    for( int i=0; i<r; ++i )
+                        WCol[i] = RVRow[i*RVLDim];
+                else
+                    for( int i=0; i<r; ++i )
+                        WCol[i] = Conj(RVRow[i*RVLDim]);
+            }
+
+            // Backtransform the last stage
+            hmat_tools::ApplyPackedQFromLeft
+            ( r, lastVQRStage, lastVTauStage, W, &applyQWork[0] );
+
+            // Backtransform using the middle stages
+            for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
+            {
+                const bool rootOfLastStage = !(teamRank & (1u<<(commStage+1)));
+                if( rootOfLastStage )
+                {
+                    // Zero the bottom half of W
+                    for( int j=0; j<maxRank; ++j )
+                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                }
+                else
+                {
+                    // Move the bottom half to the top half and zero the bottom
+                    for( int j=0; j<maxRank; ++j )
+                    {
+                        std::memcpy
+                        ( W.Buffer(0,j), W.LockedBuffer(r,j), 
+                          r*sizeof(Scalar) );
+                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                    }
+                }
+                hmat_tools::ApplyPackedQFromLeft
+                ( r, &VQRPiece[commStage*(r*r+r)],
+                  &VTauPiece[(commStage+1)*r], W, &applyQWork[0] );
+            }
+
+            // Backtransform using the original stage
+            const int n = DF.VLocal.Height();
+            const int minDim = std::min( n, r );
+            Dense<Scalar> VLocalCopy;
+            hmat_tools::Copy( DF.VLocal, VLocalCopy );
+            DF.VLocal.Resize( n, maxRank );
+            hmat_tools::Scale( (Scalar)0, DF.VLocal );
+            const bool rootOfLastStage = !(teamRank & 0x1);
+            if( rootOfLastStage )
+            {
+                // Copy the first minDim rows of the top half of W into the 
+                // top of VLocal
+                for( int j=0; j<maxRank; ++j )
+                    std::memcpy
+                    ( DF.VLocal.Buffer(0,j), W.LockedBuffer(0,j),
+                      minDim*sizeof(Scalar) );
+            }
+            else
+            {
+                // Copy the first minDim rows of the bottom half of W into
+                // the top of VLocal
+                for( int j=0; j<maxRank; ++j )
+                    std::memcpy
+                    ( DF.VLocal.Buffer(0,j), W.LockedBuffer(0,j),
+                      minDim*sizeof(Scalar) );
+            }
+            lapack::ApplyQ
+            ( 'L', 'N', n, maxRank, minDim, 
+              VLocalCopy.LockedBuffer(), VLocalCopy.LDim(), &VTauPiece[0],
+              DF.VLocal.Buffer(),        DF.VLocal.LDim(),  
+              &applyQWork[0], applyQWork.size() );
         }
-
         break;
     }
     case SPLIT_LOW_RANK:
