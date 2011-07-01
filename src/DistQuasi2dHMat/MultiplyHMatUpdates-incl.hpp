@@ -1512,8 +1512,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
     }
     case DIST_LOW_RANK:
     {
-        if( _inTargetTeam && _inSourceTeam )
-            break;
         const DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
         if( r <= MaxRank() )
@@ -1523,9 +1521,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         const unsigned teamLevel = _teams->TeamLevel( _level );
         const unsigned teamSize = mpi::CommSize( team );
         const unsigned log2TeamSize = Log2( teamSize );
+        if( _inTargetTeam && _inSourceTeam )
+        {
+            qrOffsets[teamLevel] += 2*log2TeamSize*(r*r+r);
+            break;
+        }
 
         const Scalar* lastQRChunk = 
             &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+        qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
 
         const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
         const int sendOffset = sendOffsets[partner];
@@ -1632,8 +1636,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
     }
     case DIST_LOW_RANK:
     {
-        if( _inTargetTeam && _inSourceTeam )
-            break;
         const DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
         if( r <= MaxRank() )
@@ -1644,40 +1646,69 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const unsigned teamSize = mpi::CommSize( team );
         const unsigned log2TeamSize = Log2( teamSize );
 
+        if( _inTargetTeam && _inSourceTeam )
+        {
+            // HERE
+            // Perform local compression
+            qrOffsets[teamLevel] += 2*log2TeamSize*(r*r+r);
+            break;
+        }
+
         const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
 
         //const Scalar* qrSection = &qrBuffer[qrOffsets[teamLevel]];
         const Scalar* lastQRChunk = 
             &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
-
+        qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
         const int recvOffset = recvOffsets[partner];
 
-        // TODO: Form RU and RV, then RU RV^[T/H], compute its SVD, and
-        //       then backtransform either the left or right singular 
-        //       vectors that we keep
+        // Form RU and RV. Only RU needs to be explicitly zeroed below the diag
         hmat_tools::Scale( (Scalar)0, RU );
-        for( int j=0; j<r; ++j )
-            std::memcpy
-            ( RU.Buffer(0,j), &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
-        for( int j=0; j<r; ++j )
-            std::memcpy
-            ( RV.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
-              (j+1)*sizeof(Scalar) );
+        if( _inTargetTeam )
+        {
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( RU.Buffer(0,j), &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( RV.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                  (j+1)*sizeof(Scalar) );
+        }
+        else
+        {
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( RU.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                  (j+1)*sizeof(Scalar) );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( RV.Buffer(0,j), &lastQRChunk[j*j+j], (j+1)*sizeof(Scalar) );
+        }
+        recvOffsets[partner] += (r*r+r)/2;
+
         const char option = ( Conjugated ? 'C' : 'T' );
         // Overwrite RU with RU RV^[T/H]
         blas::Trmm
         ( 'R', 'U', option, 'N', r, r, 
           1, RV.LockedBuffer(), RV.LDim(), RU.Buffer(), RU.LDim() );
-        // Perform an SVD on RU, overwriting RU with the left singular vectors 
-        // and RV with the right singular vectors.
+        // Perform an SVD on RU, overwriting RU with the left singular 
+        // vectors and RV with the right singular vectors.
         lapack::SVD
         ( 'O', 'S', r, r, RU.Buffer(), RU.LDim(), 
           &singularValues[0], 0, 1, RV.Buffer(), RV.LDim(), 
           &svdWork[0], svdWork.size(), &svdRealWork[0] );
-        // Form the compressed U and V
         // HERE
+        if( _inTargetTeam )
+        {
+            // Form the compressed U
 
-        recvOffsets[partner] += (r*r+r)/2;
+        }
+        else
+        {
+            // Form the compressed V
+
+        }
+
         break;
     }
     case SPLIT_LOW_RANK:
