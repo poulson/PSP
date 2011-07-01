@@ -53,17 +53,30 @@ public:
         return *value;
     }
 
+    void Erase( int key )
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::Erase");
+#endif
+        _baseMap.erase( key );
+#ifndef RELEASE
+        PopCallStack();
+#endif
+    }
+
     void EraseLastEntry()
     {
 #ifndef RELEASE
         PushCallStack("MemoryMap::EraseLastEntry");
         if( _currentIndex == 0 )
             throw std::logic_error("Cannot erase entry with negative index");
-        PopCallStack();
 #endif
         --_it;
         --_currentIndex;
         _baseMap.erase( _it++ );
+#ifndef RELEASE
+        PopCallStack();
+#endif
     }
     
     void Clear()

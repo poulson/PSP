@@ -2417,6 +2417,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                       DFA.rank*DFB.rank*sizeof(Scalar) );
                     offsets[A._targetRoot] += DFA.rank*DFB.rank;
                     ZC.Clear();
+                    C._ZMap.Erase( key );
                 }
             }
             break;
@@ -2464,6 +2465,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                   SFA.rank*SFB.rank*sizeof(Scalar) );
                 offsets[A._targetRoot] += SFA.rank*SFB.rank;
                 ZC.Clear();
+                C._ZMap.Erase( key );
             }
             break;
         }
@@ -2482,6 +2484,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                   SFA.rank*FB.Rank()*sizeof(Scalar) );
                 offsets[A._targetRoot] += SFA.rank*FB.Rank();
                 ZC.Clear();
+                C._ZMap.Erase( key );
             }
             break;
         }
@@ -2571,6 +2574,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                   A.Height()*SFB.rank*sizeof(Scalar) );
                 offsets[A._targetRoot] += A.Height()*SFB.rank;
                 ZC.Clear();
+                C._ZMap.Erase( key );
             }
             break;
         }
@@ -2588,6 +2592,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                   A.Height()*FB.Rank()*sizeof(Scalar) );
                 offsets[A._targetRoot] += A.Height()*FB.Rank();
                 ZC.Clear();
+                C._ZMap.Erase( key );
             }
             break;
         }
@@ -3069,18 +3074,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         }
         case SPLIT_DENSE:
+        {
             // Pass data for D/F += D D
-            if( B._inSourceTeam && A.Height() != 0 && A.Width() != 0 )
+            const int m = A.Height();    
+            const int k = A.Width();
+            if( m != 0 && k != 0 )
             {
-                C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
-                Dense<Scalar>& DC = *C._DMap[key];
+                if( C._inSourceTeam )
+                {
+                    C._DMap[key] = new Dense<Scalar>( m, k );
+                    Dense<Scalar>& DC = *C._DMap[key];
 
-                std::memcpy
-                ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
-                  A.Height()*A.Width()*sizeof(Scalar) );
-                offsets[B._targetRoot] += A.Height()*A.Width();
+                    std::memcpy
+                    ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                      m*k*sizeof(Scalar) );
+                    offsets[B._targetRoot] += m*k;
+                }
+                else
+                {
+                    // Create a placeholder for the dense update so that our
+                    // process knows how many there are
+                    C._DMap[key] = new Dense<Scalar>;
+                }
             }
             break;
+        }
         case SPLIT_DENSE_GHOST:
         case DENSE:
         case DENSE_GHOST:
@@ -3103,15 +3121,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         case SPLIT_DENSE:
         {
-            if( A.Height() != 0 && A.Width() != 0 )
+            const int m = A.Height();
+            const int k = A.Width();
+            if( m != 0 && k != 0 )
             {
-                C._DMap[key] = new Dense<Scalar>( A.Height(), A.Width() );
+                C._DMap[key] = new Dense<Scalar>( m, k );
                 Dense<Scalar>& DC = *C._DMap[key];
 
                 std::memcpy
                 ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
-                  A.Height()*A.Width()*sizeof(Scalar) );
-                offsets[B._targetRoot] += A.Height()*A.Width();
+                  m*k*sizeof(Scalar) );
+                offsets[B._targetRoot] += m*k; 
             }
             break;
         }
@@ -3794,6 +3814,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             A.MultiplyDensePostcompute
             ( *C._mainContextMap[key], alpha, DFB.ULocal, *C._UMap[key] );
             C._mainContextMap[key]->Clear();
+            C._mainContextMap.Erase( key );
             if( C._inSourceTeam )
             {
                 C._VMap[key] = new Dense<Scalar>;
@@ -3808,6 +3829,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             A.MultiplyDensePostcompute
             ( *C._mainContextMap[key], alpha, dummy, *C._UMap[key] );
             C._mainContextMap[key]->Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         default:
@@ -3861,6 +3883,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 hmat_tools::Copy( SFB.D, *C._VMap[key] );
             }
             C._mainContextMap[key]->Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         case SPLIT_LOW_RANK_GHOST:
@@ -3872,6 +3895,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             A.MultiplyDensePostcompute
             ( *C._mainContextMap[key], alpha, dummy, *C._UMap[key] );
             C._mainContextMap[key]->Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         case LOW_RANK:
@@ -3891,6 +3915,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             A.MultiplyDensePostcompute
             ( *C._mainContextMap[key], alpha, dummy, *C._UMap[key] );
             C._mainContextMap[key]->Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         default:
@@ -3970,6 +3995,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 B.TransposeMultiplyDensePostcompute
                 ( context, alpha, DFA.VLocal, *C._VMap[key] );
             context.Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         case DIST_NODE_GHOST:
@@ -3991,6 +4017,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                          ZC.LockedBuffer(),         ZC.LDim(),
               (Scalar)0, UC.Buffer(),               UC.LDim() );
             ZC.Clear();
+            C._ZMap.Erase( key );
             hmat_tools::Copy( DFB.VLocal, *C._VMap[key] );
             break;
         }
@@ -4006,6 +4033,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                          ZC.LockedBuffer(),         ZC.LDim(),
               (Scalar)0, UC.Buffer(),               UC.LDim() );
             ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         default:
@@ -4032,6 +4060,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 B.TransposeMultiplyDensePostcompute
                 ( context, alpha, dummy, *C._VMap[key] );
             context.Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         case DIST_LOW_RANK:
@@ -4070,6 +4099,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                     B.TransposeMultiplyDensePostcompute
                     ( context, alpha, dummy, *C._VMap[key] );
                 context.Clear();
+                C._mainContextMap.Erase( key );
             }
             break;
         case SPLIT_NODE_GHOST:
@@ -4101,6 +4131,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                              ZC.LockedBuffer(),    ZC.LDim(),
                   (Scalar)0, UC.Buffer(),          UC.LDim() );
                 ZC.Clear();
+                C._ZMap.Erase( key );
                 hmat_tools::Copy( SFB.D, *C._VMap[key] );
             }
             break;
@@ -4117,6 +4148,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                          ZC.LockedBuffer(),    ZC.LDim(),
               (Scalar)0, UC.Buffer(),          UC.LDim() );
             ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         case LOW_RANK:
@@ -4140,6 +4172,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                          ZC.LockedBuffer(),    ZC.LDim(),
               (Scalar)0, UC.Buffer(),          UC.LDim() );
             ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         case SPLIT_DENSE:
@@ -4165,6 +4198,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                                  ZC.LockedBuffer(),    ZC.LDim(),
                       (Scalar)0, VC.Buffer(),          VC.LDim() );
                 ZC.Clear();
+                C._ZMap.Erase( key );
             }
             break;
         case SPLIT_DENSE_GHOST:
@@ -4205,6 +4239,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 B.TransposeMultiplyDensePostcompute
                 ( context, alpha, dummy, *C._VMap[key] );
             context.Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         case SPLIT_LOW_RANK:
@@ -4233,6 +4268,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                              ZC.LockedBuffer(),    ZC.LDim(),
                   (Scalar)0, VC.Buffer(),          VC.LDim() );
             ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         default:
@@ -4327,6 +4363,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 B.TransposeMultiplyDensePostcompute
                 ( context, alpha, dummy, *C._VMap[key] );
             context.Clear();
+            C._mainContextMap.Erase( key );
             break;
         }
         case SPLIT_LOW_RANK:
@@ -4355,6 +4392,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                              ZC.LockedBuffer(),    ZC.LDim(),
                   (Scalar)0, VC.Buffer(),          VC.LDim() );
             ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         default:
@@ -4430,6 +4468,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                       (Scalar)1, D.Buffer(),           D.LDim() );
                 }
                 DC.Clear();
+                C._DMap.Erase( key );
             }
             break;
         case SPLIT_DENSE_GHOST:
@@ -4484,6 +4523,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                   (Scalar)1, D.Buffer(),           D.LDim() );
             }
             DC.Clear();
+            C._DMap.Erase( key );
             break;
         }
         default:
@@ -4531,6 +4571,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                   (Scalar)1, D.Buffer(),           D.LDim() );
             }
             DC.Clear();
+            C._DMap.Erase( key );
             break;
         }
         default:
@@ -4559,6 +4600,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeCCleanup()
     DistQuasi2dHMat<Scalar,Conjugated>& C = *this;
     C._mainContextMap.Clear();
     C._ZMap.Clear();
+
+    // Collapse the dense updates into 1 if there are 2 or more
+    const int numDenseUpdates = C._DMap.Size();
+    if( numDenseUpdates > 1 )
+    {
+        if( C._inSourceTeam )
+        {
+            const int m = Height();
+            const int n = Width();
+            C._DMap.ResetIterator();
+            Dense<Scalar>& DC = *C._DMap.NextEntry();
+            for( int update=1; update<numDenseUpdates; ++update )
+            {
+                Dense<Scalar>& DCUpdate = *C._DMap.NextEntry();
+                for( int j=0; j<n; ++j )
+                {
+                    const Scalar* updateCol = DCUpdate.LockedBuffer(0,j);
+                    Scalar* DCol = DC.Buffer(0,j);
+                    for( int i=0; i<m; ++i )
+                        DCol[i] += updateCol[i];
+                }
+                C._DMap.EraseLastEntry();
+            }
+        }
+        else
+        {
+            // Clear out all but the first placeholder for a dense update
+            C._DMap.ResetIterator();
+            C._DMap.NextEntry();
+            for( int update=1; update<numDenseUpdates; ++update )
+            {
+                C._DMap.NextEntry();
+                C._DMap.EraseLastEntry();
+            }
+        }
+    }
 
     switch( C._block.type )
     {

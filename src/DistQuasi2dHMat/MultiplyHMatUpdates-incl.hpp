@@ -96,7 +96,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
           qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
     }
 
-    // Count the number of entries of R and U that we need to exchange
+    // Count the number of entries of R and U that we need to exchange.
+    // We also need to exchange U, V, and the dense update when performing
+    // F += D, where the F is split.
     std::map<int,int> sendSizes, recvSizes;
     MultiplyHMatUpdatesExchangeCount( sendSizes, recvSizes );
 
@@ -1464,11 +1466,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         }
         else
         {
-            // Count the send/recv U sizes
+            // Factor in exchanging all info needed for both processes to
+            // locally finish their updates. 
+            const int m = Height();
+            const int n = Width();
             if( _inTargetTeam )
-                AddToMap( sendSizes, _sourceRoot, Height()*SF.rank );
+            {
+                AddToMap( sendSizes, _sourceRoot, m*SF.rank );
+                AddToMap( recvSizes, _sourceRoot, n*SF.rank + m*n );
+            }
             else
-                AddToMap( recvSizes, _targetRoot, Height()*SF.rank );
+            {
+                AddToMap( sendSizes, _targetRoot, n*SF.rank + m*n );
+                AddToMap( recvSizes, _targetRoot, m*SF.rank );
+            }
         }
         break;
     }
@@ -1571,13 +1582,39 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         {
             if( _inTargetTeam )
             {
-                const int height = Height();
+                const int m = Height();
                 const int sendOffset = sendOffsets[_sourceRoot];
+
+                // Copy U into the send buffer
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( &sendBuffer[sendOffset+j*height],
-                      SF.D.LockedBuffer(0,j), height*sizeof(Scalar) );
-                sendOffsets[_sourceRoot] += height*r;
+                    ( &sendBuffer[sendOffset+j*m],
+                      SF.D.LockedBuffer(0,j), m*sizeof(Scalar) );
+
+                sendOffsets[_sourceRoot] += m*r;
+            }
+            else
+            {
+                const int m = Height();
+                const int n = Width();
+
+                // Copy V into the send buffer
+                int sendOffset = sendOffsets[_targetRoot];
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( &sendBuffer[sendOffset+j*n],
+                      SF.D.LockedBuffer(0,j), n*sizeof(Scalar) );
+
+                // Copy the condensed dense update into the send buffer
+                sendOffset += n*r;
+                _DMap.ResetIterator();
+                const Dense<Scalar>& D = *_DMap.NextEntry();
+                for( int j=0; j<n; ++j )
+                    std::memcpy
+                    ( &sendBuffer[sendOffset+j*m], D.LockedBuffer(0,j),
+                      m*sizeof(Scalar) );
+
+                sendOffsets[_targetRoot] += n*r + m*n;
             }
         }
         break;
@@ -2052,9 +2089,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         }
         else
         {
+            // HERE: The target team unpacks V and the dense update, while
+            //       the source team unpacks U.
+
             if( _inSourceTeam )
             {
-                // TODO
+                const int m = Height();
+                const int n = Width();
+
+                _DMap.ResetIterator();
+                Dense<Scalar>& D = *_DMap.NextEntry();
+
                 // Form U and V, combine all of the dense updates into one,
                 // add U V^[T/H] onto it, perform an SVD, truncate, and 
                 // form low-rank approximation
