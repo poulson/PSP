@@ -2274,7 +2274,188 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
     }
     case LOW_RANK:
     {
-        // TODO
+        LowRank<Scalar,Conjugated>& F = *_block.data.F;
+        const int r = F.Rank();
+        const int minDimU = std::min( Height(), r );
+        const int minDimV = std::min( Width(), r );
+        const int numDenseUpdates = _DMap.Size();
+        const unsigned teamLevel = _teams->TeamLevel( _level );
+
+        if( numDenseUpdates == 0 )
+        {
+            if( r <= MaxRank() )
+                break;
+
+            // Form R_U and R_V
+            X.Resize( r, r );
+            Y.Resize( r, r );
+            const Scalar* tauPiece = &tauBuffer[tauOffsets[teamLevel]];
+            tauOffsets[teamLevel] += minDimU;
+
+            hmat_tools::Scale( (Scalar)0, X );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( X.Buffer(0,j), F.U.LockedBuffer(0,j), 
+                  std::min(minDimU,j+1)*sizeof(Scalar) );
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( Y.Buffer(0,j), F.V.LockedBuffer(0,j),
+                  std::min(minDimV,j+1)*sizeof(Scalar) );
+
+            // Overwrite X with R_U R_V^[T/H]
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Trmm
+            ( 'R', 'U', option, 'N', r, r, 
+              1, Y.LockedBuffer(), Y.LDim(), X.Buffer(), X.LDim() );
+
+            const int maxRank = MaxRank();
+            Z.Resize( 2*r, maxRank );
+            hmat_tools::Scale( (Scalar)0, Z );
+            singularValues.resize( r );
+            work.resize( lapack::SVDWorkSize(r,r) );
+            realWork.resize( lapack::SVDRealWorkSize(r,r) );
+
+            // Perform an SVD on X, overwriting X with the left singular 
+            // vectors, and Y with the adjoint of the right singular vectors.
+            lapack::SVD
+            ( 'O', 'S', r, r, X.Buffer(), X.LDim(), 
+              &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
+              &work[0], work.size(), &realWork[0] );
+
+            // Backtransform U
+            const int m = F.Height();
+            hmat_tools::Copy( F.U, Z );
+            F.U.Resize( m, maxRank );
+            hmat_tools::Scale( (Scalar)0, F.U );
+            // Copy the first maxRank singular vectors, scaled by the 
+            // singular values, into the top of the F.U buffer
+            for( int j=0; j<maxRank; ++j )
+            {
+                const Real sigma = singularValues[j];
+                const Scalar* XCol = X.LockedBuffer(0,j);
+                Scalar* UCol = F.U.Buffer(0,j);
+                for( int i=0; i<r; ++i )
+                    UCol[i] = sigma*XCol[i];
+            }
+
+            work.resize( lapack::ApplyQWorkSize('L',m,maxRank) );
+            lapack::ApplyQ
+            ( 'L', 'N', m, maxRank, minDimU,
+              Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+              F.U.Buffer(), F.U.LDim(),  
+              &work[0], work.size() );
+
+            // Backtransform V
+            const int n = F.Width();
+            hmat_tools::Copy( F.V, Z );
+            F.V.Resize( n, maxRank );
+            hmat_tools::Scale( (Scalar)0, F.V );
+            // Copy the first maxRank right singular vectors into the 
+            // top of the F.V buffer
+            for( int j=0; j<maxRank; ++j )
+            {
+                const Real sigma = singularValues[j];
+                const Scalar* YRow = Y.LockedBuffer(j,0);
+                const int YLDim = Y.LDim();
+                Scalar* VCol = F.V.Buffer(0,j);
+                if( Conjugated )
+                    for( int i=0; i<r; ++i )
+                        VCol[i] = YRow[i*YLDim];
+                else
+                    for( int i=0; i<r; ++i )
+                        VCol[i] = Conj(YRow[i*YLDim]);
+            }
+
+            work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
+            lapack::ApplyQ
+            ( 'L', 'N', n, maxRank, minDimV,
+              Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+              F.V.Buffer(), F.V.LDim(),  
+              &work[0], work.size() );
+        }
+        else
+        {
+            const int m = F.Height();
+            const int n = F.Width();
+            const int minDim = std::min( m, n );
+            const int maxRank = MaxRank();
+
+            // Add U V^[T/H] onto the dense update
+            _DMap.ResetIterator();
+            Dense<Scalar>& D = *_DMap.NextEntry();
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( 'N', option, m, n, r, 
+              (Scalar)1, F.U.LockedBuffer(), F.U.LDim(),
+                         F.V.LockedBuffer(), F.V.LDim(),
+              (Scalar)1, D.Buffer(),         D.LDim() );
+
+            if( minDim <= maxRank )
+            {
+                if( m == minDim )
+                {
+                    // Make U := I and V := Z^[T/H]
+                    F.U.Resize( minDim, minDim );
+                    hmat_tools::Scale( (Scalar)0, F.U );
+                    for( int j=0; j<minDim; ++j )
+                        F.U.Set(j,j,(Scalar)1);
+                    if( Conjugated )
+                        hmat_tools::Adjoint( Z, F.V );
+                    else
+                        hmat_tools::Transpose( Z, F.V );
+                }
+                else
+                {
+                    // Make U := Z and V := I
+                    hmat_tools::Copy( Z, F.U );
+                    F.V.Resize( minDim, minDim );
+                    hmat_tools::Scale( (Scalar)0, F.V );
+                    for( int j=0; j<minDim; ++j )
+                        F.V.Set(j,j,(Scalar)1);
+                }
+            }
+            else // minDim > maxRank
+            {
+                // Perform an SVD on the dense matrix, overwriting it with
+                // the left singular vectors and Y with the adjoint of the 
+                // right singular vecs
+                singularValues.resize( minDim );
+                work.resize( lapack::SVDWorkSize(m,n) );
+                realWork.resize( lapack::SVDRealWorkSize(m,n) );
+                lapack::SVD
+                ( 'O', 'S', m, n, Z.Buffer(), Z.LDim(), 
+                  &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
+                  &work[0], work.size(), &realWork[0] );
+
+                // Form U with the truncated left singular vectors scaled
+                // by the corresponding singular values
+                F.U.Resize( m, maxRank );
+                for( int j=0; j<maxRank; ++j )
+                {
+                    Scalar* FUCol = F.U.Buffer(0,j);
+                    const Scalar* UCol = Z.Buffer(0,j);
+                    const Real sigma = singularValues[j];
+                    for( int i=0; i<m; ++i )
+                        FUCol[i] = sigma*UCol[i];
+                }
+
+                // Form V with the truncated right singular vectors
+                F.V.Resize( n, maxRank );
+                for( int j=0; j<maxRank; ++j )
+                {
+                    Scalar* FVCol = F.V.Buffer(0,j);
+                    const Scalar* VRow = Y.Buffer(j,0);
+                    const int VLDim = Y.LDim();
+                    if( Conjugated )
+                        for( int i=0; i<n; ++i )
+                            FVCol[i] = VRow[i*VLDim];
+                    else
+                        for( int i=0; i<n; ++i )
+                            FVCol[i] = Conj(VRow[i*VLDim]);
+                }
+            }
+            _DMap.Clear();
+        }
         break;
     }
     case SPLIT_DENSE:
