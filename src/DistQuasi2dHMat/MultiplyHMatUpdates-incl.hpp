@@ -157,19 +157,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
 
-    const int maxLocalDim = std::max( LocalHeight(), LocalWidth() );
-    const int maxQHeight = std::max( maxLocalDim, 2*maxRank );
-    Dense<Scalar> RU( maxRank, maxRank ), 
-                  RV( maxRank, maxRank ), 
-                  W( 2*maxRank, maxRank );
-    std::vector<Real> singularValues( maxRank );
-    std::vector<Scalar>  
-        applyQWork( lapack::ApplyQWorkSize('L',maxQHeight,maxRank) );
-    std::vector<Scalar> svdWork( lapack::SVDWorkSize(maxRank,maxRank) );
-    std::vector<Real> svdRealWork( lapack::SVDRealWorkSize(maxRank,maxRank) );
+    Dense<Scalar> X, Y, Z;
+    std::vector<Real> singularValues, realWork;
+    std::vector<Scalar> work;
     MultiplyHMatUpdatesExchangeFinalize
     ( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
-      RU, RV, singularValues, W, svdWork, svdRealWork, applyQWork );
+      X, Y, Z, singularValues, work, realWork );
 
     // Don't continue until we know the data was sent
     for( int i=0; i<numSends; ++i )
@@ -389,7 +382,8 @@ MultiplyHMatUpdatesLowRankCountAndResize
                 rank += _UMap.NextEntry()->Width();
         }
 
-        // Create the space and store the updates if there is no dense update
+        // Create the space and store the updates. If there are no dense 
+        // updates, then mark two more matrices for QR factorization.
         {
             if( numDenseUpdates == 0 )
             {
@@ -1648,10 +1642,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
   const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-  Dense<Scalar>& RU, Dense<Scalar>& RV, std::vector<Real>& singularValues, 
-  Dense<Scalar>& W, 
-  std::vector<Scalar>& svdWork, std::vector<Real>& svdRealWork,
-  std::vector<Scalar>& applyQWork )
+  Dense<Scalar>& X, Dense<Scalar>& Y, Dense<Scalar>& Z,
+  std::vector<Real>& singularValues, 
+  std::vector<Scalar>& work, std::vector<Real>& realWork )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeFinalize");
@@ -1668,7 +1661,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 node.Child(t,s).MultiplyHMatUpdatesExchangeFinalize
                 ( recvBuffer, recvOffsets, 
                   qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
-                  RU, RV, singularValues, W, svdWork, svdRealWork, applyQWork );
+                  X, Y, Z, singularValues, work, realWork );
         break;
     }
     case DIST_LOW_RANK:
@@ -1693,7 +1686,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const Scalar* lastUTauStage;
         const Scalar* lastVTauStage;
 
-        // Set up our pointers and form RU and RV
+        // Set up our pointers and form R_U and R_V in X and Y
+        X.Resize( r, r );
+        Y.Resize( r, r );
         if( _inTargetTeam && _inSourceTeam )
         {
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
@@ -1712,13 +1707,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
-            hmat_tools::Scale( (Scalar)0, RU );
+            hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RU.Buffer(0,j), &lastUQRStage[j*j+j], (j+1)*sizeof(Scalar) );
+                ( X.Buffer(0,j), &lastUQRStage[j*j+j], (j+1)*sizeof(Scalar) );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RV.Buffer(0,j), &lastVQRStage[j*j+j], (j+1)*sizeof(Scalar) );
+                ( Y.Buffer(0,j), &lastVQRStage[j*j+j], (j+1)*sizeof(Scalar) );
         }
         else if( _inTargetTeam )
         {
@@ -1736,14 +1731,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             lastVTauStage = 0;
 
             const int recvOffset = recvOffsets[_sourceRoot];
-            hmat_tools::Scale( (Scalar)0, RU );
+            hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RU.Buffer(0,j), &lastUQRStage[j*j+j], 
+                ( X.Buffer(0,j), &lastUQRStage[j*j+j], 
                   (j+1)*sizeof(Scalar) );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RV.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                ( Y.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                   (j+1)*sizeof(Scalar) );
             recvOffsets[_sourceRoot] += (r*r+r)/2;
         }
@@ -1762,53 +1757,80 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
-            hmat_tools::Scale( (Scalar)0, RU );
+            hmat_tools::Scale( (Scalar)0, X );
             const int recvOffset = recvOffsets[_targetRoot];
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RU.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                ( X.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                   (j+1)*sizeof(Scalar) );
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( RV.Buffer(0,j), &lastVQRStage[j*j+j], 
+                ( Y.Buffer(0,j), &lastVQRStage[j*j+j], 
                   (j+1)*sizeof(Scalar) );
             recvOffsets[_targetRoot] += (r*r+r)/2;
         }
 
-        // Overwrite RU with RU RV^[T/H]
+        // Overwrite X with R_U R_V^[T/H]
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Trmm
         ( 'R', 'U', option, 'N', r, r, 
-          1, RV.LockedBuffer(), RV.LDim(), RU.Buffer(), RU.LDim() );
+          1, Y.LockedBuffer(), Y.LDim(), X.Buffer(), X.LDim() );
 
-        // Perform an SVD on RU, overwriting RU with the left singular 
-        // vectors and RV with the adjoint of the right singular vectors.
-        lapack::SVD
-        ( 'O', 'S', r, r, RU.Buffer(), RU.LDim(), 
-          &singularValues[0], 0, 1, RV.Buffer(), RV.LDim(), 
-          &svdWork[0], svdWork.size(), &svdRealWork[0] );
+        singularValues.resize( r );
+        work.resize( lapack::SVDWorkSize(r,r) );
+        realWork.resize( lapack::SVDRealWorkSize(r,r) );
+        if( _inTargetTeam && _inSourceTeam )
+        {
+            // Perform an SVD on X, overwriting X with the left singular 
+            // vectors and Y with the adjoint of the right singular vectors.
+            lapack::SVD
+            ( 'O', 'S', r, r, X.Buffer(), X.LDim(), 
+              &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
+              &work[0], work.size(), &realWork[0] );
+        }
+        else if( _inTargetTeam )
+        {
+            // Perform an SVD on X, overwriting X with the left singular 
+            // vectors.
+            lapack::SVD
+            ( 'O', 'N', r, r, X.Buffer(), X.LDim(), 
+              &singularValues[0], 0, 1, 0, 1, 
+              &work[0], work.size(), &realWork[0] );
+        }
+        else // _inSourceTeam
+        {
+            // Perform an SVD on X, overwriting X with the adjoint of the
+            // right singular vectors. Copy X into Y so that we do not have
+            // to check whether they are in Y or X.
+            lapack::SVD
+            ( 'N', 'O', r, r, X.Buffer(), X.LDim(), 
+              &singularValues[0], 0, 1, 0, 1, 
+              &work[0], work.size(), &realWork[0] );
+            hmat_tools::Copy( X, Y );
+        }
 
         const int maxRank = MaxRank();
-        W.Resize( 2*r, maxRank );
+        Z.Resize( 2*r, maxRank );
         if( _inTargetTeam )
         {
             // Form the compressed local portion of U.
 
             // Copy the first maxRank singular vectors, scaled by the singular 
-            // values, into the top of the W buffer
-            hmat_tools::Scale( (Scalar)0, W );
+            // values, into the top of the Z buffer
+            hmat_tools::Scale( (Scalar)0, Z );
             for( int j=0; j<maxRank; ++j )
             {
                 const Real sigma = singularValues[j];
-                const Scalar* RUCol = RU.LockedBuffer(0,j);
-                Scalar* WCol = W.Buffer(0,j);
+                const Scalar* XCol = X.LockedBuffer(0,j);
+                Scalar* ZCol = Z.Buffer(0,j);
                 for( int i=0; i<r; ++i )
-                    WCol[i] = sigma*RUCol[i];
+                    ZCol[i] = sigma*XCol[i];
             }
 
             // Backtransform the last stage
+            work.resize( lapack::ApplyQWorkSize('L',2*r,r) );
             hmat_tools::ApplyPackedQFromLeft
-            ( r, lastUQRStage, lastUTauStage, W, &applyQWork[0] );
+            ( r, lastUQRStage, lastUTauStage, Z, &work[0] );
 
             // Backtransform using the middle stages
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
@@ -1816,9 +1838,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 const bool rootOfLastStage = !(teamRank & (1u<<(commStage+1)));
                 if( rootOfLastStage )
                 {
-                    // Zero the bottom half of W
+                    // Zero the bottom half of Z 
                     for( int j=0; j<maxRank; ++j )
-                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
                 }
                 else
                 {
@@ -1826,71 +1848,72 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     for( int j=0; j<maxRank; ++j )
                     {
                         std::memcpy
-                        ( W.Buffer(0,j), W.LockedBuffer(r,j), 
+                        ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
                           r*sizeof(Scalar) );
-                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
                     }
                 }
                 hmat_tools::ApplyPackedQFromLeft
                 ( r, &UQRPiece[commStage*(r*r+r)],
-                  &UTauPiece[(commStage+1)*r], W, &applyQWork[0] );
+                  &UTauPiece[(commStage+1)*r], Z, &work[0] );
             }
 
             // Backtransform using the original stage
             const int m = DF.ULocal.Height();
             const int minDim = std::min( m, r );
-            Dense<Scalar> ULocalCopy;
-            hmat_tools::Copy( DF.ULocal, ULocalCopy );
+            hmat_tools::Copy( DF.ULocal, X );
             DF.ULocal.Resize( m, maxRank );
             hmat_tools::Scale( (Scalar)0, DF.ULocal );
             const bool rootOfLastStage = !(teamRank & 0x1);
             if( rootOfLastStage )
             {
-                // Copy the first minDim rows of the top half of W into the 
+                // Copy the first minDim rows of the top half of Z into the 
                 // top of ULocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.ULocal.Buffer(0,j), W.LockedBuffer(0,j),
+                    ( DF.ULocal.Buffer(0,j), Z.LockedBuffer(0,j),
                       minDim*sizeof(Scalar) );
             }
             else
             {
-                // Copy the first minDim rows of the bottom half of W into
+                // Copy the first minDim rows of the bottom half of Z into
                 // the top of ULocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.ULocal.Buffer(0,j), W.LockedBuffer(0,j),
+                    ( DF.ULocal.Buffer(0,j), Z.LockedBuffer(0,j),
                       minDim*sizeof(Scalar) );
             }
+            work.resize( lapack::ApplyQWorkSize('L',m,maxRank) );
             lapack::ApplyQ
             ( 'L', 'N', m, maxRank, minDim, 
-              ULocalCopy.LockedBuffer(), ULocalCopy.LDim(), &UTauPiece[0],
-              DF.ULocal.Buffer(),        DF.ULocal.LDim(),  
-              &applyQWork[0], applyQWork.size() );
+              X.LockedBuffer(), X.LDim(), &UTauPiece[0],
+              DF.ULocal.Buffer(), DF.ULocal.LDim(),  
+              &work[0], work.size() );
         }
         if( _inSourceTeam )
         {
             // Form the compressed local portion of V.
 
             // Copy the first maxRank right singular vectors into the top of
-            // the W buffer
-            hmat_tools::Scale( (Scalar)0, W );
+            // the Z buffer
+            hmat_tools::Scale( (Scalar)0, Z );
             for( int j=0; j<maxRank; ++j )
             {
-                const Scalar* RVRow = RV.LockedBuffer(j,0);
-                const int RVLDim = RV.LDim();
-                Scalar* WCol = W.Buffer(0,j);
+                const Scalar* YRow = Y.LockedBuffer(j,0);
+                const int YLDim = Y.LDim();
+                Scalar* ZCol = Z.Buffer(0,j);
                 if( Conjugated )
                     for( int i=0; i<r; ++i )
-                        WCol[i] = RVRow[i*RVLDim];
+                        ZCol[i] = YRow[i*YLDim];
                 else
                     for( int i=0; i<r; ++i )
-                        WCol[i] = Conj(RVRow[i*RVLDim]);
+                        ZCol[i] = Conj(YRow[i*YLDim]);
             }
 
             // Backtransform the last stage
+            work.resize( lapack::ApplyQWorkSize('L',2*r,r) );
             hmat_tools::ApplyPackedQFromLeft
-            ( r, lastVQRStage, lastVTauStage, W, &applyQWork[0] );
+            ( r, lastVQRStage, lastVTauStage, Z, &work[0] );
 
             // Backtransform using the middle stages
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
@@ -1898,9 +1921,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 const bool rootOfLastStage = !(teamRank & (1u<<(commStage+1)));
                 if( rootOfLastStage )
                 {
-                    // Zero the bottom half of W
+                    // Zero the bottom half of Z 
                     for( int j=0; j<maxRank; ++j )
-                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
                 }
                 else
                 {
@@ -1908,47 +1931,48 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     for( int j=0; j<maxRank; ++j )
                     {
                         std::memcpy
-                        ( W.Buffer(0,j), W.LockedBuffer(r,j), 
+                        ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
                           r*sizeof(Scalar) );
-                        std::memset( W.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
                     }
                 }
                 hmat_tools::ApplyPackedQFromLeft
                 ( r, &VQRPiece[commStage*(r*r+r)],
-                  &VTauPiece[(commStage+1)*r], W, &applyQWork[0] );
+                  &VTauPiece[(commStage+1)*r], Z, &work[0] );
             }
 
             // Backtransform using the original stage
             const int n = DF.VLocal.Height();
             const int minDim = std::min( n, r );
             Dense<Scalar> VLocalCopy;
-            hmat_tools::Copy( DF.VLocal, VLocalCopy );
+            hmat_tools::Copy( DF.VLocal, X );
             DF.VLocal.Resize( n, maxRank );
             hmat_tools::Scale( (Scalar)0, DF.VLocal );
             const bool rootOfLastStage = !(teamRank & 0x1);
             if( rootOfLastStage )
             {
-                // Copy the first minDim rows of the top half of W into the 
+                // Copy the first minDim rows of the top half of Z into the 
                 // top of VLocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.VLocal.Buffer(0,j), W.LockedBuffer(0,j),
+                    ( DF.VLocal.Buffer(0,j), Z.LockedBuffer(0,j),
                       minDim*sizeof(Scalar) );
             }
             else
             {
-                // Copy the first minDim rows of the bottom half of W into
+                // Copy the first minDim rows of the bottom half of Z into
                 // the top of VLocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.VLocal.Buffer(0,j), W.LockedBuffer(0,j),
+                    ( DF.VLocal.Buffer(0,j), Z.LockedBuffer(0,j),
                       minDim*sizeof(Scalar) );
             }
+            work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
             lapack::ApplyQ
             ( 'L', 'N', n, maxRank, minDim, 
-              VLocalCopy.LockedBuffer(), VLocalCopy.LDim(), &VTauPiece[0],
-              DF.VLocal.Buffer(),        DF.VLocal.LDim(),  
-              &applyQWork[0], applyQWork.size() );
+              X.LockedBuffer(), X.LDim(), &VTauPiece[0],
+              DF.VLocal.Buffer(), DF.VLocal.LDim(),  
+              &work[0], work.size() );
         }
         break;
     }
@@ -1966,25 +1990,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             if( r <= MaxRank() )
                 break;
 
-            // Form RU and RV
+            // Form R_U and R_V
+            X.Resize( r, r );
+            Y.Resize( r, r );
             const Scalar* tauPiece = &tauBuffer[tauOffsets[teamLevel]];
             if( _inTargetTeam )
             {
                 tauOffsets[teamLevel] += minDimU;
 
-                hmat_tools::Scale( (Scalar)0, RU );
+                hmat_tools::Scale( (Scalar)0, X );
                 const int recvOffset = recvOffsets[_sourceRoot];
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( RU.Buffer(0,j), SF.D.LockedBuffer(0,j), 
+                    ( X.Buffer(0,j), SF.D.LockedBuffer(0,j), 
                       std::min(minDimU,j+1)*sizeof(Scalar) );
                 for( int j=0; j<minDimV; ++j )
                     std::memcpy
-                    ( RV.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                    ( Y.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                       (j+1)*sizeof(Scalar) );
                 for( int j=minDimV; j<r; ++j )
                     std::memcpy
-                    ( RV.Buffer(0,j), 
+                    ( Y.Buffer(0,j), 
                       &recvBuffer[recvOffset+(minDimV*minDimV+minDimV)/2+
                                   (j-minDimV)*minDimV], 
                       minDimV*sizeof(Scalar) );
@@ -1995,48 +2021,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             {
                 tauOffsets[teamLevel] += minDimV;
 
-                hmat_tools::Scale( (Scalar)0, RU );
+                hmat_tools::Scale( (Scalar)0, X );
                 const int recvOffset = recvOffsets[_targetRoot];
                 for( int j=0; j<minDimU; ++j )
                     std::memcpy
-                    ( RU.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                    ( X.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                       (j+1)*sizeof(Scalar) );
                 for( int j=minDimU; j<r; ++j )
                     std::memcpy
-                    ( RU.Buffer(0,j),
+                    ( X.Buffer(0,j),
                       &recvBuffer[recvOffset+(minDimU*minDimU+minDimU)/2+
                                   (j-minDimU)*minDimU],
                       minDimU*sizeof(Scalar) );
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( RV.Buffer(0,j), SF.D.LockedBuffer(0,j), 
+                    ( Y.Buffer(0,j), SF.D.LockedBuffer(0,j), 
                       (j+1)*sizeof(Scalar) );
                 recvOffsets[_targetRoot] += 
                     (minDimU*minDimU+minDimU)/2 + (r-minDimU)*minDimU;
             }
 
-            // Overwrite RU with RU RV^[T/H]
+            // Overwrite X with R_U R_V^[T/H]
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Trmm
             ( 'R', 'U', option, 'N', r, r, 
-              1, RV.LockedBuffer(), RV.LDim(), RU.Buffer(), RU.LDim() );
-
-            // Perform an SVD on RU, overwriting RU with the left singular 
-            // vectors and RV with the adjoint of the right singular vectors.
-            lapack::SVD
-            ( 'O', 'S', r, r, RU.Buffer(), RU.LDim(), 
-              &singularValues[0], 0, 1, RV.Buffer(), RV.LDim(), 
-              &svdWork[0], svdWork.size(), &svdRealWork[0] );
+              1, Y.LockedBuffer(), Y.LDim(), X.Buffer(), X.LDim() );
 
             const int maxRank = MaxRank();
-            W.Resize( 2*r, maxRank );
-            hmat_tools::Scale( (Scalar)0, W );
+            Z.Resize( 2*r, maxRank );
+            hmat_tools::Scale( (Scalar)0, Z );
+            singularValues.resize( r );
+            work.resize( lapack::SVDWorkSize(r,r) );
+            realWork.resize( lapack::SVDRealWorkSize(r,r) );
             if( _inTargetTeam )
             {
+                // Perform an SVD on X, overwriting X with the left singular 
+                // vectors.
+                lapack::SVD
+                ( 'O', 'N', r, r, X.Buffer(), X.LDim(), 
+                  &singularValues[0], 0, 1, 0, 1, 
+                  &work[0], work.size(), &realWork[0] );
+
                 // Backtransform U
                 const int m = SF.D.Height();
-                Dense<Scalar> UCopy;
-                hmat_tools::Copy( SF.D, UCopy );
+                hmat_tools::Copy( SF.D, Z );
                 SF.D.Resize( m, maxRank );
                 hmat_tools::Scale( (Scalar)0, SF.D );
                 // Copy the first maxRank singular vectors, scaled by the 
@@ -2044,24 +2072,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 for( int j=0; j<maxRank; ++j )
                 {
                     const Real sigma = singularValues[j];
-                    const Scalar* RUCol = RU.LockedBuffer(0,j);
+                    const Scalar* XCol = X.LockedBuffer(0,j);
                     Scalar* UCol = SF.D.Buffer(0,j);
                     for( int i=0; i<r; ++i )
-                        UCol[i] = sigma*RUCol[i];
+                        UCol[i] = sigma*XCol[i];
                 }
 
+                work.resize( lapack::ApplyQWorkSize('L',m,maxRank) );
                 lapack::ApplyQ
                 ( 'L', 'N', m, maxRank, minDimU,
-                  UCopy.LockedBuffer(), UCopy.LDim(), &tauPiece[0],
-                  SF.D.Buffer(),        SF.D.LDim(),  
-                  &applyQWork[0], applyQWork.size() );
+                  Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+                  SF.D.Buffer(),    SF.D.LDim(),  
+                  &work[0], work.size() );
             }
             else // _inSourceTeam
             {
+                // Perform an SVD on X, overwriting X with the adjoint of the
+                // right singular vectors.
+                lapack::SVD
+                ( 'N', 'O', r, r, X.Buffer(), X.LDim(), 
+                  &singularValues[0], 0, 1, 0, 1, 
+                  &work[0], work.size(), &realWork[0] );
+
                 // Backtransform V
                 const int n = SF.D.Height();
-                Dense<Scalar> VCopy;
-                hmat_tools::Copy( SF.D, VCopy );
+                hmat_tools::Copy( SF.D, Z );
                 SF.D.Resize( n, maxRank );
                 hmat_tools::Scale( (Scalar)0, SF.D );
                 // Copy the first maxRank right singular vectors into the 
@@ -2069,41 +2104,171 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 for( int j=0; j<maxRank; ++j )
                 {
                     const Real sigma = singularValues[j];
-                    const Scalar* RVRow = RV.LockedBuffer(j,0);
-                    const int RVLDim = RV.LDim();
+                    const Scalar* XRow = X.LockedBuffer(j,0);
+                    const int XLDim = X.LDim();
                     Scalar* VCol = SF.D.Buffer(0,j);
                     if( Conjugated )
                         for( int i=0; i<r; ++i )
-                            VCol[i] = RVRow[i*RVLDim];
+                            VCol[i] = XRow[i*XLDim];
                     else
                         for( int i=0; i<r; ++i )
-                            VCol[i] = Conj(RVRow[i*RVLDim]);
+                            VCol[i] = Conj(XRow[i*XLDim]);
                 }
 
+                work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
                 lapack::ApplyQ
                 ( 'L', 'N', n, maxRank, minDimV,
-                  VCopy.LockedBuffer(), VCopy.LDim(), &tauPiece[0],
-                  SF.D.Buffer(),        SF.D.LDim(),  
-                  &applyQWork[0], applyQWork.size() );
+                  Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+                  SF.D.Buffer(),    SF.D.LDim(),  
+                  &work[0], work.size() );
             }
         }
         else
         {
-            // HERE: The target team unpacks V and the dense update, while
-            //       the source team unpacks U.
-
-            if( _inSourceTeam )
+            const int m = Height();
+            const int n = Width();
+            const int minDim = std::min( m, n );
+            const int maxRank = MaxRank();
+            if( _inTargetTeam )
             {
-                const int m = Height();
-                const int n = Width();
+                // Unpack V into X
+                int recvOffset = recvOffsets[_sourceRoot];
+                X.Resize( n, r );
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( X.Buffer(0,j), &recvBuffer[recvOffset+j*n], 
+                      n*sizeof(Scalar) );
+                recvOffset += n*r;
 
+                // Unpack the dense update
+                Z.Resize( m, n );
+                for( int j=0; j<n; ++j )
+                    std::memcpy
+                    ( Z.Buffer(0,j), &recvBuffer[recvOffset+j*m],
+                      m*sizeof(Scalar) );
+                recvOffsets[_sourceRoot] += n*r + m*n;
+
+                // Add U V^[T/H] onto the dense update
+                const char option = ( Conjugated ? 'C' : 'T' );
+                blas::Gemm
+                ( 'N', option, m, n, r, 
+                  (Scalar)1, SF.D.LockedBuffer(), SF.D.LDim(),
+                             X.LockedBuffer(),    X.LDim(),
+                  (Scalar)1, Z.Buffer(),          Z.LDim() );
+
+                if( minDim <= maxRank )
+                {
+                    if( m == minDim )
+                    {
+                        // Make U := I (where V := Z^[T/H])
+                        SF.D.Resize( minDim, minDim );
+                        hmat_tools::Scale( (Scalar)0, SF.D );
+                        for( int j=0; j<minDim; ++j )
+                            SF.D.Set(j,j,(Scalar)1);
+                    }
+                    else
+                    {
+                        // Make U := Z (where V := I)
+                        hmat_tools::Copy( Z, SF.D );
+                    }
+                }
+                else // minDim > maxRank
+                {
+                    // Perform an SVD on the dense matrix, overwriting it with
+                    // the left singular vectors 
+                    singularValues.resize( minDim );
+                    work.resize( lapack::SVDWorkSize(m,n) );
+                    realWork.resize( lapack::SVDRealWorkSize(m,n) );
+                    lapack::SVD
+                    ( 'O', 'N', m, n, Z.Buffer(), Z.LDim(), 
+                      &singularValues[0], 0, 1, 0, 1, 
+                      &work[0], work.size(), &realWork[0] );
+
+                    // Form U with the truncated left singular vectors scaled
+                    // by the corresponding singular values
+                    SF.D.Resize( m, maxRank );
+                    for( int j=0; j<maxRank; ++j )
+                    {
+                        Scalar* DCol = SF.D.Buffer(0,j);
+                        const Scalar* UCol = Z.Buffer(0,j);
+                        const Real sigma = singularValues[j];
+                        for( int i=0; i<m; ++i )
+                            DCol[i] = sigma*UCol[i];
+                    }
+                }
+            }
+            else // _inSourceTeam
+            {
+                // Unpack U into X
+                int recvOffset = recvOffsets[_targetRoot];
+                X.Resize( m, r );
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( X.Buffer(0,j), &recvBuffer[recvOffset+j*m], 
+                      m*sizeof(Scalar) );
+                recvOffset += m*r;
+
+                // Get a reference to the dense update
                 _DMap.ResetIterator();
                 Dense<Scalar>& D = *_DMap.NextEntry();
 
-                // Form U and V, combine all of the dense updates into one,
-                // add U V^[T/H] onto it, perform an SVD, truncate, and 
-                // form low-rank approximation
+                // Add U V^[T/H] onto the dense update
+                const char option = ( Conjugated ? 'C' : 'T' );
+                blas::Gemm
+                ( 'N', option, m, n, r, 
+                  (Scalar)1, X.LockedBuffer(),    X.LDim(),
+                             SF.D.LockedBuffer(), SF.D.LDim(),
+                  (Scalar)1, D.Buffer(),          D.LDim() );
+
+                if( minDim <= maxRank )
+                {
+                    if( m == minDim )
+                    {
+                        // Make V := Z^[T/H] (where U := I)
+                        SF.D.Resize( n, m );
+                        if( Conjugated )
+                            hmat_tools::Adjoint( Z, SF.D );
+                        else
+                            hmat_tools::Transpose( Z, SF.D );
+                    }
+                    else
+                    {
+                        // Make V := I (where U := Z)
+                        SF.D.Resize( minDim, minDim );
+                        hmat_tools::Scale( (Scalar)0, SF.D );
+                        for( int j=0; j<minDim; ++j )
+                            SF.D.Set(j,j,(Scalar)1);
+                    }
+                }
+                else // minDim > maxRank
+                {
+                    // Perform an SVD on the dense matrix, overwriting it with
+                    // adjoint of the right singular vectors
+                    singularValues.resize( minDim );
+                    work.resize( lapack::SVDWorkSize(m,n) );
+                    realWork.resize( lapack::SVDRealWorkSize(m,n) );
+                    lapack::SVD
+                    ( 'N', 'O', m, n, Z.Buffer(), Z.LDim(), 
+                      &singularValues[0], 0, 1, 0, 1, 
+                      &work[0], work.size(), &realWork[0] );
+
+                    // Form V with the truncated right singular vectors
+                    SF.D.Resize( n, maxRank );
+                    for( int j=0; j<maxRank; ++j )
+                    {
+                        Scalar* DCol = SF.D.Buffer(0,j);
+                        const Scalar* VRow = Z.Buffer(j,0);
+                        const int VLDim = Z.LDim();
+                        if( Conjugated )
+                            for( int i=0; i<n; ++i )
+                                DCol[i] = VRow[i*VLDim];
+                        else
+                            for( int i=0; i<n; ++i )
+                                DCol[i] = Conj(VRow[i*VLDim]);
+                    }
+                }
             }
+            _DMap.Clear();
         }
         break;
     }
