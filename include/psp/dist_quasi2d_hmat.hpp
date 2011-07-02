@@ -980,8 +980,9 @@ private:
     // These are only needed for the C in C += alpha A B
     MemoryMap<int,MultiplyDenseContext> 
         _mainContextMap, _colFHHContextMap, _rowFHHContextMap;
-    MemoryMap<int,Dense<Scalar> > 
-        _UMap, _VMap, _DMap, _ZMap, _colXMap, _rowXMap;
+    MemoryMap<int,Dense<Scalar> > _UMap, _VMap, _ZMap, _colXMap, _rowXMap;
+    bool _haveDenseUpdate, _storedDenseUpdate;
+    Dense<Scalar> _D;
 
     // For the reuse of the computation of T1 = H Omega1 and T2 = H' Omega2 in 
     // order to capture the column and row space, respectively, of H. These 

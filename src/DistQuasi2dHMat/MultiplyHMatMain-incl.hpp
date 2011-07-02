@@ -965,9 +965,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             if( admissibleC )
             {
                 // F += D D
-                C._DMap[key] = new Dense<Scalar>( A.Height(), B.Width() );
-                hmat_tools::Multiply
-                ( alpha, SDA.D, DB, (Scalar)0, *C._DMap[key] );
+                if( C._storedDenseUpdate )
+                    hmat_tools::Multiply( alpha, SDA.D, DB, (Scalar)1, C._D );
+                else
+                {
+                    C._D.Resize( A.Height(), B.Width() );
+                    hmat_tools::Multiply( alpha, SDA.D, DB, (Scalar)0, C._D );
+                    C._haveDenseUpdate = true;
+                    C._storedDenseUpdate = true;
+                }
             }
             else
             {
@@ -980,9 +986,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         }
         case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK_GHOST:
+            break;
         case SPLIT_DENSE:
         case SPLIT_DENSE_GHOST:
         case DENSE_GHOST:
+            if( admissibleC && (C._inSourceTeam || C._inTargetTeam) )
+                C._haveDenseUpdate = true;
             break;
         default:
 #ifndef RELEASE
@@ -993,6 +1002,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         break;
     }
     case SPLIT_DENSE_GHOST:
+        if( B._block.type == SPLIT_DENSE && admissibleC )
+            C._haveDenseUpdate = true;
         break;
     case DENSE:
     {
@@ -1032,6 +1043,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         case SPLIT_DENSE:
+            if( admissibleC )
+                C._haveDenseUpdate = true;
             break;
         case DENSE:
         {
@@ -1039,9 +1052,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             if( admissibleC )
             {
                 // F += D D
-                C._DMap[key] = new Dense<Scalar>( A.Height(), B.Width() );
-                hmat_tools::Multiply
-                ( alpha, DA, DB, (Scalar)0, *C._DMap[key] );
+                if( C._storedDenseUpdate )
+                {
+                    hmat_tools::Multiply( alpha, DA, DB, (Scalar)1, C._D );
+                }
+                else
+                {
+                    C._D.Resize( A.Height(), B.Width() );
+                    hmat_tools::Multiply( alpha, DA, DB, (Scalar)0, C._D );
+                    C._haveDenseUpdate = true;
+                    C._storedDenseUpdate = true;
+                }
             }
             else
             {
@@ -3082,19 +3103,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             {
                 if( C._inSourceTeam )
                 {
-                    C._DMap[key] = new Dense<Scalar>( m, k );
-                    Dense<Scalar>& DC = *C._DMap[key];
-
+                    C._ZMap[key] = new Dense<Scalar>( m, k );
                     std::memcpy
-                    ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                    ( C._ZMap[key]->Buffer(), 
+                      &recvBuffer[offsets[B._targetRoot]],
                       m*k*sizeof(Scalar) );
                     offsets[B._targetRoot] += m*k;
-                }
-                else
-                {
-                    // Create a placeholder for the dense update so that our
-                    // process knows how many there are
-                    C._DMap[key] = new Dense<Scalar>;
                 }
             }
             break;
@@ -3125,11 +3139,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             const int k = A.Width();
             if( m != 0 && k != 0 )
             {
-                C._DMap[key] = new Dense<Scalar>( m, k );
-                Dense<Scalar>& DC = *C._DMap[key];
-
+                C._ZMap[key] = new Dense<Scalar>( m, k );
                 std::memcpy
-                ( DC.Buffer(), &recvBuffer[offsets[B._targetRoot]],
+                ( C._ZMap[key]->Buffer(), &recvBuffer[offsets[B._targetRoot]],
                   m*k*sizeof(Scalar) );
                 offsets[B._targetRoot] += m*k; 
             }
@@ -4448,27 +4460,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             if( C._inSourceTeam )
             {
                 const SplitDense& SDB = *B._block.data.SD;
-                Dense<Scalar>& DC = *C._DMap[key];
+                const int m = C.Height();
+                const int n = C.Width();
+                Dense<Scalar>& ZC = *C._ZMap[key];
                 if( admissibleC )
                 {
-                    Dense<Scalar> D = *C._DMap[key];
-                    blas::Gemm
-                    ( 'N', 'N', C.Height(), C.Width(), A.Width(),
-                      alpha,     D.LockedBuffer(),     D.LDim(),
-                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
-                      (Scalar)0, DC.Buffer(),          DC.LDim() );
+                    if( C._storedDenseUpdate )
+                    {
+                        blas::Gemm
+                        ( 'N', 'N', m, n, A.Width(),
+                          alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                     SDB.D.LockedBuffer(), SDB.D.LDim(),
+                          (Scalar)1, C._D.Buffer(),        C._D.LDim() );
+                    }
+                    else
+                    {
+                        C._D.Resize( m, n );
+                        blas::Gemm
+                        ( 'N', 'N', m, n, A.Width(),
+                          alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                     SDB.D.LockedBuffer(), SDB.D.LDim(),
+                          (Scalar)0, C._D.Buffer(),        C._D.LDim() );
+                        C._haveDenseUpdate = true;
+                        C._storedDenseUpdate = true;
+                    }
                 }
                 else
                 {
                     Dense<Scalar>& D = *C._block.data.D;
                     blas::Gemm
-                    ( 'N', 'N', C.Height(), C.Width(), A.Width(),
-                      alpha,     DC.LockedBuffer(),    DC.LDim(),
+                    ( 'N', 'N', m, n, A.Width(),
+                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                  SDB.D.LockedBuffer(), SDB.D.LDim(),
                       (Scalar)1, D.Buffer(),           D.LDim() );
                 }
-                DC.Clear();
-                C._DMap.Erase( key );
+                ZC.Clear();
+                C._ZMap.Erase( key );
             }
             break;
         case SPLIT_DENSE_GHOST:
@@ -4503,27 +4530,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
         case SPLIT_DENSE:
         {
             const SplitDense& SDB = *B._block.data.SD;
-            Dense<Scalar>& DC = *C._DMap[key];
+            const int m = C.Height();
+            const int n = C.Width();
+            Dense<Scalar>& ZC = *C._ZMap[key];
             if( admissibleC )
             {
-                Dense<Scalar> D = *C._DMap[key];
-                blas::Gemm
-                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
-                  alpha,     D.LockedBuffer(),     D.LDim(),
-                             SDB.D.LockedBuffer(), SDB.D.LDim(),
-                  (Scalar)0, DC.Buffer(),          DC.LDim() );
+                if( C._storedDenseUpdate )
+                {
+                    blas::Gemm
+                    ( 'N', 'N', m, n, A.Width(),
+                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)1, C._D.Buffer(),        C._D.LDim() );
+                }
+                else
+                {
+                    C._D.Resize( m, n );
+                    blas::Gemm
+                    ( 'N', 'N', m, n, A.Width(),
+                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)0, C._D.Buffer(),        C._D.LDim() );
+                    C._haveDenseUpdate = true;
+                    C._storedDenseUpdate = true;
+                }
             }
             else
             {
-                Dense<Scalar>& D = C._block.data.SD->D;
+                Dense<Scalar>& D = *C._block.data.D;
                 blas::Gemm
-                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
-                  alpha,     DC.LockedBuffer(),    DC.LDim(),
+                ( 'N', 'N', m, n, A.Width(),
+                  alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                              SDB.D.LockedBuffer(), SDB.D.LDim(),
                   (Scalar)1, D.Buffer(),           D.LDim() );
             }
-            DC.Clear();
-            C._DMap.Erase( key );
+            ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         default:
@@ -4551,27 +4593,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
         case SPLIT_DENSE:
         {
             const SplitDense& SDB = *B._block.data.SD;
-            Dense<Scalar>& DC = *C._DMap[key];
+            const int m = C.Height();
+            const int n = C.Width();
+            Dense<Scalar>& ZC = *C._ZMap[key];
             if( admissibleC )
             {
-                Dense<Scalar> D = *C._DMap[key];
-                blas::Gemm
-                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
-                  alpha,     D.LockedBuffer(),     D.LDim(),
-                             SDB.D.LockedBuffer(), SDB.D.LDim(),
-                  (Scalar)0, DC.Buffer(),          DC.LDim() );
+                if( C._storedDenseUpdate )
+                {
+                    blas::Gemm
+                    ( 'N', 'N', m, n, A.Width(),
+                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)1, C._D.Buffer(),        C._D.LDim() );
+                }
+                else
+                {
+                    C._D.Resize( m, n );
+                    blas::Gemm
+                    ( 'N', 'N', m, n, A.Width(),
+                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)0, C._D.Buffer(),        C._D.LDim() );
+                    C._haveDenseUpdate = true;
+                    C._storedDenseUpdate = true;
+                }
             }
             else
             {
-                Dense<Scalar>& D = C._block.data.SD->D;
+                Dense<Scalar>& D = *C._block.data.D;
                 blas::Gemm
-                ( 'N', 'N', C.Height(), C.Width(), A.Width(),
-                  alpha,     DC.LockedBuffer(),    DC.LDim(),
+                ( 'N', 'N', m, n, A.Width(),
+                  alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                              SDB.D.LockedBuffer(), SDB.D.LDim(),
                   (Scalar)1, D.Buffer(),           D.LDim() );
             }
-            DC.Clear();
-            C._DMap.Erase( key );
+            ZC.Clear();
+            C._ZMap.Erase( key );
             break;
         }
         default:
@@ -4600,42 +4657,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeCCleanup()
     DistQuasi2dHMat<Scalar,Conjugated>& C = *this;
     C._mainContextMap.Clear();
     C._ZMap.Clear();
-
-    // Collapse the dense updates into 1 if there are 2 or more
-    const int numDenseUpdates = C._DMap.Size();
-    if( numDenseUpdates > 1 )
-    {
-        if( C._inSourceTeam )
-        {
-            const int m = Height();
-            const int n = Width();
-            C._DMap.ResetIterator();
-            Dense<Scalar>& DC = *C._DMap.NextEntry();
-            for( int update=1; update<numDenseUpdates; ++update )
-            {
-                Dense<Scalar>& DCUpdate = *C._DMap.NextEntry();
-                for( int j=0; j<n; ++j )
-                {
-                    const Scalar* updateCol = DCUpdate.LockedBuffer(0,j);
-                    Scalar* DCol = DC.Buffer(0,j);
-                    for( int i=0; i<m; ++i )
-                        DCol[i] += updateCol[i];
-                }
-                C._DMap.EraseLastEntry();
-            }
-        }
-        else
-        {
-            // Clear out all but the first placeholder for a dense update
-            C._DMap.ResetIterator();
-            C._DMap.NextEntry();
-            for( int update=1; update<numDenseUpdates; ++update )
-            {
-                C._DMap.NextEntry();
-                C._DMap.EraseLastEntry();
-            }
-        }
-    }
 
     switch( C._block.type )
     {

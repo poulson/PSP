@@ -41,7 +41,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _localSourceOffset(0), _localTargetOffset(0),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _beganColSpaceComp(false),
+  _haveDenseUpdate(false), _storedDenseUpdate(false)
 { 
     _block.type = EMPTY;
 }
@@ -67,7 +68,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _sourceRoot(sourceRoot), _targetRoot(targetRoot),
   _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _beganColSpaceComp(false),
+  _haveDenseUpdate(false), _storedDenseUpdate(false)
 { 
     _block.type = EMPTY;
 }

@@ -196,9 +196,9 @@ MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const
     case DIST_LOW_RANK:
     case SPLIT_LOW_RANK:
     case LOW_RANK:
-        if( _inTargetTeam && _DMap.Size() == 0 )
+        if( _inTargetTeam && !_haveDenseUpdate )
             ++numQRs[teamLevel];
-        if( _inSourceTeam && _DMap.Size() == 0 )
+        if( _inSourceTeam && !_haveDenseUpdate )
             ++numQRs[teamLevel];
         break;
     default:
@@ -305,8 +305,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
     case SPLIT_LOW_RANK:
     {
         SplitLowRank& SF = *_block.data.SF;
-
-        const unsigned numDenseUpdates = _DMap.Size();
         const unsigned teamLevel = _teams->TeamLevel( _level );
 
         // Compute the total update rank
@@ -338,8 +336,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         // Create the space and store the rank if we'll need to do a QR
         if( _inTargetTeam )
         {
-            const int numDenseUpdates = _DMap.Size();
-            if( numDenseUpdates == 0 )
+            if( !_haveDenseUpdate )
                 ranks[rankOffsets[teamLevel]++] = rank;
             const int oldRank = SF.D.Width();
             Dense<Scalar> UCopy;
@@ -351,7 +348,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         }
         else
         {
-            if( numDenseUpdates == 0 )
+            if( !_haveDenseUpdate )
                 ranks[rankOffsets[teamLevel]++] = rank;
             const int oldRank = SF.D.Width();
             Dense<Scalar> VCopy;
@@ -366,8 +363,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
     case LOW_RANK:
     {
         LowRank<Scalar,Conjugated>& F = *_block.data.F;
-
-        const unsigned numDenseUpdates = _DMap.Size();
         const unsigned teamLevel = _teams->TeamLevel( _level );
         // Compute the total update rank
         {
@@ -385,7 +380,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         // Create the space and store the updates. If there are no dense 
         // updates, then mark two more matrices for QR factorization.
         {
-            if( numDenseUpdates == 0 )
+            if( !_haveDenseUpdate )
             {
                 ranks[rankOffsets[teamLevel]++] = rank;
                 ranks[rankOffsets[teamLevel]++] = rank;
@@ -522,21 +517,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
               (Scalar)1, D.Buffer(),       D.LDim() );
             _UMap.EraseLastEntry();
             _VMap.EraseLastEntry();
-        }
-
-        const int numDenseUpdates = _DMap.Size();
-        _DMap.ResetIterator();
-        for( int update=0; update<numDenseUpdates; ++update )
-        {
-            const Dense<Scalar>& DUpdate = *_DMap.NextEntry();
-            for( int j=0; j<n; ++j )
-            {
-                const Scalar* DUpdateCol = DUpdate.LockedBuffer(0,j);
-                Scalar* DCol = D.Buffer(0,j);
-                for( int i=0; i<m; ++i )
-                    DCol[i] += DUpdateCol[i];
-            }
-            _DMap.EraseLastEntry();
         }
         break;
     }
@@ -784,8 +764,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
     }
     case SPLIT_LOW_RANK:
     {
-        const unsigned numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 && _inTargetTeam )
+        if( !_haveDenseUpdate && _inTargetTeam )
         {
             SplitLowRank& SF = *_block.data.SF;
             const int m = U.Height();
@@ -799,8 +778,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
     }
     case LOW_RANK:
     {
-        const unsigned numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             LowRank<Scalar,Conjugated>& F = *_block.data.F;
             const int m = U.Height();
@@ -863,8 +841,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
     }
     case SPLIT_LOW_RANK:
     {
-        const unsigned numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 && _inSourceTeam )
+        if( !_haveDenseUpdate && _inSourceTeam )
         {
             SplitLowRank& SF = *_block.data.SF;
             const int n = V.Height();
@@ -878,8 +855,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
     }
     case LOW_RANK:
     {
-        const unsigned numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             LowRank<Scalar,Conjugated>& F = *_block.data.F;
             const int n = V.Height();
@@ -1013,9 +989,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
     case SPLIT_LOW_RANK:
     {
         SplitLowRank& SF = *_block.data.SF;
-
-        const int numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             const unsigned teamLevel = _teams->TeamLevel(_level);
             if( _inTargetTeam )
@@ -1052,8 +1026,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
     case LOW_RANK:
     {
         LowRank<Scalar,Conjugated>& F = *_block.data.F;
-        const int numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             const unsigned teamLevel = _teams->TeamLevel(_level);
             Dense<Scalar>& U = F.U;
@@ -1433,8 +1406,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
     {
         const SplitLowRank& SF = *_block.data.SF;
         const int r = SF.rank;
-        const int numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             if( r <= MaxRank() )
                 break;
@@ -1481,9 +1453,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
     {
         // Count the send/recv sizes of the U's from the low-rank updates
         if( _inTargetTeam )
-            AddToMap( sendSizes, _sourceRoot, Height()*_UMap[0]->Width() );
+        {
+            _UMap.ResetIterator();
+            const Dense<Scalar>& U = *_UMap.NextEntry();
+            AddToMap( sendSizes, _sourceRoot, Height()*U.Width() );
+        }
         else
-            AddToMap( recvSizes, _targetRoot, Height()*_VMap[0]->Width() );
+        {
+            _VMap.ResetIterator();
+            const Dense<Scalar>& V = *_VMap.NextEntry();
+            AddToMap( recvSizes, _targetRoot, Height()*V.Width() );
+        }
         break;
     }
     default:
@@ -1549,8 +1529,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
     {
         const SplitLowRank& SF = *_block.data.SF;
         const int r = SF.rank;
-        const int numDenseUpdates = _DMap.Size();
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             if( r <= MaxRank() )
                 break;
@@ -1601,13 +1580,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
 
                 // Copy the condensed dense update into the send buffer
                 sendOffset += n*r;
-                _DMap.ResetIterator();
-                const Dense<Scalar>& D = *_DMap.NextEntry();
                 for( int j=0; j<n; ++j )
                     std::memcpy
-                    ( &sendBuffer[sendOffset+j*m], D.LockedBuffer(0,j),
+                    ( &sendBuffer[sendOffset+j*m], _D.LockedBuffer(0,j),
                       m*sizeof(Scalar) );
-
                 sendOffsets[_targetRoot] += n*r + m*n;
             }
         }
@@ -1617,7 +1593,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
     {
         if( _inTargetTeam )
         {
-            const Dense<Scalar>& U = *_UMap[0];
+            _UMap.ResetIterator();
+            const Dense<Scalar>& U = *_UMap.NextEntry();
             const int height = Height();
             const int r = U.Width();
             const int sendOffset = sendOffsets[_sourceRoot];
@@ -1982,10 +1959,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const int r = SF.rank;
         const int minDimU = std::min( Height(), r );
         const int minDimV = std::min( Width(), r );
-        const int numDenseUpdates = _DMap.Size();
         const unsigned teamLevel = _teams->TeamLevel( _level );
 
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             if( r <= MaxRank() )
                 break;
@@ -2189,11 +2165,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     SF.D.Resize( m, maxRank );
                     for( int j=0; j<maxRank; ++j )
                     {
-                        Scalar* DCol = SF.D.Buffer(0,j);
-                        const Scalar* UCol = Z.Buffer(0,j);
+                        Scalar* UCol = SF.D.Buffer(0,j);
+                        const Scalar* ZCol = Z.Buffer(0,j);
                         const Real sigma = singularValues[j];
                         for( int i=0; i<m; ++i )
-                            DCol[i] = sigma*UCol[i];
+                            UCol[i] = sigma*ZCol[i];
                     }
                 }
             }
@@ -2208,32 +2184,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                       m*sizeof(Scalar) );
                 recvOffset += m*r;
 
-                // Get a reference to the dense update
-                _DMap.ResetIterator();
-                Dense<Scalar>& D = *_DMap.NextEntry();
-
                 // Add U V^[T/H] onto the dense update
                 const char option = ( Conjugated ? 'C' : 'T' );
                 blas::Gemm
                 ( 'N', option, m, n, r, 
                   (Scalar)1, X.LockedBuffer(),    X.LDim(),
                              SF.D.LockedBuffer(), SF.D.LDim(),
-                  (Scalar)1, D.Buffer(),          D.LDim() );
+                  (Scalar)1, _D.Buffer(),         _D.LDim() );
 
                 if( minDim <= maxRank )
                 {
                     if( m == minDim )
                     {
-                        // Make V := Z^[T/H] (where U := I)
+                        // Make V := _D^[T/H] (where U := I)
                         SF.D.Resize( n, m );
                         if( Conjugated )
-                            hmat_tools::Adjoint( Z, SF.D );
+                            hmat_tools::Adjoint( _D, SF.D );
                         else
-                            hmat_tools::Transpose( Z, SF.D );
+                            hmat_tools::Transpose( _D, SF.D );
                     }
                     else
                     {
-                        // Make V := I (where U := Z)
+                        // Make V := I (where U := _D)
                         SF.D.Resize( minDim, minDim );
                         hmat_tools::Scale( (Scalar)0, SF.D );
                         for( int j=0; j<minDim; ++j )
@@ -2248,7 +2220,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     work.resize( lapack::SVDWorkSize(m,n) );
                     realWork.resize( lapack::SVDRealWorkSize(m,n) );
                     lapack::SVD
-                    ( 'N', 'O', m, n, Z.Buffer(), Z.LDim(), 
+                    ( 'N', 'O', m, n, _D.Buffer(), _D.LDim(), 
                       &singularValues[0], 0, 1, 0, 1, 
                       &work[0], work.size(), &realWork[0] );
 
@@ -2256,19 +2228,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     SF.D.Resize( n, maxRank );
                     for( int j=0; j<maxRank; ++j )
                     {
-                        Scalar* DCol = SF.D.Buffer(0,j);
-                        const Scalar* VRow = Z.Buffer(j,0);
-                        const int VLDim = Z.LDim();
+                        Scalar* VCol = SF.D.Buffer(0,j);
+                        const Scalar* DRow = _D.Buffer(j,0);
+                        const int DLDim = _D.LDim();
                         if( Conjugated )
                             for( int i=0; i<n; ++i )
-                                DCol[i] = VRow[i*VLDim];
+                                VCol[i] = DRow[i*DLDim];
                         else
                             for( int i=0; i<n; ++i )
-                                DCol[i] = Conj(VRow[i*VLDim]);
+                                VCol[i] = Conj(DRow[i*DLDim]);
                     }
                 }
             }
-            _DMap.Clear();
+            _D.Clear();
+            _haveDenseUpdate = false;
+            _storedDenseUpdate = false;
         }
         break;
     }
@@ -2278,10 +2252,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const int r = F.Rank();
         const int minDimU = std::min( Height(), r );
         const int minDimV = std::min( Width(), r );
-        const int numDenseUpdates = _DMap.Size();
         const unsigned teamLevel = _teams->TeamLevel( _level );
 
-        if( numDenseUpdates == 0 )
+        if( !_haveDenseUpdate )
         {
             if( r <= MaxRank() )
                 break;
@@ -2381,33 +2354,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int maxRank = MaxRank();
 
             // Add U V^[T/H] onto the dense update
-            _DMap.ResetIterator();
-            Dense<Scalar>& D = *_DMap.NextEntry();
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
             ( 'N', option, m, n, r, 
               (Scalar)1, F.U.LockedBuffer(), F.U.LDim(),
                          F.V.LockedBuffer(), F.V.LDim(),
-              (Scalar)1, D.Buffer(),         D.LDim() );
+              (Scalar)1, _D.Buffer(),        _D.LDim() );
 
             if( minDim <= maxRank )
             {
                 if( m == minDim )
                 {
-                    // Make U := I and V := Z^[T/H]
+                    // Make U := I and V := _D^[T/H]
                     F.U.Resize( minDim, minDim );
                     hmat_tools::Scale( (Scalar)0, F.U );
                     for( int j=0; j<minDim; ++j )
                         F.U.Set(j,j,(Scalar)1);
                     if( Conjugated )
-                        hmat_tools::Adjoint( Z, F.V );
+                        hmat_tools::Adjoint( _D, F.V );
                     else
-                        hmat_tools::Transpose( Z, F.V );
+                        hmat_tools::Transpose( _D, F.V );
                 }
                 else
                 {
-                    // Make U := Z and V := I
-                    hmat_tools::Copy( Z, F.U );
+                    // Make U := _D and V := I
+                    hmat_tools::Copy( _D, F.U );
                     F.V.Resize( minDim, minDim );
                     hmat_tools::Scale( (Scalar)0, F.V );
                     for( int j=0; j<minDim; ++j )
@@ -2423,7 +2394,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 work.resize( lapack::SVDWorkSize(m,n) );
                 realWork.resize( lapack::SVDRealWorkSize(m,n) );
                 lapack::SVD
-                ( 'O', 'S', m, n, Z.Buffer(), Z.LDim(), 
+                ( 'O', 'S', m, n, _D.Buffer(), _D.LDim(), 
                   &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
                   &work[0], work.size(), &realWork[0] );
 
@@ -2432,29 +2403,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 F.U.Resize( m, maxRank );
                 for( int j=0; j<maxRank; ++j )
                 {
-                    Scalar* FUCol = F.U.Buffer(0,j);
-                    const Scalar* UCol = Z.Buffer(0,j);
+                    Scalar* UCol = F.U.Buffer(0,j);
+                    const Scalar* DCol = _D.Buffer(0,j);
                     const Real sigma = singularValues[j];
                     for( int i=0; i<m; ++i )
-                        FUCol[i] = sigma*UCol[i];
+                        UCol[i] = sigma*DCol[i];
                 }
 
                 // Form V with the truncated right singular vectors
                 F.V.Resize( n, maxRank );
                 for( int j=0; j<maxRank; ++j )
                 {
-                    Scalar* FVCol = F.V.Buffer(0,j);
-                    const Scalar* VRow = Y.Buffer(j,0);
-                    const int VLDim = Y.LDim();
+                    Scalar* VCol = F.V.Buffer(0,j);
+                    const Scalar* YRow = Y.Buffer(j,0);
+                    const int YLDim = Y.LDim();
                     if( Conjugated )
                         for( int i=0; i<n; ++i )
-                            FVCol[i] = VRow[i*VLDim];
+                            VCol[i] = YRow[i*YLDim];
                     else
                         for( int i=0; i<n; ++i )
-                            FVCol[i] = Conj(VRow[i*VLDim]);
+                            VCol[i] = Conj(YRow[i*YLDim]);
                 }
             }
-            _DMap.Clear();
+            _D.Clear();
+            _haveDenseUpdate = false;
+            _storedDenseUpdate = false;
         }
         break;
     }
@@ -2462,13 +2435,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
     {
         if( _inSourceTeam )
         {
-            // TODO
+            SplitDense& SD = *_block.data.SD;
+            const int m = SD.D.Height();
+            const int n = SD.D.Width();
+
+            _VMap.ResetIterator();
+            const Dense<Scalar>& V = *_VMap.NextEntry();
+            const int r = V.Width();
+
+            // Unpack U
+            X.Resize( m, r );
+            const int offset = recvOffsets[_targetRoot];
+            for( int j=0; j<r; ++j )
+                std::memcpy
+                ( X.Buffer(0,j), &recvBuffer[offset+j*m], m*sizeof(Scalar) );
+            recvOffsets[_targetRoot] += m*r;
+
+            // Add U V^[T/H] onto our dense matrix
+            const char option = ( Conjugated ? 'C' : 'T' );
+            blas::Gemm
+            ( 'N', option, m, n, r,
+              (Scalar)1, X.LockedBuffer(), X.LDim(),
+                         V.LockedBuffer(), V.LDim(),
+              (Scalar)1, SD.D.Buffer(),    SD.D.LDim() );
+
+            _VMap.Clear();
         }
-    }
-    case DENSE:
-    {
-        // TODO
-        break;
     }
     default:
         break;
