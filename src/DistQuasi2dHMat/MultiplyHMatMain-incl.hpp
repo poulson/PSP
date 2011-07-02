@@ -190,14 +190,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
     }
     else // C is dense
     {
-        // Delay the allocation of C's dense blocks at least until after the
-        // major communication buffers have been freed
         if( C._sourceRoot == C._targetRoot )
         {
             if( C._inSourceTeam || C._inTargetTeam )
             {
                 C._block.type = DENSE;
-                C._block.data.D = new Dense<Scalar>;
+                C._block.data.D = new Dense<Scalar>( A.Height(), B.Width() );
             }
             else
                 C._block.type = DENSE_GHOST;
@@ -208,6 +206,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
             {
                 C._block.type = SPLIT_DENSE;
                 C._block.data.SD = new SplitDense;
+                C._block.data.SD->D.Resize( A.Height(), B.Width() );
             }
             else
                 C._block.type = SPLIT_DENSE_GHOST;
@@ -233,6 +232,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
         C._block.type = EMPTY;
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
     }
     if( C._block.type == EMPTY )
@@ -269,6 +271,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainPrecompute
                             ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+#ifndef RELEASE
+                PopCallStack();
+#endif
                 return;
                 break;
             }
@@ -299,35 +304,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 case NODE:
                 case NODE_GHOST:
                 {
-                    if( A._inTargetTeam )
-                    {
-                        A._rowOmega.Resize( A.LocalHeight(), sampleRank );
-                        ParallelGaussianRandomVectors( A._rowOmega );
-                    }
-                    if( A._inSourceTeam )
-                    {
-                        A._rowT.Resize( A.LocalWidth(), sampleRank );
-                        hmat_tools::Scale( (Scalar)0, A._rowT );
-                    }
+                    A._rowOmega.Resize( A.LocalHeight(), sampleRank );
+                    ParallelGaussianRandomVectors( A._rowOmega );
+
+                    A._rowT.Resize( A.LocalWidth(), sampleRank );
+                    hmat_tools::Scale( (Scalar)0, A._rowT );
+
                     A.AdjointMultiplyDenseInitialize
                     ( A._rowContext, sampleRank );
-                    if( A._inSourceTeam && A._inTargetTeam )
-                    {
-                        A.AdjointMultiplyDensePrecompute
-                        ( A._rowContext, (Scalar)1, A._rowOmega, A._rowT );
-                    }
-                    else if( A._inSourceTeam )
-                    {
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        A.AdjointMultiplyDensePrecompute
-                        ( A._rowContext, (Scalar)1, dummy, A._rowT );
-                    }
-                    else // A._inTargetTeam
-                    {
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        A.AdjointMultiplyDensePrecompute
-                        ( A._rowContext, (Scalar)1, A._rowOmega, dummy );
-                    }
+
+                    A.AdjointMultiplyDensePrecompute
+                    ( A._rowContext, (Scalar)1, A._rowOmega, A._rowT );
+
                     A._beganRowSpaceComp = true;
                     break;
                 }
@@ -355,36 +343,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 case DIST_NODE:
                 case SPLIT_NODE:
                 case NODE:
-                    if( B._inSourceTeam )
-                    {
-                        B._colOmega.Resize( B.LocalWidth(), sampleRank ); 
-                        ParallelGaussianRandomVectors( B._colOmega );
-                    }
-                    if( B._inTargetTeam )
-                    {
-                        B._colT.Resize( B.LocalHeight(), sampleRank );
-                        hmat_tools::Scale( (Scalar)0, B._colT );
-                    }
+                {
+                    B._colOmega.Resize( B.LocalWidth(), sampleRank ); 
+                    ParallelGaussianRandomVectors( B._colOmega );
+
+                    B._colT.Resize( B.LocalHeight(), sampleRank );
+                    hmat_tools::Scale( (Scalar)0, B._colT );
+
                     B.MultiplyDenseInitialize( B._colContext, sampleRank );
-                    if( B._inSourceTeam && B._inTargetTeam )
-                    {
-                        B.MultiplyDensePrecompute
-                        ( B._colContext, (Scalar)1, B._colOmega, B._colT );
-                    }
-                    else if( B._inSourceTeam )
-                    {
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        B.MultiplyDensePrecompute
-                        ( B._colContext, (Scalar)1, B._colOmega, dummy );
-                    }
-                    else // B._inTargetTeam
-                    {
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        B.MultiplyDensePrecompute
-                        ( B._colContext, (Scalar)1, dummy, B._colT );
-                    }
+                    B.MultiplyDensePrecompute
+                    ( B._colContext, (Scalar)1, B._colOmega, B._colT );
+
                     B._beganColSpaceComp = true;
                     break;
+                }
                 default:
                     break;
                 }
@@ -1069,6 +1041,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 // D += D D
                 Dense<Scalar>& DC = *C._block.data.D;
                 hmat_tools::Multiply( alpha, DA, DB, (Scalar)1, DC );
+                // HERE
             }
             break;
         }
@@ -1823,7 +1796,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     // Take care of the H += H H cases first
     const bool admissibleC = C.Admissible();
@@ -1856,6 +1834,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
                             nodeA.Child(t,r).MultiplyHMatMainPassDataCountC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               sendSizes, recvSizes );
+#ifndef RELEASE
+                PopCallStack();
+#endif
                 return;
                 break;
             }
@@ -2299,7 +2280,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     // Take care of the H += H H cases first
     const int key = A._sourceOffset;
@@ -2333,6 +2319,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                             nodeA.Child(t,r).MultiplyHMatMainPassDataPackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               sendBuffer, offsets );
+#ifndef RELEASE
+                PopCallStack();
+#endif
                 return;
                 break;
             }
@@ -2696,7 +2685,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     // Take care of the H += H H cases first
     const int key = A._sourceOffset;
@@ -2730,6 +2724,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
                             nodeA.Child(t,r).MultiplyHMatMainPassDataUnpackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               recvBuffer, offsets );
+#ifndef RELEASE
+                PopCallStack();
+#endif
                 return;
                 break;
             }
@@ -3413,7 +3410,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
@@ -3488,7 +3490,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
@@ -3566,7 +3573,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     const int key = A._sourceOffset;
     const bool admissibleC = C.Admissible();
@@ -3765,7 +3777,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
     if( C._block.type == EMPTY )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
         return;
+    }
 
     const int key = A._sourceOffset;
     
@@ -3798,6 +3815,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainPostcomputeC
                             ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+#ifndef RELEASE
+                PopCallStack();
+#endif
                 return;
                 break;
             }

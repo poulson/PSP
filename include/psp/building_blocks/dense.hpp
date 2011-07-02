@@ -472,7 +472,13 @@ psp::Dense<Scalar>::View
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( i+height > A.Height() || j+width > A.Width() )
-        throw std::logic_error("Submatrix out of bounds");
+    {
+        std::ostringstream s;
+        s << "Submatrix out of bounds: attempted to grab ["
+          << i << ":" << i+height-1 << "," << j << ":" << j+width-1 
+          << "] from " << A.Height() << " x " << A.Width() << " matrix.";
+        throw std::logic_error( s.str().c_str() );
+    }
 #endif
     _height = height;
     _width = width;
@@ -517,7 +523,13 @@ psp::Dense<Scalar>::LockedView
     if( i < 0 || j < 0 )
         throw std::logic_error("Indices must be non-negative");
     if( i+height > A.Height() || j+width > A.Width() )
-        throw std::logic_error("Submatrix out of bounds");
+    {
+        std::ostringstream s;
+        s << "Submatrix out of bounds: attempted to grab ["
+          << i << ":" << i+height << "," << j << ":" << j+width 
+          << "] from " << A.Height() << " x " << A.Width() << " matrix.";
+        throw std::logic_error( s.str().c_str() );
+    }
 #endif
     _height = height;
     _width = width;
