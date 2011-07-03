@@ -1544,7 +1544,12 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
     const int numLevels = NumLevels();
     const int totalSize = buffer.size();
     if( numLevels == 1 || totalSize == 0 )
+    {
+#ifndef RELEASE
+    PopCallStack();
+#endif
         return;
+    }
 
     const int numAllReduces = numLevels-1;
     // Use O(log(p)) custom method: 
@@ -1579,7 +1584,12 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
     const int numLevels = NumLevels();
     const int totalSize = buffer.size();
     if( numLevels == 1 || totalSize == 0 )
+    {
+#ifndef RELEASE
+    PopCallStack();
+#endif
         return;
+    }
 
     const int numReduces = numLevels-1;
     // Use O(log(p)) custom method: 
@@ -1628,7 +1638,12 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeBroadcasts
     const int numLevels = NumLevels();
     const int totalSize = buffer.size();
     if( numLevels == 1 || totalSize == 0 )
+    {
+#ifndef RELEASE
+    PopCallStack();
+#endif
         return;
+    }
 
     const int numBroadcasts = numLevels-1;
     // Use O(log(p)) custom method: 
