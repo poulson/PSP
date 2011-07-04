@@ -225,8 +225,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPrecompute");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    const int key = A._sourceOffset;
-    const int sampleRank = SampleRank( C.MaxRank() );
     if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
         C._block.type = EMPTY;
@@ -240,6 +238,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 
     // Handle all H H cases here
     const bool admissibleC = C.Admissible();
+    const int key = A._sourceOffset;
+    const int sampleRank = SampleRank( C.MaxRank() );
     if( !admissibleC )
     {
         // Take care of the H += H H cases first
@@ -3938,23 +3938,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA()
     if( A._beganRowSpaceComp )
     {
         const int numRhs = A._rowContext.numRhs;
-        if( A._inSourceTeam && A._inTargetTeam )
-        {
-            A.AdjointMultiplyDensePostcompute
-            ( A._rowContext, (Scalar)1, A._rowOmega, A._rowT );
-        }
-        else if( A._inSourceTeam )
-        {
-            Dense<Scalar> dummy( 0, numRhs );
-            A.AdjointMultiplyDensePostcompute
-            ( A._rowContext, (Scalar)1, dummy, A._rowT );
-        }
-        else // A._inTargetTeam
-        {
-            Dense<Scalar> dummy( 0, numRhs );
-            A.AdjointMultiplyDensePostcompute
-            ( A._rowContext, (Scalar)1, A._rowOmega, dummy );
-        }
+        A.AdjointMultiplyDensePostcompute
+        ( A._rowContext, (Scalar)1, A._rowOmega, A._rowT );
         A._rowContext.Clear();
     }
 

@@ -988,6 +988,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsCount
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSumsCount");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -999,10 +1007,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsCount
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
-            sizes[_level] += _block.data.DF->rank;
+        sizes[_level] += _block.data.DF->rank;
         break;
-
     default:
         break;
     }
@@ -1019,6 +1025,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsCount
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSumsCount");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1030,10 +1044,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsCount
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-            sizes[_level] += _block.data.DF->rank;
+        sizes[_level] += _block.data.DF->rank;
         break;
-
     default:
         break;
     }
@@ -1051,6 +1063,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsPack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSumsPack");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1065,17 +1085,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsPack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            const Vector<Scalar>& z = *context.block.data.z;
-            std::memcpy
-            ( &buffer[offsets[_level]], z.LockedBuffer(), 
-              DF.rank*sizeof(Scalar) );
-            offsets[_level] += DF.rank;
-        }
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        const Vector<Scalar>& z = *context.block.data.z;
+        std::memcpy
+        ( &buffer[offsets[_level]], z.LockedBuffer(), 
+          DF.rank*sizeof(Scalar) );
+        offsets[_level] += DF.rank;
         break;
-
+    }
     default:
         break;
     }
@@ -1093,6 +1111,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsPack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSumsPack");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1107,17 +1133,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsPack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            const Vector<Scalar>& z = *context.block.data.z;
-            std::memcpy
-            ( &buffer[offsets[_level]], z.LockedBuffer(), 
-              DF.rank*sizeof(Scalar) );
-            offsets[_level] += DF.rank;
-        }
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        const Vector<Scalar>& z = *context.block.data.z;
+        std::memcpy
+        ( &buffer[offsets[_level]], z.LockedBuffer(), 
+          DF.rank*sizeof(Scalar) );
+        offsets[_level] += DF.rank;
         break;
-
+    }
     default:
         break;
     }
@@ -1135,6 +1159,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsUnpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorSumsUnpack");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1149,22 +1181,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSumsUnpack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                std::memcpy
-                ( z.Buffer(), &buffer[offsets[_level]], 
-                  DF.rank*sizeof(Scalar) );
-                offsets[_level] += DF.rank;
-            }
+            std::memcpy
+            ( z.Buffer(), &buffer[offsets[_level]], 
+              DF.rank*sizeof(Scalar) );
+            offsets[_level] += DF.rank;
         }
         break;
-
+    }
     default:
         break;
     }
@@ -1182,6 +1212,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsUnpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorSumsUnpack");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1196,22 +1234,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSumsUnpack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                std::memcpy
-                ( z.Buffer(), &buffer[offsets[_level]], 
-                  DF.rank*sizeof(Scalar) );
-                offsets[_level] += DF.rank;
-            }
+            std::memcpy
+            ( z.Buffer(), &buffer[offsets[_level]], 
+              DF.rank*sizeof(Scalar) );
+            offsets[_level] += DF.rank;
         }
         break;
-
+    }
     default:
         break;
     }
@@ -1361,6 +1397,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataPack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataPack");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1387,59 +1431,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataPack
     }
     case DIST_LOW_RANK:
     {
-        if( _inSourceTeam && _inTargetTeam )
+        if( _inTargetTeam )
             break;
-        if( _inSourceTeam )
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                MPI_Comm team = _teams->Team( _level );
-                const int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    Vector<Scalar>& z = *context.block.data.z;
-                    std::memcpy
-                    ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
-                      DF.rank*sizeof(Scalar) );
-                    offsets[_targetRoot] += DF.rank;
-                    z.Clear();
-                }
+                Vector<Scalar>& z = *context.block.data.z;
+                std::memcpy
+                ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
+                  DF.rank*sizeof(Scalar) );
+                offsets[_targetRoot] += DF.rank;
+                z.Clear();
             }
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        if( _inSourceTeam )
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
         {
-            const SplitLowRank& SF = *_block.data.SF;
-            if( SF.rank != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                std::memcpy
-                ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
-                  SF.rank*sizeof(Scalar) );
-                offsets[_targetRoot] += SF.rank;
-                z.Clear();
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            std::memcpy
+            ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
+              SF.rank*sizeof(Scalar) );
+            offsets[_targetRoot] += SF.rank;
+            z.Clear();
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        if( _inSourceTeam )
+        const int height = Height();
+        if( height != 0 )
         {
-            const int height = Height();
-            if( height != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                std::memcpy
-                ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
-                  height*sizeof(Scalar) );
-                offsets[_targetRoot] += height;
-                z.Clear();
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            std::memcpy
+            ( &buffer[offsets[_targetRoot]], z.LockedBuffer(),
+              height*sizeof(Scalar) );
+            offsets[_targetRoot] += height;
+            z.Clear();
         }
         break;
     }
@@ -1460,6 +1495,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataUnpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPassDataUnpack");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1486,59 +1529,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPassDataUnpack
     }
     case DIST_LOW_RANK:
     {
-        if( _inSourceTeam && _inTargetTeam )
+        if( _inSourceTeam )
             break;
-        if( _inTargetTeam )
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                MPI_Comm team = _teams->Team( _level );
-                const int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    Vector<Scalar>& z = *context.block.data.z;
-                    z.Resize( DF.rank );
-                    std::memcpy
-                    ( z.Buffer(), &buffer[offsets[_sourceRoot]],
-                      DF.rank*sizeof(Scalar) );
-                    offsets[_sourceRoot] += DF.rank;
-                }
+                Vector<Scalar>& z = *context.block.data.z;
+                z.Resize( DF.rank );
+                std::memcpy
+                ( z.Buffer(), &buffer[offsets[_sourceRoot]],
+                  DF.rank*sizeof(Scalar) );
+                offsets[_sourceRoot] += DF.rank;
             }
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        if( _inTargetTeam )
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
         {
-            const SplitLowRank& SF = *_block.data.SF;
-            if( SF.rank != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                z.Resize( SF.rank );
-                std::memcpy
-                ( z.Buffer(), &buffer[offsets[_sourceRoot]],
-                  SF.rank*sizeof(Scalar) );
-                offsets[_sourceRoot] += SF.rank;
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            z.Resize( SF.rank );
+            std::memcpy
+            ( z.Buffer(), &buffer[offsets[_sourceRoot]],
+              SF.rank*sizeof(Scalar) );
+            offsets[_sourceRoot] += SF.rank;
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        if( _inTargetTeam )
+        const int height = Height();
+        if( height != 0 )
         {
-            const int height = Height();
-            if( height != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                z.Resize( height );
-                std::memcpy
-                ( z.Buffer(), &buffer[offsets[_sourceRoot]],
-                  height*sizeof(Scalar) );
-                offsets[_sourceRoot] += height;
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            z.Resize( height );
+            std::memcpy
+            ( z.Buffer(), &buffer[offsets[_sourceRoot]],
+              height*sizeof(Scalar) );
+            offsets[_sourceRoot] += height;
         }
         break;
     }
@@ -1691,6 +1725,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataPack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassDataPack");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1824,6 +1866,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataUnpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPassDataUnpack");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1850,59 +1900,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataUnpack
     }
     case DIST_LOW_RANK:
     {
-        if( _inSourceTeam && _inTargetTeam )
+        if( _inTargetTeam )
             break;
-        if( _inSourceTeam )
-       {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
+        {
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                MPI_Comm team = _teams->Team( _level );
-                const int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    Vector<Scalar>& z = *context.block.data.z;
-                    z.Resize( DF.rank );
-                    std::memcpy
-                    ( z.Buffer(), &buffer[offsets[_targetRoot]],
-                      DF.rank*sizeof(Scalar) );
-                    offsets[_targetRoot] += DF.rank;
-                }
+                Vector<Scalar>& z = *context.block.data.z;
+                z.Resize( DF.rank );
+                std::memcpy
+                ( z.Buffer(), &buffer[offsets[_targetRoot]],
+                  DF.rank*sizeof(Scalar) );
+                offsets[_targetRoot] += DF.rank;
             }
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        if( _inSourceTeam )
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
         {
-            const SplitLowRank& SF = *_block.data.SF;
-            if( SF.rank != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                z.Resize( SF.rank );
-                std::memcpy
-                ( z.Buffer(), &buffer[offsets[_targetRoot]],
-                  SF.rank*sizeof(Scalar) );
-                offsets[_targetRoot] += SF.rank;
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            z.Resize( SF.rank );
+            std::memcpy
+            ( z.Buffer(), &buffer[offsets[_targetRoot]],
+              SF.rank*sizeof(Scalar) );
+            offsets[_targetRoot] += SF.rank;
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        if( _inSourceTeam )
+        const int height = Height();
+        if( height != 0 )
         {
-            const int height = Height();
-            if( height != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                z.Resize( height );
-                std::memcpy
-                ( z.Buffer(), &buffer[offsets[_targetRoot]],
-                  height*sizeof(Scalar) );
-                offsets[_targetRoot] += height;
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            z.Resize( height );
+            std::memcpy
+            ( z.Buffer(), &buffer[offsets[_targetRoot]],
+              height*sizeof(Scalar) );
+            offsets[_targetRoot] += height;
         }
         break;
     }
@@ -2026,6 +2067,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsCount
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcastsCount");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2037,10 +2086,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsCount
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-            sizes[_level] += _block.data.DF->rank;
+        sizes[_level] += _block.data.DF->rank;
         break;
-
     default:
         break;
     }
@@ -2057,6 +2104,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsCount
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcastsCount");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2068,8 +2123,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsCount
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
-            sizes[_level] += _block.data.DF->rank;
+        sizes[_level] += _block.data.DF->rank;
         break;
 
     default:
@@ -2089,6 +2143,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcastsPack");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2103,22 +2165,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsPack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        const Vector<Scalar>& z = *context.block.data.z;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            const Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                std::memcpy
-                ( &buffer[offsets[_level]], z.LockedBuffer(), 
-                  DF.rank*sizeof(Scalar) );
-                offsets[_level] += DF.rank;
-            }
+            std::memcpy
+            ( &buffer[offsets[_level]], z.LockedBuffer(), 
+              DF.rank*sizeof(Scalar) );
+            offsets[_level] += DF.rank;
         }
         break;
-
+    }
     default:
         break;
     }
@@ -2136,6 +2196,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcastsPack");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2150,22 +2218,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsPack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        const Vector<Scalar>& z = *context.block.data.z;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamRank = mpi::CommRank( team );
+        if( teamRank == 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            const Vector<Scalar>& z = *context.block.data.z;
-            MPI_Comm team = _teams->Team( _level );
-            const int teamRank = mpi::CommRank( team );
-            if( teamRank == 0 )
-            {
-                std::memcpy
-                ( &buffer[offsets[_level]], z.LockedBuffer(), 
-                  DF.rank*sizeof(Scalar) );
-                offsets[_level] += DF.rank;
-            }
+            std::memcpy
+            ( &buffer[offsets[_level]], z.LockedBuffer(), 
+              DF.rank*sizeof(Scalar) );
+            offsets[_level] += DF.rank;
         }
         break;
-
+    }
     default:
         break;
     }
@@ -2183,6 +2249,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsUnpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorBroadcastsPack");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2197,17 +2271,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcastsUnpack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            std::memcpy
-            ( z.Buffer(), &buffer[offsets[_level]], DF.rank*sizeof(Scalar) );
-            offsets[_level] += DF.rank;
-        }
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( DF.rank );
+        std::memcpy
+        ( z.Buffer(), &buffer[offsets[_level]], DF.rank*sizeof(Scalar) );
+        offsets[_level] += DF.rank;
         break;
-
+    }
     default:
         break;
     }
@@ -2225,6 +2297,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsUnpack
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorBroadcastsPack");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2239,17 +2319,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcastsUnpack
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            std::memcpy
-            ( z.Buffer(), &buffer[offsets[_level]], DF.rank*sizeof(Scalar) );
-            offsets[_level] += DF.rank;
-        }
+    {
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( DF.rank );
+        std::memcpy
+        ( z.Buffer(), &buffer[offsets[_level]], DF.rank*sizeof(Scalar) );
+        offsets[_level] += DF.rank;
         break;
-
+    }
     default:
         break;
     }
