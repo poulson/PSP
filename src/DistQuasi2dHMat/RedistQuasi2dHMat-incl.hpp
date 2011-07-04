@@ -834,8 +834,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Unpack
     _inTargetTeam = true;
     _sourceRoot = 0;
     _targetRoot = 0;
-    _localSourceOffset = 0;
-    _localTargetOffset = 0;
 
     const byte* head = packedDistHMat;
     
@@ -1021,8 +1019,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           2*_ySource, 2*_yTarget,
                           *_teams, _level+1,
                           inLeftSourceTeam, inTopTargetTeam,
-                          _sourceRoot, _targetRoot,
-                          node.sourceSizes[0]*s, node.targetSizes[0]*t );
+                          _sourceRoot, _targetRoot );
                     node.Child(t,s).UnpackRecursion( head );
                 }
             }
@@ -1043,8 +1040,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           2*_ySource+1, 2*_yTarget,
                           *_teams, _level+1,
                           inRightSourceTeam, inTopTargetTeam,
-                          _sourceRoot+1, _targetRoot,
-                          node.sourceSizes[2]*(s-2), node.targetSizes[0]*t );
+                          _sourceRoot+1, _targetRoot );
                     node.Child(t,s).UnpackRecursion( head );
                 }
             }
@@ -1065,8 +1061,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           2*_ySource, 2*_yTarget+1,
                           *_teams, _level+1,
                           inLeftSourceTeam, inBottomTargetTeam,
-                          _sourceRoot, _targetRoot+1,
-                          node.sourceSizes[0]*s, node.targetSizes[2]*(t-2) );
+                          _sourceRoot, _targetRoot+1 );
                     node.Child(t,s).UnpackRecursion( head );
                 }
             }
@@ -1088,9 +1083,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                           2*_ySource+1, 2*_yTarget+1,
                           *_teams, _level+1,
                           inRightSourceTeam, inBottomTargetTeam,
-                          _sourceRoot+1, _targetRoot+1,
-                          node.sourceSizes[2]*(s-2), 
-                          node.targetSizes[2]*(t-2) );
+                          _sourceRoot+1, _targetRoot+1 );
                     node.Child(t,s).UnpackRecursion( head );
                 }
             }
@@ -1117,9 +1110,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                       2*_ySource+(s/2), 2*_yTarget+(t/2),
                       *_teams, _level+1, 
                       _inSourceTeam, _inTargetTeam,
-                      _sourceRoot, _targetRoot,
-                      _localSourceOffset+sOffset, 
-                      _localTargetOffset+tOffset );
+                      _sourceRoot, _targetRoot );
                 node.Child(t,s).UnpackRecursion( head );
             }
         }
@@ -1145,9 +1136,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
                       2*_ySource+(s/2), 2*_yTarget+(t/2),
                       *_teams, _level+1, 
                       _inSourceTeam, _inTargetTeam,
-                      _sourceRoot, _targetRoot,
-                      _localSourceOffset+sOffset, 
-                      _localTargetOffset+tOffset );
+                      _sourceRoot, _targetRoot );
                 node.Child(t,s).UnpackRecursion( head );
             }
         }

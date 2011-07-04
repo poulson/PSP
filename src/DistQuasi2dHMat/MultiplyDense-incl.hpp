@@ -1804,13 +1804,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyDensePassDataPack");
 #endif
     const int numRhs = context.numRhs;
-    if( numRhs == 0 )
+    if( !_inTargetTeam || numRhs == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
 #endif
         return;
     }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1818,10 +1819,47 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
         const Node& node = *_block.data.N;
         typename MultiplyDenseContext::DistNode& nodeContext = 
             *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyDensePassDataPack
-                ( nodeContext.Child(t,s), XLocal, buffer, offsets );
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).TransposeMultiplyDensePassDataPack
+                    ( nodeContext.Child(t,s), XLocal, buffer, offsets );
+        }
+        else // teamSize == 2
+        {
+            Dense<Scalar> XLocalSub;
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                // Take care of the upper half 
+                for( int t=0,tOffset=0; t<2;
+                     tOffset+=node.targetSizes[t],++t )
+                {
+                    XLocalSub.LockedView
+                    ( XLocal, tOffset, 0, node.targetSizes[t], numRhs );
+                    for( int s=0; s<4; ++s )
+                        node.Child(t,s).TransposeMultiplyDensePassDataPack
+                        ( nodeContext.Child(t,s), XLocalSub, buffer, offsets );
+                }
+            }
+            else // teamRank == 1
+            {
+                // Take care of the bottom half
+                for( int t=2,tOffset=0; t<4;
+                     tOffset+=node.targetSizes[t],++t )
+                {
+                    XLocalSub.LockedView
+                    ( XLocal, tOffset, 0, node.targetSizes[t], numRhs );
+                    for( int s=0; s<4; ++s )
+                        node.Child(t,s).TransposeMultiplyDensePassDataPack
+                        ( nodeContext.Child(t,s), XLocalSub, buffer, offsets );
+                }
+            }
+        }
         break;
     }
     case SPLIT_NODE:
@@ -1829,42 +1867,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
         const Node& node = *_block.data.N;
         typename MultiplyDenseContext::SplitNode& nodeContext = 
             *context.block.data.SN;
-        for( int t=0; t<4; ++t )
+        Dense<Scalar> XLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            XLocalSub.LockedView
+            ( XLocal, tOffset, 0, node.targetSizes[t], numRhs );
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyDensePassDataPack
-                ( nodeContext.Child(t,s), XLocal, buffer, offsets );
+                ( nodeContext.Child(t,s), XLocalSub, buffer, offsets );
+        }
         break;
     }
     case DIST_LOW_RANK:
     {
-        if( _inSourceTeam && _inTargetTeam )
+        if( _inSourceTeam )
             break;
-        if( _inTargetTeam )
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
-            {
-                MPI_Comm team = _teams->Team( _level );
-                const int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    Dense<Scalar>& Z = *context.block.data.Z;
-                    std::memcpy
-                    ( &buffer[offsets[_sourceRoot]], Z.LockedBuffer(),
-                      Z.Height()*Z.Width()*sizeof(Scalar) );
-                    offsets[_sourceRoot] += Z.Height()*Z.Width();
-                    Z.Clear();
-                }
-            }
-        }
-        break;
-    }
-    case SPLIT_LOW_RANK:
-    {
-        if( _inTargetTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            if( SF.rank != 0 )
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
                 Dense<Scalar>& Z = *context.block.data.Z;
                 std::memcpy
@@ -1876,33 +1899,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataPack
         }
         break;
     }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
+        {
+            Dense<Scalar>& Z = *context.block.data.Z;
+            std::memcpy
+            ( &buffer[offsets[_sourceRoot]], Z.LockedBuffer(),
+              Z.Height()*Z.Width()*sizeof(Scalar) );
+            offsets[_sourceRoot] += Z.Height()*Z.Width();
+            Z.Clear();
+        }
+        break;
+    }
     case SPLIT_DENSE:
     {
-        if( _inTargetTeam )
+        const int height = Height();
+        if( height != 0 )
         {
-            const int height = Height();
-            if( height != 0 )
+            if( XLocal.LDim() != height )
             {
-                if( XLocal.LDim() != height )
-                {
-                    Scalar* start = &buffer[offsets[_sourceRoot]];
-                    for( int j=0; j<numRhs; ++j )
-                    {
-                        std::memcpy
-                        ( &start[height*j], 
-                          XLocal.LockedBuffer(_localTargetOffset,j),
-                          height*sizeof(Scalar) );
-                    }
-                }
-                else
+                Scalar* start = &buffer[offsets[_sourceRoot]];
+                for( int j=0; j<numRhs; ++j )
                 {
                     std::memcpy
-                    ( &buffer[offsets[_sourceRoot]],
-                      XLocal.LockedBuffer(_localTargetOffset,0),
-                      height*numRhs*sizeof(Scalar) );
+                    ( &start[height*j], XLocal.LockedBuffer(0,j),
+                      height*sizeof(Scalar) );
                 }
-                offsets[_sourceRoot] += height*numRhs;
             }
+            else
+            {
+                std::memcpy
+                ( &buffer[offsets[_sourceRoot]], XLocal.LockedBuffer(),
+                  height*numRhs*sizeof(Scalar) );
+            }
+            offsets[_sourceRoot] += height*numRhs;
         }
         break;
     }
@@ -2447,7 +2479,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePostcompute
                             ( nodeContext.Child(t,s),
                               alpha, XLocalSub, YLocalSub );
                     }
-
                 }
                 else // teamRank == 1
                 {
@@ -2645,7 +2676,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePostcompute
                             ( nodeContext.Child(t,s),
                               alpha, XLocalSub, YLocalSub );
                     }
-
                 }
                 else // teamRank == 1
                 {

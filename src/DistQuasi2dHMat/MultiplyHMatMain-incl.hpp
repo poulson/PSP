@@ -82,8 +82,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
     C._inTargetTeam = A._inTargetTeam;
     C._sourceRoot = B._sourceRoot;
     C._targetRoot = A._targetRoot;
-    C._localSourceOffset = B._localSourceOffset;
-    C._localTargetOffset = A._localTargetOffset;
     
     MPI_Comm team = _teams->Team( A._level );
     const int teamSize = mpi::CommSize( team );

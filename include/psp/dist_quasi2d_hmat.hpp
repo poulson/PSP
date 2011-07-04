@@ -107,8 +107,7 @@ public:
       int zSize, int xSource, int xTarget, int ySource, int yTarget,
       const Teams& teams, unsigned level, 
       bool inSourceTeam, bool inTargetTeam, 
-      int sourceRoot, int targetRoot,
-      int localSourceOffset=0, int localTargetOffset=0 );
+      int sourceRoot, int targetRoot );
     DistQuasi2dHMat( const byte* packedPiece, const Teams& teams );
     ~DistQuasi2dHMat();
     void Clear();
@@ -970,7 +969,6 @@ private:
     unsigned _level;
     bool _inSourceTeam, _inTargetTeam;
     int _sourceRoot, _targetRoot;
-    int _localSourceOffset, _localTargetOffset;
 
     // For temporary products in an H-matrix/H-matrix multiplication. 
     // These are only needed for the C in C += alpha A B

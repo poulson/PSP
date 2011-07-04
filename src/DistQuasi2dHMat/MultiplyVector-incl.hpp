@@ -247,6 +247,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPrecompute");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -254,98 +262,199 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPrecompute
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPrecompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MultiplyVectorPrecompute
+                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+        }
+        else // teamSize == 2
+        {
+            const int teamRank = mpi::CommRank( team );
+            if( _inTargetTeam )
+            {
+                // Split xLocal and yLocal
+                Vector<Scalar> xLocalSub, yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper left block 
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0,sOffset=0; s<2;
+                             sOffset+=node.sourceSizes[s],++s )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, sOffset, node.sourceSizes[s] );
+                            node.Child(t,s).MultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Take care of the lower-left block
+                    yLocalSub.View( yLocal, 0, 0 );
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2; t<4; ++t )
+                            node.Child(t,s).MultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+
+                }
+                else // teamRank == 1
+                {
+                    // Bottom-right block
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=2,sOffset=0; s<4;
+                             sOffset+=node.sourceSizes[s],++s )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, sOffset, node.sourceSizes[s] );
+                            node.Child(t,s).MultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Upper-right block
+                    yLocalSub.View( yLocal, 0, 0 );
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<2; ++t )
+                            node.Child(t,s).MultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+            }
+            else
+            {
+                // Only split xLocal
+                Vector<Scalar> xLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the left half
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).MultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocal );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Take care of the right half
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).MultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocal );
+                    }
+                }
+            }
+        }
         break;
     }
     case SPLIT_NODE:
     {
-       typename MultiplyVectorContext::SplitNode& nodeContext = 
+        typename MultiplyVectorContext::SplitNode& nodeContext = 
             *context.block.data.SN;
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
+        Vector<Scalar> xLocalSub;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
+            for( int t=0; t<4; ++t )
                 node.Child(t,s).MultiplyVectorPrecompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                ( nodeContext.Child(t,s), alpha, xLocalSub, yLocal );
+        }
         break;
     }
     case NODE:
     {
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                xLocalSub.LockedView( xLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).MultiplyVectorPrecompute
-                ( context, alpha, xLocal, yLocal );
+                ( context, alpha, xLocalSub, yLocalSub );
+            }
+        }
         break;
     }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            // Form z := alpha VLocal^[T/H] xLocal
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Gemv
-            ( option, DF.VLocal.Height(), DF.rank, 
-              alpha,     DF.VLocal.LockedBuffer(), DF.VLocal.LDim(), 
-                         xLocal.LockedBuffer(),    1,
-              (Scalar)0, z.Buffer(),               1 );
-        }
+    {
+        // Form z := alpha VLocal^[T/H] xLocal
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( DF.rank );
+        const char option = ( Conjugated ? 'C' : 'T' );
+        blas::Gemv
+        ( option, DF.VLocal.Height(), DF.rank, 
+          alpha,     DF.VLocal.LockedBuffer(), DF.VLocal.LDim(), 
+                     xLocal.LockedBuffer(),    1,
+          (Scalar)0, z.Buffer(),               1 );
         break;
+    }
     case SPLIT_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Vector<Scalar>& z = *context.block.data.z;
-
-            Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView( xLocal, _localSourceOffset, SF.D.Height() );
-            if( Conjugated )
-                hmat_tools::AdjointMultiply( alpha, SF.D, xLocalSub, z );
-            else
-                hmat_tools::TransposeMultiply( alpha, SF.D, xLocalSub, z );
-        }
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        Vector<Scalar>& z = *context.block.data.z;
+        if( Conjugated )
+            hmat_tools::AdjointMultiply( alpha, SF.D, xLocal, z );
+        else
+            hmat_tools::TransposeMultiply( alpha, SF.D, xLocal, z );
         break;
+    }
     case LOW_RANK:
     {
         // There is no communication required for this piece, so simply perform
         // the entire update.
-        //
-        // NOTE: I'm not sure this case will ever happen. It would require a
-        //       diagonal block to be low-rank.
         const LowRank<Scalar,Conjugated>& F = *_block.data.F;
-        Vector<Scalar> xLocalSub, yLocalSub;
-        xLocalSub.LockedView( xLocal, _localSourceOffset, F.Width() );
-        yLocalSub.View( yLocal, _localTargetOffset, F.Height() );
-        hmat_tools::Multiply( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
+        hmat_tools::Multiply( alpha, F, xLocal, (Scalar)1, yLocal );
         break;
     }
     case SPLIT_DENSE:
-        if( _inSourceTeam )
-        {
-            const SplitDense& SD = *_block.data.SD;
-            Vector<Scalar>& z = *context.block.data.z;
-
-            Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView( xLocal, _localSourceOffset, Width() );
-            hmat_tools::Multiply( alpha, SD.D, xLocalSub, z );
-        }
+    {
+        const SplitDense& SD = *_block.data.SD;
+        Vector<Scalar>& z = *context.block.data.z;
+        hmat_tools::Multiply( alpha, SD.D, xLocal, z );
         break;
+    }
     case DENSE:
     {
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Dense<Scalar>& D = *_block.data.D;
-        Vector<Scalar> xLocalSub, yLocalSub;
-        xLocalSub.LockedView( xLocal, _localSourceOffset, D.Width() );
-        yLocalSub.View( yLocal, _localTargetOffset, D.Height() );
-        hmat_tools::Multiply( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
+        hmat_tools::Multiply( alpha, D, xLocal, (Scalar)1, yLocal );
         break;
     }
-
     default:
         break;
     }
@@ -363,6 +472,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPrecompute");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -370,10 +487,118 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPrecompute
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPrecompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).TransposeMultiplyVectorPrecompute
+                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+        }
+        else // teamSize == 2
+        {
+            const int teamRank = mpi::CommRank( team );
+            if( _inSourceTeam )
+            {
+                // Split xLocal and yLocal
+                Vector<Scalar> xLocalSub, yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper left block
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0,sOffset=0; s<2;
+                             sOffset+=node.sourceSizes[s],++s )
+                        {
+                            yLocalSub.View
+                            ( yLocal, sOffset, node.sourceSizes[s] );
+                            node.Child(t,s).TransposeMultiplyVectorPrecompute  
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Take care of the upper-right block
+                    yLocalSub.View( yLocal, 0, 0 );
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=2; s<4; ++s )
+                            node.Child(t,s).TransposeMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Bottom-right block
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2,tOffset=0; t<4;
+                             tOffset+=node.targetSizes[t],++t )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, tOffset, node.targetSizes[t] );
+                            node.Child(t,s).TransposeMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Bottom-left block
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<2; ++s )
+                            node.Child(t,s).TransposeMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+            }
+            else // !_inSourceTeam
+            {
+                // Only split xLocal
+                Vector<Scalar> xLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper half 
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).TransposeMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocal );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Take care of the bottom half
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).TransposeMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocal );
+                    }
+                }
+            }
+        }
         break;
     }
     case SPLIT_NODE:
@@ -381,58 +606,58 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPrecompute
         typename MultiplyVectorContext::SplitNode& nodeContext = 
             *context.block.data.SN;
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
+        Vector<Scalar> xLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorPrecompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                ( nodeContext.Child(t,s), alpha, xLocalSub, yLocal );
+        }
         break;
     }
     case NODE:
     {
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).TransposeMultiplyVectorPrecompute
-                ( context, alpha, xLocal, yLocal );
+                ( context, alpha, xLocalSub, yLocalSub );
+            }
+        }
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            // Form z := alpha ULocal^T xLocal
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            blas::Gemv
-            ( 'T', DF.ULocal.Height(), DF.rank, 
-              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
-                         xLocal.LockedBuffer(),    1,
-              (Scalar)0, z.Buffer(),               1 );
-        }
+    {
+        // Form z := alpha ULocal^T xLocal
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( DF.rank );
+        blas::Gemv
+        ( 'T', DF.ULocal.Height(), DF.rank, 
+          alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                     xLocal.LockedBuffer(),    1,
+          (Scalar)0, z.Buffer(),               1 );
         break;
+    }
     case SPLIT_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Vector<Scalar>& z = *context.block.data.z;
-            Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView( xLocal, _localTargetOffset, SF.D.Height() );
-            hmat_tools::TransposeMultiply( alpha, SF.D, xLocalSub, z );
-        }
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        Vector<Scalar>& z = *context.block.data.z;
+        hmat_tools::TransposeMultiply( alpha, SF.D, xLocal, z );
         break;
+    }
     case LOW_RANK:
     {
         // There is no communication required for this piece, so simply perform
         // the entire update.
-        //
-        // NOTE: I'm not sure this case will ever happen. It would require a
-        //       diagonal block to be low-rank.
         const LowRank<Scalar,Conjugated>& F = *_block.data.F;
-        Vector<Scalar> xLocalSub, yLocalSub;
-        xLocalSub.LockedView( xLocal, _localTargetOffset, F.Height() );
-        yLocalSub.View( yLocal, _localSourceOffset, F.Width() );
-        hmat_tools::TransposeMultiply
-        ( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
+        hmat_tools::TransposeMultiply( alpha, F, xLocal, (Scalar)1, yLocal );
         break;
     }
     case SPLIT_DENSE:
@@ -442,14 +667,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Dense<Scalar>& D = *_block.data.D;
-        Vector<Scalar> xLocalSub, yLocalSub;
-        xLocalSub.LockedView( xLocal, _localTargetOffset, D.Height() );
-        yLocalSub.View( yLocal, _localSourceOffset, D.Width() );
-        hmat_tools::TransposeMultiply
-        ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
+        hmat_tools::TransposeMultiply( alpha, D, xLocal, (Scalar)1, yLocal );
         break;
     }
-
     default:
         break;
     }
@@ -467,6 +687,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPrecompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorPrecompute");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -474,10 +702,118 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPrecompute
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).AdjointMultiplyVectorPrecompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).AdjointMultiplyVectorPrecompute
+                    ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+        }
+        else // teamSize == 2
+        {
+            const int teamRank = mpi::CommRank( team );
+            if( _inSourceTeam )
+            {
+                // Split xLocal and yLocal
+                Vector<Scalar> xLocalSub, yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper left block
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0,sOffset=0; s<2;
+                             sOffset+=node.sourceSizes[s],++s )
+                        {
+                            yLocalSub.View
+                            ( yLocal, sOffset, node.sourceSizes[s] );
+                            node.Child(t,s).AdjointMultiplyVectorPrecompute  
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Take care of the upper-right block
+                    yLocalSub.View( yLocal, 0, 0 );
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=2; s<4; ++s )
+                            node.Child(t,s).AdjointMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Bottom-right block
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2,tOffset=0; t<4;
+                             tOffset+=node.targetSizes[t],++t )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, tOffset, node.targetSizes[t] );
+                            node.Child(t,s).AdjointMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Bottom-left block
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<2; ++s )
+                            node.Child(t,s).AdjointMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+            }
+            else // !_inSourceTeam
+            {
+                // Only split xLocal
+                Vector<Scalar> xLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper half 
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).AdjointMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocal );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Take care of the bottom half
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        xLocalSub.LockedView
+                        ( xLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).AdjointMultiplyVectorPrecompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocal );
+                    }
+                }
+            }
+        }
         break;
     }
     case SPLIT_NODE:
@@ -485,60 +821,58 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPrecompute
         typename MultiplyVectorContext::SplitNode& nodeContext = 
             *context.block.data.SN;
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
+        Vector<Scalar> xLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
             for( int s=0; s<4; ++s )
                 node.Child(t,s).AdjointMultiplyVectorPrecompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
+                ( nodeContext.Child(t,s), alpha, xLocalSub, yLocal );
+        }
         break;
     }
     case NODE:
     {
         const Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
+        Vector<Scalar> xLocalSub, yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
+            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+            {
+                yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
                 node.Child(t,s).AdjointMultiplyVectorPrecompute
-                ( context, alpha, xLocal, yLocal );
+                ( context, alpha, xLocalSub, yLocalSub );
+            }
+        }
         break;
     }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            // Form z := alpha ULocal^H xLocal
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            z.Resize( DF.rank );
-            blas::Gemv
-            ( 'C', DF.ULocal.Height(), DF.rank, 
-              alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
-                         xLocal.LockedBuffer(),    1,
-              (Scalar)0, z.Buffer(),               1 );
-        }
+    {
+        // Form z := alpha ULocal^H xLocal
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        z.Resize( DF.rank );
+        blas::Gemv
+        ( 'C', DF.ULocal.Height(), DF.rank, 
+          alpha,     DF.ULocal.LockedBuffer(), DF.ULocal.LDim(), 
+                     xLocal.LockedBuffer(),    1,
+          (Scalar)0, z.Buffer(),               1 );
         break;
+    }
     case SPLIT_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Vector<Scalar>& z = *context.block.data.z;
-
-            Vector<Scalar> xLocalSub;
-            xLocalSub.LockedView
-            ( xLocal, _localTargetOffset, SF.D.Height() );
-            hmat_tools::AdjointMultiply( alpha, SF.D, xLocalSub, z );
-        }
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        Vector<Scalar>& z = *context.block.data.z;
+        hmat_tools::AdjointMultiply( alpha, SF.D, xLocal, z );
         break;
+    }
     case LOW_RANK:
     {
         // There is no communication required for this piece, so simply perform
         // the entire update.
-        //
-        // NOTE: I'm not sure this case will ever happen. It would require a
-        //       diagonal block to be low-rank.
         const LowRank<Scalar,Conjugated>& F = *_block.data.F;
-        Vector<Scalar> xLocalSub, yLocalSub;
-        xLocalSub.LockedView( xLocal, _localTargetOffset, F.Height() );
-        yLocalSub.View( yLocal, _localSourceOffset, F.Width() );
-        hmat_tools::AdjointMultiply
-        ( alpha, F, xLocalSub, (Scalar)1, yLocalSub );
+        hmat_tools::AdjointMultiply( alpha, F, xLocal, (Scalar)1, yLocal );
         break;
     }
     case SPLIT_DENSE:
@@ -548,14 +882,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPrecompute
         // There is no communication required for this piece, so simply perform
         // the entire update.
         const Dense<Scalar>& D = *_block.data.D;
-        Vector<Scalar> xLocalSub, yLocalSub;
-        xLocalSub.LockedView( xLocal, _localTargetOffset, D.Height() );
-        yLocalSub.View( yLocal, _localSourceOffset, D.Width() );
-        hmat_tools::AdjointMultiply
-        ( alpha, D, xLocalSub, (Scalar)1, yLocalSub );
+        hmat_tools::AdjointMultiply( alpha, D, xLocal, (Scalar)1, yLocal );
         break;
     }
-
     default:
         break;
     }
@@ -1373,6 +1702,47 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataPack
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorPassDataPack
                 ( nodeContext.Child(t,s), xLocal, buffer, offsets );
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).TransposeMultiplyVectorPassDataPack
+                    ( nodeContext.Child(t,s), xLocal, buffer, offsets );
+        }
+        else // teamSize == 2
+        {
+            Vector<Scalar> xLocalSub;
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
+            {
+                // Take care of the upper half 
+                for( int t=0,tOffset=0; t<2;
+                     tOffset+=node.targetSizes[t],++t )
+                {
+                    xLocalSub.LockedView
+                    ( xLocal, tOffset, node.targetSizes[t] );
+                    for( int s=0; s<4; ++s )
+                        node.Child(t,s).TransposeMultiplyVectorPassDataPack
+                        ( nodeContext.Child(t,s), xLocalSub, buffer, offsets );
+                }
+            }
+            else // teamRank == 1
+            {
+                // Take care of the bottom half
+                for( int t=2,tOffset=0; t<4;
+                     tOffset+=node.targetSizes[t],++t )
+                {
+                    xLocalSub.LockedView
+                    ( xLocal, tOffset, node.targetSizes[t] );
+                    for( int s=0; s<4; ++s )
+                        node.Child(t,s).TransposeMultiplyVectorPassDataPack
+                        ( nodeContext.Child(t,s), xLocalSub, buffer, offsets );
+                }
+            }
+        }
         break;
     }
     case SPLIT_NODE:
@@ -1380,66 +1750,60 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataPack
         const Node& node = *_block.data.N;
         typename MultiplyVectorContext::SplitNode& nodeContext =
             *context.block.data.SN;
-        for( int t=0; t<4; ++t )
+        Vector<Scalar> xLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            xLocalSub.LockedView( xLocal, tOffset, node.targetSizes[t] );
             for( int s=0; s<4; ++s )
                 node.Child(t,s).TransposeMultiplyVectorPassDataPack
-                ( nodeContext.Child(t,s), xLocal, buffer, offsets );
+                ( nodeContext.Child(t,s), xLocalSub, buffer, offsets );
+        }
         break;
     }
     case DIST_LOW_RANK:
     {
-        if( _inSourceTeam && _inTargetTeam )
+        if( _inSourceTeam )
             break;
-        if( _inTargetTeam )
+        const DistLowRank& DF = *_block.data.DF;
+        if( DF.rank != 0 )
         {
-            const DistLowRank& DF = *_block.data.DF;
-            if( DF.rank != 0 )
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 )
             {
-                MPI_Comm team = _teams->Team( _level );
-                const int teamRank = mpi::CommRank( team );
-                if( teamRank == 0 )
-                {
-                    Vector<Scalar>& z = *context.block.data.z;
-                    std::memcpy
-                    ( &buffer[offsets[_sourceRoot]], z.LockedBuffer(),
-                      DF.rank*sizeof(Scalar) );
-                    offsets[_sourceRoot] += DF.rank;
-                    z.Clear();
-                }
+                Vector<Scalar>& z = *context.block.data.z;
+                std::memcpy
+                ( &buffer[offsets[_sourceRoot]], z.LockedBuffer(),
+                  DF.rank*sizeof(Scalar) );
+                offsets[_sourceRoot] += DF.rank;
+                z.Clear();
             }
         }
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        if( _inTargetTeam )
+        const SplitLowRank& SF = *_block.data.SF;
+        if( SF.rank != 0 )
         {
-            const SplitLowRank& SF = *_block.data.SF;
-            if( SF.rank != 0 )
-            {
-                Vector<Scalar>& z = *context.block.data.z;
-                std::memcpy
-                ( &buffer[offsets[_sourceRoot]], z.LockedBuffer(),
-                  SF.rank*sizeof(Scalar) );
-                offsets[_sourceRoot] += SF.rank;
-                z.Clear();
-            }
+            Vector<Scalar>& z = *context.block.data.z;
+            std::memcpy
+            ( &buffer[offsets[_sourceRoot]], z.LockedBuffer(),
+              SF.rank*sizeof(Scalar) );
+            offsets[_sourceRoot] += SF.rank;
+            z.Clear();
         }
         break;
     }
     case SPLIT_DENSE:
     {
-        if( _inTargetTeam )
+        const int height = Height();
+        if( height != 0 )
         {
-            const int height = Height();
-            if( height != 0 )
-            {
-                std::memcpy
-                ( &buffer[offsets[_sourceRoot]],
-                  xLocal.LockedBuffer(_localTargetOffset),
-                  height*sizeof(Scalar) );
-                offsets[_sourceRoot] += height;
-            }
+            std::memcpy
+            ( &buffer[offsets[_sourceRoot]], xLocal.LockedBuffer(),
+              height*sizeof(Scalar) );
+            offsets[_sourceRoot] += height;
         }
         break;
     }
@@ -1549,8 +1913,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPassDataUnpack
     PopCallStack();
 #endif
 }
-
-// HERE
 
 template<typename Scalar,bool Conjugated>
 void
@@ -1906,6 +2268,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPostcompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyVectorPostcompute");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1913,59 +2283,160 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorPostcompute
         const Node& node = *_block.data.N;
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyVectorPostcompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
-        break;
-    }
-    case SPLIT_NODE:
-        if( _inTargetTeam )
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
         {
-            const Node& node = *_block.data.N;
-            typename MultiplyVectorContext::SplitNode& nodeContext = 
-                *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).MultiplyVectorPostcompute
                     ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         }
+        else // teamSize == 2
+        {
+            const int teamRank = mpi::CommRank( team );
+            if( _inSourceTeam )
+            {
+                // Split xLocal and yLocal
+                Vector<Scalar> xLocalSub, yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper left block 
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0,sOffset=0; s<2;
+                             sOffset+=node.sourceSizes[s],++s )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, sOffset, node.sourceSizes[s] );
+                            node.Child(t,s).MultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Take care of the upper-right block
+                    xLocalSub.LockedView( xLocal, 0, 0 );
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=2; s<4; ++s )
+                            node.Child(t,s).MultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Bottom-right block
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=2,sOffset=0; s<4;
+                             sOffset+=node.sourceSizes[s],++s )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, sOffset, node.sourceSizes[s] );
+                            node.Child(t,s).MultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Bottom-left block
+                    xLocalSub.LockedView( xLocal, 0, 0 );
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<2; ++s )
+                            node.Child(t,s).MultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+            }
+            else
+            {
+                // Only split yLocal
+                Vector<Scalar> yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper half
+                    for( int t=0,tOffset=0; t<2;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).MultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocal, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Take care of the bottom half
+                    for( int t=2,tOffset=0; t<4;
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).MultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocal, yLocalSub );
+                    }
+                }
+            }
+        }
         break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        Vector<Scalar> yLocalSub;
+        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+        {
+            yLocalSub.View( yLocal, tOffset, node.targetSizes[t] );
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyVectorPostcompute
+                ( nodeContext.Child(t,s), alpha, xLocal, yLocalSub );
+        }
+        break;
+    }
     case DIST_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            // yLocal += ULocal z
-            const DistLowRank& DF = *_block.data.DF;
-            const Vector<Scalar>& z = *context.block.data.z;
-            blas::Gemv
-            ( 'N', DF.ULocal.Height(), DF.rank,
-              (Scalar)1, DF.ULocal.LockedBuffer(), DF.ULocal.LDim(),
-                         z.LockedBuffer(),         1,
-              (Scalar)1, yLocal.Buffer(),          1 );
-        }
+    {
+        // yLocal += ULocal z
+        const DistLowRank& DF = *_block.data.DF;
+        const Vector<Scalar>& z = *context.block.data.z;
+        blas::Gemv
+        ( 'N', DF.ULocal.Height(), DF.rank,
+          (Scalar)1, DF.ULocal.LockedBuffer(), DF.ULocal.LDim(),
+                     z.LockedBuffer(),         1,
+          (Scalar)1, yLocal.Buffer(),          1 );
         break;
+    }
     case SPLIT_LOW_RANK:
-        if( _inTargetTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            const Vector<Scalar>& z = *context.block.data.z;
-            Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localTargetOffset, SF.D.Height() );
-            hmat_tools::Multiply( (Scalar)1, SF.D, z, (Scalar)1, yLocalSub );
-        }
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        const Vector<Scalar>& z = *context.block.data.z;
+        hmat_tools::Multiply( (Scalar)1, SF.D, z, (Scalar)1, yLocal );
         break;
+    }
     case SPLIT_DENSE:
-        if( _inTargetTeam )
-        {
-            const Vector<Scalar>& z = *context.block.data.z;
-            const int localHeight = Height();
-            const Scalar* zBuffer = z.LockedBuffer();
-            Scalar* yLocalBuffer = yLocal.Buffer(_localTargetOffset);
-            for( int i=0; i<localHeight; ++i )
-                yLocalBuffer[i] += zBuffer[i];
-        }
+    {
+        const Vector<Scalar>& z = *context.block.data.z;
+        const int localHeight = Height();
+        const Scalar* zBuffer = z.LockedBuffer();
+        Scalar* yLocalBuffer = yLocal.Buffer();
+        for( int i=0; i<localHeight; ++i )
+            yLocalBuffer[i] += zBuffer[i];
         break;
-
+    }
     default:
         break;
     }
@@ -1984,6 +2455,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPostcompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::TransposeMultiplyVectorPostcompute");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1991,89 +2470,182 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorPostcompute
         const Node& node = *_block.data.N;
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).TransposeMultiplyVectorPostcompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
-        break;
-    }
-    case SPLIT_NODE:
-        if( _inSourceTeam )
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
         {
-            const Node& node = *_block.data.N;
-            typename MultiplyVectorContext::SplitNode& nodeContext = 
-                *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).TransposeMultiplyVectorPostcompute
                     ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         }
+        else // teamSize == 2
+        {
+            const int teamRank = mpi::CommRank( team );
+            if( _inTargetTeam )
+            {
+                // Split xLocal and yLocal
+                Vector<Scalar> xLocalSub, yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper left block 
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0,tOffset=0; t<2;
+                             tOffset+=node.targetSizes[t],++t )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, tOffset, node.targetSizes[t] );
+                            node.Child(t,s).TransposeMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Take care of the lower left block
+                    xLocalSub.LockedView( xLocal, 0, 0 );
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2; t<4; ++t )
+                            node.Child(t,s).TransposeMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Bottom right block
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2,tOffset=0; t<4;
+                             tOffset+=node.targetSizes[t],++t )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, tOffset, node.targetSizes[t] );
+                            node.Child(t,s).TransposeMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Top right block
+                    xLocalSub.LockedView( xLocal, 0, 0 );
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<2; ++t )
+                            node.Child(t,s).TransposeMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+            }
+            else
+            {
+                // Only split yLocal
+                Vector<Scalar> yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the left half
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).TransposeMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocal, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Take care of the right half
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).TransposeMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocal, yLocalSub );
+                    }
+                }
+            }
+        }
         break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        Vector<Scalar> yLocalSub;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+                node.Child(t,s).TransposeMultiplyVectorPostcompute
+                ( nodeContext.Child(t,s), alpha, xLocal, yLocalSub );
+        }
+        break;
+    }
     case DIST_LOW_RANK:
-        if( _inSourceTeam )
+    {
+        // yLocal += (VLocal^[T/H])^T z
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        if( Conjugated )
         {
-            // yLocal += (VLocal^[T/H])^T z
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            if( Conjugated )
-            {
-                // yLocal += conj(VLocal) z
-                hmat_tools::Conjugate( z );
-                hmat_tools::Conjugate( yLocal );
-                blas::Gemv
-                ( 'N', DF.VLocal.Height(), DF.rank,
-                  (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
-                             z.LockedBuffer(),         1,
-                  (Scalar)1, yLocal.Buffer(),          1 );
-                hmat_tools::Conjugate( yLocal );
-            }
-            else
-            {
-                // yLocal += VLocal z
-                blas::Gemv
-                ( 'N', DF.VLocal.Height(), DF.rank,
-                  (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
-                             z.LockedBuffer(),         1,
-                  (Scalar)1, yLocal.Buffer(),          1 );
-            }
+            // yLocal += conj(VLocal) z
+            hmat_tools::Conjugate( z );
+            hmat_tools::Conjugate( yLocal );
+            blas::Gemv
+            ( 'N', DF.VLocal.Height(), DF.rank,
+              (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
+                         z.LockedBuffer(),         1,
+              (Scalar)1, yLocal.Buffer(),          1 );
+            hmat_tools::Conjugate( yLocal );
+        }
+        else
+        {
+            // yLocal += VLocal z
+            blas::Gemv
+            ( 'N', DF.VLocal.Height(), DF.rank,
+              (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
+                         z.LockedBuffer(),         1,
+              (Scalar)1, yLocal.Buffer(),          1 );
         }
         break;
+    }
     case SPLIT_LOW_RANK:
-        if( _inSourceTeam )
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        Vector<Scalar>& z = *context.block.data.z;
+        if( Conjugated )
         {
-            const SplitLowRank& SF = *_block.data.SF;
-            Vector<Scalar>& z = *context.block.data.z;
-
-            Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Height() );
-            if( Conjugated )
-            {
-                // yLocal += conj(V) z
-                hmat_tools::Conjugate( z );
-                hmat_tools::Conjugate( yLocalSub );
-                hmat_tools::Multiply
-                ( (Scalar)1, SF.D, z, (Scalar)1, yLocalSub );
-                hmat_tools::Conjugate( yLocalSub );
-            }
-            else
-            {
-                hmat_tools::Multiply
-                ( (Scalar)1, SF.D, z, (Scalar)1, yLocalSub );
-            }
+            // yLocal += conj(V) z
+            hmat_tools::Conjugate( z );
+            hmat_tools::Conjugate( yLocal );
+            hmat_tools::Multiply
+            ( (Scalar)1, SF.D, z, (Scalar)1, yLocal );
+            hmat_tools::Conjugate( yLocal );
         }
+        else
+            hmat_tools::Multiply( (Scalar)1, SF.D, z, (Scalar)1, yLocal );
         break;
+    }
     case SPLIT_DENSE:
-        if( _inSourceTeam )
-        {
-            const SplitDense& SD = *_block.data.SD;
-            const Vector<Scalar>& z = *context.block.data.z;
-            Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localSourceOffset, SD.D.Width() );
-            hmat_tools::TransposeMultiply
-            ( alpha, SD.D, z, (Scalar)1, yLocalSub );
-        }
+    {
+        const SplitDense& SD = *_block.data.SD;
+        const Vector<Scalar>& z = *context.block.data.z;
+        hmat_tools::TransposeMultiply( alpha, SD.D, z, (Scalar)1, yLocal );
         break;
-
+    }
     default:
         break;
     }
@@ -2092,6 +2664,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPostcompute
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::AdjointMultiplyVectorPostcompute");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2099,88 +2679,184 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyVectorPostcompute
         const Node& node = *_block.data.N;
         typename MultiplyVectorContext::DistNode& nodeContext = 
             *context.block.data.DN;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).AdjointMultiplyVectorPostcompute
-                ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
-        break;
-    }
-    case SPLIT_NODE:
-        if( _inSourceTeam )
+
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        if( teamSize > 2 )
         {
-            const Node& node = *_block.data.N;
-            typename MultiplyVectorContext::SplitNode& nodeContext = 
-                *context.block.data.SN;
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
                     node.Child(t,s).AdjointMultiplyVectorPostcompute
                     ( nodeContext.Child(t,s), alpha, xLocal, yLocal );
         }
-        break;
-    case DIST_LOW_RANK:
-        if( _inSourceTeam )
+        else // teamSize == 2
         {
-            // yLocal += (VLocal^[T/H])^H z
-            const DistLowRank& DF = *_block.data.DF;
-            Vector<Scalar>& z = *context.block.data.z;
-            if( Conjugated )
+            const int teamRank = mpi::CommRank( team );
+            if( _inTargetTeam )
             {
-                // yLocal += VLocal z
-                blas::Gemv
-                ( 'N', DF.VLocal.Height(), DF.rank,
-                  (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
-                             z.LockedBuffer(),         1,
-                  (Scalar)1, yLocal.Buffer(),          1 );
+                // Split xLocal and yLocal
+                Vector<Scalar> xLocalSub, yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the upper left block 
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0,tOffset=0; t<2;
+                             tOffset+=node.targetSizes[t],++t )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, tOffset, node.targetSizes[t] );
+                            node.Child(t,s).AdjointMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Take care of the lower left block
+                    xLocalSub.LockedView( xLocal, 0, 0 );
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2; t<4; ++t )
+                            node.Child(t,s).AdjointMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Bottom right block
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=2,tOffset=0; t<4;
+                             tOffset+=node.targetSizes[t],++t )
+                        {
+                            xLocalSub.LockedView
+                            ( xLocal, tOffset, node.targetSizes[t] );
+                            node.Child(t,s).AdjointMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                        }
+                    }
+                    // Top right block
+                    xLocalSub.LockedView( xLocal, 0, 0 );
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<2; ++t )
+                            node.Child(t,s).AdjointMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocalSub, yLocalSub );
+                    }
+                }
             }
             else
             {
-                // yLocal += conj(VLocal) z
-                hmat_tools::Conjugate( z );
-                hmat_tools::Conjugate( yLocal );
-                blas::Gemv
-                ( 'N', DF.VLocal.Height(), DF.rank,
-                  (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
-                             z.LockedBuffer(),         1,
-                  (Scalar)1, yLocal.Buffer(),          1 );
-                hmat_tools::Conjugate( yLocal );
+                // Only split yLocal
+                Vector<Scalar> yLocalSub;
+                if( teamRank == 0 )
+                {
+                    // Take care of the left half
+                    for( int s=0,sOffset=0; s<2;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).AdjointMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocal, yLocalSub );
+                    }
+                }
+                else // teamRank == 1
+                {
+                    // Take care of the right half
+                    for( int s=2,sOffset=0; s<4;
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).AdjointMultiplyVectorPostcompute
+                            ( nodeContext.Child(t,s),
+                              alpha, xLocal, yLocalSub );
+                    }
+                }
             }
         }
-        break;
-    case SPLIT_LOW_RANK:
-        if( _inSourceTeam )
-        {
-            const SplitLowRank& SF = *_block.data.SF;
-            Vector<Scalar>& z = *context.block.data.z;
-            Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localSourceOffset, SF.D.Height() );
-            if( Conjugated )
-            {
-                hmat_tools::Multiply
-                ( (Scalar)1, SF.D, z, (Scalar)1, yLocalSub );
-            }
-            else
-            {
-                // yLocal += conj(V) z
-                hmat_tools::Conjugate( z );
-                hmat_tools::Conjugate( yLocalSub );
-                hmat_tools::Multiply
-                ( (Scalar)1, SF.D, z, (Scalar)1, yLocalSub );
-                hmat_tools::Conjugate( yLocalSub );
-            }
-        }
-        break;
-    case SPLIT_DENSE:
-        if( _inSourceTeam )
-        {
-            const SplitDense& SD = *_block.data.SD;
-            const Vector<Scalar>& z = *context.block.data.z;
-            Vector<Scalar> yLocalSub;
-            yLocalSub.View( yLocal, _localSourceOffset, SD.D.Width() );
-            hmat_tools::AdjointMultiply
-            ( alpha, SD.D, z, (Scalar)1, yLocalSub );
-        }
-        break;
 
+        break;
+    }
+    case SPLIT_NODE:
+    {
+        const Node& node = *_block.data.N;
+        typename MultiplyVectorContext::SplitNode& nodeContext = 
+            *context.block.data.SN;
+        Vector<Scalar> yLocalSub;
+        for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+        {
+            yLocalSub.View( yLocal, sOffset, node.sourceSizes[s] );
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+                node.Child(t,s).AdjointMultiplyVectorPostcompute
+                ( nodeContext.Child(t,s), alpha, xLocal, yLocalSub );
+        }
+        break;
+    }
+    case DIST_LOW_RANK:
+    {
+        // yLocal += (VLocal^[T/H])^H z
+        const DistLowRank& DF = *_block.data.DF;
+        Vector<Scalar>& z = *context.block.data.z;
+        if( Conjugated )
+        {
+            // yLocal += VLocal z
+            blas::Gemv
+            ( 'N', DF.VLocal.Height(), DF.rank,
+              (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
+                         z.LockedBuffer(),         1,
+              (Scalar)1, yLocal.Buffer(),          1 );
+        }
+        else
+        {
+            // yLocal += conj(VLocal) z
+            hmat_tools::Conjugate( z );
+            hmat_tools::Conjugate( yLocal );
+            blas::Gemv
+            ( 'N', DF.VLocal.Height(), DF.rank,
+              (Scalar)1, DF.VLocal.LockedBuffer(), DF.VLocal.LDim(),
+                         z.LockedBuffer(),         1,
+              (Scalar)1, yLocal.Buffer(),          1 );
+            hmat_tools::Conjugate( yLocal );
+        }
+        break;
+    }
+    case SPLIT_LOW_RANK:
+    {
+        const SplitLowRank& SF = *_block.data.SF;
+        Vector<Scalar>& z = *context.block.data.z;
+        if( Conjugated )
+            hmat_tools::Multiply( (Scalar)1, SF.D, z, (Scalar)1, yLocal );
+        else
+        {
+            // yLocal += conj(V) z
+            hmat_tools::Conjugate( z );
+            hmat_tools::Conjugate( yLocal );
+            hmat_tools::Multiply
+            ( (Scalar)1, SF.D, z, (Scalar)1, yLocal );
+            hmat_tools::Conjugate( yLocal );
+        }
+        break;
+    }
+    case SPLIT_DENSE:
+    {
+        const SplitDense& SD = *_block.data.SD;
+        const Vector<Scalar>& z = *context.block.data.z;
+        hmat_tools::AdjointMultiply( alpha, SD.D, z, (Scalar)1, yLocal );
+        break;
+    }
     default:
         break;
     }
