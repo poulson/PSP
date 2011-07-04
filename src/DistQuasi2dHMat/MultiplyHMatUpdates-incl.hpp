@@ -1080,7 +1080,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         const unsigned teamRank = mpi::CommRank( team );
         const bool haveAnotherComm = ( step < numSteps-1 );
         // only valid result if we have a next step...
-        const bool rootOfNextStep = !(teamRank & 0x100);
+        const bool rootOfNextStep = !(teamRank & 0x4);
         const int passes = 2*step;
 
         // Compute the total message size for this step
@@ -1146,8 +1146,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         {
             // Flip the second bit of our rank in this team to get our partner,
             // and then check if our bit is 0 to see if we're the root
-            const unsigned secondPartner = teamRank ^ 0x10;
-            const bool secondRoot = !(teamRank & 0x10);
+            const unsigned secondPartner = teamRank ^ 0x2;
+            const bool secondRoot = !(teamRank & 0x2);
 
             // Unpack the recv messages, perform the QR factorizations, and
             // pack the resulting R into the next step and into the next 
@@ -2079,7 +2079,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 // top of the SF.D buffer
                 for( int j=0; j<maxRank; ++j )
                 {
-                    const Real sigma = singularValues[j];
                     const Scalar* XRow = X.LockedBuffer(j,0);
                     const int XLDim = X.LDim();
                     Scalar* VCol = SF.D.Buffer(0,j);
@@ -2327,7 +2326,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             // top of the F.V buffer
             for( int j=0; j<maxRank; ++j )
             {
-                const Real sigma = singularValues[j];
                 const Scalar* YRow = Y.LockedBuffer(j,0);
                 const int YLDim = Y.LDim();
                 Scalar* VCol = F.V.Buffer(0,j);

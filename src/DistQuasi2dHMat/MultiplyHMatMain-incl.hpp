@@ -29,6 +29,36 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSetUp");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    if( (A._inTargetTeam || A._inSourceTeam) && 
+        (A._block.type == DIST_NODE_GHOST ||
+         A._block.type == SPLIT_NODE_GHOST ||
+         A._block.type == NODE_GHOST ||
+         A._block.type == DIST_LOW_RANK_GHOST ||
+         A._block.type == SPLIT_LOW_RANK_GHOST ||
+         A._block.type == LOW_RANK_GHOST ||
+         A._block.type == SPLIT_DENSE_GHOST ||
+         A._block.type == DENSE_GHOST) )
+    {
+        std::ostringstream s;
+        s << "A was incorrectly ghosted on level " << A._level 
+          << ": " << BlockTypeString(A._block.type);
+        throw std::logic_error( s.str().c_str() );
+    }
+    if( (B._inTargetTeam || B._inSourceTeam) && 
+        (B._block.type == DIST_NODE_GHOST ||
+         B._block.type == SPLIT_NODE_GHOST ||
+         B._block.type == NODE_GHOST ||
+         B._block.type == DIST_LOW_RANK_GHOST ||
+         B._block.type == SPLIT_LOW_RANK_GHOST ||
+         B._block.type == LOW_RANK_GHOST ||
+         B._block.type == SPLIT_DENSE_GHOST ||
+         B._block.type == DENSE_GHOST) )
+    {
+        std::ostringstream s;
+        s << "B was incorrectly ghosted on level " << B._level 
+          << ": " << BlockTypeString(B._block.type);
+        throw std::logic_error( s.str().c_str() );
+    }
 
     C._numLevels = A._numLevels;
     C._maxRank = A._maxRank;
@@ -402,10 +432,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -479,10 +516,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -522,10 +566,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -582,10 +633,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case DIST_LOW_RANK_GHOST:
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -609,10 +667,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case DIST_LOW_RANK:
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -731,10 +796,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             // We are the left process, so there is no work to do
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -758,10 +830,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case SPLIT_DENSE:
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -862,10 +941,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -889,10 +975,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case SPLIT_DENSE:
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -966,10 +1059,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 C._haveDenseUpdate = true;
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -1041,15 +1141,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                 // D += D D
                 Dense<Scalar>& DC = *C._block.data.D;
                 hmat_tools::Multiply( alpha, DA, DB, (Scalar)1, DC );
-                // HERE
             }
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -1795,7 +1901,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -1878,10 +1984,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -1925,10 +2038,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -1977,10 +2097,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             }
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -1998,10 +2125,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             // Pass data for for H/F += F F is between other (two) team(s)
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2068,10 +2202,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             // Pass data for D/F += F D is in other process
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2093,10 +2234,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             AddToMap( recvSizes, B._targetRoot, B.Height()*SFGA.rank );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2123,10 +2271,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             // There is no pass data
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2148,10 +2303,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             AddToMap( recvSizes, B._targetRoot, B.Height()*FGA.rank );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2203,14 +2365,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             // These pass data do not exist or do not involve us
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
     case SPLIT_DENSE_GHOST:
+    {
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
@@ -2219,12 +2389,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             AddToMap( recvSizes, B._targetRoot, A.Height()*A.Width() );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
         }
+        }
         break;
+    }
     case DENSE:
     {
         switch( B._block.type )
@@ -2238,14 +2416,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         case DENSE:
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
     case DENSE_GHOST:
+    {
         switch( B._block.type )
         {
         case SPLIT_LOW_RANK:
@@ -2254,12 +2440,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             AddToMap( recvSizes, B._targetRoot, A.Height()*A.Width() );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
         }
+        }
         break;
+    }
     case EMPTY:
         break;
     }
@@ -2279,7 +2473,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -2354,10 +2548,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             ( *C._mainContextMap[key], sendBuffer, offsets );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2381,10 +2582,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             ( *C._mainContextMap[key], sendBuffer, offsets );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2435,10 +2643,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             // Pass data for H/F += F F is only receiving here
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2519,10 +2734,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             // Pass data for D/F += F D is in other process
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2559,10 +2781,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             // There is no pass data
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2625,10 +2854,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             // These pass data do not exist or do not involve us
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2657,10 +2893,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         case DENSE:
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2684,7 +2927,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -2761,10 +3004,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2790,10 +3040,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2845,10 +3102,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             }
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2865,10 +3129,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             // Pass data for for H/F += F F is between other (two) team(s)
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2959,10 +3230,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             // Pass data for D/F += F D is in other process
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -2993,10 +3271,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             }
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3029,10 +3314,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3116,10 +3408,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             // These pass data do not exist or do not involve us
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3145,10 +3444,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3409,7 +3715,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3489,7 +3795,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3572,7 +3878,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3776,7 +4082,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3865,10 +4171,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3885,10 +4198,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3951,10 +4271,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -3980,10 +4307,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4002,10 +4336,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4069,10 +4410,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4103,10 +4451,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4247,10 +4602,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             hmat_tools::Copy( SFA.D, *C._UMap[key] );
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4304,10 +4666,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4371,10 +4740,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4428,10 +4804,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4528,10 +4911,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             // We are the left process.
             break;
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4589,10 +4979,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }
@@ -4652,10 +5049,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             break;
         }
         default:
+        {
 #ifndef RELEASE
-            throw std::logic_error("Invalid H-matrix combination");
+            std::ostringstream s;
+            s << "Invalid H-matrix combination: " 
+              << BlockTypeString(A._block.type) << ", "
+              << BlockTypeString(B._block.type) << ", "
+              << BlockTypeString(C._block.type);
+            throw std::logic_error( s.str().c_str() );
 #endif
             break;
+        }
         }
         break;
     }

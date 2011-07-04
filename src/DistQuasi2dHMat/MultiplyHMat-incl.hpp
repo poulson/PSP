@@ -54,6 +54,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     MPI_Comm comm = A._teams->Team( 0 );
     const int rank = mpi::CommRank( comm );
 
+    if( rank == 0 || rank == 16 )
+    {
+        A.LatexWriteLocalStructure("A");
+        B.LatexWriteLocalStructure("B");
+    }
+
     mpi::Barrier( comm );
     if( rank == 0 )
     {

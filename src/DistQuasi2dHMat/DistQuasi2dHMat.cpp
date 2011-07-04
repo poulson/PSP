@@ -41,8 +41,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _localSourceOffset(0), _localTargetOffset(0),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false),
-  _haveDenseUpdate(false), _storedDenseUpdate(false)
+  _haveDenseUpdate(false), _storedDenseUpdate(false),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }
@@ -68,8 +68,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _sourceRoot(sourceRoot), _targetRoot(targetRoot),
   _localSourceOffset(localSourceOffset), _localTargetOffset(localTargetOffset),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false),
-  _haveDenseUpdate(false), _storedDenseUpdate(false)
+  _haveDenseUpdate(false), _storedDenseUpdate(false),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }
@@ -404,6 +404,38 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MScriptWriteLocalStructure
 #ifndef RELEASE
     PopCallStack();
 #endif
+}
+//----------------------------------------------------------------------------//
+// Private static routines                                                    //
+//----------------------------------------------------------------------------//
+
+template<typename Scalar,bool Conjugated>
+const std::string
+psp::DistQuasi2dHMat<Scalar,Conjugated>::BlockTypeString
+( BlockType type )
+{
+    std::string s;
+    switch( type )
+    {
+    case DIST_NODE:            s = "DIST_NODE";            break;
+    case DIST_NODE_GHOST:      s = "DIST_NODE_GHOST";      break;
+    case SPLIT_NODE:           s = "SPLIT_NODE";           break;
+    case SPLIT_NODE_GHOST:     s = "SPLIT_NODE_GHOST";     break;
+    case NODE:                 s = "NODE";                 break;
+    case NODE_GHOST:           s = "NODE_GHOST";           break;
+    case DIST_LOW_RANK:        s = "DIST_LOW_RANK";        break;
+    case DIST_LOW_RANK_GHOST:  s = "DIST_LOW_RANK_GHOST";  break;
+    case SPLIT_LOW_RANK:       s = "SPLIT_LOW_RANK";       break;
+    case SPLIT_LOW_RANK_GHOST: s = "SPLIT_LOW_RANK_GHOST"; break;
+    case LOW_RANK:             s = "LOW_RANK";             break;
+    case LOW_RANK_GHOST:       s = "LOW_RANK_GHOST";       break;
+    case SPLIT_DENSE:          s = "SPLIT_DENSE";          break;
+    case SPLIT_DENSE_GHOST:    s = "SPLIT_DENSE_GHOST";    break;
+    case DENSE:                s = "DENSE";                break;
+    case DENSE_GHOST:          s = "DENSE_GHOST";          break;
+    case EMPTY:                s = "EMPTY";                break;
+    }
+    return s;
 }
 
 //----------------------------------------------------------------------------//

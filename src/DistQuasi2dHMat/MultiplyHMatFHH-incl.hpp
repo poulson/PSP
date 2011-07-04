@@ -29,7 +29,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPrecompute");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -200,7 +200,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -263,7 +263,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsPack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -333,7 +333,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsUnpack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -477,7 +477,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -547,7 +547,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataPack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -632,7 +632,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataUnpack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -748,7 +748,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsCount");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -811,7 +811,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsPack");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -881,7 +881,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsUnpack");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -968,7 +968,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcomputeC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -1185,13 +1185,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         const unsigned teamRank = mpi::CommRank( team );
         const bool haveAnotherComm = ( step < numSteps-1 );
         // only valid result if we have a next step...
-        const bool rootOfNextStep = !(teamRank & 0x100); 
+        const bool rootOfNextStep = !(teamRank & 0x4); 
         const int passes = 2*step;
 
         // Flip the first bit of our rank in this team to get our partner,
         // and then check if our bit is 0 to see if we're the root
         const unsigned firstPartner = teamRank ^ 0x1;
         const bool firstRoot = !(teamRank & 0x1);
+        std::cout << "teamRank=" << teamRank 
+                  << ", firstPartner=" << firstPartner << std::endl;
 
         // Count the messages to send/recv to/from firstPartner
         int msgSize = 0;
@@ -1241,8 +1243,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         {
             // Flip the second bit in our team rank to get our partner, and
             // then check if our bit is 0 to see if we're the root
-            const unsigned secondPartner = teamRank ^ 0x10;
-            const bool secondRoot = !(teamRank & 0x10);
+            const unsigned secondPartner = teamRank ^ 0x2;
+            const bool secondRoot = !(teamRank & 0x2);
+            std::cout << "teamRank=" << teamRank 
+                      << ", secondPartner=" << secondPartner << std::endl;
 
             // Unpack the recv messages, perform the QR factorizations, and
             // pack the resulting R into the next step and into the next 
@@ -1659,7 +1663,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeMiddleUpdates");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -1667,7 +1671,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
         return;
     }
 
-    const int r = SampleRank( C.MaxRank() );
+    const int rank = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
     {
@@ -1695,13 +1699,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* middleUpdate = 
                         &allReduceBuffer[middleOffsets[teamLevel]];
-                    middleOffsets[teamLevel] += r*r;
+                    middleOffsets[teamLevel] += rank*rank;
 
                     blas::Gemm
-                    ( 'C', 'N', r, r, A.LocalHeight(),
+                    ( 'C', 'N', rank, rank, A.LocalHeight(),
                       (Scalar)1, Omega2.LockedBuffer(), Omega2.LDim(),
                                  X.LockedBuffer(),      X.LDim(),
-                      (Scalar)0, middleUpdate,          r );
+                      (Scalar)0, middleUpdate,          rank );
                 }
             }
             else
@@ -1711,10 +1715,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
-                        nodeA.Child(t,r).
-                        MultiplyHMatFHHFinalizeMiddleUpdates
-                        ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                          allReduceBuffer, middleOffsets );
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).
+                            MultiplyHMatFHHFinalizeMiddleUpdates
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              allReduceBuffer, middleOffsets );
             }
             break;
         default:
@@ -1873,7 +1878,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeOuterUpdates");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -1881,7 +1886,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
         return;
     }
 
-    const int r = SampleRank( C.MaxRank() );
+    const int rank = SampleRank( C.MaxRank() );
 
     switch( A._block.type )
     {
@@ -1909,13 +1914,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[teamLevel]];
-                    leftOffsets[teamLevel] += r*r;
+                    leftOffsets[teamLevel] += rank*rank;
 
                     blas::Gemm
-                    ( 'C', 'N', r, r, A.LocalHeight(),
+                    ( 'C', 'N', rank, rank, A.LocalHeight(),
                       (Scalar)1, Q1.LockedBuffer(),     Q1.LDim(),
                                  Omega2.LockedBuffer(), Omega2.LDim(),
-                      (Scalar)0, leftUpdate,            r );
+                      (Scalar)0, leftUpdate,            rank );
                 }
                 if( C._inSourceTeam )
                 {
@@ -1925,13 +1930,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
-                    rightOffsets[teamLevel] += r*r;
+                    rightOffsets[teamLevel] += rank*rank;
 
                     blas::Gemm
-                    ( 'C', 'N', r, r, B.LocalWidth(),
+                    ( 'C', 'N', rank, rank, B.LocalWidth(),
                       (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
                                  Omega1.LockedBuffer(), Omega1.LDim(),
-                      (Scalar)0, rightUpdate,           r );
+                      (Scalar)0, rightUpdate,           rank );
                 }
             }
             else
@@ -1941,10 +1946,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
-                        nodeA.Child(t,r).
-                        MultiplyHMatFHHFinalizeOuterUpdates
-                        ( nodeB.Child(r,s), nodeC.Child(t,s), allReduceBuffer,
-                          leftOffsets, rightOffsets );
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).
+                            MultiplyHMatFHHFinalizeOuterUpdates
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              allReduceBuffer, leftOffsets, rightOffsets );
             }
             break;
         default:
@@ -1978,7 +1984,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeFormLowRank");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( C._block.type == EMPTY )
+    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
     {
 #ifndef RELEASE
         PopCallStack();

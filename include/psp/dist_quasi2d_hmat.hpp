@@ -420,6 +420,8 @@ private:
     /*
      * Private static functions
      */
+    static const std::string BlockTypeString( BlockType type );
+
     static void PackedSizesRecursion
     ( std::vector<std::size_t>& packedSizes,
       const std::vector<int>& localSizes,
@@ -710,18 +712,12 @@ private:
     void MultiplyHMatFormGhostRanks( DistQuasi2dHMat<Scalar,Conjugated>& B );
     void MultiplyHMatFormGhostRanksCount
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-      std::vector<std::set<std::pair<int,int> > >& markedANodes,
-      std::vector<std::set<std::pair<int,int> > >& markedBNodes,
       std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const;
     void MultiplyHMatFormGhostRanksPack
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-      std::vector<std::set<std::pair<int,int> > >& markedANodes,
-      std::vector<std::set<std::pair<int,int> > >& markedBNodes,
       std::vector<int>& sendBuffer, std::map<int,int>& offsets ) const;
     void MultiplyHMatFormGhostRanksUnpack
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
-      std::vector<std::set<std::pair<int,int> > >& markedANodes,
-      std::vector<std::set<std::pair<int,int> > >& markedBNodes,
       const std::vector<int>& recvBuffer, std::map<int,int>& offsets );
 
     void MultiplyHMatMainPrecompute

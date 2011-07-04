@@ -365,7 +365,30 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindTargetGhostNodesRecursion
             Node& node = *_block.data.N;
 
             for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
                 for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    int newSourceRoot, newTargetRoot;
+                    if( teamSize >= 4 )
+                    {
+                        _block.type = DIST_NODE_GHOST;
+                        newSourceRoot = sourceRoot + s*teamSize/4;
+                        newTargetRoot = targetRoot + t*teamSize/4;
+                    }
+                    else if( teamSize == 2 )
+                    {
+                        _block.type = DIST_NODE_GHOST;
+                        newSourceRoot = sourceRoot + s/2;
+                        newTargetRoot = targetRoot + t/2;
+                    }
+                    else
+                    {
+                        _block.type = 
+                            ( sourceRoot==targetRoot ? 
+                              NODE_GHOST : SPLIT_NODE_GHOST );
+                        newSourceRoot = sourceRoot;
+                        newTargetRoot = targetRoot;
+                    }
                     node.children[s+4*t] = 
                         new DistQuasi2dHMat<Scalar,Conjugated>
                         ( _numLevels-1, _maxRank, _stronglyAdmissible,
@@ -376,39 +399,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindTargetGhostNodesRecursion
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+(s/2), 2*_yTarget+(t/2),
                           *_teams, _level+1, false, false, 
-                          sourceRoot, targetRoot );
-
-            if( teamSize >= 2 )
-            {
-                _block.type = DIST_NODE_GHOST;
-                if( teamSize >= 4 )
-                {
-                    for( int t=0; t<4; ++t )
-                        for( int s=0; s<4; ++s )
-                            node.Child(t,s).FindTargetGhostNodesRecursion
-                            ( targetStructure,
-                              sourceRoot+s*teamSize/4, 
-                              targetRoot+t*teamSize/4 );
+                          newSourceRoot, newTargetRoot );
+                    node.Child(t,s).FindTargetGhostNodesRecursion
+                    ( targetStructure, newSourceRoot, newTargetRoot );
                 }
-                else // teamSize == 2
-                {
-                    for( int t=0; t<4; ++t ) 
-                        for( int s=0; s<4; ++s )
-                            node.Child(t,s).FindTargetGhostNodesRecursion
-                            ( targetStructure, sourceRoot+s/2, targetRoot+t/2 );
-                }
-            }
-            else // teamSize == 1
-            {
-                if( sourceRoot == targetRoot )
-                    _block.type = NODE_GHOST;
-                else
-                    _block.type = SPLIT_NODE_GHOST;
-                
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        node.Child(t,s).FindTargetGhostNodesRecursion
-                        ( targetStructure, sourceRoot, targetRoot );
             }
         }
         else
@@ -420,7 +414,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindTargetGhostNodesRecursion
         }
         break;
     }
-    
+
     default:
         break;
     }
@@ -516,9 +510,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindSourceGhostNodesRecursion
         {
             _block.data.N = NewNode();
             Node& node = *_block.data.N;
-
             for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
                 for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    int newSourceRoot, newTargetRoot;
+                    if( teamSize >= 4 )
+                    {
+                        _block.type = DIST_NODE_GHOST;
+                        newSourceRoot = sourceRoot + s*teamSize/4;
+                        newTargetRoot = targetRoot + t*teamSize/4;
+                    }
+                    else if( teamSize == 2 )
+                    {
+                        _block.type = DIST_NODE_GHOST;
+                        newSourceRoot = sourceRoot + s/2;
+                        newTargetRoot = targetRoot + t/2;
+                    }
+                    else
+                    {
+                        _block.type = 
+                            ( sourceRoot==targetRoot ? 
+                              NODE_GHOST : SPLIT_NODE_GHOST );
+                        newSourceRoot = sourceRoot;
+                        newTargetRoot = targetRoot;
+                    }
                     node.children[s+4*t] = 
                         new DistQuasi2dHMat<Scalar,Conjugated>
                         ( _numLevels-1, _maxRank, _stronglyAdmissible,
@@ -529,39 +545,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FindSourceGhostNodesRecursion
                           2*_xSource+(s&1), 2*_xTarget+(t&1),
                           2*_ySource+(s/2), 2*_yTarget+(t/2),
                           *_teams, _level+1, false, false, 
-                          sourceRoot, targetRoot );
-
-            if( teamSize >= 2 )
-            {
-                _block.type = DIST_NODE_GHOST;
-                if( teamSize >= 4 )
-                {
-                    for( int t=0; t<4; ++t )
-                        for( int s=0; s<4; ++s )
-                            node.Child(t,s).FindSourceGhostNodesRecursion
-                            ( sourceStructure,
-                              sourceRoot+s*teamSize/4, 
-                              targetRoot+t*teamSize/4 );
+                          newSourceRoot, newTargetRoot );
+                    node.Child(t,s).FindSourceGhostNodesRecursion
+                    ( sourceStructure, newSourceRoot, newTargetRoot );
                 }
-                else // teamSize == 2
-                {
-                    for( int t=0; t<4; ++t ) 
-                        for( int s=0; s<4; ++s )
-                            node.Child(t,s).FindSourceGhostNodesRecursion
-                            ( sourceStructure, sourceRoot+s/2, targetRoot+t/2 );
-                }
-            }
-            else // teamSize == 1
-            {
-                if( sourceRoot == targetRoot )
-                    _block.type = NODE_GHOST;
-                else
-                    _block.type = SPLIT_NODE_GHOST;
-                
-                for( int t=0; t<4; ++t )
-                    for( int s=0; s<4; ++s )
-                        node.Child(t,s).FindSourceGhostNodesRecursion
-                        ( sourceStructure, sourceRoot, targetRoot );
             }
         }
         else
