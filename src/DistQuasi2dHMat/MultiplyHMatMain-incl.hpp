@@ -29,36 +29,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSetUp");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( (A._inTargetTeam || A._inSourceTeam) && 
-        (A._block.type == DIST_NODE_GHOST ||
-         A._block.type == SPLIT_NODE_GHOST ||
-         A._block.type == NODE_GHOST ||
-         A._block.type == DIST_LOW_RANK_GHOST ||
-         A._block.type == SPLIT_LOW_RANK_GHOST ||
-         A._block.type == LOW_RANK_GHOST ||
-         A._block.type == SPLIT_DENSE_GHOST ||
-         A._block.type == DENSE_GHOST) )
-    {
-        std::ostringstream s;
-        s << "A was incorrectly ghosted on level " << A._level 
-          << ": " << BlockTypeString(A._block.type);
-        throw std::logic_error( s.str().c_str() );
-    }
-    if( (B._inTargetTeam || B._inSourceTeam) && 
-        (B._block.type == DIST_NODE_GHOST ||
-         B._block.type == SPLIT_NODE_GHOST ||
-         B._block.type == NODE_GHOST ||
-         B._block.type == DIST_LOW_RANK_GHOST ||
-         B._block.type == SPLIT_LOW_RANK_GHOST ||
-         B._block.type == LOW_RANK_GHOST ||
-         B._block.type == SPLIT_DENSE_GHOST ||
-         B._block.type == DENSE_GHOST) )
-    {
-        std::ostringstream s;
-        s << "B was incorrectly ghosted on level " << B._level 
-          << ": " << BlockTypeString(B._block.type);
-        throw std::logic_error( s.str().c_str() );
-    }
 
     C._numLevels = A._numLevels;
     C._maxRank = A._maxRank;
@@ -1733,19 +1703,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
     case SPLIT_NODE:
     {
         if( _beganRowSpaceComp )
-        {
-            if( _inTargetTeam )
-            {
-                TransposeMultiplyDensePassDataPack
-                ( _rowContext, _rowOmega, sendBuffer, offsets );
-            }
-            else
-            {
-                Dense<Scalar> dummy( 0, _rowContext.numRhs );
-                TransposeMultiplyDensePassDataPack
-                ( _rowContext, dummy, sendBuffer, offsets );
-            }
-        }
+            TransposeMultiplyDensePassDataPack
+            ( _rowContext, _rowOmega, sendBuffer, offsets );
 
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
