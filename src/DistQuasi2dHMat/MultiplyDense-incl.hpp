@@ -3092,12 +3092,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::AdjointMultiplyDensePostcompute
         if( SF.rank != 0 )
         {
             Dense<Scalar>& Z = *context.block.data.Z;
-            std::ostringstream s;
-            s << "SF.D ~ " << SF.D.Height() << " x " << SF.D.Width()
-              << ", Z ~ " << Z.Height() << " x " << Z.Width() 
-              << ", YLocal ~ " << YLocal.Height() << " x " << YLocal.Width()
-              << std::endl;
-            std::cout << s.str();
             if( Conjugated )
                 hmat_tools::Multiply( (Scalar)1, SF.D, Z, (Scalar)1, YLocal );
             else

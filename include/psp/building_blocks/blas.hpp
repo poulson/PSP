@@ -360,7 +360,46 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(sgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    if( trans == 'N' )
+    {
+        if( n != 0 )
+            BLAS(sgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == 0 )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, m*sizeof(float) );
+                else
+                    for( int i=0; i<m; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<m; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
+    else
+    {
+        if( m != 0 )
+            BLAS(sgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == 0 )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, n*sizeof(float) );
+                else
+                    for( int i=0; i<n; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<n; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -377,7 +416,46 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(dgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    if( trans == 'N' )
+    {
+        if( n != 0 )
+            BLAS(dgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == 0 )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, m*sizeof(double) );
+                else
+                    for( int i=0; i<m; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<m; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
+    else
+    {
+        if( m != 0 )
+            BLAS(dgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == 0 )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, n*sizeof(double) );
+                else
+                    for( int i=0; i<n; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<n; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -394,7 +472,46 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(cgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    if( trans == 'N' )
+    {
+        if( n != 0 )
+            BLAS(cgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == std::complex<float>(0) )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, m*sizeof(std::complex<float>) );
+                else
+                    for( int i=0; i<m; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<m; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
+    else
+    {
+        if( m != 0 )
+            BLAS(cgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == std::complex<float>(0) )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, n*sizeof(std::complex<float>) );
+                else
+                    for( int i=0; i<n; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<n; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -411,7 +528,46 @@ inline void Gemv
     if( lda == 0 )
         throw std::logic_error("lda = 0");
 #endif
-    BLAS(zgemv)( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+    if( trans == 'N' )
+    {
+        if( n != 0 )
+            BLAS(zgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == std::complex<double>(0) )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, m*sizeof(std::complex<double>) );
+                else
+                    for( int i=0; i<m; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<m; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
+    else
+    {
+        if( m != 0 )
+            BLAS(zgemv)
+            ( &trans, &m, &n, &alpha, A, &lda, x, &incx, &beta, y, &incy );
+        else
+        {
+            if( beta == std::complex<double>(0) )
+            {
+                if( incy == 1 )
+                    std::memset( y, 0, n*sizeof(std::complex<double>) );
+                else
+                    for( int i=0; i<n; ++i )
+                        y[i*incy] = 0;
+            }
+            else
+                for( int i=0; i<n; ++i )
+                    y[i*incy] *= beta;
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -508,8 +664,20 @@ inline void Gemm
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
 #endif
-    BLAS(sgemm)
-    ( &transa, &transb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    if( k != 0 )
+        BLAS(sgemm)
+        ( &transa, &transb, &m, &n, &k, 
+          &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    else
+    {
+        if( beta == 0 )
+            for( int j=0; j<n; ++j )
+                std::memset( &C[j*ldc], 0, m*sizeof(float) );
+        else
+            for( int j=0; j<n; ++j )
+                for( int i=0; i<m; ++i )
+                    C[j*ldc+i] *= beta;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -530,8 +698,20 @@ inline void Gemm
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
 #endif
-    BLAS(dgemm)
-    ( &transa, &transb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    if( k != 0 )
+        BLAS(dgemm)
+        ( &transa, &transb, &m, &n, &k, 
+          &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    else
+    {
+        if( beta == 0 )
+            for( int j=0; j<n; ++j )
+                std::memset( &C[j*ldc], 0, m*sizeof(double) );
+        else
+            for( int j=0; j<n; ++j )
+                for( int i=0; i<m; ++i )
+                    C[j*ldc+i] *= beta;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -552,8 +732,20 @@ inline void Gemm
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
 #endif
-    BLAS(cgemm)
-    ( &transa, &transb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    if( k != 0 )
+        BLAS(cgemm)
+        ( &transa, &transb, &m, &n, &k, 
+          &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    else
+    {
+        if( beta == std::complex<float>(0) )
+            for( int j=0; j<n; ++j )
+                std::memset( &C[j*ldc], 0, m*sizeof(std::complex<float>) );
+        else
+            for( int j=0; j<n; ++j )
+                for( int i=0; i<m; ++i )
+                    C[j*ldc+i] *= beta;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -574,8 +766,20 @@ inline void Gemm
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
 #endif
-    BLAS(zgemm)
-    ( &transa, &transb, &m, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    if( k != 0 )
+        BLAS(zgemm)
+        ( &transa, &transb, &m, &n, &k, 
+          &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
+    else
+    {
+        if( beta == std::complex<double>(0) )
+            for( int j=0; j<n; ++j )
+                std::memset( &C[j*ldc], 0, m*sizeof(std::complex<double>) );
+        else
+            for( int j=0; j<n; ++j )
+                for( int i=0; i<m; ++i )
+                    C[j*ldc+i] *= beta;
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
