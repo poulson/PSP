@@ -61,68 +61,26 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
         {
             if( admissibleC )
             {
-                if( A._inSourceTeam || A._inTargetTeam )
-                {
-                    C._colFHHContextMap[key] = new MultiplyDenseContext;
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    context.numRhs = sampleRank;
-                    if( A._inTargetTeam )
-                    {
-                        C._colXMap[key] = 
-                            new Dense<Scalar>( A.LocalHeight(), sampleRank );
-                        Dense<Scalar>& X = *C._colXMap[key];
-                        hmat_tools::Scale( (Scalar)0, X );
-                    }
-                    if( A._inSourceTeam && A._inTargetTeam )
-                    {
-                        Dense<Scalar>& X = *C._colXMap[key];
-                        A.MultiplyDensePrecompute( context, alpha, B._colT, X );
-                    }
-                    else if( A._inSourceTeam )
-                    {
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        A.MultiplyDensePrecompute
-                        ( context, alpha, B._colT, dummy );
-                    }
-                    else // A._inTargetTeam
-                    {
-                        Dense<Scalar>& X = *C._colXMap[key];
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        A.MultiplyDensePrecompute( context, alpha, dummy, X );
-                    }
-                }
-                if( B._inSourceTeam || B._inTargetTeam )
-                {
-                    C._rowFHHContextMap[key] = new MultiplyDenseContext;
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    context.numRhs = sampleRank;
-                    if( B._inSourceTeam )
-                    {
-                        C._rowXMap[key] = 
-                            new Dense<Scalar>( B.LocalWidth(), sampleRank );
-                        Dense<Scalar>& X = *C._rowXMap[key];
-                        hmat_tools::Scale( (Scalar)0, X );
-                    }
-                    if( B._inSourceTeam && B._inTargetTeam )
-                    {
-                        Dense<Scalar>& X = *C._rowXMap[key];
-                        B.AdjointMultiplyDensePrecompute
-                        ( context, Conj(alpha), A._rowT, X );
-                    }
-                    else if( B._inTargetTeam )
-                    {
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        B.AdjointMultiplyDensePrecompute
-                        ( context, Conj(alpha), A._rowT, dummy );
-                    }
-                    else // B._inSourceTeam
-                    {
-                        Dense<Scalar>& X = *C._rowXMap[key];
-                        Dense<Scalar> dummy( 0, sampleRank );
-                        B.AdjointMultiplyDensePrecompute
-                        ( context, Conj(alpha), dummy, X );
-                    }
-                }
+                C._colFHHContextMap[key] = new MultiplyDenseContext;
+                MultiplyDenseContext& colContext = *C._colFHHContextMap[key];
+                colContext.numRhs = sampleRank;
+                C._colXMap[key] = 
+                    new Dense<Scalar>( A.LocalHeight(), sampleRank );
+                Dense<Scalar>& colX = *C._colXMap[key];
+                hmat_tools::Scale( (Scalar)0, colX );
+                A.MultiplyDenseInitialize( colContext, sampleRank );
+                A.MultiplyDensePrecompute( colContext, alpha, B._colT, colX );
+
+                C._rowFHHContextMap[key] = new MultiplyDenseContext;
+                MultiplyDenseContext& rowContext = *C._rowFHHContextMap[key];
+                rowContext.numRhs = sampleRank;
+                C._rowXMap[key] = 
+                    new Dense<Scalar>( B.LocalWidth(), sampleRank );
+                Dense<Scalar>& rowX = *C._rowXMap[key];
+                hmat_tools::Scale( (Scalar)0, rowX );
+                B.AdjointMultiplyDenseInitialize( rowContext, sampleRank );
+                B.AdjointMultiplyDensePrecompute
+                ( rowContext, Conj(alpha), A._rowT, rowX );
             }
             else
             {
@@ -221,11 +179,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                if( A._inSourceTeam )
-                    A.MultiplyDenseSumsCount( sizes, sampleRank );
-                if( B._inTargetTeam )
-                    B.TransposeMultiplyDenseSumsCount
-                    ( sizes, sampleRank );
+                A.MultiplyDenseSumsCount( sizes, sampleRank );
+                B.TransposeMultiplyDenseSumsCount( sizes, sampleRank );
             }
             else
             {
@@ -284,17 +239,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                if( A._inSourceTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDenseSumsPack( context, buffer, offsets );
-                }
-                if( B._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDenseSumsPack
-                    ( context, buffer, offsets );
-                }
+                A.MultiplyDenseSumsPack
+                ( *C._colFHHContextMap[key], buffer, offsets );
+                B.TransposeMultiplyDenseSumsPack
+                ( *C._rowFHHContextMap[key], buffer, offsets );
             }
             else
             {
@@ -354,17 +302,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                if( A._inSourceTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDenseSumsUnpack( context, buffer, offsets );
-                }
-                if( B._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDenseSumsUnpack
-                    ( context, buffer, offsets );
-                }
+                A.MultiplyDenseSumsUnpack
+                ( *C._colFHHContextMap[key], buffer, offsets );
+                B.TransposeMultiplyDenseSumsUnpack
+                ( *C._rowFHHContextMap[key], buffer, offsets );
             }
             else
             {
@@ -494,21 +435,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
     case DIST_NODE_GHOST:
     case SPLIT_NODE:
     case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
         switch( B._block.type )
         {
         case DIST_NODE:
         case DIST_NODE_GHOST:
         case SPLIT_NODE:
         case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
         {
             if( admissibleC )
             {
-                if( A._inSourceTeam || A._inTargetTeam )
-                    A.MultiplyDensePassDataCount
-                    ( sendSizes, recvSizes, sampleRank );
-                if( B._inSourceTeam || B._inTargetTeam )
-                    B.TransposeMultiplyDensePassDataCount
-                    ( sendSizes, recvSizes, sampleRank );
+                A.MultiplyDensePassDataCount
+                ( sendSizes, recvSizes, sampleRank );
+                B.TransposeMultiplyDensePassDataCount
+                ( sendSizes, recvSizes, sampleRank );
             }
             else
             {
@@ -565,35 +508,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
     case DIST_NODE_GHOST:
     case SPLIT_NODE:
     case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
         switch( B._block.type )
         {
         case DIST_NODE:
         case DIST_NODE_GHOST:
         case SPLIT_NODE:
         case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
         {
             if( admissibleC )
             {
-                if( A._inSourceTeam || A._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDensePassDataPack
-                    ( context, sendBuffer, offsets );
-                }
-
-                if( B._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDensePassDataPack
-                    ( context, A._rowT, sendBuffer, offsets );
-                }
-                else if( B._inSourceTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    Dense<Scalar> dummy( 0, sampleRank );
-                    B.TransposeMultiplyDensePassDataPack
-                    ( context, dummy, sendBuffer, offsets );
-                }
+                A.MultiplyDensePassDataPack
+                ( *C._colFHHContextMap[key], sendBuffer, offsets );
+                B.TransposeMultiplyDensePassDataPack
+                ( *C._rowFHHContextMap[key], A._rowT, sendBuffer, offsets );
             }
             else
             {
@@ -649,27 +580,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
     case DIST_NODE_GHOST:
     case SPLIT_NODE:
     case SPLIT_NODE_GHOST:
+    case NODE:
+    case NODE_GHOST:
         switch( B._block.type )
         {
         case DIST_NODE:
         case DIST_NODE_GHOST:
         case SPLIT_NODE:
         case SPLIT_NODE_GHOST:
+        case NODE:
+        case NODE_GHOST:
         {
             if( admissibleC )
             {
-                if( A._inSourceTeam || A._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDensePassDataUnpack
-                    ( context, recvBuffer, offsets );
-                }
-                if( B._inSourceTeam || B._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDensePassDataUnpack
-                    ( context, recvBuffer, offsets );
-                }
+                A.MultiplyDensePassDataUnpack
+                ( *C._colFHHContextMap[key], recvBuffer, offsets );
+                B.TransposeMultiplyDensePassDataUnpack
+                ( *C._rowFHHContextMap[key], recvBuffer, offsets );
             }
             else
             {
@@ -769,11 +696,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                if( A._inTargetTeam )
-                    A.MultiplyDenseBroadcastsCount( sizes, sampleRank );
-                if( B._inSourceTeam )
-                    B.TransposeMultiplyDenseBroadcastsCount
-                    ( sizes, sampleRank );
+                A.MultiplyDenseBroadcastsCount( sizes, sampleRank );
+                B.TransposeMultiplyDenseBroadcastsCount( sizes, sampleRank );
             }
             else
             {
@@ -832,17 +756,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                if( A._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDenseBroadcastsPack( context, buffer, offsets );
-                }
-                if( B._inSourceTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDenseBroadcastsPack
-                    ( context, buffer, offsets );
-                }
+                A.MultiplyDenseBroadcastsPack
+                ( *C._colFHHContextMap[key], buffer, offsets );
+                B.TransposeMultiplyDenseBroadcastsPack
+                ( *C._rowFHHContextMap[key], buffer, offsets );
             }
             else
             {
@@ -902,17 +819,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                if( A._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    A.MultiplyDenseBroadcastsUnpack( context, buffer, offsets );
-                }
-                if( B._inSourceTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    B.TransposeMultiplyDenseBroadcastsUnpack
-                    ( context, buffer, offsets );
-                }
+                A.MultiplyDenseBroadcastsUnpack
+                ( *C._colFHHContextMap[key], buffer, offsets );
+                B.TransposeMultiplyDenseBroadcastsUnpack
+                ( *C._rowFHHContextMap[key], buffer, offsets );
             }
             else
             {
@@ -1001,36 +911,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
             if( admissibleC )
             {
                 // Finish computing A B Omega1
-                if( A._inSourceTeam && A._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    Dense<Scalar>& X = *C._colXMap[key];
-                    A.MultiplyDensePostcompute( context, alpha, B._colT, X );
-                }
-                else if( A._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._colFHHContextMap[key];
-                    Dense<Scalar>& X = *C._colXMap[key];
-                    Dense<Scalar> dummy( 0, sampleRank );
-                    A.MultiplyDensePostcompute( context, alpha, dummy, X );
-                }
+                A.MultiplyDensePostcompute
+                ( *C._colFHHContextMap[key], 
+                  alpha, B._colT, *C._colXMap[key] );
 
                 // Finish computing B' A' Omega2
-                if( B._inSourceTeam && B._inTargetTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    Dense<Scalar>& X = *C._rowXMap[key];
-                    B.AdjointMultiplyDensePostcompute
-                    ( context, Conj(alpha), A._rowT, X );
-                }
-                else if( B._inSourceTeam )
-                {
-                    MultiplyDenseContext& context = *C._rowFHHContextMap[key];
-                    Dense<Scalar>& X = *C._rowXMap[key];
-                    Dense<Scalar> dummy( 0, sampleRank );
-                    B.AdjointMultiplyDensePostcompute
-                    ( context, Conj(alpha), dummy, X );
-                }
+                B.AdjointMultiplyDensePostcompute
+                ( *C._rowFHHContextMap[key], 
+                  Conj(alpha), A._rowT, *C._rowXMap[key] );
             }
             else
             {
@@ -1192,8 +1080,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         // and then check if our bit is 0 to see if we're the root
         const unsigned firstPartner = teamRank ^ 0x1;
         const bool firstRoot = !(teamRank & 0x1);
-        std::cout << "teamRank=" << teamRank 
-                  << ", firstPartner=" << firstPartner << std::endl;
 
         // Count the messages to send/recv to/from firstPartner
         int msgSize = 0;
@@ -1245,8 +1131,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             // then check if our bit is 0 to see if we're the root
             const unsigned secondPartner = teamRank ^ 0x2;
             const bool secondRoot = !(teamRank & 0x2);
-            std::cout << "teamRank=" << teamRank 
-                      << ", secondPartner=" << secondPartner << std::endl;
 
             // Unpack the recv messages, perform the QR factorizations, and
             // pack the resulting R into the next step and into the next 

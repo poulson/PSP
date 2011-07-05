@@ -1988,6 +1988,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDensePassDataUnpack
 #endif
         return;
     }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -2412,8 +2413,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsUnpack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::
-TransposeMultiplyDenseBroadcastsUnpack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcastsUnpack
 ( MultiplyDenseContext& context,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
 {

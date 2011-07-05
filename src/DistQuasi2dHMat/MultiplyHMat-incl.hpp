@@ -50,56 +50,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
 
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
-
-    MPI_Comm comm = A._teams->Team( 0 );
-    const int rank = mpi::CommRank( comm );
-
-    if( rank == 0 || rank == 16 )
-    {
-        A.LatexWriteLocalStructure("A");
-        B.LatexWriteLocalStructure("B");
-    }
-
-    mpi::Barrier( comm );
-    if( rank == 0 )
-    {
-        std::cout << "FormGhostRanks...";
-        std::cout.flush();
-    }
     A.MultiplyHMatFormGhostRanks( B );
-    mpi::Barrier( comm );
-    if( rank == 0 )
-        std::cout << "DONE" << std::endl;
 
-    if( rank == 0 )
-    {
-        std::cout << "MainPrecompute...";
-        std::cout.flush();
-    }
     A.MultiplyHMatMainPrecompute( alpha, B, C );
-    mpi::Barrier( comm );
-    if( rank == 0 )
-        std::cout << "DONE" << std::endl;
-
-    if( rank == 0 )
-    {
-        std::cout << "MainSums...";
-        std::cout.flush();
-    }
     A.MultiplyHMatMainSums( B, C );
-    mpi::Barrier( comm );
-    if( rank == 0 )
-        std::cout << "DONE" << std::endl;
-
-    if( rank == 0 )
-    {
-        std::cout << "MainPassData...";
-        std::cout.flush();
-    }
     A.MultiplyHMatMainPassData( alpha, B, C );
-    mpi::Barrier( comm );
-    if( rank == 0 )
-        std::cout << "DONE" << std::endl;
 
     A.MultiplyHMatMainBroadcasts( B, C );
     A.MultiplyHMatMainPostcompute( alpha, B, C );
