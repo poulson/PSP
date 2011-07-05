@@ -39,7 +39,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
 
     const int key = A._sourceOffset;
     const int sampleRank = SampleRank( C.MaxRank() );
-
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
@@ -428,7 +427,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
 
     const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
-
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -499,7 +497,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
     }
 
     const int key = A._sourceOffset;
-    const int sampleRank = SampleRank( C.MaxRank() );
     const bool admissibleC = C.Admissible();
 
     switch( A._block.type )
@@ -887,8 +884,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
     }
 
     const int key = A._sourceOffset;
-    const int sampleRank = SampleRank( C.MaxRank() );
-
     const bool admissibleC = C.Admissible();
     switch( A._block.type )
     {
@@ -1461,9 +1456,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     // Q1' Omega2, Omega2' (alpha A B Omega1), and Q2' Omega1
     {
         // Generate offsets and sizes for each entire level
-        std::vector<int> sizes, offsets;
+        const unsigned numAllReduces = numTeamLevels-1;
+        std::vector<int> sizes(numAllReduces), offsets(numAllReduces);
         totalAllReduceSize = 0;
-        for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
+        for( unsigned teamLevel=0; teamLevel<numAllReduces; ++teamLevel )
         {
             offsets[teamLevel] = totalAllReduceSize;
             sizes[teamLevel] = r*r*(2*numTargetFHH[teamLevel]+

@@ -3966,7 +3966,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA()
     // Handle postcomputation of A's row space
     if( A._beganRowSpaceComp )
     {
-        const int numRhs = A._rowContext.numRhs;
         A.AdjointMultiplyDensePostcompute
         ( A._rowContext, (Scalar)1, A._rowOmega, A._rowT );
         A._rowContext.Clear();
@@ -4003,7 +4002,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB()
     // Handle postcomputation of B's column space
     if( B._beganColSpaceComp )
     {
-        const int numRhs = B._colContext.numRhs;
         B.MultiplyDensePostcompute
         ( B._colContext, (Scalar)1, B._colOmega, B._colT );
         B._colContext.Clear();

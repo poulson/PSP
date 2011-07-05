@@ -1536,7 +1536,12 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
     PushCallStack("DistQuasi2dHMat::Teams::TreeSums");
 #endif
     const int numLevels = NumLevels();
-    const int totalSize = buffer.size();
+    const int numAllReduces = numLevels-1;
+
+    int totalSize = 0;
+    for( int i=0; i<numAllReduces; ++i )
+        totalSize += sizes[i];
+
     if( numLevels == 1 || totalSize == 0 )
     {
 #ifndef RELEASE
@@ -1545,7 +1550,6 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
         return;
     }
 
-    const int numAllReduces = numLevels-1;
     // Use O(log(p)) custom method: 
     // - AllReduce over each cross communicator
     int partialSize = totalSize;
@@ -1576,7 +1580,12 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
     PushCallStack("DistQuasi2dHMat::Teams::TreeSumToRoots");
 #endif
     const int numLevels = NumLevels();
-    const int totalSize = buffer.size();
+    const int numReduces = numLevels-1;
+
+    int totalSize = 0;
+    for( int i=0; i<numReduces; ++i )
+        totalSize += sizes[i];
+
     if( numLevels == 1 || totalSize == 0 )
     {
 #ifndef RELEASE
@@ -1585,7 +1594,6 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
         return;
     }
 
-    const int numReduces = numLevels-1;
     // Use O(log(p)) custom method: 
     // - Reduce onto the root of our smallest nontrivial communicator
     // - Continue using the root teams to finish the reduction
@@ -1630,7 +1638,12 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeBroadcasts
     PushCallStack("DistQuasi2dHMat::Teams::TreeBroadcasts");
 #endif
     const int numLevels = NumLevels();
-    const int totalSize = buffer.size();
+    const int numBroadcasts = numLevels-1;
+
+    int totalSize = 0;
+    for( int i=0; i<numBroadcasts; ++i )
+        totalSize += sizes[i];
+
     if( numLevels == 1 || totalSize == 0 )
     {
 #ifndef RELEASE
@@ -1639,7 +1652,6 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeBroadcasts
         return;
     }
 
-    const int numBroadcasts = numLevels-1;
     // Use O(log(p)) custom method: 
     // - Broadcasts from the root of our smallest nontrivial communicator
     // - Continue broadcasting from the roots of the root teams

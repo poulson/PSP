@@ -26,11 +26,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdates");
 #endif
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Entered Updates." << std::endl;
+
     const unsigned numTeamLevels = _teams->NumLevels();
+
+    const int rank = mpi::CommRank( _teams->Team(0) );
 
     // Count the number of QRs we'll need to perform
     std::vector<int> numQRs(numTeamLevels,0);
     MultiplyHMatUpdatesCountQRs( numQRs );
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Finished CountQRs." << std::endl;
 
     // Count the ranks of all of the low-rank updates that we will have to 
     // perform a QR on and also make space for their aggregations.
@@ -40,13 +47,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     {
         rankOffsets[teamLevel] = numTotalQRs;        
         numTotalQRs += numQRs[teamLevel];
+        std::ostringstream s;
+        s << "rank=" << rank << ", teamLevel=" << teamLevel << ":\n"
+          << "  rankOffsets: " << rankOffsets[teamLevel] << std::endl;
+        std::cout << s.str();
     }
     std::vector<int> ranks(numTotalQRs);
     MultiplyHMatUpdatesLowRankCountAndResize( ranks, rankOffsets, 0 );
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Finished LowRankCountAndResize." << std::endl;
 
     // Carry the low-rank updates down from nodes into the low-rank and dense
     // blocks.
     MultiplyHMatUpdatesLowRankImport( 0 );
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Finished LowRankImport." << std::endl;
 
     // Allocate space for packed storage of the various components in our
     // distributed QR factorizations.
@@ -87,6 +102,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         tauOffsetsCopy = tauOffsets;
         MultiplyHMatUpdatesLocalQR
         ( qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
+        mpi::Barrier( MPI_COMM_WORLD );
+        std::cout << "Finished LocalQR." << std::endl;
 
         // Perform the parallel portion of the TSQR algorithm
         qrOffsetsCopy = qrOffsets;
@@ -94,6 +111,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         MultiplyHMatUpdatesParallelQR
         ( numQRs, ranks, rankOffsets,
           qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
+        mpi::Barrier( MPI_COMM_WORLD );
+        std::cout << "Finished ParallelQR." << std::endl;
     }
 
     // Count the number of entries of R and U that we need to exchange.
@@ -101,6 +120,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     // F += D, where the F is split.
     std::map<int,int> sendSizes, recvSizes;
     MultiplyHMatUpdatesExchangeCount( sendSizes, recvSizes );
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Finished ExchangeCount." << std::endl;
 
     // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
@@ -126,6 +147,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         MultiplyHMatUpdatesExchangePack
         ( sendBuffer, sendOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Finished ExchangePack." << std::endl;
 
     // Start the non-blocking sends
     MPI_Comm comm = _teams->Team( 0 );
@@ -163,6 +186,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     MultiplyHMatUpdatesExchangeFinalize
     ( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
       X, Y, Z, singularValues, work, realWork );
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Finished ExchangeFinalize." << std::endl;
 
     // Don't continue until we know the data was sent
     for( int i=0; i<numSends; ++i )
