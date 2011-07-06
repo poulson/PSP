@@ -1422,7 +1422,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
                 // Make a copy of X and then form the left part of identity.
                 Dense<Scalar> Y; 
-                Y = X;
+                hmat_tools::Copy( X, Y );
                 hmat_tools::Scale( (Scalar)0, X );
                 for( int j=0; j<minDim; ++j )
                     X.Set(j,j,(Scalar)1);
@@ -1654,9 +1654,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
             const unsigned numEntries = _colXMap.Size();
             const unsigned teamLevel = _teams->TeamLevel(_level);
             _colXMap.ResetIterator();
-            for( unsigned i=0; i<numEntries; ++i )
+            for( unsigned i=0; i<numEntries; ++i,_colXMap.Increment() )
             {
-                Dense<Scalar>& X = *_colXMap.NextEntry();
+                Dense<Scalar>& X = *_colXMap.CurrentEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
@@ -1697,9 +1697,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
             const int numEntries = _rowXMap.Size();
             const unsigned teamLevel = _teams->TeamLevel(_level);
             _rowXMap.ResetIterator();
-            for( int i=0; i<numEntries; ++i )
+            for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
             {
-                Dense<Scalar>& X = *_rowXMap.NextEntry();
+                Dense<Scalar>& X = *_rowXMap.CurrentEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
@@ -1920,7 +1920,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 
                     // Q1 := X.
                     Dense<Scalar> Q1;
-                    Q1 = X;
+                    hmat_tools::Copy( X, Q1 );
 
                     // Form X := Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     blas::Gemm
@@ -1946,7 +1946,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 
                     // Q2 := X
                     Dense<Scalar> Q2;
-                    Q2 = X;
+                    hmat_tools::Copy( X, Q2 );
 
                     blas::Gemm
                     ( 'N', 'C', Q2.Height(), rank, rank,

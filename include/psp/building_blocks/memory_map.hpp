@@ -38,19 +38,51 @@ public:
     int CurrentIndex() const { return _currentIndex; }
     void ResetIterator() { _currentIndex=0; _it=_baseMap.begin(); }
 
-    T2*& NextEntry() 
+    T2* CurrentEntry() 
     {
 #ifndef DEBUG
-        PushCallStack("MemoryMap::NextEntry");
-        if( !(_currentIndex < _baseMap.size()) )
+        PushCallStack("MemoryMap::CurrentEntry");
+        if( _currentIndex >= _baseMap.size() )
             throw std::logic_error("Traversed past end of map");
+#endif
+        if( _currentIndex == 0 )
+            _it = _baseMap.begin();
+
+        T2* value = (*_it).second;
+#ifndef RELEASE
         PopCallStack();
 #endif
-        T2** value = &(*_it).second;
+        return value;
+    }
+
+    void Increment()
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::Increment");
+        if( _currentIndex >= _baseMap.size() )
+            throw std::logic_error("Traversed past end of map");
+#endif
+        if( _currentIndex == 0 )
+            _it = _baseMap.begin();
         ++_it;
         ++_currentIndex;
-
-        return *value;
+#ifndef RELEASE
+        PopCallStack();
+#endif
+    }
+    
+    void Decrement()
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::Decrement");
+        if( _currentIndex == 0 )
+            throw std::logic_error("Traversed prior to beginning of map");
+#endif
+        --_it;
+        --_currentIndex;
+#ifndef RELEASE
+        PopCallStack();
+#endif
     }
 
     void Erase( int key )
@@ -59,20 +91,18 @@ public:
         PushCallStack("MemoryMap::Erase");
 #endif
         _baseMap.erase( key );
+        _it = _baseMap.begin();
+        _currentIndex = 0;
 #ifndef RELEASE
         PopCallStack();
 #endif
     }
 
-    void EraseLastEntry()
+    void EraseCurrentEntry()
     {
 #ifndef RELEASE
-        PushCallStack("MemoryMap::EraseLastEntry");
-        if( _currentIndex == 0 )
-            throw std::logic_error("Cannot erase entry with negative index");
+        PushCallStack("MemoryMap::EraseCurrentEntry");
 #endif
-        --_it;
-        --_currentIndex;
         _baseMap.erase( _it++ );
 #ifndef RELEASE
         PopCallStack();

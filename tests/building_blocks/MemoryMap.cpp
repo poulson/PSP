@@ -27,18 +27,17 @@ main( int argc, char* argv[] )
     {
         psp::MemoryMap<int,psp::Dense<double> > memoryMap;
 
-        memoryMap[17] = new psp::Dense<double>( 1, 1 );
-        memoryMap[11] = new psp::Dense<double>( 2, 2 );
-        memoryMap[23] = new psp::Dense<double>( 3, 3 );
-        memoryMap[7]  = new psp::Dense<double>( 4, 4 );
+        for( int i=0; i<10000; ++i )
+            memoryMap[400 - 3*i] = new psp::Dense<double>( i%4, i%4 );
 
         int numEntries = memoryMap.Size();
         std::cout << "size of memory map: " << numEntries << std::endl;
         memoryMap.ResetIterator();
-        for( int entry=0; entry<numEntries; ++entry )
+        for( int entry=0; entry<numEntries; ++entry,memoryMap.Increment() )
         {
-            const psp::Dense<double>& D = *memoryMap.NextEntry(); 
-            std::cout << "Index " << memoryMap.CurrentIndex() << ": " 
+            const int currentIndex = memoryMap.CurrentIndex();
+            const psp::Dense<double>& D = *memoryMap.CurrentEntry(); 
+            std::cout << "Index " << currentIndex << ": " 
                       << D.Height() << " x " << D.Width() << "\n"; 
         }
         std::cout << std::endl;
@@ -48,15 +47,18 @@ main( int argc, char* argv[] )
         memoryMap.ResetIterator();
         for( int entry=0; entry<numEntries; ++entry )
         {
-            const psp::Dense<double>& D = *memoryMap.NextEntry();
-            if( entry == 2 )
+            const int currentIndex = memoryMap.CurrentIndex();
+            const psp::Dense<double>& D = *memoryMap.CurrentEntry();
+            std::cout << "Index " << currentIndex << ": "
+                      << D.Height() << " x " << D.Width() << "\n";
+            if( entry%3 == 2 )
             {
-                memoryMap.EraseLastEntry();
+                memoryMap.EraseCurrentEntry();
                 std::cout << "Erased third entry, new size is: " 
                           << memoryMap.Size() << "\n";
             }
-            std::cout << "Index " << memoryMap.CurrentIndex() << ": "
-                      << D.Height() << " x " << D.Width() << "\n";
+            else
+                memoryMap.Increment();
         }
         std::cout << std::endl;
     }
