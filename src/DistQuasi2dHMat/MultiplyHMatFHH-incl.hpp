@@ -1872,8 +1872,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
         return;
     }
 
-    const int r = SampleRank( C.MaxRank() );
-
+    const int rank = SampleRank( C.MaxRank() );
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -1903,21 +1902,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                         &allReduceBuffer[leftOffsets[teamLevel]];
                     const Scalar* middleUpdate = 
                         &allReduceBuffer[middleOffsets[teamLevel]];
-                    leftOffsets[teamLevel] += r*r;
-                    middleOffsets[teamLevel] += r*r;
+                    leftOffsets[teamLevel] += rank*rank;
+                    middleOffsets[teamLevel] += rank*rank;
 
                     lapack::AdjointPseudoInverse
-                    ( r, r, leftUpdate, r, &singularValues[0],
-                      &U[0], r, &VH[0], r, &svdWork[0], svdWork.size(),
+                    ( rank, rank, leftUpdate, rank, &singularValues[0],
+                      &U[0], rank, &VH[0], rank, &svdWork[0], svdWork.size(),
                       &svdRealWork[0] );
 
                     // We can use the VH space to hold the product 
                     // pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     blas::Gemm
-                    ( 'N', 'N', r, r, r, 
-                      (Scalar)1, leftUpdate,   r, 
-                                 middleUpdate, r, 
-                      (Scalar)0, &VH[0],       r );
+                    ( 'N', 'N', rank, rank, rank, 
+                      (Scalar)1, leftUpdate,   rank, 
+                                 middleUpdate, rank, 
+                      (Scalar)0, &VH[0],       rank );
 
                     // Q1 := X.
                     Dense<Scalar> Q1;
@@ -1925,9 +1924,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 
                     // Form X := Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     blas::Gemm
-                    ( 'N', 'N', Q1.Height(), r, r,
+                    ( 'N', 'N', Q1.Height(), rank, rank,
                       (Scalar)1, Q1.LockedBuffer(), Q1.LDim(),
-                                 &VH[0],            r, 
+                                 &VH[0],            rank, 
                       (Scalar)0, X.Buffer(),        X.LDim() );
                 }
                 if( C._inSourceTeam )
@@ -1938,11 +1937,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
-                    rightOffsets[teamLevel] += r*r;
+                    rightOffsets[teamLevel] += rank*rank;
 
                     lapack::AdjointPseudoInverse
-                    ( r, r, rightUpdate, r, &singularValues[0],
-                      &U[0], r, &VH[0], r, &svdWork[0], svdWork.size(),
+                    ( rank, rank, rightUpdate, rank, &singularValues[0],
+                      &U[0], rank, &VH[0], rank, &svdWork[0], svdWork.size(),
                       &svdRealWork[0] );
 
                     // Q2 := X
@@ -1950,9 +1949,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                     Q2 = X;
 
                     blas::Gemm
-                    ( 'N', 'C', Q2.Height(), r, r,
+                    ( 'N', 'C', Q2.Height(), rank, rank,
                       (Scalar)1, Q2.LockedBuffer(), Q2.LDim(),
-                                 rightUpdate,       r,
+                                 rightUpdate,       rank,
                       (Scalar)0, X.Buffer(),        X.LDim() );
                     if( !Conjugated )
                         hmat_tools::Conjugate( X );
@@ -1965,10 +1964,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 Node& nodeC = *C._block.data.N;
                 for( int t=0; t<4; ++t )
                     for( int s=0; s<4; ++s )
-                        nodeA.Child(t,r).MultiplyHMatFHHFinalizeFormLowRank
-                        ( nodeB.Child(r,s), nodeC.Child(t,s), allReduceBuffer,
-                          leftOffsets, middleOffsets, rightOffsets, 
-                          singularValues, U, VH, svdWork, svdRealWork );
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatFHHFinalizeFormLowRank
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), 
+                              allReduceBuffer,
+                              leftOffsets, middleOffsets, rightOffsets, 
+                              singularValues, U, VH, svdWork, svdRealWork );
             }
             break;
         default:
