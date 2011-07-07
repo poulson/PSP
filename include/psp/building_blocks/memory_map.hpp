@@ -33,14 +33,55 @@ private:
 public:
     // NOTE: Insertion with the same key without manual deletion
     //       will cause a memory leak.
-    T2*& operator[]( T1 key ) { return _baseMap[key]; }
     int Size() const { return _baseMap.size(); }
     int CurrentIndex() const { return _currentIndex; }
     void ResetIterator() { _currentIndex=0; _it=_baseMap.begin(); }
 
+    T2& Get( int key )
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::Get");
+#endif
+        T2* value = _baseMap[key];
+#ifndef RELEASE
+        if( value == 0 )
+            throw std::logic_error("Tried to access with invalid key.");
+        PopCallStack();
+#endif
+        return *value;
+    }
+    
+    const T2& Get( int key ) const
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::Get");
+#endif
+        T2* value = _baseMap[key];
+#ifndef RELEASE
+        if( value == 0 )
+            throw std::logic_error("Tried to access with invalid key.");
+        PopCallStack();
+#endif
+        return *value;
+    }
+
+
+    void Set( int key, T2* value )
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::Set");
+        if( _baseMap[key] != 0 )
+            throw std::logic_error("Overwrote previous value");
+#endif
+        _baseMap[key] = value;
+#ifndef RELEASE
+        PopCallStack();
+#endif
+    }
+
     T2* CurrentEntry() 
     {
-#ifndef DEBUG
+#ifndef RELEASE
         PushCallStack("MemoryMap::CurrentEntry");
         if( _currentIndex >= _baseMap.size() )
             throw std::logic_error("Traversed past end of map");
@@ -50,6 +91,27 @@ public:
 
         T2* value = (*_it).second;
 #ifndef RELEASE
+        if( value == 0 )
+            throw std::logic_error("Tried to return null pointer.");
+        PopCallStack();
+#endif
+        return value;
+    }
+
+    const T2* CurrentEntry() const
+    {
+#ifndef RELEASE
+        PushCallStack("MemoryMap::CurrentEntry");
+        if( _currentIndex >= _baseMap.size() )
+            throw std::logic_error("Traversed past end of map");
+#endif
+        if( _currentIndex == 0 )
+            _it = _baseMap.begin();
+
+        const T2* value = (*_it).second;
+#ifndef RELEASE
+        if( value == 0 )
+            throw std::logic_error("Tried to return null pointer.");
         PopCallStack();
 #endif
         return value;

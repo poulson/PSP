@@ -60,22 +60,24 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
         {
             if( admissibleC )
             {
-                C._colFHHContextMap[key] = new MultiplyDenseContext;
-                MultiplyDenseContext& colContext = *C._colFHHContextMap[key];
+                C._colFHHContextMap.Set( key, new MultiplyDenseContext );
+                MultiplyDenseContext& colContext = 
+                    C._colFHHContextMap.Get( key );
                 colContext.numRhs = sampleRank;
-                C._colXMap[key] = 
-                    new Dense<Scalar>( A.LocalHeight(), sampleRank );
-                Dense<Scalar>& colX = *C._colXMap[key];
+                C._colXMap.Set
+                ( key, new Dense<Scalar>( A.LocalHeight(), sampleRank ) );
+                Dense<Scalar>& colX = C._colXMap.Get( key );
                 hmat_tools::Scale( (Scalar)0, colX );
                 A.MultiplyDenseInitialize( colContext, sampleRank );
                 A.MultiplyDensePrecompute( colContext, alpha, B._colT, colX );
 
-                C._rowFHHContextMap[key] = new MultiplyDenseContext;
-                MultiplyDenseContext& rowContext = *C._rowFHHContextMap[key];
+                C._rowFHHContextMap.Set( key, new MultiplyDenseContext );
+                MultiplyDenseContext& rowContext = 
+                    C._rowFHHContextMap.Get( key );
                 rowContext.numRhs = sampleRank;
-                C._rowXMap[key] = 
-                    new Dense<Scalar>( B.LocalWidth(), sampleRank );
-                Dense<Scalar>& rowX = *C._rowXMap[key];
+                C._rowXMap.Set
+                ( key, new Dense<Scalar>( B.LocalWidth(), sampleRank ) );
+                Dense<Scalar>& rowX = C._rowXMap.Get( key );
                 hmat_tools::Scale( (Scalar)0, rowX );
                 B.AdjointMultiplyDenseInitialize( rowContext, sampleRank );
                 B.AdjointMultiplyDensePrecompute
@@ -239,9 +241,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
             if( admissibleC )
             {
                 A.MultiplyDenseSumsPack
-                ( *C._colFHHContextMap[key], buffer, offsets );
+                ( C._colFHHContextMap.Get( key ), buffer, offsets );
                 B.TransposeMultiplyDenseSumsPack
-                ( *C._rowFHHContextMap[key], buffer, offsets );
+                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
             }
             else
             {
@@ -302,9 +304,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
             if( admissibleC )
             {
                 A.MultiplyDenseSumsUnpack
-                ( *C._colFHHContextMap[key], buffer, offsets );
+                ( C._colFHHContextMap.Get( key ), buffer, offsets );
                 B.TransposeMultiplyDenseSumsUnpack
-                ( *C._rowFHHContextMap[key], buffer, offsets );
+                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
             }
             else
             {
@@ -519,9 +521,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
             if( admissibleC )
             {
                 A.MultiplyDensePassDataPack
-                ( *C._colFHHContextMap[key], sendBuffer, offsets );
+                ( C._colFHHContextMap.Get( key ), sendBuffer, offsets );
                 B.TransposeMultiplyDensePassDataPack
-                ( *C._rowFHHContextMap[key], A._rowT, sendBuffer, offsets );
+                ( C._rowFHHContextMap.Get( key ), 
+                  A._rowT, sendBuffer, offsets );
             }
             else
             {
@@ -591,9 +594,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
             if( admissibleC )
             {
                 A.MultiplyDensePassDataUnpack
-                ( *C._colFHHContextMap[key], recvBuffer, offsets );
+                ( C._colFHHContextMap.Get( key ), recvBuffer, offsets );
                 B.TransposeMultiplyDensePassDataUnpack
-                ( *C._rowFHHContextMap[key], recvBuffer, offsets );
+                ( C._rowFHHContextMap.Get( key ), recvBuffer, offsets );
             }
             else
             {
@@ -754,9 +757,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
             if( admissibleC )
             {
                 A.MultiplyDenseBroadcastsPack
-                ( *C._colFHHContextMap[key], buffer, offsets );
+                ( C._colFHHContextMap.Get( key ), buffer, offsets );
                 B.TransposeMultiplyDenseBroadcastsPack
-                ( *C._rowFHHContextMap[key], buffer, offsets );
+                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
             }
             else
             {
@@ -817,9 +820,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
             if( admissibleC )
             {
                 A.MultiplyDenseBroadcastsUnpack
-                ( *C._colFHHContextMap[key], buffer, offsets );
+                ( C._colFHHContextMap.Get( key ), buffer, offsets );
                 B.TransposeMultiplyDenseBroadcastsUnpack
-                ( *C._rowFHHContextMap[key], buffer, offsets );
+                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
             }
             else
             {
@@ -907,13 +910,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
             {
                 // Finish computing A B Omega1
                 A.MultiplyDensePostcompute
-                ( *C._colFHHContextMap[key], 
-                  alpha, B._colT, *C._colXMap[key] );
+                ( C._colFHHContextMap.Get( key ), 
+                  alpha, B._colT, C._colXMap.Get( key ) );
 
                 // Finish computing B' A' Omega2
                 B.AdjointMultiplyDensePostcompute
-                ( *C._rowFHHContextMap[key], 
-                  Conj(alpha), A._rowT, *C._rowXMap[key] );
+                ( C._rowFHHContextMap.Get( key ), 
+                  Conj(alpha), A._rowT, C._rowXMap.Get( key ) );
             }
             else
             {
@@ -1574,7 +1577,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                 if( C._inTargetTeam ) 
                 {
                     // Handle the middle update, Omega2' (alpha A B Omega1)
-                    const Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
+                    const Dense<Scalar>& X = C._colXMap.Get( A._sourceOffset );
                     const Dense<Scalar>& Omega2 = A._rowOmega;
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* middleUpdate = 
@@ -1789,7 +1792,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                 if( C._inTargetTeam ) 
                 {
                     // Handle the left update, Q1' Omega2
-                    const Dense<Scalar>& Q1 = *C._colXMap[A._sourceOffset];
+                    const Dense<Scalar>& Q1 = C._colXMap.Get( A._sourceOffset );
                     const Dense<Scalar>& Omega2 = A._rowOmega;
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* leftUpdate = 
@@ -1805,7 +1808,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                 if( C._inSourceTeam )
                 {
                     // Handle the right update, Q2' Omega1
-                    const Dense<Scalar>& Q2 = *C._rowXMap[A._sourceOffset];
+                    const Dense<Scalar>& Q2 = C._rowXMap.Get( A._sourceOffset );
                     const Dense<Scalar>& Omega1 = B._colOmega;
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* rightUpdate = 
@@ -1896,7 +1899,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                     // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     // in the place of X.
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
-                    Dense<Scalar>& X = *C._colXMap[A._sourceOffset];
+                    Dense<Scalar>& X = C._colXMap.Get( A._sourceOffset );
 
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[teamLevel]];
@@ -1932,7 +1935,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                 if( C._inSourceTeam )
                 {
                     // Form Q2 pinv(Q2' Omega1) or its conjugate
-                    Dense<Scalar>& X = *C._rowXMap[A._sourceOffset];
+                    Dense<Scalar>& X = C._rowXMap.Get( A._sourceOffset );
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
 
                     Scalar* rightUpdate = 

@@ -28,7 +28,7 @@ main( int argc, char* argv[] )
         psp::MemoryMap<int,psp::Dense<double> > memoryMap;
 
         for( int i=0; i<10000; ++i )
-            memoryMap[400 - 3*i] = new psp::Dense<double>( i%4, i%4 );
+            memoryMap.Set(400 - 3*i,new psp::Dense<double>(i%4,i%4));
 
         int numEntries = memoryMap.Size();
         std::cout << "size of memory map: " << numEntries << std::endl;

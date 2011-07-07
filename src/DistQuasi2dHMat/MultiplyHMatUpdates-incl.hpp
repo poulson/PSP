@@ -28,19 +28,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 #endif
     mpi::Barrier( MPI_COMM_WORLD );
     std::cout.flush();
-    sleep(1);
     std::cout << "Entered Updates." << std::endl;
 
     const unsigned numTeamLevels = _teams->NumLevels();
-
-    const int rank = mpi::CommRank( _teams->Team(0) );
 
     // Count the number of QRs we'll need to perform
     std::vector<int> numQRs(numTeamLevels,0);
     MultiplyHMatUpdatesCountQRs( numQRs );
     mpi::Barrier( MPI_COMM_WORLD );
     std::cout.flush();
-    sleep(1);
     std::cout << "Finished CountQRs." << std::endl;
 
     // Count the ranks of all of the low-rank updates that we will have to 
@@ -51,17 +47,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     {
         rankOffsets[teamLevel] = numTotalQRs;        
         numTotalQRs += numQRs[teamLevel];
-        std::ostringstream s;
-        s << "rank=" << rank << ", teamLevel=" << teamLevel << ":\n"
-          << "  numQRs:      " << numQRs[teamLevel] << "\n"
-          << "  rankOffsets: " << rankOffsets[teamLevel] << std::endl;
-        std::cout << s.str();
     }
     std::vector<int> ranks(numTotalQRs);
     MultiplyHMatUpdatesLowRankCountAndResize( ranks, rankOffsets, 0 );
     mpi::Barrier( MPI_COMM_WORLD );
     std::cout.flush();
-    sleep(1);
     std::cout << "Finished LowRankCountAndResize." << std::endl;
 
     // Carry the low-rank updates down from nodes into the low-rank and dense
@@ -69,7 +59,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     MultiplyHMatUpdatesLowRankImport( 0 );
     mpi::Barrier( MPI_COMM_WORLD );
     std::cout.flush();
-    sleep(1);
     std::cout << "Finished LowRankImport." << std::endl;
 
     // Allocate space for packed storage of the various components in our
@@ -252,51 +241,26 @@ MultiplyHMatUpdatesLowRankCountAndResize
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLowRankCountAndResize");
 #endif
-    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-
-    std::ostringstream msg;
-    msg << "On process " << commRank << ": Height/Width=" << Height() << "/"
-        << Width() << ", LocalHeight/Width=" << LocalHeight() << "/" 
-        << LocalWidth() << std::endl;
-    std::cout << msg.str();
-
     switch( _block.type )
     {
     case DIST_NODE:
     case SPLIT_NODE:
     case NODE:
     {
-        std::ostringstream start;
-        start << "In NODE on process " << commRank 
-              << " with _UMap.Size()=" << _UMap.Size() << ", and"
-              << " _VMap.Size()=" << _VMap.Size() << ", "
-              << _inTargetTeam << " " << _inSourceTeam << std::endl;
-        std::cout << start.str();
-
         if( _inTargetTeam )
         {
             const int numEntries = _UMap.Size();
             _UMap.ResetIterator();
 
             for( int i=0; i<numEntries; ++i,_UMap.Increment() )
-            {
-                std::cout << commRank << ": _UMap[" << i << "]: " 
-                          << _UMap.CurrentEntry()->Height() << " x " 
-                          << _UMap.CurrentEntry()->Width() << std::endl;
                 rank += _UMap.CurrentEntry()->Width();
-            }
         }
         else if( _inSourceTeam )
         {
             const int numEntries = _VMap.Size();
             _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_VMap.Increment() )
-            {
-                std::cout << commRank << ": _VMap[" << i << "]: " 
-                          << _VMap.CurrentEntry()->Height() << " x "
-                          << _VMap.CurrentEntry()->Width() << std::endl;
                 rank += _VMap.CurrentEntry()->Width();
-            }
         }
 
         Node& node = *_block.data.N;
@@ -304,22 +268,11 @@ MultiplyHMatUpdatesLowRankCountAndResize
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesLowRankCountAndResize
                 ( ranks, rankOffsets, rank );
-
-        std::ostringstream stop;
-        stop << "Exiting from NODE on process " << commRank << std::endl;
-        std::cout << stop.str();
-
         break;
     }
     case DIST_LOW_RANK:
     {
-        /*
         DistLowRank& DF = *_block.data.DF;
-
-        std::ostringstream start;
-        start << "In DIST_LOW_RANK on process " << commRank 
-              << " with rank=" << rank << std::endl;
-        std::cout << start.str();
 
         // Compute the new rank
         if( _inTargetTeam )
@@ -328,23 +281,13 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _colXMap.Size();
             _colXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_colXMap.Increment() )
-            {
-                std::cout << commRank << ": _colXMap[" << i << "]: " 
-                          << _colXMap.CurrentEntry()->Height() << " x " 
-                          << _colXMap.CurrentEntry()->Width() << std::endl;
                 rank += _colXMap.CurrentEntry()->Width();
-            }
 
             // Add the low-rank updates
             numEntries = _UMap.Size();
             _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_UMap.Increment() )
-            {
-                std::cout << commRank << ": _UMap[" << i << "]: " 
-                          << _UMap.CurrentEntry()->Height() << " x " 
-                          << _UMap.CurrentEntry()->Width() << std::endl;
                 rank += _UMap.CurrentEntry()->Width();
-            }
 
             // Add the rank of the original low-rank matrix
             rank += DF.ULocal.Width();
@@ -355,23 +298,13 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _rowXMap.Size();
             _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
-            {
-                std::cout << commRank << ": _rowXMap[" << i << "]: " 
-                          << _rowXMap.CurrentEntry()->Height() << " x " 
-                          << _rowXMap.CurrentEntry()->Width() << std::endl;
                 rank += _rowXMap.CurrentEntry()->Width();
-            }
 
             // Add the low-rank updates
             numEntries = _VMap.Size();
             _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_VMap.Increment() )
-            {
-                std::cout << commRank << ": _VMap[" << i << "]: " 
-                          << _VMap.CurrentEntry()->Height() << " x " 
-                          << _VMap.CurrentEntry()->Width() << std::endl;
                 rank += _VMap.CurrentEntry()->Width();
-            }
 
             // Add the rank of the original low-rank matrix
             rank += DF.VLocal.Width();
@@ -403,30 +336,12 @@ MultiplyHMatUpdatesLowRankCountAndResize
             ( DF.VLocal.Buffer(0,rank-oldRank), VLocalCopy.LockedBuffer(),
               localWidth*oldRank*sizeof(Scalar) );
         }
-        
-        std::ostringstream stop;
-        stop << "Exiting from DIST_LOW_RANK on process " 
-             << commRank << " with rank=" << rank << std::endl;
-        std::cout << stop.str();
-
-        */
         break;
     }
     case SPLIT_LOW_RANK:
     {
-        /*
         SplitLowRank& SF = *_block.data.SF;
         const unsigned teamLevel = _teams->TeamLevel( _level );
-
-        std::ostringstream start;
-        start << "In SPLIT_LOW_RANK on process " << commRank 
-              << " with rank=" << rank << " and "
-              << "_colXMap.Size()=" << _colXMap.Size() << ", "
-              << "_rowXMap.Size()=" << _rowXMap.Size() << ", "
-              << "_UMap.Size()=" << _UMap.Size() << ", "
-              << "_VMap.Size()=" << _VMap.Size() << ", "
-              << "_inSourceTeam=" << _inSourceTeam << std::endl;
-        std::cout << start.str();
 
         // Compute the new rank
         if( _inTargetTeam )
@@ -435,23 +350,13 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _colXMap.Size();
             _colXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_colXMap.Increment() )
-            {
-                std::cout << commRank << ": _colXMap[" << i << "]: " 
-                          << _colXMap.CurrentEntry()->Height() << " x " 
-                          << _colXMap.CurrentEntry()->Width() << std::endl;
                 rank += _colXMap.CurrentEntry()->Width();
-            }
 
             // Add the low-rank updates
             numEntries = _UMap.Size();
             _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_UMap.Increment() )
-            {
-                std::cout << commRank << ": _UMap[" << i << "]: " 
-                          << _UMap.CurrentEntry()->Height() << " x " 
-                          << _UMap.CurrentEntry()->Width() << std::endl;
                 rank += _UMap.CurrentEntry()->Width();
-            }
 
             // Add the original rank
             rank += SF.D.Width();
@@ -462,23 +367,13 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _rowXMap.Size();
             _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
-            {
-                std::cout << commRank << ": _rowXMap[" << i << "]: " 
-                          << _rowXMap.CurrentEntry()->Height() << " x " 
-                          << _rowXMap.CurrentEntry()->Width() << std::endl;
                 rank += _rowXMap.CurrentEntry()->Width();
-            }
 
             // Add the low-rank updates
             numEntries = _VMap.Size();
             _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_VMap.Increment() )
-            {
-                std::cout << commRank << ": _VMap[" << i << "]: " 
-                          << _VMap.CurrentEntry()->Height() << " x " 
-                          << _VMap.CurrentEntry()->Width() << std::endl;
                 rank += _VMap.CurrentEntry()->Width();
-            }
 
             // Add the original rank
             rank += SF.D.Width();
@@ -511,26 +406,13 @@ MultiplyHMatUpdatesLowRankCountAndResize
             ( SF.D.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
               width*oldRank*sizeof(Scalar) );
         }
-        
-        std::ostringstream stop;
-        stop << "Exiting from SPLIT_LOW_RANK on process " << commRank 
-              << " with rank=" << rank << std::endl;
-        std::cout << stop.str();
-
-        */
         break;
     }
     case LOW_RANK:
     {
-        /*
         LowRank<Scalar,Conjugated>& F = *_block.data.F;
         const unsigned teamLevel = _teams->TeamLevel( _level );
         
-        std::ostringstream start;
-        start << "In LOW_RANK on process " << commRank 
-              << " with rank=" << rank << std::endl;
-        std::cout << start.str();
-
         // Compute the total new rank
         {
             // Add the F+=HH updates
@@ -575,23 +457,10 @@ MultiplyHMatUpdatesLowRankCountAndResize
             ( F.V.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
               width*oldRank*sizeof(Scalar) );
         }
-        
-        std::ostringstream stop;
-        stop << "Exiting from LOW_RANK on process " << commRank 
-             << " with rank=" << rank << std::endl;
-        std::cout << stop.str();
-
-        */
         break;
     }
     case SPLIT_DENSE:
     {
-        /*
-        std::ostringstream start;
-        start << "In SPLIT_DENSE on process " << commRank 
-              << " with rank=" << rank << std::endl;
-        std::cout << start.str();
-
         if( _inTargetTeam )
         {
             // Combine all of the U's into a single buffer with enough space
@@ -605,7 +474,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
 
             if( numLowRankUpdates == 0 )
             {
-                _UMap[0] = new Dense<Scalar>( m, rank );
+                _UMap.Set( 0, new Dense<Scalar>( m, rank ) );
             }
             else
             {
@@ -654,7 +523,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
 
             if( numLowRankUpdates == 0 )
             {
-                _VMap[0] = new Dense<Scalar>( n, rank );
+                _VMap.Set( 0, new Dense<Scalar>( n, rank ) );
             }
             else
             {
@@ -690,21 +559,10 @@ MultiplyHMatUpdatesLowRankCountAndResize
                 }
             }
         }
-        std::ostringstream stop;
-        stop << "Exiting from SPLIT_DENSE on process " << commRank 
-             << " with rank=" << rank << std::endl;
-        std::cout << stop.str();
-        */
         break;
     }
     case DENSE:
     {
-        /*
-        std::ostringstream start;
-        start << "In DENSE on process " << commRank 
-              << " with rank=" << rank << std::endl;
-        std::cout << start.str();
-
         // Condense all of the U's and V's onto the dense matrix
         Dense<Scalar>& D = *_block.data.D;
         const int m = Height();
@@ -726,12 +584,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
             _UMap.EraseCurrentEntry();
             _VMap.EraseCurrentEntry();
         }
-        
-        std::ostringstream stop;
-        stop << "Exiting from DENSE on process " << commRank 
-             << " with rank=" << rank << std::endl;
-        std::cout << stop.str();
-        */
         break;
     }
     default:
