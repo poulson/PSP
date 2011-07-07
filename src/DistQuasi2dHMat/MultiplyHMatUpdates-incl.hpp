@@ -2430,6 +2430,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 // Perform an SVD on the dense matrix, overwriting it with
                 // the left singular vectors and Y with the adjoint of the 
                 // right singular vecs
+                Y.Resize( std::min(m,n), n );
                 singularValues.resize( minDim );
                 work.resize( lapack::SVDWorkSize(m,n) );
                 realWork.resize( lapack::SVDRealWorkSize(m,n) );

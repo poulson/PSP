@@ -908,9 +908,14 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
-    std::vector<float> ACopy( m*n );
-    for( int j=0; j<n; ++j )
-        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(float) );
+    if( jobu == 'A' && ldu < m )
+        throw std::logic_error("ldu too small for jobu='A'");
+    else if( jobu == 'S' && ldu < std::min(m,n) )
+        throw std::logic_error("ldu too small for jobu='S'");
+    if( jobvh == 'A' && ldvh < n )
+        throw std::logic_error("ldvh too small for jobvh='A'");
+    else if( jobvh == 'S' && ldvh < std::min(m,n) )
+        throw std::logic_error("ldvh too small for jobvh='S'");
 #endif
     int info;
     LAPACK(sgesvd)
@@ -920,14 +925,7 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, sgesvd, failed with info=" << info << "\n";
-        s << "Input matrix:\n";
-        for( int i=0; i<m; ++i )
-        {
-            for( int j=0; j<n; ++j )
-                s << ACopy[i+j*m] << " ";
-            s << "\n";
-        }
+        s << "SVD, sgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
@@ -950,9 +948,14 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
-    std::vector<double> ACopy( m*n );
-    for( int j=0; j<n; ++j )
-        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(double) );
+    if( jobu == 'A' && ldu < m )
+        throw std::logic_error("ldu too small for jobu='A'");
+    else if( jobu == 'S' && ldu < std::min(m,n) )
+        throw std::logic_error("ldu too small for jobu='S'");
+    if( jobvh == 'A' && ldvh < n )
+        throw std::logic_error("ldvh too small for jobvh='A'");
+    else if( jobvh == 'S' && ldvh < std::min(m,n) )
+        throw std::logic_error("ldvh too small for jobvh='S'");
 #endif
     int info;
     LAPACK(dgesvd)
@@ -962,14 +965,7 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, dgesvd, failed with info=" << info << "\n";
-        s << "Input matrix:\n";
-        for( int i=0; i<m; ++i )
-        {
-            for( int j=0; j<n; ++j )
-                s << ACopy[i+j*m] << " ";
-            s << "\n";
-        }
+        s << "SVD, dgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
@@ -993,9 +989,14 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
-    std::vector< std::complex<float> > ACopy( m*n );
-    for( int j=0; j<n; ++j )
-        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(std::complex<float>) );
+    if( jobu == 'A' && ldu < m )
+        throw std::logic_error("ldu too small for jobu='A'");
+    else if( jobu == 'S' && ldu < std::min(m,n) )
+        throw std::logic_error("ldu too small for jobu='S'");
+    if( jobvh == 'A' && ldvh < n )
+        throw std::logic_error("ldvh too small for jobvh='A'");
+    else if( jobvh == 'S' && ldvh < std::min(m,n) )
+        throw std::logic_error("ldvh too small for jobvh='S'");
 #endif
     int info;
     LAPACK(cgesvd)
@@ -1005,14 +1006,7 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, dgesvd, failed with info=" << info << "\n";
-        s << "Input matrix:\n";
-        for( int i=0; i<m; ++i )
-        {
-            for( int j=0; j<n; ++j )
-                s << ACopy[i+j*m] << " ";
-            s << "\n";
-        }
+        s << "SVD, cgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
@@ -1036,9 +1030,14 @@ inline void SVD
         throw std::logic_error("ldu was 0");
     if( ldvh == 0 )
         throw std::logic_error("ldvh was 0");
-    std::vector< std::complex<double> > ACopy( m*n );
-    for( int j=0; j<n; ++j )
-        std::memcpy( &ACopy[j*m], &A[j*lda], m*sizeof(std::complex<double>) );
+    if( jobu == 'A' && ldu < m )
+        throw std::logic_error("ldu too small for jobu='A'");
+    else if( jobu == 'S' && ldu < std::min(m,n) )
+        throw std::logic_error("ldu too small for jobu='S'");
+    if( jobvh == 'A' && ldvh < n )
+        throw std::logic_error("ldvh too small for jobvh='A'");
+    else if( jobvh == 'S' && ldvh < std::min(m,n) )
+        throw std::logic_error("ldvh too small for jobvh='S'");
 #endif
     int info;
     LAPACK(zgesvd)
@@ -1048,14 +1047,7 @@ inline void SVD
     if( info != 0 )
     {
         std::ostringstream s;
-        s << "SVD, dgesvd, failed with info=" << info << "\n";
-        s << "Input matrix:\n";
-        for( int i=0; i<m; ++i )
-        {
-            for( int j=0; j<n; ++j )
-                s << ACopy[i+j*m] << " ";
-            s << "\n";
-        }
+        s << "SVD, zgesvd, failed with info=" << info;
         throw std::runtime_error( s.str().c_str() );
     }
     PopCallStack();
