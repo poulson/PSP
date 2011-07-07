@@ -26,18 +26,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdates");
 #endif
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout.flush();
-    std::cout << "Entered Updates." << std::endl;
-
     const unsigned numTeamLevels = _teams->NumLevels();
 
     // Count the number of QRs we'll need to perform
     std::vector<int> numQRs(numTeamLevels,0);
     MultiplyHMatUpdatesCountQRs( numQRs );
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout.flush();
-    std::cout << "Finished CountQRs." << std::endl;
 
     // Count the ranks of all of the low-rank updates that we will have to 
     // perform a QR on and also make space for their aggregations.
@@ -52,17 +45,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     {
         std::vector<int> rankOffsetsCopy = rankOffsets;
         MultiplyHMatUpdatesLowRankCountAndResize( ranks, rankOffsetsCopy, 0 );
-        mpi::Barrier( MPI_COMM_WORLD );
-        std::cout.flush();
-        std::cout << "Finished LowRankCountAndResize." << std::endl;
     }
 
     // Carry the low-rank updates down from nodes into the low-rank and dense
     // blocks.
     MultiplyHMatUpdatesLowRankImport( 0 );
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout.flush();
-    std::cout << "Finished LowRankImport." << std::endl;
 
     // Allocate space for packed storage of the various components in our
     // distributed QR factorizations.
@@ -92,9 +79,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     qrOffsets[numTeamLevels] = qrTotalSize;
     tauOffsets[numTeamLevels] = tauTotalSize;
 
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout << "Starting LocalQR" << std::endl;
-
     std::vector<Scalar> qrBuffer( qrTotalSize ), tauBuffer( tauTotalSize );
     {
         std::vector<Scalar> qrWork( lapack::QRWorkSize(maxRank) );
@@ -106,8 +90,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         tauOffsetsCopy = tauOffsets;
         MultiplyHMatUpdatesLocalQR
         ( qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
-        mpi::Barrier( MPI_COMM_WORLD );
-        std::cout << "Finished LocalQR." << std::endl;
 
         // Perform the parallel portion of the TSQR algorithm
         qrOffsetsCopy = qrOffsets;
@@ -115,8 +97,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         MultiplyHMatUpdatesParallelQR
         ( numQRs, ranks, rankOffsets,
           qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
-        mpi::Barrier( MPI_COMM_WORLD );
-        std::cout << "Finished ParallelQR." << std::endl;
     }
 
     // Count the number of entries of R and U that we need to exchange.
@@ -124,8 +104,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     // F += D, where the F is split.
     std::map<int,int> sendSizes, recvSizes;
     MultiplyHMatUpdatesExchangeCount( sendSizes, recvSizes );
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout << "Finished ExchangeCount." << std::endl;
 
     // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
@@ -151,8 +129,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         MultiplyHMatUpdatesExchangePack
         ( sendBuffer, sendOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout << "Finished ExchangePack." << std::endl;
 
     // Start the non-blocking sends
     MPI_Comm comm = _teams->Team( 0 );
@@ -190,8 +166,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     MultiplyHMatUpdatesExchangeFinalize
     ( recvBuffer, recvOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
       X, Y, Z, singularValues, work, realWork );
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout << "Finished ExchangeFinalize." << std::endl;
 
     // Don't continue until we know the data was sent
     for( int i=0; i<numSends; ++i )
@@ -611,6 +585,104 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
     switch( _block.type )
     {
     case DIST_NODE:
+    {
+        Node& node = *_block.data.N;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        const int teamRank = mpi::CommRank( team );
+
+        int newRank = rank;
+        if( teamSize == 2 )
+        {
+            if( _inTargetTeam )
+            {
+                const int tStart = (teamRank==0 ? 0 : 2);
+                const int tStop = (teamRank==0 ? 2 : 4);
+                const int numEntries = _UMap.Size();
+                _UMap.ResetIterator();
+                for( int i=0; i<numEntries; ++i )
+                {
+                    const Dense<Scalar>& ULocal = *_UMap.CurrentEntry();
+                    const int r = ULocal.Width();
+                    Dense<Scalar> ULocalSub;
+                    for( int t=tStart,tOffset=0; t<tStop; 
+                         tOffset+=node.targetSizes[t],++t )
+                    {
+                        ULocalSub.LockedView
+                        ( ULocal, tOffset, 0, node.targetSizes[t], r );
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).MultiplyHMatUpdatesImportU
+                            ( newRank, ULocalSub );
+                    }
+                    newRank += r;
+                    _UMap.EraseCurrentEntry();
+                }
+            }
+            if( _inSourceTeam )
+            {
+                newRank = rank;
+                const int sStart = (teamRank==0 ? 0 : 2);
+                const int sStop = (teamRank==0 ? 2 : 4);
+                const int numEntries = _VMap.Size();
+                _VMap.ResetIterator();
+                for( int i=0; i<numEntries; ++i )
+                {
+                    const Dense<Scalar>& VLocal = *_VMap.CurrentEntry();
+                    const int r = VLocal.Width();
+                    Dense<Scalar> VLocalSub;
+                    for( int s=sStart,sOffset=0; s<sStop; 
+                         sOffset+=node.sourceSizes[s],++s )
+                    {
+                        VLocalSub.LockedView
+                        ( VLocal, sOffset, 0, node.sourceSizes[s], r );
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).MultiplyHMatUpdatesImportV
+                            ( newRank, VLocalSub );
+                    }
+                    newRank += r;
+                    _VMap.EraseCurrentEntry();
+                }
+            }
+        }
+        else // teamSize >= 4
+        {
+            if( _inTargetTeam )
+            {
+                const int numEntries = _UMap.Size();
+                _UMap.ResetIterator();
+                for( int i=0; i<numEntries; ++i )
+                {
+                    const Dense<Scalar>& U = *_UMap.CurrentEntry();
+                    for( int t=0; t<4; ++t )
+                        for( int s=0; s<4; ++s )
+                            node.Child(t,s).MultiplyHMatUpdatesImportU
+                            ( newRank, U );
+                    newRank += U.Width();
+                    _UMap.EraseCurrentEntry();
+                }
+            }
+            if( _inSourceTeam )
+            {
+                newRank = rank;
+                const int numEntries = _VMap.Size();
+                _VMap.ResetIterator();
+                for( int i=0; i<numEntries; ++i )
+                {
+                    const Dense<Scalar>& V = *_VMap.CurrentEntry();
+                    for( int s=0; s<4; ++s )
+                        for( int t=0; t<4; ++t )
+                            node.Child(t,s).MultiplyHMatUpdatesImportV
+                            ( newRank, V );
+                    newRank += V.Width();
+                    _VMap.EraseCurrentEntry();
+                }
+            }
+        }
+        for( int t=0; t<4; ++t )
+            for( int s=0; s<4; ++s )
+                node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
+        break;
+    }
     case SPLIT_NODE:
     case NODE:
     {
@@ -627,13 +699,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
 
                 for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
                 {
+                    ULocal.LockedView
+                    ( U, tOffset, 0, node.targetSizes[t], U.Width() );
                     for( int s=0; s<4; ++s )
-                    {
-                        ULocal.LockedView
-                        ( U, tOffset, 0, node.targetSizes[t], U.Width() );
                         node.Child(t,s).MultiplyHMatUpdatesImportU
                         ( newRank, ULocal );
-                    }
                 }
                 newRank += U.Width();
                 _UMap.EraseCurrentEntry();
@@ -651,19 +721,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
 
                 for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
                 {
+                    VLocal.LockedView
+                    ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
                     for( int t=0; t<4; ++t )
-                    {
-                        VLocal.LockedView
-                        ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
                         node.Child(t,s).MultiplyHMatUpdatesImportV
                         ( newRank, VLocal );
-                    }
                 }
                 newRank += V.Width();
                 _VMap.EraseCurrentEntry();
             }
         }
-
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
@@ -774,22 +841,55 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesImportU");
 #endif
+    if( !_inTargetTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
+    {
+        Node& node = *_block.data.N;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        const int teamRank = mpi::CommRank( team );
+
+        if( teamSize == 2 )
+        {
+            const int tStart = (teamRank==0 ? 0 : 2);            
+            const int tStop = (teamRank==0 ? 2 : 4);
+            Dense<Scalar> USub;
+            for( int t=tStart,tOffset=0; t<tStop; 
+                 tOffset+=node.targetSizes[t],++t )
+            {
+                USub.LockedView
+                ( U, tOffset, 0, node.targetSizes[t], U.Width() );
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MultiplyHMatUpdatesImportU( rank, USub );
+            }
+        }
+        else  // teamSize >= 4
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MultiplyHMatUpdatesImportU( rank, U );
+        }
+        break;
+    }
     case SPLIT_NODE:
     case NODE:
     {
         Node& node = *_block.data.N;
-        Dense<Scalar> ULocal;
+        Dense<Scalar> USub;
         for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
         {
+            USub.LockedView( U, tOffset, 0, node.targetSizes[t], U.Width() );
             for( int s=0; s<4; ++s )
-            {
-                ULocal.LockedView
-                ( U, tOffset, 0, node.targetSizes[t], U.Width() );
-                node.Child(t,s).MultiplyHMatUpdatesImportU( rank, ULocal );
-            }
+                node.Child(t,s).MultiplyHMatUpdatesImportU( rank, USub );
         }
         break;
     }
@@ -848,22 +948,55 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesImportV");
 #endif
+    if( !_inSourceTeam )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
+    {
+        Node& node = *_block.data.N;
+        MPI_Comm team = _teams->Team( _level );
+        const int teamSize = mpi::CommSize( team );
+        const int teamRank = mpi::CommRank( team );
+
+        if( teamSize == 2 )
+        {
+            const int sStart = (teamRank==0 ? 0 : 2);            
+            const int sStop = (teamRank==0 ? 2 : 4);
+            Dense<Scalar> VSub;
+            for( int s=sStart,sOffset=0; s<sStop; 
+                 sOffset+=node.sourceSizes[s],++s )
+            {
+                VSub.LockedView
+                ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
+                for( int t=0; t<4; ++t )
+                    node.Child(t,s).MultiplyHMatUpdatesImportV( rank, VSub );
+            }
+        }
+        else  // teamSize >= 4
+        {
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MultiplyHMatUpdatesImportV( rank, V );
+        }
+        break;
+    }
     case SPLIT_NODE:
     case NODE:
     {
         Node& node = *_block.data.N;
-        Dense<Scalar> VLocal;
+        Dense<Scalar> VSub;
         for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
         {
+            VSub.LockedView( V, sOffset, 0, node.sourceSizes[s], V.Width() );
             for( int t=0; t<4; ++t )
-            {
-                VLocal.LockedView
-                ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
-                node.Child(t,s).MultiplyHMatUpdatesImportV( rank, VLocal );
-            }
+                node.Child(t,s).MultiplyHMatUpdatesImportV( rank, VSub );
         }
         break;
     }

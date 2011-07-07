@@ -411,7 +411,7 @@ inline Scalar*
 psp::Dense<Scalar>::Buffer( int i, int j )
 {
 #ifndef RELEASE
-    PushCallStack("Dense::Get");
+    PushCallStack("Dense::Buffer");
     if( _lockedView )
         throw std::logic_error("Cannot modify the buffer from a locked view");
     if( i < 0 || j < 0 )

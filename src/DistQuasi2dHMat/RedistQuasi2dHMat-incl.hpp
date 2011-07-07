@@ -809,7 +809,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalSizesRecursion
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 ( const byte* packedSub, const Teams& teams )
-: _beganRowSpaceComp(false), _beganColSpaceComp(false)
+: _haveDenseUpdate(false), _storedDenseUpdate(false),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");

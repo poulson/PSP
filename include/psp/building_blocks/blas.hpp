@@ -663,6 +663,16 @@ inline void Gemm
         throw std::logic_error("ldb was 0");
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
+    if( transa == 'N' && lda < m )
+        throw std::logic_error("Invalid lda for non-transposed A");
+    else if( (transa =='C' || transa=='T') && lda < k )
+        throw std::logic_error("Invalid lda for transposed A");
+    if( transb == 'N' && ldb < k )
+        throw std::logic_error("Invalid ldb for non-transposed B");
+    else if( (transb == 'C' || transb == 'T') && ldb < n )
+        throw std::logic_error("Invalid ldb for transposed B");
+    if( ldc < m )
+        throw std::logic_error("Invalid ldc for C");
 #endif
     if( k != 0 )
         BLAS(sgemm)
@@ -697,6 +707,16 @@ inline void Gemm
         throw std::logic_error("ldb was 0");
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
+    if( transa == 'N' && lda < m )
+        throw std::logic_error("Invalid lda for non-transposed A");
+    else if( (transa =='C' || transa=='T') && lda < k )
+        throw std::logic_error("Invalid lda for transposed A");
+    if( transb == 'N' && ldb < k )
+        throw std::logic_error("Invalid ldb for non-transposed B");
+    else if( (transb == 'C' || transb == 'T') && ldb < n )
+        throw std::logic_error("Invalid ldb for transposed B");
+    if( ldc < m )
+        throw std::logic_error("Invalid ldc for C");
 #endif
     if( k != 0 )
         BLAS(dgemm)
@@ -731,6 +751,16 @@ inline void Gemm
         throw std::logic_error("ldb was 0");
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
+    if( transa == 'N' && lda < m )
+        throw std::logic_error("Invalid lda for non-transposed A");
+    else if( (transa =='C' || transa=='T') && lda < k )
+        throw std::logic_error("Invalid lda for transposed A");
+    if( transb == 'N' && ldb < k )
+        throw std::logic_error("Invalid ldb for non-transposed B");
+    else if( (transb == 'C' || transb == 'T') && ldb < n )
+        throw std::logic_error("Invalid ldb for transposed B");
+    if( ldc < m )
+        throw std::logic_error("Invalid ldc for C");
 #endif
     if( k != 0 )
         BLAS(cgemm)
@@ -765,6 +795,16 @@ inline void Gemm
         throw std::logic_error("ldb was 0");
     if( ldc == 0 )
         throw std::logic_error("ldc was 0");
+    if( transa == 'N' && lda < m )
+        throw std::logic_error("Invalid lda for non-transposed A");
+    else if( (transa =='C' || transa=='T') && lda < k )
+        throw std::logic_error("Invalid lda for transposed A");
+    if( transb == 'N' && ldb < k )
+        throw std::logic_error("Invalid ldb for non-transposed B");
+    else if( (transb == 'C' || transb == 'T') && ldb < n )
+        throw std::logic_error("Invalid ldb for transposed B");
+    if( ldc < m )
+        throw std::logic_error("Invalid ldc for C");
 #endif
     if( k != 0 )
         BLAS(zgemm)

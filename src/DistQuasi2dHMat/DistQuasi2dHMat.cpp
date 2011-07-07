@@ -447,7 +447,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _teams(0), _level(0),
   _inSourceTeam(true), _inTargetTeam(true), 
-  _sourceRoot(0), _targetRoot(0)
+  _sourceRoot(0), _targetRoot(0),
+  _haveDenseUpdate(false), _storedDenseUpdate(false),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }

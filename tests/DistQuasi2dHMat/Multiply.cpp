@@ -177,12 +177,13 @@ main( int argc, char* argv[] )
         // Convert to H-matrix form
         if( rank == 0 )
         {
-            std::cout << "Constructing H-matrices...";
+            std::cout << "Constructing H-matrices in serial...";
             std::cout.flush();
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStartTime = psp::mpi::WallTime();
-        Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
+        Quasi2d ASerial
+        ( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -190,18 +191,33 @@ main( int argc, char* argv[] )
             std::cout << "done: " << constructStopTime-constructStartTime 
                       << " seconds." << std::endl;
             if( print )
-                H.Print("H");
+                ASerial.Print("ASerial");
             if( printStructure )
             {
-                H.LatexWriteStructure("H_serial_structure");
-                H.MScriptWriteStructure("H_serial_structure");
+                ASerial.LatexWriteStructure("ASerial_structure");
+                ASerial.MScriptWriteStructure("ASerial_structure");
             }
         }
+
+        // Invert H-matrix
+        if( rank == 0 )
+        {
+            std::cout << "Inverting H-matrices in serial...";
+            std::cout.flush();
+        }
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        double invertStartTime = psp::mpi::WallTime();
+        ASerial.DirectInvert();
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        double invertStopTime = psp::mpi::WallTime();
+        if( rank == 0 )
+            std::cout << "done: " << invertStopTime-invertStartTime 
+                      << " seconds." << std::endl;
 
         // Set up our subcommunicators and compute the packed sizes
         DistQuasi2d::Teams teams( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
-        DistQuasi2d::PackedSizes( packedSizes, H, teams ); 
+        DistQuasi2d::PackedSizes( packedSizes, ASerial, teams ); 
         const std::size_t myMaxSize = 
             *(std::max_element( packedSizes.begin(), packedSizes.end() ));
 
@@ -217,14 +233,12 @@ main( int argc, char* argv[] )
         std::vector<psp::byte*> packedPieces( p );
         for( int i=0; i<p; ++i )
             packedPieces[i] = &sendBuffer[i*myMaxSize];
-        DistQuasi2d::Pack( packedPieces, H, teams );
+        DistQuasi2d::Pack( packedPieces, ASerial, teams );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double packStopTime = psp::mpi::WallTime();
         if( rank == 0 )
-        {
             std::cout << "done: " << packStopTime-packStartTime << " seconds."
                       << std::endl;
-        }
 
         // Compute the maximum package size
         int myIntMaxSize, intMaxSize;
@@ -268,8 +282,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double unpackStartTime = psp::mpi::WallTime();
-        DistQuasi2d distH1( &recvBuffer[0], teams );
-        DistQuasi2d distH2( &recvBuffer[0], teams );
+        DistQuasi2d A( &recvBuffer[0], teams );
+        DistQuasi2d B( &recvBuffer[0], teams );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double unpackStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -279,8 +293,8 @@ main( int argc, char* argv[] )
         }
         if( printStructure )
         {
-            distH1.LatexWriteLocalStructure("distH_structure");
-            distH1.MScriptWriteLocalStructure("distH_structure");
+            A.LatexWriteLocalStructure("A_structure");
+            A.MScriptWriteLocalStructure("A_structure");
         }
 
         // Attempt to multiply the two matrices
@@ -291,8 +305,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStartTime = psp::mpi::WallTime();
-        DistQuasi2d distH3( teams );
-        distH1.Multiply( (Scalar)1, distH2, distH3 );
+        DistQuasi2d C( teams );
+        A.Multiply( (Scalar)1, B, C );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -302,8 +316,50 @@ main( int argc, char* argv[] )
         }
         if( printStructure )
         {
-            distH3.LatexWriteLocalStructure("distH3_ghosted_structure");
-            distH3.MScriptWriteLocalStructure("distH3_ghosted_structure");
+            C.LatexWriteLocalStructure("C_ghosted_structure");
+            C.MScriptWriteLocalStructure("C_ghosted_structure");
+        }
+
+        // Check that CX = ABX for an arbitrary X
+        if( rank == 0 )
+            std::cout << "Checking consistency: " << std::endl;
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        const int localHeight = A.LocalHeight();
+        const int localWidth = A.LocalWidth();
+        if( localHeight != localWidth )
+            throw std::logic_error("A was not locally square");
+        const int numRhs = 30;
+        psp::Dense<Scalar> XLocal( localHeight, numRhs );
+        psp::ParallelGaussianRandomVectors( XLocal );
+        psp::Dense<Scalar> YLocal, ZLocal;
+        // Y := AZ := ABX
+        B.Multiply( (Scalar)1, XLocal, ZLocal );
+        A.Multiply( (Scalar)1, ZLocal, YLocal );
+        // Z := CX
+        C.Multiply( (Scalar)1, XLocal, ZLocal );
+        double myErrors[3] = { 0., 0., 0. };
+        for( int j=0; j<numRhs; ++j )
+        {
+            for( int i=0; i<localHeight; ++i )
+            {
+                double error = psp::Abs(YLocal.Get(i,j)-ZLocal.Get(i,j));
+                myErrors[0] = std::max(myErrors[0],error);
+                myErrors[1] += error;
+                myErrors[2] += error*error;
+            }
+        }
+        double errors[3];
+        psp::mpi::Reduce( myErrors, errors, 3, 0, MPI_SUM, MPI_COMM_WORLD );
+        if( rank == 0 )
+        {
+            const double infError = errors[0];
+            const double L1Error = errors[1];
+            const double L2Error = sqrt(errors[2]);
+            YLocal.Print("YLocal on 0");
+            ZLocal.Print("ZLocal on 0");
+            std::cout << "||CX-ABX||_oo = " << infError << "\n"
+                      << "||CX-ABX||_1  = " << L1Error << "\n"
+                      << "||CX-ABX||_2  = " << L2Error << std::endl;
         }
     }
     catch( std::exception& e )
