@@ -49,10 +49,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         numTotalQRs += numQRs[teamLevel];
     }
     std::vector<int> ranks(numTotalQRs);
-    MultiplyHMatUpdatesLowRankCountAndResize( ranks, rankOffsets, 0 );
-    mpi::Barrier( MPI_COMM_WORLD );
-    std::cout.flush();
-    std::cout << "Finished LowRankCountAndResize." << std::endl;
+    {
+        std::vector<int> rankOffsetsCopy = rankOffsets;
+        MultiplyHMatUpdatesLowRankCountAndResize( ranks, rankOffsetsCopy, 0 );
+        mpi::Barrier( MPI_COMM_WORLD );
+        std::cout.flush();
+        std::cout << "Finished LowRankCountAndResize." << std::endl;
+    }
 
     // Carry the low-rank updates down from nodes into the low-rank and dense
     // blocks.
@@ -88,6 +91,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     }
     qrOffsets[numTeamLevels] = qrTotalSize;
     tauOffsets[numTeamLevels] = tauTotalSize;
+
+    mpi::Barrier( MPI_COMM_WORLD );
+    std::cout << "Starting LocalQR" << std::endl;
 
     std::vector<Scalar> qrBuffer( qrTotalSize ), tauBuffer( tauTotalSize );
     {
@@ -664,21 +670,45 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
         break;
     }
     case DIST_LOW_RANK:
+    case SPLIT_LOW_RANK:
+    case LOW_RANK:
     {
-        DistLowRank& DF = *_block.data.DF; 
         int newRank = rank;
         if( _inTargetTeam )
         {
-            const int numEntries = _UMap.Size();
+            Dense<Scalar>* mainU;
+            if( _block.type == DIST_LOW_RANK )
+                mainU = &_block.data.DF->ULocal;
+            else if( _block.type == SPLIT_LOW_RANK )
+                mainU = &_block.data.SF->D;
+            else
+                mainU = &_block.data.F->U;
+
+            int numEntries = _colXMap.Size();
+            _colXMap.ResetIterator();
+            for( int entry=0; entry<numEntries; ++entry )
+            {
+                const Dense<Scalar>& X = *_colXMap.CurrentEntry();
+                const int m = X.Height();
+                const int r = X.Width();
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( mainU->Buffer(0,newRank+j), X.LockedBuffer(0,j),
+                      m*sizeof(Scalar) );
+                _colXMap.EraseCurrentEntry();
+                newRank += r;
+            }
+
+            numEntries = _UMap.Size();
             _UMap.ResetIterator();
             for( int entry=0; entry<numEntries; ++entry )
             {
-                Dense<Scalar>& U = *_UMap.CurrentEntry();
+                const Dense<Scalar>& U = *_UMap.CurrentEntry();
                 const int m = U.Height();
                 const int r = U.Width();
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( DF.ULocal.Buffer(0,newRank+j), U.LockedBuffer(0,j),
+                    ( mainU->Buffer(0,newRank+j), U.LockedBuffer(0,j),
                       m*sizeof(Scalar) );
                 _UMap.EraseCurrentEntry();
                 newRank += r;
@@ -687,7 +717,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
         if( _inSourceTeam )
         {
             newRank = rank;
-            const int numEntries = _VMap.Size();
+
+            Dense<Scalar>* mainV;
+            if( _block.type == DIST_LOW_RANK )
+                mainV = &_block.data.DF->VLocal;
+            else if( _block.type == SPLIT_LOW_RANK )
+                mainV = &_block.data.SF->D;
+            else
+                mainV = &_block.data.F->V;
+            
+            int numEntries = _rowXMap.Size();
+            _rowXMap.ResetIterator();
+            for( int entry=0; entry<numEntries; ++entry )
+            {
+                const Dense<Scalar>& X = *_rowXMap.CurrentEntry();
+                const int n = X.Height();
+                const int r = X.Width();
+                for( int j=0; j<r; ++j )
+                    std::memcpy
+                    ( mainV->Buffer(0,newRank+j), X.LockedBuffer(0,j),
+                      n*sizeof(Scalar) );
+                _rowXMap.EraseCurrentEntry();
+                newRank += r;
+            }
+
+            numEntries = _VMap.Size();
             _VMap.ResetIterator();
             for( int entry=0; entry<numEntries; ++entry )
             {
@@ -696,86 +750,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 const int r = V.Width();
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( DF.VLocal.Buffer(0,newRank+j), V.LockedBuffer(0,j),
+                    ( mainV->Buffer(0,newRank+j), V.LockedBuffer(0,j),
                       n*sizeof(Scalar) );
                 _VMap.EraseCurrentEntry();
                 newRank += r;
             }
-        }
-        break;
-    }
-    case SPLIT_LOW_RANK:
-    {
-        SplitLowRank& SF = *_block.data.SF; 
-        int newRank = rank;
-        if( _inTargetTeam )
-        {
-            const int numEntries = _UMap.Size();
-            _UMap.ResetIterator();
-            for( int entry=0; entry<numEntries; ++entry )
-            {
-                Dense<Scalar>& U = *_UMap.CurrentEntry();
-                const int m = U.Height();
-                const int r = U.Width();
-                for( int j=0; j<r; ++j )
-                    std::memcpy
-                    ( SF.D.Buffer(0,newRank+j), U.LockedBuffer(0,j),
-                      m*sizeof(Scalar) );
-                _UMap.EraseCurrentEntry();
-                newRank += r;
-            }
-        }
-        else
-        {
-            newRank = rank;
-            const int numEntries = _VMap.Size();
-            _VMap.ResetIterator();
-            for( int entry=0; entry<numEntries; ++entry )
-            {
-                Dense<Scalar>& V = *_VMap.CurrentEntry();
-                const int n = V.Height();
-                const int r = V.Width();
-                for( int j=0; j<r; ++j )
-                    std::memcpy
-                    ( SF.D.Buffer(0,newRank+j), V.LockedBuffer(0,j),
-                      n*sizeof(Scalar) );
-                _VMap.EraseCurrentEntry();
-                newRank += r;
-            }
-        }
-        break;
-    }
-    case LOW_RANK:
-    {
-        LowRank<Scalar,Conjugated>& F = *_block.data.F;
-        int newRank = rank;
-        const int numEntries = _UMap.Size();
-        _UMap.ResetIterator();
-        for( int entry=0; entry<numEntries; ++entry )
-        {
-            Dense<Scalar>& U = *_UMap.CurrentEntry();
-            const int m = U.Height();
-            const int r = U.Width();
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( F.U.Buffer(0,newRank+j), U.LockedBuffer(0,j),
-                  m*sizeof(Scalar) );
-            _UMap.EraseCurrentEntry();
-            newRank += r;
-        }
-        newRank = rank;
-        _VMap.ResetIterator();
-        for( int entry=0; entry<numEntries; ++entry )
-        {
-            Dense<Scalar>& V = *_VMap.CurrentEntry();
-            const int n = V.Height();
-            const int r = V.Width();
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( F.V.Buffer(0,newRank+j), V.LockedBuffer(0,j),
-                  n*sizeof(Scalar) );
-            _VMap.EraseCurrentEntry();
-            newRank += r;
         }
         break;
     }
@@ -830,7 +809,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
     }
     case SPLIT_LOW_RANK:
     {
-        if( !_haveDenseUpdate && _inTargetTeam )
+        if( _inTargetTeam )
         {
             SplitLowRank& SF = *_block.data.SF;
             const int m = U.Height();
@@ -844,16 +823,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
     }
     case LOW_RANK:
     {
-        if( !_haveDenseUpdate )
-        {
-            LowRank<Scalar,Conjugated>& F = *_block.data.F;
-            const int m = U.Height();
-            const int r = U.Width();
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( F.U.Buffer(0,rank+j), U.LockedBuffer(0,j),
-                  m*sizeof(Scalar) );
-        }
+        LowRank<Scalar,Conjugated>& F = *_block.data.F;
+        const int m = U.Height();
+        const int r = U.Width();
+        for( int j=0; j<r; ++j )
+            std::memcpy
+            ( F.U.Buffer(0,rank+j), U.LockedBuffer(0,j),
+              m*sizeof(Scalar) );
         break;
     }
     default:
@@ -907,7 +883,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
     }
     case SPLIT_LOW_RANK:
     {
-        if( !_haveDenseUpdate && _inSourceTeam )
+        if( _inSourceTeam )
         {
             SplitLowRank& SF = *_block.data.SF;
             const int n = V.Height();
@@ -921,16 +897,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
     }
     case LOW_RANK:
     {
-        if( !_haveDenseUpdate )
-        {
-            LowRank<Scalar,Conjugated>& F = *_block.data.F;
-            const int n = V.Height();
-            const int r = V.Width();
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( F.V.Buffer(0,rank+j), V.LockedBuffer(0,j),
-                  n*sizeof(Scalar) );
-        }
+        LowRank<Scalar,Conjugated>& F = *_block.data.F;
+        const int n = V.Height();
+        const int r = V.Width();
+        for( int j=0; j<r; ++j )
+            std::memcpy
+            ( F.V.Buffer(0,rank+j), V.LockedBuffer(0,j),
+              n*sizeof(Scalar) );
         break;
     }
     default:
