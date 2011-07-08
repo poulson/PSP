@@ -1759,6 +1759,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
                     ( &sendBuffer[sendOffset+j*m], _D.LockedBuffer(0,j),
                       m*sizeof(Scalar) );
                 sendOffsets[_targetRoot] += n*r + m*n;
+                _D.Clear();
             }
         }
         break;
@@ -2349,22 +2350,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             }
             else // _inSourceTeam
             {
-                // Unpack U into X
-                int recvOffset = recvOffsets[_targetRoot];
-                X.Resize( m, r );
-                for( int j=0; j<r; ++j )
-                    std::memcpy
-                    ( X.Buffer(0,j), &recvBuffer[recvOffset+j*m], 
-                      m*sizeof(Scalar) );
-                recvOffset += m*r;
-
                 // Add U V^[T/H] onto the dense update
                 const char option = ( Conjugated ? 'C' : 'T' );
                 blas::Gemm
                 ( 'N', option, m, n, r, 
-                  (Scalar)1, X.LockedBuffer(),    X.LDim(),
-                             SF.D.LockedBuffer(), SF.D.LDim(),
-                  (Scalar)1, _D.Buffer(),         _D.LDim() );
+                  (Scalar)1, &recvBuffer[recvOffsets[_targetRoot]], m,
+                             SF.D.LockedBuffer(),                   SF.D.LDim(),
+                  (Scalar)1, _D.Buffer(),                           _D.LDim() );
+                recvOffsets[_targetRoot] += m*r;
 
                 if( minDim <= maxRank )
                 {

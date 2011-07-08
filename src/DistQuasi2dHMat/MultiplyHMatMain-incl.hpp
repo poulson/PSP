@@ -1034,8 +1034,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     hmat_tools::Multiply( alpha, SDA.D, DB, (Scalar)1, C._D );
                 else
                 {
-                    C._D.Resize( A.Height(), B.Width() );
-                    hmat_tools::Multiply( alpha, SDA.D, DB, (Scalar)0, C._D );
+                    hmat_tools::Multiply( alpha, SDA.D, DB, C._D );
                     C._haveDenseUpdate = true;
                     C._storedDenseUpdate = true;
                 }
@@ -1129,8 +1128,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                     hmat_tools::Multiply( alpha, DA, DB, (Scalar)1, C._D );
                 else
                 {
-                    C._D.Resize( A.Height(), B.Width() );
-                    hmat_tools::Multiply( alpha, DA, DB, (Scalar)0, C._D );
+                    hmat_tools::Multiply( alpha, DA, DB, C._D );
                     C._haveDenseUpdate = true;
                     C._storedDenseUpdate = true;
                 }
