@@ -355,8 +355,6 @@ main( int argc, char* argv[] )
             const double infError = errors[0];
             const double L1Error = errors[1];
             const double L2Error = sqrt(errors[2]);
-            YLocal.Print("YLocal on 0");
-            ZLocal.Print("ZLocal on 0");
             std::cout << "||CX-ABX||_oo = " << infError << "\n"
                       << "||CX-ABX||_1  = " << L1Error << "\n"
                       << "||CX-ABX||_2  = " << L2Error << std::endl;

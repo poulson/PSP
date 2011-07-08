@@ -548,6 +548,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         const int m = Height();
         const int n = Width();
         const int numLowRankUpdates = _UMap.Size();
+        
         _UMap.ResetIterator();
         _VMap.ResetIterator();
         for( int update=0; update<numLowRankUpdates; ++update )
@@ -2135,6 +2136,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const int r = SF.rank;
         const int minDimU = std::min( Height(), r );
         const int minDimV = std::min( Width(), r );
+        const int minDim = std::min( minDimU, minDimV );
         const unsigned teamLevel = _teams->TeamLevel( _level );
 
         if( !_haveDenseUpdate )
@@ -2143,19 +2145,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 break;
 
             // Form R_U and R_V
-            X.Resize( r, r );
-            Y.Resize( r, r );
-            const Scalar* tauPiece = &tauBuffer[tauOffsets[teamLevel]];
+            X.Resize( minDimU, r );
+            Y.Resize( minDimV, r );
             if( _inTargetTeam )
             {
-                tauOffsets[teamLevel] += minDimU;
-
                 hmat_tools::Scale( (Scalar)0, X );
                 const int recvOffset = recvOffsets[_sourceRoot];
                 for( int j=0; j<r; ++j )
                     std::memcpy
                     ( X.Buffer(0,j), SF.D.LockedBuffer(0,j), 
                       std::min(minDimU,j+1)*sizeof(Scalar) );
+                hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<minDimV; ++j )
                     std::memcpy
                     ( Y.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
@@ -2171,8 +2171,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             }
             else // _inSourceTeam
             {
-                tauOffsets[teamLevel] += minDimV;
-
                 hmat_tools::Scale( (Scalar)0, X );
                 const int recvOffset = recvOffsets[_targetRoot];
                 for( int j=0; j<minDimU; ++j )
@@ -2185,6 +2183,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                       &recvBuffer[recvOffset+(minDimU*minDimU+minDimU)/2+
                                   (j-minDimU)*minDimU],
                       minDimU*sizeof(Scalar) );
+                hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<r; ++j )
                     std::memcpy
                     ( Y.Buffer(0,j), SF.D.LockedBuffer(0,j), 
@@ -2194,84 +2193,91 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             }
 
             // Overwrite X with R_U R_V^[T/H]
+            Z.Resize( minDimU, minDimV );
             const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Trmm
-            ( 'R', 'U', option, 'N', r, r, 
-              1, Y.LockedBuffer(), Y.LDim(), X.Buffer(), X.LDim() );
+            blas::Gemm
+            ( 'N', option, minDimU, minDimV, r,
+              (Scalar)1, X.LockedBuffer(), X.LDim(),
+                         Y.LockedBuffer(), Y.LDim(),
+              (Scalar)0, Z.Buffer(),       Z.LDim() );
 
             const int maxRank = MaxRank();
-            Z.Resize( 2*r, maxRank );
-            hmat_tools::Scale( (Scalar)0, Z );
-            singularValues.resize( r );
-            work.resize( lapack::SVDWorkSize(r,r) );
-            realWork.resize( lapack::SVDRealWorkSize(r,r) );
+            singularValues.resize( minDim );
+            work.resize( lapack::SVDWorkSize(minDimU,minDimV) );
+            realWork.resize( lapack::SVDRealWorkSize(minDimU,minDimV) );
             if( _inTargetTeam )
             {
-                // Perform an SVD on X, overwriting X with the left singular 
+                // Perform an SVD on Z, overwriting Z with the left singular 
                 // vectors.
                 lapack::SVD
-                ( 'O', 'N', r, r, X.Buffer(), X.LDim(), 
+                ( 'O', 'N', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
                   &singularValues[0], 0, 1, 0, 1, 
                   &work[0], work.size(), &realWork[0] );
+                const int newRank = std::min( minDim, maxRank );
 
                 // Backtransform U
                 const int m = SF.D.Height();
-                hmat_tools::Copy( SF.D, Z );
-                SF.D.Resize( m, maxRank );
+                hmat_tools::Copy( SF.D, X );
+                SF.D.Resize( m, newRank );
                 hmat_tools::Scale( (Scalar)0, SF.D );
-                // Copy the first maxRank singular vectors, scaled by the 
+                // Copy the first newRank singular vectors, scaled by the 
                 // singular values, into the top of the SF.D buffer
-                for( int j=0; j<maxRank; ++j )
+                for( int j=0; j<newRank; ++j )
                 {
                     const Real sigma = singularValues[j];
-                    const Scalar* XCol = X.LockedBuffer(0,j);
+                    const Scalar* ZCol = Z.LockedBuffer(0,j);
                     Scalar* UCol = SF.D.Buffer(0,j);
-                    for( int i=0; i<r; ++i )
-                        UCol[i] = sigma*XCol[i];
+                    for( int i=0; i<minDimU; ++i )
+                        UCol[i] = sigma*ZCol[i];
                 }
 
-                work.resize( lapack::ApplyQWorkSize('L',m,maxRank) );
+                work.resize( lapack::ApplyQWorkSize('L',m,newRank) );
                 lapack::ApplyQ
                 ( 'L', 'N', m, maxRank, minDimU,
-                  Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+                  X.LockedBuffer(), X.LDim(), 
+                  &tauBuffer[tauOffsets[teamLevel]],
                   SF.D.Buffer(),    SF.D.LDim(),  
                   &work[0], work.size() );
+                tauOffsets[teamLevel] += r;
             }
             else // _inSourceTeam
             {
-                // Perform an SVD on X, overwriting X with the adjoint of the
+                // Perform an SVD on Z, overwriting Z with the adjoint of the
                 // right singular vectors.
                 lapack::SVD
-                ( 'N', 'O', r, r, X.Buffer(), X.LDim(), 
+                ( 'N', 'O', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
                   &singularValues[0], 0, 1, 0, 1, 
                   &work[0], work.size(), &realWork[0] );
+                const int newRank = std::min( minDim, maxRank );
 
                 // Backtransform V
                 const int n = SF.D.Height();
-                hmat_tools::Copy( SF.D, Z );
-                SF.D.Resize( n, maxRank );
+                hmat_tools::Copy( SF.D, Y );
+                SF.D.Resize( n, newRank );
                 hmat_tools::Scale( (Scalar)0, SF.D );
-                // Copy the first maxRank right singular vectors into the 
+                // Copy the first newRank right singular vectors into the 
                 // top of the SF.D buffer
-                for( int j=0; j<maxRank; ++j )
+                for( int j=0; j<newRank; ++j )
                 {
-                    const Scalar* XRow = X.LockedBuffer(j,0);
-                    const int XLDim = X.LDim();
+                    const Scalar* ZRow = Z.LockedBuffer(j,0);
+                    const int ZLDim = Z.LDim();
                     Scalar* VCol = SF.D.Buffer(0,j);
                     if( Conjugated )
                         for( int i=0; i<r; ++i )
-                            VCol[i] = XRow[i*XLDim];
+                            VCol[i] = ZRow[i*ZLDim];
                     else
                         for( int i=0; i<r; ++i )
-                            VCol[i] = Conj(XRow[i*XLDim]);
+                            VCol[i] = Conj(ZRow[i*ZLDim]);
                 }
 
-                work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
+                work.resize( lapack::ApplyQWorkSize('L',n,newRank) );
                 lapack::ApplyQ
-                ( 'L', 'N', n, maxRank, minDimV,
-                  Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+                ( 'L', 'N', n, newRank, minDimV,
+                  Y.LockedBuffer(), Y.LDim(), 
+                  &tauBuffer[tauOffsets[teamLevel]],
                   SF.D.Buffer(),    SF.D.LDim(),  
                   &work[0], work.size() );
+                tauOffsets[teamLevel] += r;
             }
         }
         else
@@ -2419,6 +2425,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const int r = F.Rank();
         const int minDimU = std::min( Height(), r );
         const int minDimV = std::min( Width(), r );
+        const int minDim = std::min( minDimU, minDimV );
         const unsigned teamLevel = _teams->TeamLevel( _level );
 
         if( !_haveDenseUpdate )
@@ -2427,90 +2434,95 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 break;
 
             // Form R_U and R_V
-            X.Resize( r, r );
-            Y.Resize( r, r );
-            const Scalar* tauPiece = &tauBuffer[tauOffsets[teamLevel]];
-            tauOffsets[teamLevel] += minDimU;
+            X.Resize( minDimU, r );
+            Y.Resize( minDimV, r );
 
             hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<r; ++j )
                 std::memcpy
                 ( X.Buffer(0,j), F.U.LockedBuffer(0,j), 
                   std::min(minDimU,j+1)*sizeof(Scalar) );
+            hmat_tools::Scale( (Scalar)0, Y );
             for( int j=0; j<r; ++j )
                 std::memcpy
                 ( Y.Buffer(0,j), F.V.LockedBuffer(0,j),
                   std::min(minDimV,j+1)*sizeof(Scalar) );
 
-            // Overwrite X with R_U R_V^[T/H]
+            // Z := R_U R_V^[T/H]
+            Z.Resize( minDimU, minDimV );
             const char option = ( Conjugated ? 'C' : 'T' );
-            blas::Trmm
-            ( 'R', 'U', option, 'N', r, r, 
-              1, Y.LockedBuffer(), Y.LDim(), X.Buffer(), X.LDim() );
+            blas::Gemm
+            ( 'N', option, minDimU, minDimV, r,
+              (Scalar)1, X.LockedBuffer(), X.LDim(),
+                         Y.LockedBuffer(), Y.LDim(),
+              (Scalar)0, Z.Buffer(),       Z.LDim() );
 
             const int maxRank = MaxRank();
-            Z.Resize( 2*r, maxRank );
-            hmat_tools::Scale( (Scalar)0, Z );
-            singularValues.resize( r );
-            work.resize( lapack::SVDWorkSize(r,r) );
-            realWork.resize( lapack::SVDRealWorkSize(r,r) );
+            singularValues.resize( minDim );
+            work.resize( lapack::SVDWorkSize(minDimU,minDimV) );
+            realWork.resize( lapack::SVDRealWorkSize(minDimU,minDimV) );
 
-            // Perform an SVD on X, overwriting X with the left singular 
+            // Perform an SVD on Z, overwriting Z with the left singular 
             // vectors, and Y with the adjoint of the right singular vectors.
             lapack::SVD
-            ( 'O', 'S', r, r, X.Buffer(), X.LDim(), 
+            ( 'O', 'S', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
               &work[0], work.size(), &realWork[0] );
+            const int newRank = std::min(minDim,maxRank);
 
             // Backtransform U
             const int m = F.Height();
-            hmat_tools::Copy( F.U, Z );
-            F.U.Resize( m, maxRank );
+            hmat_tools::Copy( F.U, X );
+            F.U.Resize( m, newRank );
             hmat_tools::Scale( (Scalar)0, F.U );
-            // Copy the first maxRank singular vectors, scaled by the 
+            // Copy the first few singular vectors, scaled by the 
             // singular values, into the top of the F.U buffer
-            for( int j=0; j<maxRank; ++j )
+            for( int j=0; j<newRank; ++j )
             {
                 const Real sigma = singularValues[j];
-                const Scalar* XCol = X.LockedBuffer(0,j);
+                const Scalar* ZCol = Z.LockedBuffer(0,j);
                 Scalar* UCol = F.U.Buffer(0,j);
-                for( int i=0; i<r; ++i )
-                    UCol[i] = sigma*XCol[i];
+                for( int i=0; i<minDimU; ++i )
+                    UCol[i] = sigma*ZCol[i];
             }
 
-            work.resize( lapack::ApplyQWorkSize('L',m,maxRank) );
+            work.resize( lapack::ApplyQWorkSize('L',m,newRank) );
             lapack::ApplyQ
-            ( 'L', 'N', m, maxRank, minDimU,
-              Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+            ( 'L', 'N', m, newRank, minDimU,
+              X.LockedBuffer(), X.LDim(), 
+              &tauBuffer[tauOffsets[teamLevel]],
               F.U.Buffer(), F.U.LDim(),  
               &work[0], work.size() );
+            tauOffsets[teamLevel] += r;
 
             // Backtransform V
             const int n = F.Width();
-            hmat_tools::Copy( F.V, Z );
-            F.V.Resize( n, maxRank );
+            hmat_tools::Copy( F.V, X );
+            F.V.Resize( n, newRank );
             hmat_tools::Scale( (Scalar)0, F.V );
-            // Copy the first maxRank right singular vectors into the 
+            // Copy the first newRank right singular vectors into the 
             // top of the F.V buffer
-            for( int j=0; j<maxRank; ++j )
+            for( int j=0; j<newRank; ++j )
             {
                 const Scalar* YRow = Y.LockedBuffer(j,0);
                 const int YLDim = Y.LDim();
                 Scalar* VCol = F.V.Buffer(0,j);
                 if( Conjugated )
-                    for( int i=0; i<r; ++i )
+                    for( int i=0; i<minDimV; ++i )
                         VCol[i] = YRow[i*YLDim];
                 else
-                    for( int i=0; i<r; ++i )
+                    for( int i=0; i<minDimV; ++i )
                         VCol[i] = Conj(YRow[i*YLDim]);
             }
 
             work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
             lapack::ApplyQ
-            ( 'L', 'N', n, maxRank, minDimV,
-              Z.LockedBuffer(), Z.LDim(), &tauPiece[0],
+            ( 'L', 'N', n, newRank, minDimV,
+              X.LockedBuffer(), X.LDim(), 
+              &tauBuffer[tauOffsets[teamLevel]],
               F.V.Buffer(), F.V.LDim(),  
               &work[0], work.size() );
+            tauOffsets[teamLevel] += r;
         }
         else
         {

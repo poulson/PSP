@@ -765,9 +765,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             const Dense<Scalar>& DB = *B._block.data.D;
             Dense<Scalar>& VC = C._VMap.Get( key );
             const char option = ( Conjugated ? 'C' : 'T' );
+            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
             blas::Gemm
             ( option, 'N', n, SFA.rank, k,
-              (Scalar)1, DB.LockedBuffer(),    DB.LDim(),
+              scale,     DB.LockedBuffer(),    DB.LDim(),
                          SFA.D.LockedBuffer(), SFA.D.LDim(),
               (Scalar)0, VC.Buffer(),          VC.LDim() );
             break;
@@ -925,9 +926,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             const Dense<Scalar>& DB = *B._block.data.D;
             Dense<Scalar>& VC = C._VMap.Get( key );
             const char option = ( Conjugated ? 'C' : 'T' );
+            const Scalar scale = ( Conjugated ? Conj(alpha) : alpha );
             blas::Gemm
             ( option, 'N', n, FA.Rank(), k,
-              (Scalar)1, DB.LockedBuffer(),   DB.LDim(),
+              scale,     DB.LockedBuffer(),   DB.LDim(),
                          FA.V.LockedBuffer(), FA.V.LDim(),
               (Scalar)0, VC.Buffer(),         VC.LDim() );
             break;
@@ -4731,6 +4733,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             const LowRank<Scalar,Conjugated>& FB = *B._block.data.F;
             const int m = A.Height();
             const int k = FA.Rank();
+
             C._UMap.Set( key, new Dense<Scalar>( m, FB.Rank() ) );
             C._VMap.Set( key, new Dense<Scalar> );
             Dense<Scalar>& UC = C._UMap.Get( key );
