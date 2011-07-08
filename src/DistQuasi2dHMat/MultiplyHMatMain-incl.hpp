@@ -194,6 +194,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
             {
                 C._block.type = DENSE;
                 C._block.data.D = new Dense<Scalar>( A.Height(), B.Width() );
+                hmat_tools::Scale( (Scalar)0, *C._block.data.D );
             }
             else
                 C._block.type = DENSE_GHOST;
@@ -205,7 +206,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
                 C._block.type = SPLIT_DENSE;
                 C._block.data.SD = new SplitDense;
                 if( C._inSourceTeam )
+                {
                     C._block.data.SD->D.Resize( A.Height(), B.Width() );
+                    hmat_tools::Scale( (Scalar)0, C._block.data.SD->D );
+                }
             }
             else
                 C._block.type = SPLIT_DENSE_GHOST;
@@ -564,7 +568,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // Start H/F += F H
             C._VMap.Set( key, new Dense<Scalar>( C.LocalWidth(), DFA.rank ) );
-
             hmat_tools::Scale( (Scalar)0, C._VMap.Get( key ) );
             C._mainContextMap.Set( key, new MultiplyDenseContext );
             MultiplyDenseContext& context = C._mainContextMap.Get( key );
@@ -856,7 +859,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         {
             // We must own all of A, B, and C
             C._VMap.Set( key, new Dense<Scalar>( B.Width(), FA.Rank() ) );
-                
             hmat_tools::Scale( (Scalar)0, C._VMap.Get( key ) );
             C._mainContextMap.Set( key, new MultiplyDenseContext );
             MultiplyDenseContext& context = C._mainContextMap.Get( key );
@@ -4130,6 +4132,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             const DistLowRankGhost& DFGB = *B._block.data.DFG; 
             Dense<Scalar> dummy( 0, DFGB.rank );
             C._UMap.Set( key, new Dense<Scalar>(LocalHeight(), DFGB.rank ) );
+            hmat_tools::Scale( (Scalar)0, C._UMap.Get( key ) );
             A.MultiplyDensePostcompute
             ( C._mainContextMap.Get( key ), alpha, dummy, C._UMap.Get( key ) );
             C._mainContextMap.Get( key ).Clear();
@@ -4199,6 +4202,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             if( C._inTargetTeam )
             {
                 C._UMap.Set( key, new Dense<Scalar>( C.Height(), SFB.rank ) );
+                hmat_tools::Scale( (Scalar)0, C._UMap.Get( key ) );
                 Dense<Scalar> dummy( 0, SFB.rank );
                 A.MultiplyDensePostcompute
                 ( C._mainContextMap.Get( key ), 
@@ -4218,6 +4222,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             // We are the left process
             const SplitLowRankGhost& SFGB = *B._block.data.SFG;
             C._UMap.Set( key, new Dense<Scalar>( C.Height(), SFGB.rank ) );
+            hmat_tools::Scale( (Scalar)0, C._UMap.Get( key ) );
             Dense<Scalar> dummy( 0, SFGB.rank );
             A.MultiplyDensePostcompute
             ( C._mainContextMap.Get( key ), alpha, dummy, C._UMap.Get( key ) );
@@ -4242,6 +4247,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             // We are the left process
             const LowRankGhost& FGB = *B._block.data.FG;
             C._UMap.Set( key, new Dense<Scalar>( C.Height(), FGB.rank ) );
+            hmat_tools::Scale( (Scalar)0, C._UMap.Get( key ) );
             Dense<Scalar> dummy( 0, FGB.rank );
             A.MultiplyDensePostcompute
             ( C._mainContextMap.Get( key ), alpha, dummy, C._UMap.Get( key ) );
@@ -4432,6 +4438,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             MultiplyDenseContext& context = C._mainContextMap.Get( key );
             Dense<Scalar> dummy( 0, DFGA.rank );
             C._VMap.Set( key, new Dense<Scalar>(C.LocalWidth(),DFGA.rank) );
+            hmat_tools::Scale( (Scalar)0, C._VMap.Get( key ) );
             if( Conjugated )
                 B.AdjointMultiplyDensePostcompute
                 ( context, Conj(alpha), dummy, C._VMap.Get( key ) );
@@ -4483,6 +4490,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 hmat_tools::Copy( SFA.D, C._UMap.Get( key ) );
                 Dense<Scalar> dummy( 0, SFA.rank );
                 C._VMap.Set( key, new Dense<Scalar>(C.LocalWidth(),SFA.rank) );
+                hmat_tools::Scale( (Scalar)0, C._VMap.Get( key ) );
                 if( Conjugated )
                     B.AdjointMultiplyDensePostcompute
                     ( context, Conj(alpha), dummy, C._VMap.Get( key ) );
@@ -4674,6 +4682,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             MultiplyDenseContext& context = C._mainContextMap.Get( key );
             Dense<Scalar> dummy( 0, SFGA.rank );
             C._VMap.Set( key, new Dense<Scalar>(C.LocalWidth(),SFGA.rank) );
+            hmat_tools::Scale( (Scalar)0, C._VMap.Get( key ) );
             if( Conjugated )
                 B.AdjointMultiplyDensePostcompute
                 ( context, Conj(alpha), dummy, C._VMap.Get( key ) );
@@ -4851,6 +4860,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             MultiplyDenseContext& context = C._mainContextMap.Get( key );
             Dense<Scalar> dummy( 0, FGA.rank );
             C._VMap.Set( key, new Dense<Scalar>(C.LocalWidth(),FGA.rank) );
+            hmat_tools::Scale( (Scalar)0, C._VMap.Get( key ) );
             if( Conjugated )
                 B.AdjointMultiplyDensePostcompute
                 ( context, Conj(alpha), dummy, C._VMap.Get( key ) );

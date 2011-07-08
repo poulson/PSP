@@ -2618,21 +2618,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             _VMap.Increment();
             const int r = V.Width();
 
-            // Unpack U
-            X.Resize( m, r );
-            const int offset = recvOffsets[_targetRoot];
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( X.Buffer(0,j), &recvBuffer[offset+j*m], m*sizeof(Scalar) );
-            recvOffsets[_targetRoot] += m*r;
-
             // Add U V^[T/H] onto our dense matrix
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
             ( 'N', option, m, n, r,
-              (Scalar)1, X.LockedBuffer(), X.LDim(),
-                         V.LockedBuffer(), V.LDim(),
-              (Scalar)1, SD.D.Buffer(),    SD.D.LDim() );
+              (Scalar)1, &recvBuffer[recvOffsets[_targetRoot]], m,
+                         V.LockedBuffer(),                      V.LDim(),
+              (Scalar)1, SD.D.Buffer(),                         SD.D.LDim() );
+            recvOffsets[_targetRoot] += m*r;
 
             _VMap.Clear();
         }
