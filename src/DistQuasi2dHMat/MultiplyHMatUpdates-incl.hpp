@@ -1298,8 +1298,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         for( int l=0; l<numSteps-step; ++l )
         {
             int qrOffset = qrOffsets[l];
-            MPI_Comm thisTeam = _teams->Team(l);
-            const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+            MPI_Comm parentTeam = _teams->Team(l);
+            const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
 
             for( int k=0; k<numQRs[l]; ++k )
             {
@@ -1326,7 +1326,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         sendOffset += j+1;
                     }
                 }
-                qrOffset += log2ThisTeamSize*(r*r+r);
+                qrOffset += log2ParentTeamSize*(r*r+r);
             }
         }
 
@@ -1351,8 +1351,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
             {
                 int qrOffset = qrOffsets[l];
                 int tauOffset = tauOffsets[l];
-                MPI_Comm thisTeam = _teams->Team(l);
-                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+                MPI_Comm parentTeam = _teams->Team(l);
+                const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
 
                 for( int k=0; k<numQRs[l]; ++k )
                 {
@@ -1420,8 +1420,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             sendOffset += j+1;
                         }
                     }
-                    qrOffset += log2ThisTeamSize*(r*r+r);
-                    tauOffset += (log2ThisTeamSize+1)*r;
+                    qrOffset += log2ParentTeamSize*(r*r+r);
+                    tauOffset += (log2ParentTeamSize+1)*r;
                 }
             }
             
@@ -1437,8 +1437,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
             {
                 int qrOffset = qrOffsets[l];
                 int tauOffset = tauOffsets[l];
-                MPI_Comm thisTeam = _teams->Team(l);
-                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+                MPI_Comm parentTeam = _teams->Team(l);
+                const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
 
                 for( int k=0; k<numQRs[l]; ++k )
                 {
@@ -1497,8 +1497,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                                   (j+1)*sizeof(Scalar) );
                         }
                     }
-                    qrOffset += log2ThisTeamSize*(r*r+r);
-                    tauOffset += (log2ThisTeamSize+1)*r;
+                    qrOffset += log2ParentTeamSize*(r*r+r);
+                    tauOffset += (log2ParentTeamSize+1)*r;
                 }
             }
         }
@@ -1510,8 +1510,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
             {
                 int qrOffset = qrOffsets[l];
                 int tauOffset = tauOffsets[l];
-                MPI_Comm thisTeam = _teams->Team(l);
-                const int log2ThisTeamSize = Log2(mpi::CommSize(thisTeam));
+                MPI_Comm parentTeam = _teams->Team(l);
+                const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
 
                 for( int k=0; k<numQRs[l]; ++k )
                 {
@@ -1543,8 +1543,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
                       &tauBuffer[tauOffset+(passes+1)*r], &qrWork[0] );
 
-                    qrOffset += log2ThisTeamSize*(r*r+r);
-                    tauOffset += (log2ThisTeamSize+1)*r;
+                    qrOffset += log2ParentTeamSize*(r*r+r);
+                    tauOffset += (log2ParentTeamSize+1)*r;
                 }
             }
         }
@@ -2178,6 +2178,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     std::memcpy
                     ( X.Buffer(0,j), SF.D.LockedBuffer(0,j),
                       minDimU*sizeof(Scalar) );
+
                 hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<minDimV; ++j )
                     std::memcpy
@@ -2206,6 +2207,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                       &recvBuffer[recvOffset+(minDimU*minDimU+minDimU)/2+
                                   (j-minDimU)*minDimU],
                       minDimU*sizeof(Scalar) );
+
                 hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<minDimV; ++j )
                     std::memcpy
@@ -2261,12 +2263,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
                 work.resize( lapack::ApplyQWorkSize('L',m,newRank) );
                 lapack::ApplyQ
-                ( 'L', 'N', m, maxRank, minDimU,
+                ( 'L', 'N', m, newRank, minDimU,
                   X.LockedBuffer(), X.LDim(), 
                   &tauBuffer[tauOffsets[teamLevel]],
                   SF.D.Buffer(),    SF.D.LDim(),  
                   &work[0], work.size() );
-                tauOffsets[teamLevel] += r;
+                tauOffsets[teamLevel] += r; // this is an upper bound
             }
             else // _inSourceTeam
             {
@@ -2290,21 +2292,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     const int ZLDim = Z.LDim();
                     Scalar* VCol = SF.D.Buffer(0,j);
                     if( Conjugated )
-                        for( int i=0; i<r; ++i )
+                        for( int i=0; i<minDimV; ++i )
                             VCol[i] = ZRow[i*ZLDim];
                     else
-                        for( int i=0; i<r; ++i )
+                        for( int i=0; i<minDimV; ++i )
                             VCol[i] = Conj(ZRow[i*ZLDim]);
                 }
 
                 work.resize( lapack::ApplyQWorkSize('L',n,newRank) );
                 lapack::ApplyQ
                 ( 'L', 'N', n, newRank, minDimV,
-                  Y.LockedBuffer(), Y.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]],
+                  Y.LockedBuffer(), Y.LDim(), &tauBuffer[tauOffsets[teamLevel]],
                   SF.D.Buffer(),    SF.D.LDim(),  
                   &work[0], work.size() );
-                tauOffsets[teamLevel] += r;
+                tauOffsets[teamLevel] += r; // this is an upper bound
             }
         }
         else

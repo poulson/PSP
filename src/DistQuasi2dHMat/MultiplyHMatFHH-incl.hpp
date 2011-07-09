@@ -1139,9 +1139,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             {
                 for( int k=0; k<numQRs[l]; ++k )
                 {
-                    const unsigned thisQROffset = 
+                    const unsigned qrOffset = 
                         qrOffsets[l]+k*qrPieceSizes[l]+passes*(r*r+r);
-                    const unsigned thisTauOffset = 
+                    const unsigned tauOffset = 
                         tauOffsets[l]+k*tauPieceSizes[l]+(passes+1)*r;
 
                     if( firstRoot )
@@ -1150,7 +1150,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(j*j+j)+(j+1)],
+                            ( &qrBuffer[qrOffset+(j*j+j)+(j+1)],
                               &recvBuffer[recvOffset],
                               (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
@@ -1162,14 +1162,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(j*j+j)],
+                            ( &qrBuffer[qrOffset+(j*j+j)],
                               &recvBuffer[recvOffset],
                               (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[thisQROffset], &tauBuffer[thisTauOffset],
+                    ( r, &qrBuffer[qrOffset], &tauBuffer[tauOffset],
                       &work[0] );
                     if( secondRoot )
                     {
@@ -1178,12 +1178,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(r*r+r)+(j*j+j)],
-                              &qrBuffer[thisQROffset+(j*j+j)],
+                            ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)],
+                              &qrBuffer[qrOffset+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[thisQROffset+(j*j+j)],
+                              &qrBuffer[qrOffset+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             sendOffset += j+1;
                         }
@@ -1195,13 +1195,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(r*r+r)+(j*j+j)+
+                            ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)+
                                         (j+1)],
-                              &qrBuffer[thisQROffset+(j*j+j)],
+                              &qrBuffer[qrOffset+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[thisQROffset+(j*j+j)],
+                              &qrBuffer[qrOffset+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             sendOffset += j+1;
                         }
@@ -1221,9 +1221,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             {
                 for( int k=0; k<numQRs[l]; ++k )
                 {
-                    const unsigned thisQROffset = 
+                    const unsigned qrOffset = 
                         qrOffsets[l]+k*qrPieceSizes[l]+(passes+1)*(r*r+r);
-                    const unsigned thisTauOffset = 
+                    const unsigned tauOffset = 
                         tauOffsets[l]+k*tauPieceSizes[l]+(passes+2)*r;
 
                     if( secondRoot )
@@ -1232,7 +1232,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(j*j+j)+(j+1)],
+                            ( &qrBuffer[qrOffset+(j*j+j)+(j+1)],
                               &recvBuffer[recvOffset],
                               (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
@@ -1244,7 +1244,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(j*j+j)],
+                            ( &qrBuffer[qrOffset+(j*j+j)],
                               &recvBuffer[recvOffset],
                               (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
@@ -1252,7 +1252,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[thisQROffset], &tauBuffer[thisTauOffset],
+                    ( r, &qrBuffer[qrOffset], &tauBuffer[tauOffset],
                       &work[0] );
                     if( haveAnotherComm )
                     {
@@ -1261,8 +1261,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                             // Copy into the upper triangle of the next block
                             for( int j=0; j<r; ++j )
                                 std::memcpy
-                                ( &qrBuffer[thisQROffset+(r*r+r)+(j*j+j)],
-                                  &qrBuffer[thisQROffset+(j*j+j)],
+                                ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)],
+                                  &qrBuffer[qrOffset+(j*j+j)],
                                   (j+1)*sizeof(Scalar) );
                         }
                         else
@@ -1270,8 +1270,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                             // Copy into the lower triangle of the next block
                             for( int j=0; j<r; ++j )
                                 std::memcpy
-                                ( &qrBuffer[thisQROffset+(r*r+r)+(j*j+j)+(j+1)],
-                                  &qrBuffer[thisQROffset+(j*j+j)],
+                                ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)+(j+1)],
+                                  &qrBuffer[qrOffset+(j*j+j)],
                                   (j+1)*sizeof(Scalar) );
                         }
                     }
@@ -1291,9 +1291,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             {
                 for( int k=0; k<numQRs[l]; ++k )
                 {
-                    const unsigned thisQROffset = 
+                    const unsigned qrOffset = 
                         qrOffsets[l]+k*qrPieceSizes[l]+passes*(r*r+r);
-                    const unsigned thisTauOffset = 
+                    const unsigned tauOffset = 
                         tauOffsets[l]+k*tauPieceSizes[l]+(passes+1)*r;
 
                     if( firstRoot )
@@ -1302,7 +1302,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(j*j+j)+(j+1)],
+                            ( &qrBuffer[qrOffset+(j*j+j)+(j+1)],
                               &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
@@ -1313,13 +1313,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[thisQROffset+(j*j+j)],
+                            ( &qrBuffer[qrOffset+(j*j+j)],
                               &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[thisQROffset], &tauBuffer[thisTauOffset],
+                    ( r, &qrBuffer[qrOffset], &tauBuffer[tauOffset],
                       &work[0] );
                 }
             }
@@ -1335,16 +1335,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         const unsigned teamSize = mpi::CommSize( team );
         const unsigned log2TeamSize = Log2( teamSize );
         const unsigned teamRank = mpi::CommRank( team );
-        const Scalar* thisQRLevel = &qrBuffer[qrOffsets[teamLevel]];
-        const Scalar* thisTauLevel = &tauBuffer[tauOffsets[teamLevel]];
+        const Scalar* qrLevel = &qrBuffer[qrOffsets[teamLevel]];
+        const Scalar* tauLevel = &tauBuffer[tauOffsets[teamLevel]];
 
         for( int k=0; k<numQRs[teamLevel]; ++k )
         {
-            const Scalar* thisQRPiece = &thisQRLevel[k*qrPieceSizes[teamLevel]];
-            const Scalar* thisTauPiece = 
-                &thisTauLevel[k*tauPieceSizes[teamLevel]];
-            const Scalar* lastQRStage = &thisQRPiece[(log2TeamSize-1)*(r*r+r)];
-            const Scalar* lastTauStage = &thisTauPiece[log2TeamSize*r];
+            const Scalar* qrPiece = &qrLevel[k*qrPieceSizes[teamLevel]];
+            const Scalar* tauPiece = &tauLevel[k*tauPieceSizes[teamLevel]];
 
             if( log2TeamSize > 0 )
             {
@@ -1354,6 +1351,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 for( int j=0; j<r; ++j )
                     Z.Set(j,j,(Scalar)1);
                 // Backtransform the last stage
+                const Scalar* lastQRStage = &qrPiece[(log2TeamSize-1)*(r*r+r)];
+                const Scalar* lastTauStage = &tauPiece[log2TeamSize*r];
                 hmat_tools::ApplyPackedQFromLeft
                 ( r, lastQRStage, lastTauStage, Z, &work[0] );
                 // Take care of the middle stages before handling the large 
@@ -1381,8 +1380,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         }
                     }
                     hmat_tools::ApplyPackedQFromLeft
-                    ( r, &thisQRPiece[commStage*(r*r+r)], 
-                      &thisTauPiece[(commStage+1)*r], Z, &work[0] );
+                    ( r, &qrPiece[commStage*(r*r+r)], 
+                      &tauPiece[(commStage+1)*r], Z, &work[0] );
                 }
                 // Take care of the original stage. Do so by forming Y := X, 
                 // then zeroing X and placing our piece of Z at its top.
@@ -1414,7 +1413,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 work.resize( lapack::ApplyQWorkSize('L',m,r) );
                 lapack::ApplyQ
                 ( 'L', 'N', m, r, minDim,
-                  Y.LockedBuffer(), Y.LDim(), &thisTauPiece[0],
+                  Y.LockedBuffer(), Y.LDim(), &tauPiece[0],
                   X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
             else // this team only contains one process
@@ -1433,7 +1432,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 work.resize( lapack::ApplyQWorkSize('L',m,r) );
                 lapack::ApplyQ
                 ( 'L', 'N', m, r, minDim,
-                  Y.LockedBuffer(), Y.LDim(), &thisTauPiece[0],
+                  Y.LockedBuffer(), Y.LDim(), &tauPiece[0],
                   X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
         }
