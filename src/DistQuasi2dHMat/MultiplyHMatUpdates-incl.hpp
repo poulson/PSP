@@ -292,6 +292,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
 
         // Store the rank and create the space
         const unsigned teamLevel = _teams->TeamLevel( _level );
+        DF.rank = rank;
         if( _inTargetTeam )
         {
             ranks[rankOffsets[teamLevel]++] = rank;
@@ -360,6 +361,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         }
 
         // Create the space and store the rank if we'll need to do a QR
+        SF.rank = rank;
         if( _inTargetTeam )
         {
             if( !_haveDenseUpdate )
@@ -934,7 +936,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
     case SPLIT_DENSE:
     case DENSE:
     {
-        Dense<Scalar>& mainU = _UMap.Get( 0 );
+        _UMap.ResetIterator();
+        Dense<Scalar>& mainU = *_UMap.CurrentEntry();
         const int m = U.Height();
         const int r = U.Width();
         for( int j=0; j<r; ++j )
@@ -1047,7 +1050,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
     case SPLIT_DENSE:
     case DENSE:
     {
-        Dense<Scalar>& mainV = _VMap.Get( 0 );
+        _VMap.ResetIterator();
+        Dense<Scalar>& mainV = *_VMap.CurrentEntry();
         const int n = V.Height();
         const int r = V.Width();
         for( int j=0; j<r; ++j )
@@ -1645,14 +1649,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         {
             _UMap.ResetIterator();
             const Dense<Scalar>& U = *_UMap.CurrentEntry();
-            _UMap.Increment();
             AddToMap( sendSizes, _sourceRoot, Height()*U.Width() );
         }
         else
         {
             _VMap.ResetIterator();
             const Dense<Scalar>& V = *_VMap.CurrentEntry();
-            _VMap.Increment();
             AddToMap( recvSizes, _targetRoot, Height()*V.Width() );
         }
         break;
@@ -1768,15 +1770,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
                     std::memcpy
                     ( &sendBuffer[sendOffset+j*n],
                       SF.D.LockedBuffer(0,j), n*sizeof(Scalar) );
+                sendOffset += n*r;
 
                 // Copy the condensed dense update into the send buffer
-                sendOffset += n*r;
                 for( int j=0; j<n; ++j )
                     std::memcpy
                     ( &sendBuffer[sendOffset+j*m], _D.LockedBuffer(0,j),
                       m*sizeof(Scalar) );
                 sendOffsets[_targetRoot] += n*r + m*n;
-                _D.Clear();
             }
         }
         break;
@@ -1787,7 +1788,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         {
             _UMap.ResetIterator();
             const Dense<Scalar>& U = *_UMap.CurrentEntry();
-            _UMap.Increment();
             const int height = Height();
             const int r = U.Width();
             const int sendOffset = sendOffsets[_sourceRoot];
@@ -1796,6 +1796,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
                 ( &sendBuffer[sendOffset+j*height],
                   U.LockedBuffer(0,j), height*sizeof(Scalar) );
             sendOffsets[_sourceRoot] += height*r;
+            _UMap.Clear();
         }
     }
     default:
@@ -1941,6 +1942,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         }
 
         // Overwrite X with R_U R_V^[T/H]
+        // HERE: Should switch to a gemm
         const char option = ( Conjugated ? 'C' : 'T' );
         blas::Trmm
         ( 'R', 'U', option, 'N', r, r, 
@@ -1981,6 +1983,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
         const int maxRank = MaxRank();
         Z.Resize( 2*r, maxRank );
+        DF.rank = maxRank;
         if( _inTargetTeam )
         {
             // Form the compressed local portion of U.
@@ -2167,10 +2170,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             {
                 hmat_tools::Scale( (Scalar)0, X );
                 const int recvOffset = recvOffsets[_sourceRoot];
-                for( int j=0; j<r; ++j )
+                for( int j=0; j<minDimU; ++j )
                     std::memcpy
                     ( X.Buffer(0,j), SF.D.LockedBuffer(0,j), 
-                      std::min(minDimU,j+1)*sizeof(Scalar) );
+                      (j+1)*sizeof(Scalar) );
+                for( int j=minDimU; j<r; ++j )
+                    std::memcpy
+                    ( X.Buffer(0,j), SF.D.LockedBuffer(0,j),
+                      minDimU*sizeof(Scalar) );
                 hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<minDimV; ++j )
                     std::memcpy
@@ -2200,10 +2207,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                                   (j-minDimU)*minDimU],
                       minDimU*sizeof(Scalar) );
                 hmat_tools::Scale( (Scalar)0, Y );
-                for( int j=0; j<r; ++j )
+                for( int j=0; j<minDimV; ++j )
                     std::memcpy
                     ( Y.Buffer(0,j), SF.D.LockedBuffer(0,j), 
                       (j+1)*sizeof(Scalar) );
+                for( int j=minDimV; j<r; ++j )
+                    std::memcpy
+                    ( Y.Buffer(0,j), SF.D.LockedBuffer(0,j),
+                      minDimV*sizeof(Scalar) );
                 recvOffsets[_targetRoot] += 
                     (minDimU*minDimU+minDimU)/2 + (r-minDimU)*minDimU;
             }
@@ -2221,6 +2232,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             singularValues.resize( minDim );
             work.resize( lapack::SVDWorkSize(minDimU,minDimV) );
             realWork.resize( lapack::SVDRealWorkSize(minDimU,minDimV) );
+            const int newRank = std::min( minDim, maxRank );
+            SF.rank = newRank;
             if( _inTargetTeam )
             {
                 // Perform an SVD on Z, overwriting Z with the left singular 
@@ -2229,7 +2242,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( 'O', 'N', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
                   &singularValues[0], 0, 1, 0, 1, 
                   &work[0], work.size(), &realWork[0] );
-                const int newRank = std::min( minDim, maxRank );
 
                 // Backtransform U
                 const int m = SF.D.Height();
@@ -2264,7 +2276,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( 'N', 'O', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
                   &singularValues[0], 0, 1, 0, 1, 
                   &work[0], work.size(), &realWork[0] );
-                const int newRank = std::min( minDim, maxRank );
 
                 // Backtransform V
                 const int n = SF.D.Height();
@@ -2331,6 +2342,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
                 if( minDim <= maxRank )
                 {
+                    SF.rank = minDim;
                     if( m == minDim )
                     {
                         // Make U := I (where V := Z^[T/H])
@@ -2347,6 +2359,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 }
                 else // minDim > maxRank
                 {
+                    SF.rank = maxRank;
+
                     // Perform an SVD on the dense matrix, overwriting it with
                     // the left singular vectors 
                     singularValues.resize( minDim );
@@ -2374,15 +2388,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             {
                 // Add U V^[T/H] onto the dense update
                 const char option = ( Conjugated ? 'C' : 'T' );
+                int recvOffset = recvOffsets[_targetRoot];
                 blas::Gemm
                 ( 'N', option, m, n, r, 
-                  (Scalar)1, &recvBuffer[recvOffsets[_targetRoot]], m,
-                             SF.D.LockedBuffer(),                   SF.D.LDim(),
-                  (Scalar)1, _D.Buffer(),                           _D.LDim() );
+                  (Scalar)1, &recvBuffer[recvOffset], m,
+                             SF.D.LockedBuffer(),     SF.D.LDim(),
+                  (Scalar)1, _D.Buffer(),             _D.LDim() );
                 recvOffsets[_targetRoot] += m*r;
 
                 if( minDim <= maxRank )
                 {
+                    SF.rank = minDim;
                     if( m == minDim )
                     {
                         // Make V := _D^[T/H] (where U := I)
@@ -2403,6 +2419,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 }
                 else // minDim > maxRank
                 {
+                    SF.rank = maxRank;
+
                     // Perform an SVD on the dense matrix, overwriting it with
                     // adjoint of the right singular vectors
                     singularValues.resize( minDim );
@@ -2634,7 +2652,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int m = SD.D.Height();
             const int n = SD.D.Width();
 
-            const Dense<Scalar>& V = _VMap.Get( 0 );
+            _VMap.ResetIterator();
+            const Dense<Scalar>& V = *_VMap.CurrentEntry();
             const int r = V.Width();
 
             // Add U V^[T/H] onto our dense matrix
@@ -2648,6 +2667,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
             _VMap.Clear();
         }
+        break;
     }
     case DENSE:
     {
@@ -2655,8 +2675,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const int m = D.Height();
         const int n = D.Width();
 
-        const Dense<Scalar>& U = _UMap.Get( 0 );
-        const Dense<Scalar>& V = _VMap.Get( 0 );
+        _UMap.ResetIterator();
+        _VMap.ResetIterator();
+        const Dense<Scalar>& U = *_UMap.CurrentEntry();
+        const Dense<Scalar>& V = *_VMap.CurrentEntry();
         const int r = U.Width();
 
         // Add U V^[T/H] onto our dense matrix

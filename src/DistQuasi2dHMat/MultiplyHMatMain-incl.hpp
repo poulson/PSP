@@ -32,26 +32,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSetUp
 
     C._numLevels = A._numLevels;
     C._maxRank = A._maxRank;
-    C._sourceOffset = B._sourceOffset;
     C._targetOffset = A._targetOffset;
+    C._sourceOffset = B._sourceOffset;
     C._stronglyAdmissible = ( A._stronglyAdmissible || B._stronglyAdmissible );
 
-    C._xSizeSource = B._xSizeSource;
-    C._ySizeSource = B._ySizeSource;
     C._xSizeTarget = A._xSizeTarget;
     C._ySizeTarget = A._ySizeTarget;
+    C._xSizeSource = B._xSizeSource;
+    C._ySizeSource = B._ySizeSource;
     C._zSize = A._zSize;
-    C._xSource = B._xSource;
-    C._ySource = B._ySource;
+
     C._xTarget = A._xTarget;
     C._yTarget = A._yTarget;
+    C._xSource = B._xSource;
+    C._ySource = B._ySource;
 
     C._teams = A._teams;
     C._level = A._level;
-    C._inSourceTeam = B._inSourceTeam;
     C._inTargetTeam = A._inTargetTeam;
-    C._sourceRoot = B._sourceRoot;
+    C._inSourceTeam = B._inSourceTeam;
     C._targetRoot = A._targetRoot;
+    C._sourceRoot = B._sourceRoot;
     
     MPI_Comm team = _teams->Team( A._level );
     const int teamSize = mpi::CommSize( team );
@@ -1054,9 +1055,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         case LOW_RANK_GHOST:
             break;
         case SPLIT_DENSE:
+            if( admissibleC && C._inSourceTeam )
+                C._haveDenseUpdate = true;
+            break;
         case SPLIT_DENSE_GHOST:
         case DENSE_GHOST:
-            if( admissibleC && (C._inSourceTeam || C._inTargetTeam) )
+            if( admissibleC )
                 C._haveDenseUpdate = true;
             break;
         default:
@@ -1159,6 +1163,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         break;
     }
     case DENSE_GHOST:
+        if( B._block.type == SPLIT_DENSE && admissibleC )
+            C._haveDenseUpdate = true;
+        break;
     case EMPTY:
         break;
     }
@@ -2189,7 +2196,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         case SPLIT_DENSE_GHOST:
         case DENSE:
         case DENSE_GHOST:
-            // Pass data for D/F += F D is in other process
             break;
         default:
         {
@@ -4916,40 +4922,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                 const int m = C.Height();
                 const int n = C.Width();
                 const int k = A.Width();
-                if( m != 0 && k != 0 )
+                if( admissibleC )
                 {
-                    Dense<Scalar>& ZC = C._ZMap.Get( key );
-                    if( admissibleC )
+                    if( C._storedDenseUpdate )
                     {
-                        if( C._storedDenseUpdate )
+                        if( m != 0 && k != 0 )
                         {
+                            Dense<Scalar>& ZC = C._ZMap.Get( key );
                             blas::Gemm
                             ( 'N', 'N', m, n, k,
                               alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                          SDB.D.LockedBuffer(), SDB.D.LDim(),
                               (Scalar)1, C._D.Buffer(),        C._D.LDim() );
+                            ZC.Clear();
+                            C._ZMap.Erase( key );
                         }
-                        else
+                    }
+                    else
+                    {
+                        C._D.Resize( m, n );
+                        if( m != 0 && k != 0 )
                         {
-                            C._D.Resize( m, n );
+                            Dense<Scalar>& ZC = C._ZMap.Get( key );
                             blas::Gemm
                             ( 'N', 'N', m, n, k,
                               alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                          SDB.D.LockedBuffer(), SDB.D.LDim(),
                               (Scalar)0, C._D.Buffer(),        C._D.LDim() );
-                            C._haveDenseUpdate = true;
-                            C._storedDenseUpdate = true;
+                            ZC.Clear();
+                            C._ZMap.Erase( key );
                         }
+                        else
+                            hmat_tools::Scale( (Scalar)0, C._D );
+                        C._storedDenseUpdate = true;
                     }
-                    else
-                    {
-                        Dense<Scalar>& D = *C._block.data.D;
-                        blas::Gemm
-                        ( 'N', 'N', m, n, k,
-                          alpha,     ZC.LockedBuffer(),    ZC.LDim(),
-                                     SDB.D.LockedBuffer(), SDB.D.LDim(),
-                          (Scalar)1, D.Buffer(),           D.LDim() );
-                    }
+                }
+                else if( m != 0 && k != 0 )
+                {
+                    Dense<Scalar>& ZC = C._ZMap.Get( key );
+                    Dense<Scalar>& D = *C._block.data.D;
+                    blas::Gemm
+                    ( 'N', 'N', m, n, k,
+                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
+                      (Scalar)1, D.Buffer(),           D.LDim() );
                     ZC.Clear();
                     C._ZMap.Erase( key );
                 }
@@ -4997,40 +5013,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             const int m = C.Height();
             const int n = C.Width();
             const int k = A.Width();
-            if( m != 0 && k != 0 )
+            if( admissibleC )
             {
-                Dense<Scalar>& ZC = C._ZMap.Get( key );
-                if( admissibleC )
+                if( C._storedDenseUpdate )
                 {
-                    if( C._storedDenseUpdate )
+                    if( m != 0 && k != 0 )
                     {
+                        Dense<Scalar>& ZC = C._ZMap.Get( key );
                         blas::Gemm
                         ( 'N', 'N', m, n, k,
                           alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                      SDB.D.LockedBuffer(), SDB.D.LDim(),
                           (Scalar)1, C._D.Buffer(),        C._D.LDim() );
+                        ZC.Clear();
+                        C._ZMap.Erase( key );
                     }
-                    else
+                }
+                else
+                {
+                    C._D.Resize( m, n );
+                    if( m != 0 && k != 0 )
                     {
-                        C._D.Resize( m, n );
+                        Dense<Scalar>& ZC = C._ZMap.Get( key );
                         blas::Gemm
                         ( 'N', 'N', m, n, k,
                           alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                      SDB.D.LockedBuffer(), SDB.D.LDim(),
                           (Scalar)0, C._D.Buffer(),        C._D.LDim() );
-                        C._haveDenseUpdate = true;
-                        C._storedDenseUpdate = true;
+                        ZC.Clear();
+                        C._ZMap.Erase( key );
                     }
+                    else
+                        hmat_tools::Scale( (Scalar)0, C._D );
+                    C._storedDenseUpdate = true;
                 }
-                else
-                {
-                    Dense<Scalar>& D = *C._block.data.D;
-                    blas::Gemm
-                    ( 'N', 'N', m, n, k,
-                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
-                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
-                      (Scalar)1, D.Buffer(),           D.LDim() );
-                }
+            }
+            else if( m != 0 && k != 0 )
+            {
+                Dense<Scalar>& ZC = C._ZMap.Get( key );
+                Dense<Scalar>& D = *C._block.data.D;
+                blas::Gemm
+                ( 'N', 'N', m, n, k,
+                  alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                             SDB.D.LockedBuffer(), SDB.D.LDim(),
+                  (Scalar)1, D.Buffer(),           D.LDim() );
                 ZC.Clear();
                 C._ZMap.Erase( key );
             }
@@ -5071,40 +5097,50 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             const int m = C.Height();
             const int n = C.Width();
             const int k = A.Width();
-            if( m != 0 && k != 0 )
+            if( admissibleC )
             {
-                Dense<Scalar>& ZC = C._ZMap.Get( key );
-                if( admissibleC )
+                if( C._storedDenseUpdate )
                 {
-                    if( C._storedDenseUpdate )
+                    if( m != 0 && k != 0 )
                     {
+                        Dense<Scalar>& ZC = C._ZMap.Get( key );
                         blas::Gemm
                         ( 'N', 'N', m, n, k,
                           alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                      SDB.D.LockedBuffer(), SDB.D.LDim(),
                           (Scalar)1, C._D.Buffer(),        C._D.LDim() );
+                        ZC.Clear();
+                        C._ZMap.Erase( key );
                     }
-                    else
+                }
+                else
+                {
+                    C._D.Resize( m, n );
+                    if( m != 0 && k != 0 )
                     {
-                        C._D.Resize( m, n );
+                        Dense<Scalar>& ZC = C._ZMap.Get( key );
                         blas::Gemm
                         ( 'N', 'N', m, n, k,
                           alpha,     ZC.LockedBuffer(),    ZC.LDim(),
                                      SDB.D.LockedBuffer(), SDB.D.LDim(),
                           (Scalar)0, C._D.Buffer(),        C._D.LDim() );
-                        C._haveDenseUpdate = true;
-                        C._storedDenseUpdate = true;
+                        ZC.Clear();
+                        C._ZMap.Erase( key );
                     }
+                    else
+                        hmat_tools::Scale( (Scalar)0, C._D );
+                    C._storedDenseUpdate = true;
                 }
-                else
-                {
-                    Dense<Scalar>& D = *C._block.data.D;
-                    blas::Gemm
-                    ( 'N', 'N', m, n, k,
-                      alpha,     ZC.LockedBuffer(),    ZC.LDim(),
-                                 SDB.D.LockedBuffer(), SDB.D.LDim(),
-                      (Scalar)1, D.Buffer(),           D.LDim() );
-                }
+            }
+            else if( m != 0 && k != 0 )
+            {
+                Dense<Scalar>& ZC = C._ZMap.Get( key );
+                Dense<Scalar>& D = *C._block.data.D;
+                blas::Gemm
+                ( 'N', 'N', m, n, k,
+                  alpha,     ZC.LockedBuffer(),    ZC.LDim(),
+                             SDB.D.LockedBuffer(), SDB.D.LDim(),
+                  (Scalar)1, D.Buffer(),           D.LDim() );
                 ZC.Clear();
                 C._ZMap.Erase( key );
             }
