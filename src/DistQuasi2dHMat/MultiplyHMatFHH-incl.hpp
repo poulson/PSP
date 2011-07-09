@@ -1577,18 +1577,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
         case NODE_GHOST:
             if( C.Admissible() )
             {
-                const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-                std::ostringstream s;
-                s << commRank << ".dat";
-                std::ofstream file
-                ( s.str().c_str(), std::ios::out | std::ios::app );
-                file << "Omega prints: level=" << A._level << ", offsets="
-                     << C._targetOffset << ", " << C._sourceOffset << ", entry="
-                     << A._sourceOffset << std::endl;
-
                 if( C._inTargetTeam ) 
                 {
-                    A._rowOmega.Print( file, "Omega2" );
                     // Handle the middle update, Omega2' (alpha A B Omega1)
                     const Dense<Scalar>& X = C._colXMap.Get( A._sourceOffset );
                     const Dense<Scalar>& Omega2 = A._rowOmega;
@@ -1602,8 +1592,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                       (Scalar)0, middleUpdate,          rank );
                     middleOffsets[teamLevel] += rank*rank;
                 }
-                if( C._inSourceTeam )
-                    B._colOmega.Print( file, "Omega1" );
             }
             else
             {
@@ -1667,11 +1655,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
         const int log2TeamSize = Log2( teamSize );
         const int r = SampleRank( MaxRank() );
 
-        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-        std::ostringstream s;
-        s << commRank << ".dat";
-        std::ofstream file( s.str().c_str(), std::ios::out | std::ios::app );
-
         if( _inTargetTeam )
         {
             _colXMap.ResetIterator();
@@ -1680,11 +1663,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
             {
                 Dense<Scalar>& X = *_colXMap.CurrentEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
-
-                file << "target side, level=" << _level 
-                    << "offset=" << _targetOffset << ", "<< _sourceOffset 
-                    << ", entry=" << _colXMap.CurrentKey() << "\n";
-                X.Print( file, "X before QR" );
 
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
@@ -1729,11 +1707,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                 Dense<Scalar>& X = *_rowXMap.CurrentEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
                 
-                file << "source side, level=" << _level 
-                    << "offset=" << _targetOffset << ", "<< _sourceOffset 
-                    << ", entry=" << _rowXMap.CurrentKey() << "\n";
-                X.Print( file, "X before QR" );
-
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
                   &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
@@ -1841,37 +1814,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
 
-                    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-                    std::ostringstream s;
-                    s << commRank << ".dat";
-                    std::ofstream file
-                    ( s.str().c_str(), std::ios::out | std::ios::app );
-                    file << "Q2' Omega1 comp with offsets= "
-                         << C._targetOffset << ", " << C._sourceOffset
-                         << ",  entry=" << key << std::endl;
-
-                    Q2.Print( file, "Q2" );
-                    Omega1.Print( file, "Omega1" );
-
-                    file << "Q2.Width(): " << Q2.Width() << "\n"
-                         << "rank: " << rank << "\n"
-                         << "B.LocalWidth(): " << B.LocalWidth() << std::endl;
-
                     blas::Gemm
                     ( 'C', 'N', Q2.Width(), rank, B.LocalWidth(),
                       (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
                                  Omega1.LockedBuffer(), Omega1.LDim(),
                       (Scalar)0, rightUpdate,           rank );
-
-                    file << "Q2' Omega1\n";
-                    for( int i=0; i<Q2.Width(); ++i )
-                    {
-                        for( int j=0; j<rank; ++j )
-                            file << ScalarWrapper<Scalar>
-                                    (rightUpdate[i+j*rank]) << " ";
-                        file << "\n";
-                    }
-                    file << "\n";
 
                     rightOffsets[teamLevel] += rank*rank;
                 }
@@ -1949,12 +1896,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
             {
                 const int key = A._sourceOffset;
                 const unsigned teamLevel = C._teams->TeamLevel(C._level);
-                const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-                std::ostringstream s;
-                s << commRank << ".dat";
-                std::ofstream file
-                ( s.str().c_str(), std::ios::out | std::ios::app );
-
                 if( C._inTargetTeam ) 
                 {
                     // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
@@ -1992,16 +1933,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 
                     leftOffsets[teamLevel] += rank*rank;
                     middleOffsets[teamLevel] += rank*rank;
-                    
-                    file << "target side, level=" << C._level 
-                         << "offset=" << C._targetOffset << ", "
-                                      << C._sourceOffset 
-                         << ", entry=" << A._sourceOffset << "\n";
-                    X.Print( file, "U" );
                 }
                 if( C._inSourceTeam )
                 {
-                    // Form Q2 pinv(Q2' Omega1) or its conjugate
+                    // Form Q2 pinv(Q2' Omega1)' or its conjugate
                     Dense<Scalar>& X = C._rowXMap.Get( key );
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
@@ -2017,7 +1952,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                     X.Resize( X.Height(), rank );
 
                     blas::Gemm
-                    ( 'N', 'C', Q2.Height(), rank, Q2.Width(),
+                    ( 'N', 'N', Q2.Height(), rank, Q2.Width(),
                       (Scalar)1, Q2.LockedBuffer(), Q2.LDim(),
                                  rightUpdate,       rank,
                       (Scalar)0, X.Buffer(),        X.LDim() );
@@ -2025,12 +1960,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                         hmat_tools::Conjugate( X );
 
                     rightOffsets[teamLevel] += rank*rank;
-
-                    file << "source side, level=" << C._level 
-                         << "offset=" << C._targetOffset << ", "
-                                      << C._sourceOffset 
-                         << ", entry=" << A._sourceOffset << "\n";
-                    X.Print( file, "V" );
                 }
             }
             else
