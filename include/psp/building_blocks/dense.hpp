@@ -401,7 +401,7 @@ psp::Dense<Scalar>::Print( std::ostream& os, const std::string& tag ) const
             os << "\n";
         }
     }
-    os << std::endl;
+    os.flush();
 #ifndef RELEASE
     PopCallStack();
 #endif

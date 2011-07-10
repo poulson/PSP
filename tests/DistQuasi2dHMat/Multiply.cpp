@@ -23,8 +23,8 @@
 void Usage()
 {
     std::cout << "Ghost <xSize> <ySize> <zSize> <numLevels> "
-                 "<strongly admissible?> <r> <print?> <print structure?>" 
-              << std::endl;
+                 "<strongly admissible?> <r> <print?> <print structure?> "
+                 "<multiply identity?>" << std::endl;
 }
 
 template<typename Real>
@@ -93,7 +93,12 @@ main( int argc, char* argv[] )
     const int commRank = psp::mpi::CommRank( MPI_COMM_WORLD );
     const int commSize = psp::mpi::CommSize( MPI_COMM_WORLD );
 
-    if( argc < 9 )
+    psp::UInt64 seed;
+    seed.d[0] = 17U;
+    seed.d[1] = 21U;
+    psp::SeedParallelLcg( commRank, commSize, seed );
+
+    if( argc < 10 )
     {
         if( commRank == 0 )
             Usage();
@@ -108,6 +113,7 @@ main( int argc, char* argv[] )
     const int r = atoi( argv[6] );
     const bool print = atoi( argv[7] );
     const bool printStructure = atoi( argv[8] );
+    const bool multiplyIdentity = atoi( argv[9] );
 
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
@@ -328,13 +334,23 @@ main( int argc, char* argv[] )
         const int localWidth = A.LocalWidth();
         if( localHeight != localWidth )
             throw std::logic_error("A was not locally square");
-        const int numRhs = 30;
-        psp::Dense<Scalar> XLocal( localHeight, numRhs );
-        psp::UInt64 seed;
-        seed.d[0] = 17U;
-        seed.d[1] = 21U;
-        psp::SeedParallelLcg( commRank, commSize, seed );
-        psp::ParallelGaussianRandomVectors( XLocal );
+
+        psp::Dense<Scalar> XLocal;
+        if( multiplyIdentity )
+        {
+            const int firstLocalRow = A.FirstLocalRow();
+            XLocal.Resize( localHeight, n );
+            psp::hmat_tools::Scale( (Scalar)0, XLocal );
+            for( int j=firstLocalRow; j<firstLocalRow+localHeight; ++j )
+                XLocal.Set( j-firstLocalRow, j, (Scalar)1 );
+        }
+        else
+        {
+            const int numRhs = 30;
+            XLocal.Resize( localHeight, numRhs );
+            psp::ParallelGaussianRandomVectors( XLocal );
+        }
+        
         psp::Dense<Scalar> YLocal, ZLocal;
         // Y := AZ := ABX
         B.Multiply( (Scalar)1, XLocal, ZLocal );
@@ -342,12 +358,32 @@ main( int argc, char* argv[] )
         // Z := CX
         C.Multiply( (Scalar)1, XLocal, ZLocal );
 
+        if( print )
+        {
+            std::ostringstream sY, sZ;
+            sY << "YLocal_" << commRank << ".m";
+            sZ << "ZLocal_" << commRank << ".m";
+            std::ofstream YFile( sY.str().c_str() );
+            std::ofstream ZFile( sZ.str().c_str() );
+
+            YFile << "YLocal" << commRank << "=[\n";
+            YLocal.Print( YFile, "" );
+            YFile << "];\n";
+
+            ZFile << "ZLocal" << commRank << "=[\n";
+            ZLocal.Print( ZFile, "" );
+            ZFile << "];\n";
+        }
+
+        // Compute the error norms and put ZLocal = YLocal-ZLocal
         double myErrors[3] = { 0., 0., 0. };
-        for( int j=0; j<numRhs; ++j )
+        for( int j=0; j<XLocal.Width(); ++j )
         {
             for( int i=0; i<localHeight; ++i )
             {
-                double error = psp::Abs(YLocal.Get(i,j)-ZLocal.Get(i,j));
+                std::complex<double> diff = YLocal.Get(i,j) - ZLocal.Get(i,j);
+                ZLocal.Set( i, j, diff );
+                double error = psp::Abs( diff );
                 myErrors[0] = std::max(myErrors[0],error);
                 myErrors[1] += error;
                 myErrors[2] += error*error;
@@ -363,6 +399,17 @@ main( int argc, char* argv[] )
             std::cout << "||CX-ABX||_oo = " << infError << "\n"
                       << "||CX-ABX||_1  = " << L1Error << "\n"
                       << "||CX-ABX||_2  = " << L2Error << std::endl;
+        }
+
+        if( print )
+        {
+            std::ostringstream sE;
+            sE << "ELocal_" << commRank << ".m";
+            std::ofstream EFile( sE.str().c_str() );
+
+            EFile << "ELocal" << commRank << "=[\n";
+            ZLocal.Print( EFile, "" );
+            EFile << "];\n";
         }
     }
     catch( std::exception& e )

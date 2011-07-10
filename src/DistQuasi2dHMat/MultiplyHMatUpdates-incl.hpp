@@ -231,7 +231,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
         {
             const int numEntries = _UMap.Size();
             _UMap.ResetIterator();
-
             for( int i=0; i<numEntries; ++i,_UMap.Increment() )
                 rank += _UMap.CurrentEntry()->Width();
         }
@@ -292,7 +291,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
 
         // Store the rank and create the space
         const unsigned teamLevel = _teams->TeamLevel( _level );
-        DF.rank = rank;
         if( _inTargetTeam )
         {
             ranks[rankOffsets[teamLevel]++] = rank;
@@ -317,6 +315,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
             ( DF.VLocal.Buffer(0,rank-oldRank), VLocalCopy.LockedBuffer(),
               localWidth*oldRank*sizeof(Scalar) );
         }
+        DF.rank = rank;
         break;
     }
     case SPLIT_LOW_RANK:
@@ -361,7 +360,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
         }
 
         // Create the space and store the rank if we'll need to do a QR
-        SF.rank = rank;
         if( _inTargetTeam )
         {
             if( !_haveDenseUpdate )
@@ -371,6 +369,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
             Dense<Scalar> UCopy;
             hmat_tools::Copy( SF.D, UCopy );
             SF.D.Resize( height, rank, height );
+            SF.rank = rank;
             std::memcpy
             ( SF.D.Buffer(0,rank-oldRank), UCopy.LockedBuffer(), 
               height*oldRank*sizeof(Scalar) );
@@ -384,6 +383,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
             Dense<Scalar> VCopy;
             hmat_tools::Copy( SF.D, VCopy );
             SF.D.Resize( width, rank, width );
+            SF.rank = rank;
             std::memcpy
             ( SF.D.Buffer(0,rank-oldRank), VCopy.LockedBuffer(),
               width*oldRank*sizeof(Scalar) );
@@ -450,14 +450,11 @@ MultiplyHMatUpdatesLowRankCountAndResize
             const int m = Height();
             const int numLowRankUpdates = _UMap.Size();
             _UMap.ResetIterator();
-            for( int update=0; update<numLowRankUpdates; 
-                 ++update,_UMap.Increment() )
+            for( int i=0; i<numLowRankUpdates; ++i,_UMap.Increment() )
                 rank += _UMap.CurrentEntry()->Width();
 
             if( numLowRankUpdates == 0 )
-            {
                 _UMap.Set( 0, new Dense<Scalar>( m, rank ) );
-            }
             else
             {
                 _UMap.ResetIterator();
@@ -499,14 +496,11 @@ MultiplyHMatUpdatesLowRankCountAndResize
             const int n = Width();
             const int numLowRankUpdates = _VMap.Size();
             _VMap.ResetIterator();
-            for( int update=0; update<numLowRankUpdates; 
-                 ++update,_VMap.Increment() )
+            for( int i=0; i<numLowRankUpdates; ++i,_VMap.Increment() )
                 rank += _VMap.CurrentEntry()->Width();
 
             if( numLowRankUpdates == 0 )
-            {
                 _VMap.Set( 0, new Dense<Scalar>( n, rank ) );
-            }
             else
             {
                 _VMap.ResetIterator();
@@ -1184,35 +1178,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
         SplitLowRank& SF = *_block.data.SF;
         if( !_haveDenseUpdate )
         {
+            if( SF.rank <= MaxRank() )
+                break;
+
             const unsigned teamLevel = _teams->TeamLevel(_level);
-            if( _inTargetTeam )
-            {
-                Dense<Scalar>& U = SF.D;
-                const int m = U.Height();
-                const int r = U.Width();
-                if( r <= MaxRank() )
-                    break;
-
-                lapack::QR
-                ( m, r, U.Buffer(), U.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]], 
-                  &qrWork[0], qrWork.size() );
-                tauOffsets[teamLevel] += r;
-            }
-            else
-            {
-                Dense<Scalar>& V = SF.D;
-                const int n = V.Height();
-                const int r = V.Width();
-                if( r <= MaxRank() )
-                    break;
-
-                lapack::QR
-                ( n, r, V.Buffer(), V.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]], 
-                  &qrWork[0], qrWork.size() );
-                tauOffsets[teamLevel] += r;
-            }
+            lapack::QR
+            ( SF.D.Height(), SF.rank, SF.D.Buffer(), SF.D.LDim(),
+              &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
+            tauOffsets[teamLevel] += SF.rank;
         }
         break;
     }
@@ -2077,10 +2050,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 Scalar* ZCol = Z.Buffer(0,j);
                 if( Conjugated )
                     for( int i=0; i<r; ++i )
-                        ZCol[i] = YRow[i*YLDim];
+                        ZCol[i] = Conj(YRow[i*YLDim]);
                 else
                     for( int i=0; i<r; ++i )
-                        ZCol[i] = Conj(YRow[i*YLDim]);
+                        ZCol[i] = YRow[i*YLDim];
             }
 
             // Backtransform the last stage
@@ -2293,10 +2266,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     Scalar* VCol = SF.D.Buffer(0,j);
                     if( Conjugated )
                         for( int i=0; i<minDimV; ++i )
-                            VCol[i] = ZRow[i*ZLDim];
+                            VCol[i] = Conj(ZRow[i*ZLDim]);
                     else
                         for( int i=0; i<minDimV; ++i )
-                            VCol[i] = Conj(ZRow[i*ZLDim]);
+                            VCol[i] = ZRow[i*ZLDim];
                 }
 
                 work.resize( lapack::ApplyQWorkSize('L',n,newRank) );
@@ -2347,9 +2320,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     if( m == minDim )
                     {
                         // Make U := I (where V := Z^[T/H])
-                        SF.D.Resize( minDim, minDim );
+                        SF.D.Resize( m, m );
                         hmat_tools::Scale( (Scalar)0, SF.D );
-                        for( int j=0; j<minDim; ++j )
+                        for( int j=0; j<m; ++j )
                             SF.D.Set(j,j,(Scalar)1);
                     }
                     else
@@ -2403,18 +2376,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     if( m == minDim )
                     {
                         // Make V := _D^[T/H] (where U := I)
-                        SF.D.Resize( n, m );
                         if( Conjugated )
                             hmat_tools::Adjoint( _D, SF.D );
                         else
                             hmat_tools::Transpose( _D, SF.D );
                     }
-                    else
+                    else // n == minDim
                     {
                         // Make V := I (where U := _D)
-                        SF.D.Resize( minDim, minDim );
+                        SF.D.Resize( n, n );
                         hmat_tools::Scale( (Scalar)0, SF.D );
-                        for( int j=0; j<minDim; ++j )
+                        for( int j=0; j<n; ++j )
                             SF.D.Set(j,j,(Scalar)1);
                     }
                 }
@@ -2544,10 +2516,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 Scalar* VCol = F.V.Buffer(0,j);
                 if( Conjugated )
                     for( int i=0; i<minDimV; ++i )
-                        VCol[i] = YRow[i*YLDim];
+                        VCol[i] = Conj(YRow[i*YLDim]);
                 else
                     for( int i=0; i<minDimV; ++i )
-                        VCol[i] = Conj(YRow[i*YLDim]);
+                        VCol[i] = YRow[i*YLDim];
             }
 
             work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
