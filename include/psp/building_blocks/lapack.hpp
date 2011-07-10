@@ -1361,47 +1361,6 @@ inline void AdjointPseudoInverse
     char cmach = 'S';
     const double safeMin = LAPACK(dlamch)( &cmach );
 
-#if defined(PACK_DURING_PSEUDO_INVERSE)
-    // Combine the inversion of the sufficiently large singular values with 
-    // the scaling of U. We can skip the columns of U that correspond to 
-    // numerically zero singular values
-    const int k = std::min( m, n );
-    int packedColumns = 0;
-    for( int j=0; j<k; ++j )
-    {
-        if( s[j] >= safeMin )
-        {
-            const double invSigma = 1 / s[j];
-            // Split our approach based on whether or not the source and 
-            // destination buffers are the same
-            if( packedColumns == j )
-            {
-                std::complex<double>* RESTRICT UCol = &U[j*ldu];
-                for( int i=0; i<m; ++i ) 
-                    UCol[i] *= invSigma;
-            }
-            else
-            {
-                // Form the scaled column of U in its packed location
-                std::complex<double>* RESTRICT 
-                    UPackedCol = &U[packedColumns*ldu];
-                const std::complex<double>* RESTRICT UCol = &U[j*ldu];
-                for( int i=0; i<m; ++i )
-                    UPackedCol[i] = invSigma*UCol[i];
-                // Since we moved a column of U, we have to move the
-                // corresponding column of V as well. This may ruin the benefit
-                // of the packed approach
-                for( int i=0; i<n; ++i )
-                    VH[packedColumns+i*ldvh] = VH[j+i*ldvh];
-            }
-            ++packedColumns;
-        }
-    }
-
-    // Form A := U V^H, where U and V have been compressed
-    blas::Gemm
-    ( 'N', 'N', m, n, packedColumns, 1, U, ldu, VH, ldvh, 0, A, lda );
-#else
     // Scale the columns of U using thresholded inversion of the singular values
     const int k = std::min( m, n );
     for( int j=0; j<k; ++j )
@@ -1424,7 +1383,6 @@ inline void AdjointPseudoInverse
     // Form A := U V^H, where U has been scaled
     blas::Gemm
     ( 'N', 'N', m, n, k, 1, U, ldu, VH, ldvh, 0, A, lda );
-#endif // PACK_DURING_PSEUDO_INVERSE
 #ifndef RELEASE
     PopCallStack();
 #endif

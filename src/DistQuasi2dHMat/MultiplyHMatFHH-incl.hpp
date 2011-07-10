@@ -1034,11 +1034,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     {
         leftOffsets[teamLevel] = totalAllReduceSize;
         totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
+
         middleOffsets[teamLevel] = totalAllReduceSize;
         totalAllReduceSize += numTargetFHH[teamLevel]*r*r;
+
         rightOffsets[teamLevel] = totalAllReduceSize;
         totalAllReduceSize += numSourceFHH[teamLevel]*r*r;
     }
+
+    // Compute the local contributions to the middle updates, 
+    // Omega2' (alpha A B Omega1)
     std::vector<Scalar> allReduceBuffer( totalAllReduceSize );
     {
         std::vector<int> middleOffsetsCopy = middleOffsets;
@@ -1089,16 +1094,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         int sendOffset = 0;
         for( int l=0; l<numSteps-step; ++l )
         {
+            const Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
             for( int k=0; k<numQRs[l]; ++k )
             {
+                const Scalar* qrPiece = &qrLevel[k*qrPieceSizes[l]];
                 if( firstRoot )
                 {
                     for( int j=0; j<r; ++j )
                     {
                         std::memcpy
                         ( &sendBuffer[sendOffset],
-                          &qrBuffer[qrOffsets[l]+k*qrPieceSizes[l]+
-                                    passes*(r*r+r)+(j*j+j)],
+                          &qrPiece[passes*(r*r+r)+(j*j+j)],
                           (j+1)*sizeof(Scalar) );
                         sendOffset += j+1;
                     }
@@ -1109,8 +1115,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                     {
                         std::memcpy
                         ( &sendBuffer[sendOffset],
-                          &qrBuffer[qrOffsets[l]+k*qrPieceSizes[l]+
-                                    passes*(r*r+r)+(j*j+j)+(j+1)],
+                          &qrPiece[passes*(r*r+r)+(j*j+j)+(j+1)],
                           (j+1)*sizeof(Scalar) );
                         sendOffset += j+1;
                     }
@@ -1137,12 +1142,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             int recvOffset = 0;
             for( int l=0; l<numSteps-step; ++l )
             {
+                Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
+                Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
                 for( int k=0; k<numQRs[l]; ++k )
                 {
-                    const unsigned qrOffset = 
-                        qrOffsets[l]+k*qrPieceSizes[l]+passes*(r*r+r);
-                    const unsigned tauOffset = 
-                        tauOffsets[l]+k*tauPieceSizes[l]+(passes+1)*r;
+                    Scalar* qrPiece = &qrLevel[k*qrPieceSizes[l]];
+                    Scalar* tauPiece = &tauLevel[k*tauPieceSizes[l]];
 
                     if( firstRoot )
                     {
@@ -1150,9 +1155,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(j*j+j)+(j+1)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
+                            ( &qrPiece[passes*(r*r+r)+(j*j+j)+(j+1)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
                     }
@@ -1162,14 +1166,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(j*j+j)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
+                            ( &qrPiece[passes*(r*r+r)+(j*j+j)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset], &tauBuffer[tauOffset],
+                    ( r, &qrPiece[passes*(r*r+r)], &tauPiece[(passes+1)*r],
                       &work[0] );
                     if( secondRoot )
                     {
@@ -1178,12 +1181,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)],
-                              &qrBuffer[qrOffset+(j*j+j)],
+                            ( &qrPiece[(passes+1)*(r*r+r)+(j*j+j)],
+                              &qrPiece[passes*(r*r+r)+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffset+(j*j+j)],
+                              &qrPiece[passes*(r*r+r)+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             sendOffset += j+1;
                         }
@@ -1195,13 +1198,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)+
-                                        (j+1)],
-                              &qrBuffer[qrOffset+(j*j+j)],
+                            ( &qrPiece[(passes+1)*(r*r+r)+(j*j+j)+(j+1)],
+                              &qrPiece[passes*(r*r+r)+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             std::memcpy
                             ( &sendBuffer[sendOffset],
-                              &qrBuffer[qrOffset+(j*j+j)],
+                              &qrPiece[passes*(r*r+r)+(j*j+j)],
                               (j+1)*sizeof(Scalar) );
                             sendOffset += j+1;
                         }
@@ -1219,12 +1221,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             recvOffset = 0;
             for( int l=0; l<numSteps-step; ++l )
             {
+                Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
+                Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
                 for( int k=0; k<numQRs[l]; ++k )
                 {
-                    const unsigned qrOffset = 
-                        qrOffsets[l]+k*qrPieceSizes[l]+(passes+1)*(r*r+r);
-                    const unsigned tauOffset = 
-                        tauOffsets[l]+k*tauPieceSizes[l]+(passes+2)*r;
+                    Scalar* qrPiece = &qrLevel[k*qrPieceSizes[l]];
+                    Scalar* tauPiece = &tauLevel[k*tauPieceSizes[l]];
 
                     if( secondRoot )
                     {
@@ -1232,9 +1234,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(j*j+j)+(j+1)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
+                            ( &qrPiece[(passes+1)*(r*r+r)+(j*j+j)+(j+1)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
                     }
@@ -1244,15 +1245,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(j*j+j)],
-                              &recvBuffer[recvOffset],
-                              (j+1)*sizeof(Scalar) );
+                            ( &qrPiece[(passes+1)*(r*r+r)+(j*j+j)],
+                              &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
 
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset], &tauBuffer[tauOffset],
+                    ( r, &qrPiece[(passes+1)*(r*r+r)], &tauPiece[(passes+2)*r],
                       &work[0] );
                     if( haveAnotherComm )
                     {
@@ -1261,8 +1261,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                             // Copy into the upper triangle of the next block
                             for( int j=0; j<r; ++j )
                                 std::memcpy
-                                ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)],
-                                  &qrBuffer[qrOffset+(j*j+j)],
+                                ( &qrPiece[(passes+2)*(r*r+r)+(j*j+j)],
+                                  &qrPiece[(passes+1)*(r*r+r)+(j*j+j)],
                                   (j+1)*sizeof(Scalar) );
                         }
                         else
@@ -1270,8 +1270,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                             // Copy into the lower triangle of the next block
                             for( int j=0; j<r; ++j )
                                 std::memcpy
-                                ( &qrBuffer[qrOffset+(r*r+r)+(j*j+j)+(j+1)],
-                                  &qrBuffer[qrOffset+(j*j+j)],
+                                ( &qrPiece[(passes+2)*(r*r+r)+(j*j+j)+(j+1)],
+                                  &qrPiece[(passes+1)*(r*r+r)+(j*j+j)],
                                   (j+1)*sizeof(Scalar) );
                         }
                     }
@@ -1289,12 +1289,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             int recvOffset = 0;
             for( int l=0; l<numSteps-step; ++l )
             {
+                Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
+                Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
                 for( int k=0; k<numQRs[l]; ++k )
                 {
-                    const unsigned qrOffset = 
-                        qrOffsets[l]+k*qrPieceSizes[l]+passes*(r*r+r);
-                    const unsigned tauOffset = 
-                        tauOffsets[l]+k*tauPieceSizes[l]+(passes+1)*r;
+                    Scalar* qrPiece = &qrLevel[k*qrPieceSizes[l]];
+                    Scalar* tauPiece = &tauLevel[k*tauPieceSizes[l]];
 
                     if( firstRoot )
                     {
@@ -1302,7 +1302,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(j*j+j)+(j+1)],
+                            ( &qrPiece[passes*(r*r+r)+(j*j+j)+(j+1)],
                               &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
@@ -1313,13 +1313,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         for( int j=0; j<r; ++j )
                         {
                             std::memcpy
-                            ( &qrBuffer[qrOffset+(j*j+j)],
+                            ( &qrPiece[passes*(r*r+r)+(j*j+j)],
                               &recvBuffer[recvOffset], (j+1)*sizeof(Scalar) );
                             recvOffset += j+1;
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset], &tauBuffer[tauOffset],
+                    ( r, &qrPiece[passes*(r*r+r)], &tauPiece[(passes+1)*r],
                       &work[0] );
                 }
             }
@@ -1327,7 +1327,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     }
 
     // Explicitly form the Q's
-    Dense<Scalar> Z( 2*r, r );
+    Dense<Scalar> Z( 2*r, r, 2*r );
     std::vector<Scalar> applyQWork( r, 1 );
     for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
     {
@@ -1337,11 +1337,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         const unsigned teamRank = mpi::CommRank( team );
         const Scalar* qrLevel = &qrBuffer[qrOffsets[teamLevel]];
         const Scalar* tauLevel = &tauBuffer[tauOffsets[teamLevel]];
+        Dense<Scalar>** XLevel = &Xs[XOffsets[teamLevel]];
 
         for( int k=0; k<numQRs[teamLevel]; ++k )
         {
             const Scalar* qrPiece = &qrLevel[k*qrPieceSizes[teamLevel]];
             const Scalar* tauPiece = &tauLevel[k*tauPieceSizes[teamLevel]];
+            Dense<Scalar>& X = *XLevel[k];
+            const int m = X.Height();
+            const int minDim = std::min(m,r);
 
             if( log2TeamSize > 0 )
             {
@@ -1350,11 +1354,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 std::memset( Z.Buffer(), 0, 2*r*r*sizeof(Scalar) );
                 for( int j=0; j<r; ++j )
                     Z.Set(j,j,(Scalar)1);
+
                 // Backtransform the last stage
                 const Scalar* lastQRStage = &qrPiece[(log2TeamSize-1)*(r*r+r)];
                 const Scalar* lastTauStage = &tauPiece[log2TeamSize*r];
                 hmat_tools::ApplyPackedQFromLeft
                 ( r, lastQRStage, lastTauStage, Z, &work[0] );
+
                 // Take care of the middle stages before handling the large 
                 // original stage.
                 for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
@@ -1383,13 +1389,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                     ( r, &qrPiece[commStage*(r*r+r)], 
                       &tauPiece[(commStage+1)*r], Z, &work[0] );
                 }
+
                 // Take care of the original stage. Do so by forming Y := X, 
                 // then zeroing X and placing our piece of Z at its top.
-                Dense<Scalar>& X = *Xs[XOffsets[teamLevel]+k]; 
-                const int m = X.Height();
-                const int minDim = std::min( m, r );
                 Dense<Scalar> Y;
                 hmat_tools::Copy( X, Y );
+                // HERE: Need ot think about how to ensure only minDim columns
+                //       are formed for Q. 
                 hmat_tools::Scale( (Scalar)0, X );
                 const bool rootOfLastStage = !(teamRank & 0x1);
                 if( rootOfLastStage )
@@ -1418,20 +1424,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
             }
             else // this team only contains one process
             {
-                Dense<Scalar>& X = *Xs[XOffsets[teamLevel]+k]; 
-                const int m = X.Height();
-                const int minDim = std::min(m,r);
-
                 // Make a copy of X and then form the left part of identity.
                 Dense<Scalar> Y; 
                 hmat_tools::Copy( X, Y );
+                X.Resize( m, minDim );
                 hmat_tools::Scale( (Scalar)0, X );
                 for( int j=0; j<minDim; ++j )
                     X.Set(j,j,(Scalar)1);
                 // Backtransform the last stage
-                work.resize( lapack::ApplyQWorkSize('L',m,r) );
+                work.resize( lapack::ApplyQWorkSize('L',m,minDim) );
                 lapack::ApplyQ
-                ( 'L', 'N', m, r, minDim,
+                ( 'L', 'N', m, minDim, minDim,
                   Y.LockedBuffer(), Y.LDim(), &tauPiece[0],
                   X.Buffer(),       X.LDim(), &work[0], work.size() );
             }
@@ -1512,6 +1515,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
     case DIST_LOW_RANK:
     case SPLIT_LOW_RANK:
     case LOW_RANK:
+        // TODO: Think about avoiding the expensive F += H H proceduce in the 
+        //       case where there is already a dense update. We could simply
+        //       add H H onto the dense update.
         if( _inTargetTeam )
         {
             const unsigned teamLevel = _teams->TeamLevel(_level);
@@ -1552,9 +1558,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
 #endif
         return;
     }
-
     const int rank = SampleRank( C.MaxRank() );
-
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -1573,22 +1577,33 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
         case NODE_GHOST:
             if( C.Admissible() )
             {
+                const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+                std::ostringstream s;
+                s << commRank << ".dat";
+                std::ofstream file
+                ( s.str().c_str(), std::ios::out | std::ios::app );
+                file << "Omega prints: level=" << A._level << ", offsets="
+                     << C._targetOffset << ", " << C._sourceOffset << ", entry="
+                     << A._sourceOffset << std::endl;
+
                 if( C._inTargetTeam ) 
                 {
+                    A._rowOmega.Print( file, "Omega2" );
                     // Handle the middle update, Omega2' (alpha A B Omega1)
                     const Dense<Scalar>& X = C._colXMap.Get( A._sourceOffset );
                     const Dense<Scalar>& Omega2 = A._rowOmega;
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* middleUpdate = 
                         &allReduceBuffer[middleOffsets[teamLevel]];
-                    middleOffsets[teamLevel] += rank*rank;
-
                     blas::Gemm
                     ( 'C', 'N', rank, rank, A.LocalHeight(),
                       (Scalar)1, Omega2.LockedBuffer(), Omega2.LDim(),
                                  X.LockedBuffer(),      X.LDim(),
                       (Scalar)0, middleUpdate,          rank );
+                    middleOffsets[teamLevel] += rank*rank;
                 }
+                if( C._inSourceTeam )
+                    B._colOmega.Print( file, "Omega1" );
             }
             else
             {
@@ -1646,20 +1661,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
     case LOW_RANK:
     {
         MPI_Comm team = _teams->Team( _level );
+        const unsigned teamLevel = _teams->TeamLevel(_level);
         const int teamRank = mpi::CommRank( team );
         const int teamSize = mpi::CommSize( team );
         const int log2TeamSize = Log2( teamSize );
         const int r = SampleRank( MaxRank() );
 
+        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+        std::ostringstream s;
+        s << commRank << ".dat";
+        std::ofstream file( s.str().c_str(), std::ios::out | std::ios::app );
+
         if( _inTargetTeam )
         {
-            const unsigned numEntries = _colXMap.Size();
-            const unsigned teamLevel = _teams->TeamLevel(_level);
             _colXMap.ResetIterator();
+            const unsigned numEntries = _colXMap.Size();
             for( unsigned i=0; i<numEntries; ++i,_colXMap.Increment() )
             {
                 Dense<Scalar>& X = *_colXMap.CurrentEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
+
+                file << "target side, level=" << _level 
+                    << "offset=" << _targetOffset << ", "<< _sourceOffset 
+                    << ", entry=" << _colXMap.CurrentKey() << "\n";
+                X.Print( file, "X before QR" );
+
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
                   &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
@@ -1690,19 +1716,24 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                               X.LockedBuffer(0,j), 
                               std::min(X.Height(),j+1)*sizeof(Scalar) );
                     }
+                    qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
                 }
-                qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             }
         }
         if( _inSourceTeam )
         {
-            const int numEntries = _rowXMap.Size();
-            const unsigned teamLevel = _teams->TeamLevel(_level);
             _rowXMap.ResetIterator();
+            const int numEntries = _rowXMap.Size();
             for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
             {
                 Dense<Scalar>& X = *_rowXMap.CurrentEntry();
                 Xs[XOffsets[teamLevel]++] = &X;
+                
+                file << "source side, level=" << _level 
+                    << "offset=" << _targetOffset << ", "<< _sourceOffset 
+                    << ", entry=" << _rowXMap.CurrentKey() << "\n";
+                X.Print( file, "X before QR" );
+
                 lapack::QR
                 ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
                   &tauBuffer[tauOffsets[teamLevel]], &work[0], work.size() );
@@ -1733,8 +1764,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                               X.LockedBuffer(0,j), 
                               std::min(X.Height(),j+1)*sizeof(Scalar) );
                     }
+                    qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
                 }
-                qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             }
         }
         break;
@@ -1767,9 +1798,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
 #endif
         return;
     }
-
     const int rank = SampleRank( C.MaxRank() );
-
     switch( A._block.type )
     {
     case DIST_NODE:
@@ -1788,37 +1817,63 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
         case NODE_GHOST:
             if( C.Admissible() )
             {
+                const int key = A._sourceOffset;
+                const unsigned teamLevel = C._teams->TeamLevel(C._level);
                 if( C._inTargetTeam ) 
                 {
                     // Handle the left update, Q1' Omega2
-                    const Dense<Scalar>& Q1 = C._colXMap.Get( A._sourceOffset );
+                    const Dense<Scalar>& Q1 = C._colXMap.Get( key );
                     const Dense<Scalar>& Omega2 = A._rowOmega;
-                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[teamLevel]];
-                    leftOffsets[teamLevel] += rank*rank;
-
                     blas::Gemm
-                    ( 'C', 'N', rank, rank, A.LocalHeight(),
+                    ( 'C', 'N', Q1.Width(), rank, A.LocalHeight(),
                       (Scalar)1, Q1.LockedBuffer(),     Q1.LDim(),
                                  Omega2.LockedBuffer(), Omega2.LDim(),
                       (Scalar)0, leftUpdate,            rank );
+                    leftOffsets[teamLevel] += rank*rank;
                 }
                 if( C._inSourceTeam )
                 {
                     // Handle the right update, Q2' Omega1
-                    const Dense<Scalar>& Q2 = C._rowXMap.Get( A._sourceOffset );
+                    const Dense<Scalar>& Q2 = C._rowXMap.Get( key );
                     const Dense<Scalar>& Omega1 = B._colOmega;
-                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
-                    rightOffsets[teamLevel] += rank*rank;
+
+                    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+                    std::ostringstream s;
+                    s << commRank << ".dat";
+                    std::ofstream file
+                    ( s.str().c_str(), std::ios::out | std::ios::app );
+                    file << "Q2' Omega1 comp with offsets= "
+                         << C._targetOffset << ", " << C._sourceOffset
+                         << ",  entry=" << key << std::endl;
+
+                    Q2.Print( file, "Q2" );
+                    Omega1.Print( file, "Omega1" );
+
+                    file << "Q2.Width(): " << Q2.Width() << "\n"
+                         << "rank: " << rank << "\n"
+                         << "B.LocalWidth(): " << B.LocalWidth() << std::endl;
 
                     blas::Gemm
-                    ( 'C', 'N', rank, rank, B.LocalWidth(),
+                    ( 'C', 'N', Q2.Width(), rank, B.LocalWidth(),
                       (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
                                  Omega1.LockedBuffer(), Omega1.LDim(),
                       (Scalar)0, rightUpdate,           rank );
+
+                    file << "Q2' Omega1\n";
+                    for( int i=0; i<Q2.Width(); ++i )
+                    {
+                        for( int j=0; j<rank; ++j )
+                            file << ScalarWrapper<Scalar>
+                                    (rightUpdate[i+j*rank]) << " ";
+                        file << "\n";
+                    }
+                    file << "\n";
+
+                    rightOffsets[teamLevel] += rank*rank;
                 }
             }
             else
@@ -1873,7 +1928,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
 #endif
         return;
     }
-
     const int rank = SampleRank( C.MaxRank() );
     switch( A._block.type )
     {
@@ -1893,29 +1947,33 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
         case NODE_GHOST:
             if( C.Admissible() )
             {
+                const int key = A._sourceOffset;
+                const unsigned teamLevel = C._teams->TeamLevel(C._level);
+                const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+                std::ostringstream s;
+                s << commRank << ".dat";
+                std::ofstream file
+                ( s.str().c_str(), std::ios::out | std::ios::app );
+
                 if( C._inTargetTeam ) 
                 {
                     // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     // in the place of X.
-                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
-                    Dense<Scalar>& X = C._colXMap.Get( A._sourceOffset );
-
+                    Dense<Scalar>& X = C._colXMap.Get( key );
                     Scalar* leftUpdate = 
                         &allReduceBuffer[leftOffsets[teamLevel]];
                     const Scalar* middleUpdate = 
                         &allReduceBuffer[middleOffsets[teamLevel]];
-                    leftOffsets[teamLevel] += rank*rank;
-                    middleOffsets[teamLevel] += rank*rank;
 
                     lapack::AdjointPseudoInverse
-                    ( rank, rank, leftUpdate, rank, &singularValues[0],
+                    ( X.Width(), rank, leftUpdate, rank, &singularValues[0],
                       &U[0], rank, &VH[0], rank, &svdWork[0], svdWork.size(),
                       &svdRealWork[0] );
 
                     // We can use the VH space to hold the product 
                     // pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     blas::Gemm
-                    ( 'N', 'N', rank, rank, rank, 
+                    ( 'N', 'N', X.Width(), rank, rank, 
                       (Scalar)1, leftUpdate,   rank, 
                                  middleUpdate, rank, 
                       (Scalar)0, &VH[0],       rank );
@@ -1923,40 +1981,56 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                     // Q1 := X.
                     Dense<Scalar> Q1;
                     hmat_tools::Copy( X, Q1 );
+                    X.Resize( X.Height(), rank );
 
                     // Form X := Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
                     blas::Gemm
-                    ( 'N', 'N', Q1.Height(), rank, rank,
+                    ( 'N', 'N', Q1.Height(), rank, Q1.Width(),
                       (Scalar)1, Q1.LockedBuffer(), Q1.LDim(),
                                  &VH[0],            rank, 
                       (Scalar)0, X.Buffer(),        X.LDim() );
+
+                    leftOffsets[teamLevel] += rank*rank;
+                    middleOffsets[teamLevel] += rank*rank;
+                    
+                    file << "target side, level=" << C._level 
+                         << "offset=" << C._targetOffset << ", "
+                                      << C._sourceOffset 
+                         << ", entry=" << A._sourceOffset << "\n";
+                    X.Print( file, "U" );
                 }
                 if( C._inSourceTeam )
                 {
                     // Form Q2 pinv(Q2' Omega1) or its conjugate
-                    Dense<Scalar>& X = C._rowXMap.Get( A._sourceOffset );
-                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
-
+                    Dense<Scalar>& X = C._rowXMap.Get( key );
                     Scalar* rightUpdate = 
                         &allReduceBuffer[rightOffsets[teamLevel]];
-                    rightOffsets[teamLevel] += rank*rank;
 
                     lapack::AdjointPseudoInverse
-                    ( rank, rank, rightUpdate, rank, &singularValues[0],
+                    ( X.Width(), rank, rightUpdate, rank, &singularValues[0],
                       &U[0], rank, &VH[0], rank, &svdWork[0], svdWork.size(),
                       &svdRealWork[0] );
 
                     // Q2 := X
                     Dense<Scalar> Q2;
                     hmat_tools::Copy( X, Q2 );
+                    X.Resize( X.Height(), rank );
 
                     blas::Gemm
-                    ( 'N', 'C', Q2.Height(), rank, rank,
+                    ( 'N', 'C', Q2.Height(), rank, Q2.Width(),
                       (Scalar)1, Q2.LockedBuffer(), Q2.LDim(),
                                  rightUpdate,       rank,
                       (Scalar)0, X.Buffer(),        X.LDim() );
                     if( !Conjugated )
                         hmat_tools::Conjugate( X );
+
+                    rightOffsets[teamLevel] += rank*rank;
+
+                    file << "source side, level=" << C._level 
+                         << "offset=" << C._targetOffset << ", "
+                                      << C._sourceOffset 
+                         << ", entry=" << A._sourceOffset << "\n";
+                    X.Print( file, "V" );
                 }
             }
             else

@@ -27,15 +27,26 @@ template<typename T1,typename T2>
 class MemoryMap 
 {   
 private:
-    unsigned _currentIndex;
-    typename std::map<T1,T2*>::iterator _it;
-    std::map<T1,T2*> _baseMap;
+    mutable unsigned _currentIndex;
+    mutable typename std::map<T1,T2*>::iterator _it;
+    mutable std::map<T1,T2*> _baseMap;
 public:
-    // NOTE: Insertion with the same key without manual deletion
-    //       will cause a memory leak.
     int Size() const { return _baseMap.size(); }
-    int CurrentIndex() const { return _currentIndex; }
     void ResetIterator() { _currentIndex=0; _it=_baseMap.begin(); }
+    int CurrentIndex() const { return _currentIndex; }
+
+    T1 CurrentKey() const
+    { 
+#ifndef RELEASE
+        PushCallStack("MemoryMap::CurrentKey");
+        if( _currentIndex >= _baseMap.size() )
+            throw std::logic_error("Traversed past end of map");
+        PopCallStack();
+#endif
+        if( _currentIndex == 0 )
+            _it = _baseMap.begin();
+        return _it->first; 
+    }
 
     T2& Get( int key )
     {
@@ -89,7 +100,7 @@ public:
         if( _currentIndex == 0 )
             _it = _baseMap.begin();
 
-        T2* value = (*_it).second;
+        T2* value = _it->second;
 #ifndef RELEASE
         if( value == 0 )
             throw std::logic_error("Tried to return null pointer.");
@@ -108,7 +119,7 @@ public:
         if( _currentIndex == 0 )
             _it = _baseMap.begin();
 
-        const T2* value = (*_it).second;
+        const T2* value = _it->second;
 #ifndef RELEASE
         if( value == 0 )
             throw std::logic_error("Tried to return null pointer.");

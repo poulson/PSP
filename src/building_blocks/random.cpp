@@ -28,7 +28,7 @@ namespace {
 // We initialize the state to an arbitrary value.
 const psp::ExpandedUInt64 serialMultValue={{32557U,19605U,62509U,22609U}}; 
 const psp::ExpandedUInt64 serialAddValue={{33103U,63335U,31614U,5125U}};
-psp::ExpandedUInt64 serialLcgValue={{17U,0U,0U,0U}};
+psp::ExpandedUInt64 serialLcgValue={{03U,17U,19U,86U}};
 
 // We initialize the state to an arbitrary value and set the coefficients
 // equal to the serial case by default.

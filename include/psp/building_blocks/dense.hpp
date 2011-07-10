@@ -80,6 +80,7 @@ public:
 
     void Set( int i, int j, Scalar value );
     Scalar Get( int i, int j ) const;
+    void Print( std::ostream& os, const std::string& tag ) const;
     void Print( const std::string& tag ) const;
 
     Scalar* Buffer( int i=0, int j=0 );
@@ -374,21 +375,21 @@ psp::Dense<Scalar>::Get( int i, int j ) const
 
 template<typename Scalar>
 inline void
-psp::Dense<Scalar>::Print( const std::string& tag ) const
+psp::Dense<Scalar>::Print( std::ostream& os, const std::string& tag ) const
 {
 #ifndef RELEASE
     PushCallStack("Dense::Print");
 #endif
-    std::cout << tag << "\n";
+    os << tag << "\n";
     if( _type == SYMMETRIC )
     {
         for( int i=0; i<_height; ++i )
         {
             for( int j=0; j<=i; ++j )
-                std::cout << WrapScalar(Get(i,j)) << " ";
+                os << WrapScalar(Get(i,j)) << " ";
             for( int j=i+1; j<_width; ++j )
-                std::cout << WrapScalar(Get(j,i)) << " ";
-            std::cout << "\n";
+                os << WrapScalar(Get(j,i)) << " ";
+            os << "\n";
         }
     }
     else
@@ -396,14 +397,21 @@ psp::Dense<Scalar>::Print( const std::string& tag ) const
         for( int i=0; i<_height; ++i )
         {
             for( int j=0; j<_width; ++j )
-                std::cout << WrapScalar(Get(i,j)) << " ";
-            std::cout << "\n";
+                os << WrapScalar(Get(i,j)) << " ";
+            os << "\n";
         }
     }
-    std::cout << std::endl;
+    os << std::endl;
 #ifndef RELEASE
     PopCallStack();
 #endif
+}
+
+template<typename Scalar>
+inline void
+psp::Dense<Scalar>::Print( const std::string& tag ) const
+{
+    Print( std::cout, tag );
 }
 
 template<typename Scalar>

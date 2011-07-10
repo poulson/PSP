@@ -90,12 +90,12 @@ int
 main( int argc, char* argv[] )
 {
     MPI_Init( &argc, &argv );
-    const int rank = psp::mpi::CommRank( MPI_COMM_WORLD );
-    const int p = psp::mpi::CommSize( MPI_COMM_WORLD );
+    const int commRank = psp::mpi::CommRank( MPI_COMM_WORLD );
+    const int commSize = psp::mpi::CommSize( MPI_COMM_WORLD );
 
     if( argc < 9 )
     {
-        if( rank == 0 )
+        if( commRank == 0 )
             Usage();
         MPI_Finalize();
         return 0;
@@ -112,7 +112,7 @@ main( int argc, char* argv[] )
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
 
-    if( rank == 0 )
+    if( commRank == 0 )
     {
         std::cout << "----------------------------------------------------\n"
                   << "Testing complex double Quasi2dHMat packing/unpacking\n"
@@ -139,7 +139,7 @@ main( int argc, char* argv[] )
         for( int i=0; i<m; ++i )
             inverseMap[map[i]] = i;
 
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "Filling sparse matrices...";
             std::cout.flush();
@@ -168,14 +168,14 @@ main( int argc, char* argv[] )
         S.rowOffsets.push_back( S.nonzeros.size() );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double fillStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
                       << std::endl;
         }
 
         // Convert to H-matrix form
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "Constructing H-matrices in serial...";
             std::cout.flush();
@@ -186,9 +186,24 @@ main( int argc, char* argv[] )
         ( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
+        if( commRank == 0 )
             std::cout << "done: " << constructStopTime-constructStartTime 
+                      << " seconds." << std::endl;
+
+        // Invert H-matrix
+        if( commRank == 0 )
+        {
+            std::cout << "Inverting H-matrices in serial...";
+            std::cout.flush();
+        }
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        double invertStartTime = psp::mpi::WallTime();
+        ASerial.DirectInvert();
+        psp::mpi::Barrier( MPI_COMM_WORLD );
+        double invertStopTime = psp::mpi::WallTime();
+        if( commRank == 0 )
+        {
+            std::cout << "done: " << invertStopTime-invertStartTime 
                       << " seconds." << std::endl;
             if( print )
                 ASerial.Print("ASerial");
@@ -199,21 +214,6 @@ main( int argc, char* argv[] )
             }
         }
 
-        // Invert H-matrix
-        if( rank == 0 )
-        {
-            std::cout << "Inverting H-matrices in serial...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double invertStartTime = psp::mpi::WallTime();
-        ASerial.DirectInvert();
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double invertStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-            std::cout << "done: " << invertStopTime-invertStartTime 
-                      << " seconds." << std::endl;
-
         // Set up our subcommunicators and compute the packed sizes
         DistQuasi2d::Teams teams( MPI_COMM_WORLD );
         std::vector<std::size_t> packedSizes;
@@ -222,21 +222,21 @@ main( int argc, char* argv[] )
             *(std::max_element( packedSizes.begin(), packedSizes.end() ));
 
         // Pack for a DistQuasi2dHMat
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "Packing H-matrix for distribution...";
             std::cout.flush();
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double packStartTime = psp::mpi::WallTime();
-        std::vector<psp::byte> sendBuffer( p*myMaxSize );
-        std::vector<psp::byte*> packedPieces( p );
-        for( int i=0; i<p; ++i )
+        std::vector<psp::byte> sendBuffer( commSize*myMaxSize );
+        std::vector<psp::byte*> packedPieces( commSize );
+        for( int i=0; i<commSize; ++i )
             packedPieces[i] = &sendBuffer[i*myMaxSize];
         DistQuasi2d::Pack( packedPieces, ASerial, teams );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double packStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
+        if( commRank == 0 )
             std::cout << "done: " << packStopTime-packStartTime << " seconds."
                       << std::endl;
 
@@ -247,7 +247,7 @@ main( int argc, char* argv[] )
             psp::mpi::AllReduce
             ( &myIntMaxSize, &intMaxSize, 1, MPI_MAX, MPI_COMM_WORLD );
         }
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "Maximum per-process message size: " 
                       << ((double)intMaxSize)/(1024.*1024.) << " MB." 
@@ -255,27 +255,27 @@ main( int argc, char* argv[] )
         }
  
         // AllToAll
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "AllToAll redistribution...";
             std::cout.flush();
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double allToAllStartTime = psp::mpi::WallTime();
-        std::vector<psp::byte> recvBuffer( p*intMaxSize );
+        std::vector<psp::byte> recvBuffer( commSize*intMaxSize );
         psp::mpi::AllToAll
         ( &sendBuffer[0], myIntMaxSize, &recvBuffer[0], intMaxSize,
           MPI_COMM_WORLD );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double allToAllStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "done: " << allToAllStopTime-allToAllStartTime
                       << " seconds." << std::endl;
         }
 
         // Unpack our part of the matrix defined by process 0 twice
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "Unpacking...";
             std::cout.flush();
@@ -286,7 +286,7 @@ main( int argc, char* argv[] )
         DistQuasi2d B( &recvBuffer[0], teams );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double unpackStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "done: " << unpackStopTime-unpackStartTime
                       << " seconds." << std::endl;
@@ -298,7 +298,7 @@ main( int argc, char* argv[] )
         }
 
         // Attempt to multiply the two matrices
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "Multiplying distributed H-matrices...";
             std::cout.flush();
@@ -309,7 +309,7 @@ main( int argc, char* argv[] )
         A.Multiply( (Scalar)1, B, C );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             std::cout << "done: " << multStopTime-multStartTime
                       << " seconds." << std::endl;
@@ -321,7 +321,7 @@ main( int argc, char* argv[] )
         }
 
         // Check that CX = ABX for an arbitrary X
-        if( rank == 0 )
+        if( commRank == 0 )
             std::cout << "Checking consistency: " << std::endl;
         psp::mpi::Barrier( MPI_COMM_WORLD );
         const int localHeight = A.LocalHeight();
@@ -330,6 +330,10 @@ main( int argc, char* argv[] )
             throw std::logic_error("A was not locally square");
         const int numRhs = 30;
         psp::Dense<Scalar> XLocal( localHeight, numRhs );
+        psp::UInt64 seed;
+        seed.d[0] = 17U;
+        seed.d[1] = 21U;
+        psp::SeedParallelLcg( commRank, commSize, seed );
         psp::ParallelGaussianRandomVectors( XLocal );
         psp::Dense<Scalar> YLocal, ZLocal;
         // Y := AZ := ABX
@@ -337,6 +341,7 @@ main( int argc, char* argv[] )
         A.Multiply( (Scalar)1, ZLocal, YLocal );
         // Z := CX
         C.Multiply( (Scalar)1, XLocal, ZLocal );
+
         double myErrors[3] = { 0., 0., 0. };
         for( int j=0; j<numRhs; ++j )
         {
@@ -350,7 +355,7 @@ main( int argc, char* argv[] )
         }
         double errors[3];
         psp::mpi::Reduce( myErrors, errors, 3, 0, MPI_SUM, MPI_COMM_WORLD );
-        if( rank == 0 )
+        if( commRank == 0 )
         {
             const double infError = errors[0];
             const double L1Error = errors[1];
@@ -362,7 +367,7 @@ main( int argc, char* argv[] )
     }
     catch( std::exception& e )
     {
-        std::cerr << "Process " << rank << " caught message: " << e.what() 
+        std::cerr << "Process " << commRank << " caught message: " << e.what() 
                   << std::endl;
 #ifndef RELEASE
         psp::DumpCallStack();
