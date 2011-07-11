@@ -1172,7 +1172,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrPiece[passes*(r*r+r)], &tauPiece[(passes+1)*r],
+                    ( r, r, r, 
+                      &qrPiece[passes*(r*r+r)], &tauPiece[(passes+1)*r],
                       &work[0] );
                     if( secondRoot )
                     {
@@ -1252,7 +1253,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrPiece[(passes+1)*(r*r+r)], &tauPiece[(passes+2)*r],
+                    ( r, r, r, 
+                      &qrPiece[(passes+1)*(r*r+r)], &tauPiece[(passes+2)*r],
                       &work[0] );
                     if( haveAnotherComm )
                     {
@@ -1319,7 +1321,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrPiece[passes*(r*r+r)], &tauPiece[(passes+1)*r],
+                    ( r, r, r, 
+                      &qrPiece[passes*(r*r+r)], &tauPiece[(passes+1)*r],
                       &work[0] );
                 }
             }
@@ -1359,7 +1362,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                 const Scalar* lastQRStage = &qrPiece[(log2TeamSize-1)*(r*r+r)];
                 const Scalar* lastTauStage = &tauPiece[log2TeamSize*r];
                 hmat_tools::ApplyPackedQFromLeft
-                ( r, lastQRStage, lastTauStage, Z, &work[0] );
+                ( r, r, r, lastQRStage, lastTauStage, Z, &work[0] );
 
                 // Take care of the middle stages before handling the large 
                 // original stage.
@@ -1386,7 +1389,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                         }
                     }
                     hmat_tools::ApplyPackedQFromLeft
-                    ( r, &qrPiece[commStage*(r*r+r)], 
+                    ( r, r, r, &qrPiece[commStage*(r*r+r)], 
                       &tauPiece[(commStage+1)*r], Z, &work[0] );
                 }
 

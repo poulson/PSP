@@ -22,97 +22,30 @@
 
 void Usage()
 {
-    std::cout << "PackedQR <r> <print?>\n"
-              << "r: size of the problem\n"
+    std::cout << "PackedQR <r> <s> <t> <print?>\n"
+              << "r: width of triangular matrices\n"
+              << "s: height of top matrix    (s <= r)\n"
+              << "t: height of bottom matrix (t <= r)\n"
               << "print?: print out matrices?" << std::endl;
 }
 
 int
 main( int argc, char* argv[] )
 {
-    if( argc < 3 )
+    if( argc < 5 )
     {
         Usage();
         return 0;
     }
     const int r = atoi( argv[1] );
-    const bool print = atoi( argv[2] );
+    const int s = atoi( argv[2] );
+    const int t = atoi( argv[3] );
+    const bool print = atoi( argv[4] );
 
-    std::cout << "----------------------------------------------------\n"
-              << "Testing double-precision PackedQR                   \n"
-              << "----------------------------------------------------" 
-              << std::endl;
-    try
+    if( s > r || t > r )
     {
-        // Fill a packed version of two concatenated upper triangular r x r
-        // matrices with uniformly random samples from (0,1].
-        const int packedSize = r*r + r;
-        std::vector<double> packedA( packedSize );
-        for( int j=0; j<packedSize; ++j )
-            packedA[j] = psp::SerialUniform<double>();
-        if( print )
-            psp::hmat_tools::PrintPacked( r, &packedA[0], "packedA:" );
-
-        // Allocate a workspace and perform the packed QR
-        std::vector<double> tau(r), work(r);
-        psp::hmat_tools::PackedQR( r, &packedA[0], &tau[0], &work[0] );
-        if( print )
-        {
-            psp::hmat_tools::PrintPacked( r, &packedA[0], "packedQR:" );
-            std::cout << "tau:\n";
-            for( int j=0; j<r; ++j )
-                std::cout << tau[j] << "\n";
-            std::cout << std::endl;
-        }
-
-        // Copy the R into a zeroed 2r x r matrix
-        psp::Dense<double> B( 2*r, r );
-        psp::hmat_tools::Scale( 0.0, B );
-        for( int j=0; j<r; ++j )
-            for( int i=0; i<=j; ++i )
-                B.Set( i, j, packedA[j*(j+1)+i] );
-        if( print )
-            B.Print( "R" );
-
-        psp::hmat_tools::ApplyPackedQFromLeft
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "QR ~= A" );
-
-        // Create a 2r x 2r identity matrix and then apply Q' Q from the left
-        B.Resize( 2*r, 2*r );
-        work.resize( 2*r );
-        psp::hmat_tools::Scale( 0.0, B );
-        for( int j=0; j<2*r; ++j )
-            B.Set( j, j, 1.0 );
-        psp::hmat_tools::ApplyPackedQFromLeft
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "Q I" );
-        psp::hmat_tools::ApplyPackedQAdjointFromLeft
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "Q' Q I" );
-
-        // Create a 2r x 2r identity matrix and then apply Q' Q from the right
-        psp::hmat_tools::Scale( 0.0, B );
-        for( int j=0; j<2*r; ++j )
-            B.Set( j, j, 1.0 );
-        psp::hmat_tools::ApplyPackedQAdjointFromRight
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "I Q'" );
-        psp::hmat_tools::ApplyPackedQFromRight
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "I Q' Q" );
-    }
-    catch( std::exception& e )
-    {
-        std::cerr << "Caught message: " << e.what() << std::endl;
-#ifndef RELEASE
-        psp::DumpCallStack();
-#endif
+        std::cout << "s and t cannot be greater than r" << std::endl;
+        return 0;
     }
 
     std::cout << "----------------------------------------------------\n"
@@ -121,69 +54,156 @@ main( int argc, char* argv[] )
               << std::endl;
     try
     {
-        // Fill a packed version of two concatenated upper triangular r x r
-        // matrices with uniformly random samples from (0,1].
-        const int packedSize = r*r + r;
-        std::vector<std::complex<double> > packedA( packedSize );
-        for( int j=0; j<packedSize; ++j )
-            packedA[j] = std::complex<double>(psp::SerialUniform<double>(),
-                                              psp::SerialUniform<double>());
-        if( print )
-            psp::hmat_tools::PrintPacked( r, &packedA[0], "packedA:" );
+        // Fill a packed version of two concatenated upper triangular s x r
+        // and t x r matrices with Gaussian random variables.
+        const int minDimT = std::min(s,r);
+        const int minDimB = std::min(t,r);
+        const int packedSize = 
+            (minDimT*minDimT+minDimT)/2 + (r-minDimT)*minDimT + 
+            (minDimB*minDimB+minDimB)/2 + (r-minDimB)*minDimB;
 
-        // Allocate a workspace and perform the packed QR
-        std::vector<std::complex<double> > tau(r), work(r);
-        psp::hmat_tools::PackedQR( r, &packedA[0], &tau[0], &work[0] );
+        // Form the random packed A
+        std::vector<std::complex<double> > packedA( packedSize );
+        for( int k=0; k<packedSize; ++k )
+            psp::SerialGaussianRandomVariable( packedA[k] );
+
+        // Expand the packed A
+        psp::Dense<std::complex<double> > A( s+t, r );
+        psp::hmat_tools::Scale( std::complex<double>(0), A );
+        {
+            int k=0;
+            for( int j=0; j<r; ++j )
+            {
+                for( int i=0; i<std::min(j+1,s); ++i )
+                    A.Set( i, j, packedA[k++] );
+                for( int i=s; i<std::min(j+s+1,s+t); ++i )
+                    A.Set( i, j, packedA[k++] );
+            }
+        }
         if( print )
         {
-            psp::hmat_tools::PrintPacked( r, &packedA[0], "packedQR:" );
-            std::cout << "tau:\n";
-            for( int j=0; j<r; ++j )
-                std::cout << tau[j] << "\n";
+            psp::hmat_tools::PrintPacked( r, s, t, &packedA[0], "packedA:" );
             std::cout << std::endl;
         }
 
-        // Copy the R into a zeroed 2r x r matrix
-        psp::Dense<std::complex<double> > B( 2*r, r );
+        // Allocate a workspace and perform the packed QR
+        std::vector<std::complex<double> > tau( std::min(r,s+t) ), work(t);
+        psp::hmat_tools::PackedQR( r, s, t, &packedA[0], &tau[0], &work[0] );
+        if( print )
+        {
+            psp::hmat_tools::PrintPacked( r, s, t, &packedA[0], "packedQR:" );
+            std::cout << "\ntau:\n";
+            for( unsigned j=0; j<tau.size(); ++j )
+                std::cout << 
+                    psp::ScalarWrapper<std::complex<double> >(tau[j]) << "\n";
+            std::cout << std::endl;
+        }
+
+        // Copy the R into a zeroed (s+t) x r matrix
+        psp::Dense<std::complex<double> > B( s+t, r );
         psp::hmat_tools::Scale( std::complex<double>(0), B );
-        for( int j=0; j<r; ++j )
-            for( int i=0; i<=j; ++i )
-                B.Set( i, j, packedA[j*(j+1)+i] );
+        if( r == s && r == t )
+        {
+            for( int j=0; j<r; ++j )
+                for( int i=0; i<=j; ++i )
+                    B.Set( i, j, packedA[j*(j+1)+i] );
+        }
+        else 
+        {
+            int k=0;
+            for( int j=0; j<r; ++j )
+            {
+                for( int i=0; i<std::min(j+1,s); ++i )
+                    A.Set( i, j, packedA[k++] );
+                for( int i=s; i<std::min(j+1,s+t); ++i )
+                    A.Set( i, j, packedA[k++] );
+                k += std::min(j+s+1,s+t) - std::min(j+1,s+t);
+            }
+            throw std::logic_error("Not yet written");
+        }
         if( print )
+        {
             B.Print( "R" );
+            std::cout << std::endl;
+        }
 
         psp::hmat_tools::ApplyPackedQFromLeft
-        ( r, &packedA[0], &tau[0], B, &work[0] );
+        ( r, s, t, &packedA[0], &tau[0], B, &work[0] );
+        {
+            double maxError = 0;
+            for( int j=0; j<r; ++j )
+                for( int i=0; i<s+t; ++i )
+                    maxError = 
+                        std::max(maxError,psp::Abs(B.Get(i,j)-A.Get(i,j)));
+            std::cout << "||QR-A||_oo = " << maxError << std::endl;
+        }
         if( print )
+        {
             B.Print( "QR ~= A" );
-        
-        // Create a 2r x 2r identity matrix and then apply Q' Q from the left
-        B.Resize( 2*r, 2*r );
-        work.resize( 2*r );
-        psp::hmat_tools::Scale( std::complex<double>(0.0,0.0), B );
-        for( int j=0; j<2*r; ++j )
-            B.Set( j, j, std::complex<double>(1.0,0.0) );
-        psp::hmat_tools::ApplyPackedQFromLeft
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "Q I" );
-        psp::hmat_tools::ApplyPackedQAdjointFromLeft
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "Q' Q I" );
+            std::cout << std::endl;
+        }
 
-        // Create a 2r x 2r identity matrix and then apply Q' Q from the right
-        psp::hmat_tools::Scale( std::complex<double>(0.0,0.0), B );
-        for( int j=0; j<2*r; ++j )
-            B.Set( j, j, std::complex<double>(1.0,0.0) );
+        // Create an (s+t) x (s+t) identity matrix and then apply Q' Q from 
+        // the left
+        B.Resize( s+t, s+t );
+        work.resize( s+t );
+        psp::hmat_tools::Scale( std::complex<double>(0), B );
+        for( int j=0; j<s+t; ++j )
+            B.Set( j, j, 1.0 );
+        psp::hmat_tools::ApplyPackedQFromLeft
+        ( r, s, t, &packedA[0], &tau[0], B, &work[0] );
+        psp::hmat_tools::ApplyPackedQAdjointFromLeft
+        ( r, s, t, &packedA[0], &tau[0], B, &work[0] );
+        {
+            double maxError = 0;
+            for( int j=0; j<s+t; ++j )
+            {
+                for( int i=0; i<s+t; ++i )
+                {
+                    const std::complex<double> computed = B.Get(i,j);
+                    if( i == j )
+                        maxError = std::max(maxError,psp::Abs(computed-1.0));
+                    else
+                        maxError = std::max(maxError,psp::Abs(computed));
+                }
+            }
+            std::cout << "||I - Q'QI||_oo = " << maxError << std::endl;
+        }
+        if( print )
+        {
+            B.Print( "Q' Q I" );
+            std::cout << std::endl;
+        }
+
+        // Create an (s+t) x (s+t) identity matrix and then apply Q' Q from 
+        // the right
+        psp::hmat_tools::Scale( std::complex<double>(0), B );
+        for( int j=0; j<s+t; ++j )
+            B.Set( j, j, 1.0 );
         psp::hmat_tools::ApplyPackedQAdjointFromRight
-        ( r, &packedA[0], &tau[0], B, &work[0] );
-        if( print )
-            B.Print( "I Q'" );
+        ( r, s, t, &packedA[0], &tau[0], B, &work[0] );
         psp::hmat_tools::ApplyPackedQFromRight
-        ( r, &packedA[0], &tau[0], B, &work[0] );
+        ( r, s, t, &packedA[0], &tau[0], B, &work[0] );
+        {
+            double maxError = 0;
+            for( int j=0; j<s+t; ++j )
+            {
+                for( int i=0; i<s+t; ++i )
+                {
+                    const std::complex<double> computed = B.Get(i,j);
+                    if( i == j )
+                        maxError = std::max(maxError,psp::Abs(computed-1.0));
+                    else
+                        maxError = std::max(maxError,psp::Abs(computed));
+                }
+            }
+            std::cout << "||I - IQ'Q||_oo = " << maxError << std::endl;
+        }
         if( print )
+        {
             B.Print( "I Q' Q" );
+            std::cout << std::endl;
+        }
     }
     catch( std::exception& e )
     {

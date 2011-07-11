@@ -776,46 +776,52 @@ void Adjoint
 ( const LowRank<Scalar,Conjugated>& A, LowRank<Scalar,Conjugated>& B );
 
 /*
- *  For computing the in-place QR decomposition of two r x r upper-triangular
- *  matrices with their nonzeros packed columnwise.
+ *  For computing the in-place QR decomposition of stacked s x r  and t x r 
+ *  upper-triangular matrices with their nonzeros packed columnwise.
  *
- * tau should be of length r and work must be of size r-1.
+ * tau should be of length min(r,s+t) and work must be of size t-1.
  */
 template<typename Scalar>
 void PackedQR
-( const int r, Scalar* RESTRICT packedA, Scalar* RESTRICT tau, 
-  Scalar* RESTRICT work );
+( const int r, const int s, const int t, 
+  Scalar* RESTRICT packedA, Scalar* RESTRICT tau, Scalar* RESTRICT work );
 
 /*
  * For overwriting B with Q B or Q' B using the Q from a packed QR.
  *
- * tau should be of length r and work must be of size n.
+ * tau should be of length min(r,s+t) and work must be of size n.
  */
 template<typename Scalar>
 void ApplyPackedQFromLeft
-( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+( const int r, const int s, const int t,
+  const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* RESTRICT work );
 template<typename Scalar>
 void ApplyPackedQAdjointFromLeft
-( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+( const int r, const int s, const int t,
+  const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* RESTRICT work );
 
 /*
  * For overwriting B with B Q or B Q' using the Q from a packed QR.
  *
- * tau should be of length r and work must be of size n.
+ * tau should be of length min(r,s+t) and work must be of size n.
  */
 template<typename Scalar>
 void ApplyPackedQFromRight
-( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+( const int r, const int s, const int t, 
+  const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* RESTRICT work );
 template<typename Scalar>
 void ApplyPackedQAdjointFromRight
-( const int r, const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
+( const int r, const int s, const int t,
+  const Scalar* RESTRICT packedA, const Scalar* RESTRICT tau, 
   Dense<Scalar>& B, Scalar* RESTRICT work );
 
 template<typename Scalar>
-void PrintPacked( const int r, const Scalar* packedA, const std::string& msg );
+void PrintPacked
+( const int r, const int s, const int t, 
+  const Scalar* packedA, const std::string& msg );
 
 } // namespace hmat_tools
 } // namespace psp

@@ -58,7 +58,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
 
     A.MultiplyHMatMainBroadcasts( B, C );
     A.MultiplyHMatMainPostcompute( alpha, B, C );
-
     A.MultiplyHMatFHHPrecompute( alpha, B, C );
     A.MultiplyHMatFHHSums( alpha, B, C );
     A.MultiplyHMatFHHPassData( alpha, B, C );

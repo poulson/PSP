@@ -1356,7 +1356,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
+                    ( r, r, r, &qrBuffer[qrOffset+passes*(r*r+r)], 
                       &tauBuffer[tauOffset+(passes+1)*r], &qrWork[0] );
                     if( secondRoot )
                     {
@@ -1443,7 +1443,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset+(passes+1)*(r*r+r)], 
+                    ( r, r, r, &qrBuffer[qrOffset+(passes+1)*(r*r+r)], 
                       &tauBuffer[tauOffset+(passes+2)*r], &qrWork[0] );
                     if( haveAnotherComm )
                     {
@@ -1513,7 +1513,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         }
                     }
                     hmat_tools::PackedQR
-                    ( r, &qrBuffer[qrOffset+passes*(r*r+r)], 
+                    ( r, r, r, &qrBuffer[qrOffset+passes*(r*r+r)], 
                       &tauBuffer[tauOffset+(passes+1)*r], &qrWork[0] );
 
                     qrOffset += log2ParentTeamSize*(r*r+r);
@@ -1556,15 +1556,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         if( r <= MaxRank() )
             break;
 
+        const int teamRank = mpi::CommRank( _teams->Team(_level) );
         if( _inTargetTeam )
         {
-            AddToMap( sendSizes, _sourceRoot, (r*r+r)/2 );
-            AddToMap( recvSizes, _sourceRoot, (r*r+r)/2 );
+            AddToMap( sendSizes, _sourceRoot+teamRank, (r*r+r)/2 );
+            AddToMap( recvSizes, _sourceRoot+teamRank, (r*r+r)/2 );
         }
         else
         {
-            AddToMap( sendSizes, _targetRoot, (r*r+r)/2 );
-            AddToMap( recvSizes, _targetRoot, (r*r+r)/2 );
+            AddToMap( sendSizes, _targetRoot+teamRank, (r*r+r)/2 );
+            AddToMap( recvSizes, _targetRoot+teamRank, (r*r+r)/2 );
         }
         break;
     }
@@ -1671,6 +1672,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         MPI_Comm team = _teams->Team( _level );
         const unsigned teamLevel = _teams->TeamLevel( _level );
         const unsigned teamSize = mpi::CommSize( team );
+        const unsigned teamRank = mpi::CommRank( team );
         const unsigned log2TeamSize = Log2( teamSize );
         if( _inTargetTeam && _inSourceTeam )
         {
@@ -1682,7 +1684,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
             &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
         qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
 
-        const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
+        const int partner = 
+            ( _inTargetTeam ? _sourceRoot : _targetRoot ) + teamRank;
         const int sendOffset = sendOffsets[partner];
         for( int j=0; j<r; ++j )
             std::memcpy
@@ -1874,7 +1877,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             lastVQRStage = 0;
             lastVTauStage = 0;
 
-            const int recvOffset = recvOffsets[_sourceRoot];
+            const int partner = _sourceRoot + teamRank;
+            const int recvOffset = recvOffsets[partner];
             hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<r; ++j )
                 std::memcpy
@@ -1884,7 +1888,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 std::memcpy
                 ( Y.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
                   (j+1)*sizeof(Scalar) );
-            recvOffsets[_sourceRoot] += (r*r+r)/2;
+            recvOffsets[partner] += (r*r+r)/2;
         }
         else // _inSourceTeam
         {
@@ -1902,7 +1906,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
             hmat_tools::Scale( (Scalar)0, X );
-            const int recvOffset = recvOffsets[_targetRoot];
+            const int partner = _targetRoot + teamRank;
+            const int recvOffset = recvOffsets[partner];
             for( int j=0; j<r; ++j )
                 std::memcpy
                 ( X.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
@@ -1911,7 +1916,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 std::memcpy
                 ( Y.Buffer(0,j), &lastVQRStage[j*j+j], 
                   (j+1)*sizeof(Scalar) );
-            recvOffsets[_targetRoot] += (r*r+r)/2;
+            recvOffsets[partner] += (r*r+r)/2;
         }
 
         // Overwrite X with R_U R_V^[T/H]
@@ -1976,7 +1981,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             // Backtransform the last stage
             work.resize( lapack::ApplyQWorkSize('L',2*r,r) );
             hmat_tools::ApplyPackedQFromLeft
-            ( r, lastUQRStage, lastUTauStage, Z, &work[0] );
+            ( r, r, r, lastUQRStage, lastUTauStage, Z, &work[0] );
 
             // Backtransform using the middle stages
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
@@ -2000,7 +2005,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     }
                 }
                 hmat_tools::ApplyPackedQFromLeft
-                ( r, &UQRPiece[commStage*(r*r+r)],
+                ( r, r, r, &UQRPiece[commStage*(r*r+r)],
                   &UTauPiece[(commStage+1)*r], Z, &work[0] );
             }
 
@@ -2059,7 +2064,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             // Backtransform the last stage
             work.resize( lapack::ApplyQWorkSize('L',2*r,r) );
             hmat_tools::ApplyPackedQFromLeft
-            ( r, lastVQRStage, lastVTauStage, Z, &work[0] );
+            ( r, r, r, lastVQRStage, lastVTauStage, Z, &work[0] );
 
             // Backtransform using the middle stages
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
@@ -2083,7 +2088,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     }
                 }
                 hmat_tools::ApplyPackedQFromLeft
-                ( r, &VQRPiece[commStage*(r*r+r)],
+                ( r, r, r, &VQRPiece[commStage*(r*r+r)],
                   &VTauPiece[(commStage+1)*r], Z, &work[0] );
             }
 

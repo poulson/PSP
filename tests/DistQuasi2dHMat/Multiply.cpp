@@ -376,27 +376,41 @@ main( int argc, char* argv[] )
         }
 
         // Compute the error norms and put ZLocal = YLocal-ZLocal
-        double myErrors[3] = { 0., 0., 0. };
+        double myNormVars[6] = { 0., 0., 0., 0., 0., 0. };
         for( int j=0; j<XLocal.Width(); ++j )
         {
             for( int i=0; i<localHeight; ++i )
             {
-                std::complex<double> diff = YLocal.Get(i,j) - ZLocal.Get(i,j);
-                ZLocal.Set( i, j, diff );
-                double error = psp::Abs( diff );
-                myErrors[0] = std::max(myErrors[0],error);
-                myErrors[1] += error;
-                myErrors[2] += error*error;
+                const std::complex<double> truth = YLocal.Get(i,j);
+                const std::complex<double> error = truth - ZLocal.Get(i,j);
+                const double truthMag = psp::Abs( truth );
+                const double errorMag = psp::Abs( error );
+                ZLocal.Set( i, j, error );
+
+                // RHS norms
+                myNormVars[0] = std::max(myNormVars[0],truthMag);
+                myNormVars[1] += truthMag;
+                myNormVars[2] += truthMag*truthMag;
+                // Error norms
+                myNormVars[3] = std::max(myNormVars[3],errorMag);
+                myNormVars[4] += errorMag;
+                myNormVars[5] += errorMag*errorMag;
             }
         }
-        double errors[3];
-        psp::mpi::Reduce( myErrors, errors, 3, 0, MPI_SUM, MPI_COMM_WORLD );
+        double normVars[6];
+        psp::mpi::Reduce( myNormVars, normVars, 6, 0, MPI_SUM, MPI_COMM_WORLD );
         if( commRank == 0 )
         {
-            const double infError = errors[0];
-            const double L1Error = errors[1];
-            const double L2Error = sqrt(errors[2]);
-            std::cout << "||CX-ABX||_oo = " << infError << "\n"
+            const double infTruth = normVars[0];
+            const double L1Truth = normVars[1];
+            const double L2Truth = sqrt(normVars[2]);
+            const double infError = normVars[3];
+            const double L1Error = normVars[4];
+            const double L2Error = sqrt(normVars[5]);
+            std::cout << "||ABX||_oo    = " << infTruth << "\n"
+                      << "||ABX||_1     = " << L1Truth << "\n"
+                      << "||ABX||_2     = " << L2Truth << "\n"
+                      << "||CX-ABX||_oo = " << infError << "\n"
                       << "||CX-ABX||_1  = " << L1Error << "\n"
                       << "||CX-ABX||_2  = " << L2Error << std::endl;
         }

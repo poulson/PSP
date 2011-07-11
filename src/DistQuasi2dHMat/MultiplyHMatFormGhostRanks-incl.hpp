@@ -56,10 +56,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanks
     // Start the non-blocking sends
     MPI_Comm comm = A._teams->Team( 0 );
 #ifndef RELEASE
-    const int rank = mpi::CommRank( comm );
-    if( rank == 0 )
+    const int commRank = mpi::CommRank( comm );
+    if( commRank == 0 )
     {
-        std::cerr << "Forming ranks requires process 0 to send to "
+        std::cerr << "\n"
+                  << "Forming ranks requires process 0 to send to "
                   << sendSizes.size() << " processes and recv from "
                   << recvSizes.size() << std::endl;
     }
@@ -261,13 +262,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksCount
             if( B._inSourceTeam && 
                 A._targetRoot != B._targetRoot &&
                 A._targetRoot != B._sourceRoot )
-                AddToMap( sendSizes, A._targetRoot+teamRank, 1 );
+                AddToMap( sendSizes, A._targetRoot, 1 );
             break;
         }
         case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK_GHOST:
         {
-            AddToMap( recvSizes, B._sourceRoot+teamRank, 1 );
+            AddToMap( recvSizes, B._sourceRoot, 1 );
             break;
         }
         default:
@@ -421,7 +422,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksPack
             if( B._inSourceTeam && 
                 A._targetRoot != B._targetRoot &&
                 A._targetRoot != B._sourceRoot )
-                sendBuffer[offsets[A._targetRoot+teamRank]++] = B.Rank();
+                sendBuffer[offsets[A._targetRoot]++] = B.Rank();
             break;
         }
         default:
@@ -542,7 +543,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanksUnpack
         case SPLIT_LOW_RANK_GHOST:
         case LOW_RANK_GHOST:
         {
-            B.SetGhostRank( recvBuffer[offsets[B._sourceRoot+teamRank]++] );
+            B.SetGhostRank( recvBuffer[offsets[B._sourceRoot]++] );
             break;
         }
         default:
