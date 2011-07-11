@@ -119,6 +119,9 @@ public:
     int LocalHeight() const;
     int LocalWidth() const;
 
+    int LocalHeightPartner() const;
+    int LocalWidthPartner() const;
+
     int FirstLocalRow() const;
     int FirstLocalCol() const;
 

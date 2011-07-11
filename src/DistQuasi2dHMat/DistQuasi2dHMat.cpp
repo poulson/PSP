@@ -109,6 +109,30 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalHeight() const
 
 template<typename Scalar,bool Conjugated>
 int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalHeightPartner() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::LocalHeightPartner");
+#endif
+    int localHeightPartner;
+    if( _inSourceTeam )
+    {
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
+        ComputeLocalDimensionRecursion
+        ( localHeightPartner, teamSize, teamRank, 
+          _xSizeTarget, _ySizeTarget, _zSize );
+    }
+    else
+        localHeightPartner = 0;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return localHeightPartner;
+}
+
+template<typename Scalar,bool Conjugated>
+int
 psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalWidth() const
 {
 #ifndef RELEASE
@@ -128,6 +152,30 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalWidth() const
     PopCallStack();
 #endif
     return localWidth;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalWidthPartner() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::LocalWidthPartner");
+#endif
+    int localWidthPartner;
+    if( _inTargetTeam )
+    {
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
+        ComputeLocalDimensionRecursion
+        ( localWidthPartner, teamSize, teamRank, 
+          _xSizeSource, _ySizeSource, _zSize );
+    }
+    else
+        localWidthPartner = 0;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return localWidthPartner;
 }
 
 template<typename Scalar,bool Conjugated>
