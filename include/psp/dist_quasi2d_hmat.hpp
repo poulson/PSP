@@ -901,7 +901,7 @@ private:
             std::vector<int>& middleOffsets ) const;
     void MultiplyHMatFHHFinalizeLocalQR
     ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
-      std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets, 
+      std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
     void MultiplyHMatFHHFinalizeOuterUpdates
@@ -926,20 +926,24 @@ private:
     void MultiplyHMatUpdates();
     void MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const;
     void MultiplyHMatUpdatesLowRankCountAndResize
-    ( std::vector<int>& ranks, std::vector<int>& rankOffsets, int rank );
+    ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets, int rank );
     void MultiplyHMatUpdatesLowRankImport( int rank );
     void MultiplyHMatUpdatesImportU( int rank, const Dense<Scalar>& U );
     void MultiplyHMatUpdatesImportV( int rank, const Dense<Scalar>& V );
     void MultiplyHMatUpdatesLocalQR
-    ( std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
-      std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
+    ( std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
     void MultiplyHMatUpdatesParallelQR
-    ( std::vector<int>& numQRs,
-      std::vector<int>& ranks, std::vector<int>& rankOffsets,
-      std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
-      std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-      std::vector<Scalar>& work ) const;
+    ( const std::vector<int>& numQRs,
+      const std::vector<Dense<Scalar>*>& Xs,      
+      const std::vector<int>& XOffsets,
+            std::vector<int>& halfHeights,
+      const std::vector<int>& halfHeightOffsets,
+            std::vector<Scalar>& qrBuffer,
+      const std::vector<int>& qrOffsets,
+            std::vector<Scalar>& tauBuffer,
+      const std::vector<int>& tauOffsets,
+            std::vector<Scalar>& qrWork ) const;
     void MultiplyHMatUpdatesExchangeCount
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
     void MultiplyHMatUpdatesExchangePack
@@ -947,6 +951,7 @@ private:
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets );
     void MultiplyHMatUpdatesExchangeFinalize
     ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
+      const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
       const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       Dense<Scalar>& X, Dense<Scalar>& Y, Dense<Scalar>& Z,

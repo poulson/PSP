@@ -145,44 +145,62 @@ void psp::hmat_tools::PackedQR
 ( const int r, const int s, const int t,
   Scalar* RESTRICT packedA, Scalar* RESTRICT tau, Scalar* RESTRICT work )
 {
-    if( r == s && t == s )
+    const int minDim = std::min(s+t,r);
+
+    int jCol = 0;
+    for( int j=0; j<minDim; ++j )
     {
-        for( int j=0; j<r; ++j )
+        const int S = std::min(j+1,s);
+        const int T = std::min(j+1,t);
+        const int overlap = ( j >= s ? j+1-s : 0 );
+
+        // Compute the Householder vector, v, and scalar, tau, in-place
+        const int jDiag = jCol + j;
+        tau[j] = Householder( S+T-j, &packedA[jDiag] );
+
+        // Form z := A(I_j,j+1:end)' v in the work vector 
+        int iCol = jCol + S + T;
+        for( int i=0; i<r-(j+1); ++i )
         {
-            // Compute the Householder vector, v, and scalar, tau, in-place
-            const int diag = j*(j+2);
-            tau[j] = Householder( j+2, &packedA[diag] );
+            const int Si = std::min(j+i+2,s);
+            const int Ti = std::min(j+i+2,t);
 
-            // Form z := A(I_j,j+1:end)' v in the work vector 
-            for( int i=0; i<r-1-j; ++i )
-            {
-                // z[i] := Conj(A(j,j+i+1)) v(0) = Conj(A(j,j+1))
-                const int right = (j+i+1)*(j+i+2) + j;
-                work[i] = Conj(packedA[right]);
+            // z[i] := Conj(A(j,j+i+1)) v(0) = Conj(A(j,j+i+1))
+            const int iDiagRight = iCol + j;
+            work[i] = Conj(packedA[iDiagRight]);
 
-                // Traverse over this col of the lower triangle
-                for( int k=0; k<j+1; ++k )
-                    work[i] += Conj(packedA[right+(i+2)+k])*packedA[diag+k+1];
-            }
+            // Traverse over this col of the lower triangle
+            const int jump = ( j >= s ? 1 : Si-j );
+            for( int k=0; k<T-overlap; ++k )
+                work[i] += Conj(packedA[iDiagRight+k+jump])*packedA[jDiag+k+1];
 
-            // A(I_j,j+1:n-1) -= conj(tau) v z'
-            for( int i=0; i<r-1-j; ++i )
-            {
-                const Scalar scale = Conj(tau[j])*Conj(work[i]);
-
-                // A(j,j+i+1) -= conj(tau) v(0) z[k] = conj(tau) z[k]
-                const int right = (j+i+1)*(j+i+2) + j;
-                packedA[right] -= scale;
-
-                // Traverse over the relevant piece of this col of the 
-                // lower-triangle
-                for( int k=0; k<j+1; ++k )
-                    packedA[right+(i+2)+k] -= scale*packedA[diag+k+1];
-            }
+            iCol += Si + Ti;
         }
+
+        // A(I_j,j+1:end) -= conj(tau) v z'
+        iCol = jCol + S + T;
+        for( int i=0; i<r-(j+1); ++i )
+        {
+            const int Si = std::min(j+i+2,s);
+            const int Ti = std::min(j+i+2,t);
+
+            const Scalar scale = Conj(tau[j])*Conj(work[i]);
+
+            // A(j,j+i+1) -= conj(tau) v(0) z[k] = conj(tau) z[k]
+            const int iDiagRight = iCol + j;
+            packedA[iDiagRight] -= scale;
+
+            // Traverse over the relevant piece of this col of the 
+            // lower-triangle
+            const int jump = ( j >= s ? 1 : Si-j );
+            for( int k=0; k<T-overlap; ++k )
+                packedA[iDiagRight+k+jump] -= scale*packedA[jDiag+k+1];
+
+            iCol += Si + Ti;
+        }
+
+        jCol += S + T;
     }
-    else
-        throw std::logic_error("This option is not yet implemented");
 }
 
 template<typename Scalar>
@@ -198,46 +216,53 @@ void psp::hmat_tools::ApplyPackedQFromLeft
     if( B.Height() != s+t )
         throw std::logic_error("B is not the correct height");
 #endif
-    const int n = B.Width();
     Scalar* BBuffer = B.Buffer();
+    const int n = B.Width();
     const int BLDim = B.LDim();
-    if( r == s && r == t )
+    const int minDim = std::min(s+t,r);
+
+    const int packedATopSize = (s*s+s)/2 + (r-s)*s;
+    const int packedABottomSize = (t*t+t)/2 + (r-t)*t;
+    const int packedASize = packedATopSize + packedABottomSize;
+
+    int jCol = packedASize;
+    for( int j=minDim-1; j>=0; --j )
     {
-        for( int j=r-1; j>=0; --j )
-        {
-            // B := (I - tau_j v_j v_j') B
-            //    = B - tau_j v_j (v_j' B)
-            //    = B - tau_j v_j (B' v_j)'
+        const int S = std::min(j+1,s);
+        const int T = std::min(j+1,t);
+        const int overlap = ( j >= s ? j+1-s : 0 );
+        jCol -= S + T;
 
-            // 1) Form w_j := B' v_j
-            // Since v_j's only nonzero entries are a 1 in the j'th entry and 
-            // arbitrary values in the r:r+j entries, 
-            //     w_j = B(j,:)' + B(r:r+j,:)' v_j(r:r+j)
-            for( int i=0; i<n; ++i )
-                work[i] = Conj(BBuffer[j+i*BLDim]);
-            blas::Gemv
-            ( 'C', j+1, n, 
-              (Scalar)1, &BBuffer[r],           BLDim,
-                         &packedA[(j+1)*(j+1)], 1,
-              (Scalar)1, work,                  1 );
+        // B := (I - tau_j v_j v_j') B
+        //    = B - tau_j v_j (v_j' B)
+        //    = B - tau_j v_j (B' v_j)'
 
-            // 2) B := B - tau_j v_j w_j'
-            // Since v_j has the structure described above, we only need to 
-            // subtract tau_j w_j' from the j'th row of B and then perform the
-            // update 
-            //     B(r:r+j,:) -= tau_j v_j(r:r+j) w_j'
-            const Scalar tauj = tau[j];
-            for( int i=0; i<n; ++i )
-                BBuffer[j+i*BLDim] -= tauj*Conj(work[i]);
-            blas::Ger
-            ( j+1, n, 
-              -tauj, &packedA[(j*j+j)+(j+1)], 1,
-                     work,                    1,
-                     &BBuffer[r],             BLDim );
-        }
+        // 1) Form w_j := B' v_j
+        // Since v_j's only nonzero entries are a 1 in the j'th entry and 
+        // arbitrary values in the r:r+j entries, 
+        //     w_j = B(j,:)' + B(s:s+T-1,:)' v_j(s:s+T-1)
+        for( int i=0; i<n; ++i )
+            work[i] = Conj(BBuffer[j+i*BLDim]);
+        blas::Gemv
+        ( 'C', T-overlap, n, 
+          (Scalar)1, &BBuffer[s+overlap],      BLDim,
+                     &packedA[jCol+S+overlap], 1,
+          (Scalar)1, work,                     1 );
+
+        // 2) B := B - tau_j v_j w_j'
+        // Since v_j has the structure described above, we only need to 
+        // subtract tau_j w_j' from the j'th row of B and then perform the
+        // update 
+        //     B(s:s+T-1,:) -= tau_j v_j(s:s+T-1) w_j'
+        const Scalar tauj = tau[j];
+        for( int i=0; i<n; ++i )
+            BBuffer[j+i*BLDim] -= tauj*Conj(work[i]);
+        blas::Ger
+        ( T-overlap, n, 
+          -tauj, &packedA[jCol+S+overlap], 1,
+                 work,                     1,
+                 &BBuffer[s+overlap],      BLDim );
     }
-    else
-        throw std::logic_error("This option is not yet implemented");
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -256,46 +281,50 @@ void psp::hmat_tools::ApplyPackedQAdjointFromLeft
     if( B.Height() != s+t )
         throw std::logic_error("B is not the correct height");
 #endif
-    const int n = B.Width();
     Scalar* BBuffer = B.Buffer();
+    const int n = B.Width();
     const int BLDim = B.LDim();
-    if( r == s && r == t )
+    const int minDim = std::min(s+t,r);
+
+    int jCol = 0;
+    for( int j=0; j<minDim; ++j )
     {
-        for( int j=0; j<r; ++j )
-        {
-            // B := (I - conj(tau_j) v_j v_j') B
-            //    = B - conj(tau_j) v_j v_j' B
-            //    = B - conj(tau_j) v_j (B' v_j)'
+        const int S = std::min(j+1,s);
+        const int T = std::min(j+1,t);
+        const int overlap = ( j >= s ? j+1-s : 0 );
 
-            // 1) Form w_j := B' v_j
-            // Since v_j's only nonzero entries are a 1 in the j'th entry and 
-            // arbitrary values in the r:r+j entries, 
-            //     w_j = B(j,:)' + B(r:r+j,:)' v_j(r:r+j)
-            for( int i=0; i<n; ++i )
-                work[i] = Conj(BBuffer[j+i*BLDim]);
-            blas::Gemv
-            ( 'C', j+1, n, 
-              (Scalar)1, &BBuffer[r],           BLDim,
-                         &packedA[(j+1)*(j+1)], 1,
-              (Scalar)1, work,                  1 );
+        // B := (I - conj(tau_j) v_j v_j') B
+        //    = B - conj(tau_j) v_j v_j' B
+        //    = B - conj(tau_j) v_j (B' v_j)'
 
-            // 2) B := B - tau_j v_j w_j'
-            // Since v_j has the structure described above, we only need to 
-            // subtract tau_j w_j' from the j'th row of B and then perform the
-            // update 
-            //     B(r:r+j,:) -= tau_j v_j(r:r+j) w_j'
-            const Scalar conjTauj = Conj(tau[j]);
-            for( int i=0; i<n; ++i )
-                BBuffer[j+i*BLDim] -= conjTauj*Conj(work[i]);
-            blas::Ger
-            ( j+1, n, 
-              -conjTauj, &packedA[(j*j+j)+(j+1)], 1,
-                         work,                    1,
-                         &BBuffer[r],             BLDim );
-        }
+        // 1) Form w_j := B' v_j
+        // Since v_j's only nonzero entries are a 1 in the j'th entry and 
+        // arbitrary values in the r:r+j entries, 
+        //     w_j = B(j,:)' + B(s:s+T-1,:)' v_j(s:s+T-1)
+        for( int i=0; i<n; ++i )
+            work[i] = Conj(BBuffer[j+i*BLDim]);
+        blas::Gemv
+        ( 'C', T-overlap, n, 
+          (Scalar)1, &BBuffer[s+overlap],      BLDim,
+                     &packedA[jCol+S+overlap], 1,
+          (Scalar)1, work,                     1 );
+
+        // 2) B := B - tau_j v_j w_j'
+        // Since v_j has the structure described above, we only need to 
+        // subtract tau_j w_j' from the j'th row of B and then perform the
+        // update 
+        //     B(s:s+T-1,:) -= tau_j v_j(s:s+T-1) w_j'
+        const Scalar conjTauj = Conj(tau[j]);
+        for( int i=0; i<n; ++i )
+            BBuffer[j+i*BLDim] -= conjTauj*Conj(work[i]);
+        blas::Ger
+        ( T-overlap, n, 
+          -conjTauj, &packedA[jCol+S+overlap], 1,
+                     work,                     1,
+                     &BBuffer[s+overlap],      BLDim );
+
+        jCol += S + T;
     }
-    else
-        throw std::logic_error("This option is not yet implemented");
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -314,39 +343,42 @@ void psp::hmat_tools::ApplyPackedQFromRight
     if( B.Width() != s+t )
         throw std::logic_error("B is not the correct width");
 #endif
-    const int m = B.Height();
     Scalar* BBuffer = B.Buffer();
+    const int m = B.Height();
     const int BLDim = B.LDim();
-    if( r == s && r == t )
+    const int minDim = std::min(s+t,r);
+
+    int jCol = 0;
+    for( int j=0; j<minDim; ++j )
     {
-        for( int j=0; j<r; ++j )
-        {
-            const Scalar tauj = tau[j];
+        const int S = std::min(j+1,s);
+        const int T = std::min(j+1,t);
+        const int overlap = ( j >= s ? j+1-s : 0 );
 
-            // B := B (I - tau_j v_j v_j')
-            //    = B - (tau_j B v_j) v_j'
+        // B := B (I - tau_j v_j v_j')
+        //    = B - (tau_j B v_j) v_j'
 
-            // 1) Form w_j := tau_j B v_j
-            for( int i=0; i<m; ++i )
-                work[i] = tauj*BBuffer[i+j*BLDim];
-            blas::Gemv
-            ( 'N', m, j+1,
-              tauj,      &BBuffer[r*BLDim],     BLDim,
-                         &packedA[(j+1)*(j+1)], 1,
-              (Scalar)1, work,                  1 );
+        // 1) Form w_j := tau_j B v_j
+        const Scalar tauj = tau[j];
+        for( int i=0; i<m; ++i )
+            work[i] = tauj*BBuffer[i+j*BLDim];
+        blas::Gemv
+        ( 'N', m, T-overlap,
+          tauj,      &BBuffer[(s+overlap)*BLDim], BLDim,
+                     &packedA[jCol+S+overlap],    1,
+          (Scalar)1, work,                        1 );
 
-            // 2) B := B - w_j v_j'
-            for( int i=0; i<m; ++i )
-                BBuffer[i+j*BLDim] -= work[i];
-            blas::Ger
-            ( m, j+1,
-             (Scalar)-1, work,                    1,
-                         &packedA[(j*j+j)+(j+1)], 1,
-                         &BBuffer[r*BLDim],       BLDim );
-        }
+        // 2) B := B - w_j v_j'
+        for( int i=0; i<m; ++i )
+            BBuffer[i+j*BLDim] -= work[i];
+        blas::Ger
+        ( m, T-overlap,
+         (Scalar)-1, work,                        1,
+                     &packedA[jCol+S+overlap],    1,
+                     &BBuffer[(s+overlap)*BLDim], BLDim );
+
+        jCol += S + T;
     }
-    else
-        throw std::logic_error("This option is not yet implemented");
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -365,39 +397,45 @@ void psp::hmat_tools::ApplyPackedQAdjointFromRight
     if( B.Width() != s+t )
         throw std::logic_error("B is not the correct width");
 #endif
-    const int m = B.Height();
     Scalar* BBuffer = B.Buffer();
+    const int m = B.Height();
     const int BLDim = B.LDim();
-    if( r == s && r == t )
+    const int minDim = std::min(s+t,r);
+
+    const int packedATopSize = (s*s+s)/2 + (r-s)*s;
+    const int packedABottomSize = (t*t+t)/2 + (r-t)*t;
+    const int packedASize = packedATopSize + packedABottomSize;
+
+    int jCol = packedASize;
+    for( int j=minDim-1; j>=0; --j )
     {
-        for( int j=r-1; j>=0; --j )
-        {
-            const Scalar conjTauj = Conj(tau[j]);
+        const int S = std::min(j+1,s);
+        const int T = std::min(j+1,t);
+        const int overlap = ( j >= s ? j+1-s : 0 );
+        jCol -= S + T;
 
-            // B := B (I - conj(tau)_j v_j v_j')
-            //    = B - (conj(tau_j) B v_j) v_j'
+        // B := B (I - conj(tau)_j v_j v_j')
+        //    = B - (conj(tau_j) B v_j) v_j'
 
-            // 1) Form w_j := conj(tau_j) B v_j
-            for( int i=0; i<m; ++i )
-                work[i] = conjTauj*BBuffer[i+j*BLDim];
-            blas::Gemv
-            ( 'N', m, j+1,
-              conjTauj,  &BBuffer[r*BLDim],     BLDim,
-                         &packedA[(j+1)*(j+1)], 1,
-              (Scalar)1, work,                  1 );
+        // 1) Form w_j := conj(tau_j) B v_j
+        const Scalar conjTauj = Conj(tau[j]);
+        for( int i=0; i<m; ++i )
+            work[i] = conjTauj*BBuffer[i+j*BLDim];
+        blas::Gemv
+        ( 'N', m, T-overlap,
+          conjTauj,  &BBuffer[(s+overlap)*BLDim], BLDim,
+                     &packedA[jCol+S+overlap],    1,
+          (Scalar)1, work,              1 );
 
-            // 2) B := B - w_j v_j'
-            for( int i=0; i<m; ++i )
-                BBuffer[i+j*BLDim] -= work[i];
-            blas::Ger
-            ( m, j+1,
-             (Scalar)-1, work,                    1,
-                         &packedA[(j*j+j)+(j+1)], 1,
-                         &BBuffer[r*BLDim],       BLDim );
-        }
+        // 2) B := B - w_j v_j'
+        for( int i=0; i<m; ++i )
+            BBuffer[i+j*BLDim] -= work[i];
+        blas::Ger
+        ( m, T-overlap,
+         (Scalar)-1, work,                        1,
+                     &packedA[jCol+S+overlap],    1,
+                     &BBuffer[(s+overlap)*BLDim], BLDim );
     }
-    else
-        throw std::logic_error("This option is not yet implemented");
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -405,41 +443,80 @@ void psp::hmat_tools::ApplyPackedQAdjointFromRight
 
 template<typename Scalar>
 void psp::hmat_tools::PrintPacked
-( const int r, const int s, const int t,
-  const Scalar* packedA, const std::string& msg )
+( std::ostream& os, const std::string& msg, 
+  const int r, const int s, const int t,
+  const Scalar* packedA )
 {
 #ifndef RELEASE
     PushCallStack("hmat_tools::PrintPacked");
 #endif
-    std::cout << msg << "\n";
-    if( r == s && r == t )
+    os << msg << "\n";
+
+    // Print the upper triangle
+    int iCol = 0;
+    for( int i=0; i<s; ++i )
     {
-        // Print the upper triangle
-        for( int i=0; i<r; ++i )
+        const int Si = std::min(i+1,s);
+        const int Ti = std::min(i+1,t); 
+
+        for( int j=0; j<i; ++j )
+            os << "0 ";
+
+        int jCol = iCol;
+        for( int j=i; j<r; ++j )
         {
-            for( int j=0; j<i; ++j )
-                std::cout << "0 ";
-            for( int j=i; j<r; ++j )
-                std::cout << ScalarWrapper<Scalar>(packedA[(j*j+j)+i]) << " ";
-            std::cout << "\n";
+            const int Sj = std::min(j+1,s);
+            const int Tj = std::min(j+1,t);
+
+            const Scalar value = packedA[jCol+i];
+            os << ScalarWrapper<Scalar>(value) << " ";
+
+            jCol += Sj + Tj;
         }
-        // Print the lower triangle
-        for( int i=0; i<r; ++i )
-        {
-            for( int j=0; j<i; ++j )
-                std::cout << "0 ";
-            for( int j=i; j<r; ++j )
-                std::cout << ScalarWrapper<Scalar>(packedA[(j*j+j)+(i+j+1)]) 
-                          << " ";
-            std::cout << "\n";
-        }
+        os << "\n";
+
+        iCol += Si + Ti;
     }
-    else
-        throw std::logic_error("This option is not yet implemented");
-    std::cout.flush();
+
+    // Print the lower triangle
+    iCol = 0;
+    for( int i=0; i<t; ++i )
+    {
+        const int Si = std::min(i+1,s);
+        const int Ti = std::min(i+1,t); 
+
+        for( int j=0; j<i; ++j )
+            os << "0 ";
+
+        int jCol = iCol;
+        for( int j=i; j<r; ++j )
+        {
+            const int Sj = std::min(j+1,s);
+            const int Tj = std::min(j+1,t);
+
+            const Scalar value = packedA[jCol+Sj+i];
+            os << ScalarWrapper<Scalar>(value) << " ";
+
+            jCol += Sj + Tj;
+        }
+        os << "\n";
+
+        iCol += Si + Ti;
+    }
+
+    os.flush();
 #ifndef RELEASE
     PopCallStack();
 #endif
+}
+
+template<typename Scalar>
+void psp::hmat_tools::PrintPacked
+( const std::string& msg, 
+  const int r, const int s, const int t,
+  const Scalar* packedA )
+{
+    PrintPacked( std::cout, msg, r, s, t, packedA );
 }
 
 template void psp::hmat_tools::PackedQR
@@ -564,15 +641,28 @@ template void psp::hmat_tools::ApplyPackedQAdjointFromRight
         std::complex<double>* RESTRICT work );
 
 template void psp::hmat_tools::PrintPacked
-( const int r, const int s, const int t, 
-  const float* packedA, const std::string& msg );
+( std::ostream& os, const std::string& msg,
+  const int r, const int s, const int t, const float* packedA );
 template void psp::hmat_tools::PrintPacked
-( const int r, const int s, const int t,
-  const double* packedA, const std::string& msg );
+( std::ostream& os, const std::string& msg,
+  const int r, const int s, const int t, const double* packedA );
 template void psp::hmat_tools::PrintPacked
-( const int r, const int s, const int t,
-  const std::complex<float>* packedA, const std::string& msg );
+( std::ostream& os, const std::string& msg,
+  const int r, const int s, const int t, const std::complex<float>* packedA );
 template void psp::hmat_tools::PrintPacked
-( const int r, const int s, const int t,
-  const std::complex<double>* packedA, const std::string& msg );
+( std::ostream& os, const std::string& msg,
+  const int r, const int s, const int t, const std::complex<double>* packedA );
+
+template void psp::hmat_tools::PrintPacked
+( const std::string& msg,
+  const int r, const int s, const int t, const float* packedA );
+template void psp::hmat_tools::PrintPacked
+( const std::string& msg,
+  const int r, const int s, const int t, const double* packedA );
+template void psp::hmat_tools::PrintPacked
+( const std::string& msg,
+  const int r, const int s, const int t, const std::complex<float>* packedA );
+template void psp::hmat_tools::PrintPacked
+( const std::string& msg,
+  const int r, const int s, const int t, const std::complex<double>* packedA );
 

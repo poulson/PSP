@@ -820,8 +820,12 @@ void ApplyPackedQAdjointFromRight
 
 template<typename Scalar>
 void PrintPacked
-( const int r, const int s, const int t, 
-  const Scalar* packedA, const std::string& msg );
+( std::ostream& os, const std::string& msg,
+  const int r, const int s, const int t, const Scalar* packedA );
+template<typename Scalar>
+void PrintPacked
+( const std::string& msg,
+  const int r, const int s, const int t, const Scalar* packedA );
 
 } // namespace hmat_tools
 } // namespace psp

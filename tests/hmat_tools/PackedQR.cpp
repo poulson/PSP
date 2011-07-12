@@ -82,16 +82,16 @@ main( int argc, char* argv[] )
         }
         if( print )
         {
-            psp::hmat_tools::PrintPacked( r, s, t, &packedA[0], "packedA:" );
+            psp::hmat_tools::PrintPacked( "packedA:", r, s, t, &packedA[0] );
             std::cout << std::endl;
         }
 
         // Allocate a workspace and perform the packed QR
-        std::vector<std::complex<double> > tau( std::min(r,s+t) ), work(t);
+        std::vector<std::complex<double> > tau( std::min(s+t,r) ), work(s+t);
         psp::hmat_tools::PackedQR( r, s, t, &packedA[0], &tau[0], &work[0] );
         if( print )
         {
-            psp::hmat_tools::PrintPacked( r, s, t, &packedA[0], "packedQR:" );
+            psp::hmat_tools::PrintPacked( "packedQR:", r, s, t, &packedA[0] );
             std::cout << "\ntau:\n";
             for( unsigned j=0; j<tau.size(); ++j )
                 std::cout << 
@@ -102,24 +102,17 @@ main( int argc, char* argv[] )
         // Copy the R into a zeroed (s+t) x r matrix
         psp::Dense<std::complex<double> > B( s+t, r );
         psp::hmat_tools::Scale( std::complex<double>(0), B );
-        if( r == s && r == t )
+        int k=0;
+        for( int j=0; j<r; ++j )
         {
-            for( int j=0; j<r; ++j )
-                for( int i=0; i<=j; ++i )
-                    B.Set( i, j, packedA[j*(j+1)+i] );
-        }
-        else 
-        {
-            int k=0;
-            for( int j=0; j<r; ++j )
-            {
-                for( int i=0; i<std::min(j+1,s); ++i )
-                    A.Set( i, j, packedA[k++] );
-                for( int i=s; i<std::min(j+1,s+t); ++i )
-                    A.Set( i, j, packedA[k++] );
-                k += std::min(j+s+1,s+t) - std::min(j+1,s+t);
-            }
-            throw std::logic_error("Not yet written");
+            const int S = std::min(j+1,s);
+            const int T = std::min(j+1,t);
+            const int U = std::min(j+1,S+T);
+
+            for( int i=0; i<U; ++i )
+                B.Set( i, j, packedA[k++] );
+
+            k += (S+T) - U;
         }
         if( print )
         {
