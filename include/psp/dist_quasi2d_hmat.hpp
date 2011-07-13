@@ -947,10 +947,11 @@ private:
     void MultiplyHMatUpdatesExchangeCount
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
     void MultiplyHMatUpdatesExchangePack
-    ( std::vector<Scalar>& sendBuffer, std::map<int,int>& sendOffsets,
+    ( std::vector<byte>& sendBuffer, std::map<int,int>& sendOffsets,
+      const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets );
     void MultiplyHMatUpdatesExchangeFinalize
-    ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
+    ( const std::vector<byte>& recvBuffer, std::map<int,int>& recvOffsets,
       const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
       const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,

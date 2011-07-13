@@ -120,13 +120,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     }
 
     // Fill the send buffer
-    std::vector<Scalar> sendBuffer( totalSendSize );
+    std::vector<byte> sendBuffer( totalSendSize );
     {
         std::map<int,int> sendOffsetsCopy = sendOffsets;
+        std::vector<int> halfHeightOffsetsCopy = halfHeightOffsets;
         std::vector<int> qrOffsetsCopy = qrOffsets;
 
         MultiplyHMatUpdatesExchangePack
-        ( sendBuffer, sendOffsetsCopy, qrBuffer, qrOffsetsCopy );
+        ( sendBuffer, sendOffsetsCopy, 
+          halfHeights, halfHeightOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
 
     // Start the non-blocking sends
@@ -145,7 +147,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     // Start the non-blocking recvs
     const int numRecvs = recvSizes.size();
     std::vector<MPI_Request> recvRequests( numRecvs );
-    std::vector<Scalar> recvBuffer( totalRecvSize );
+    std::vector<byte> recvBuffer( totalRecvSize );
     offset = 0;
     for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
     {
@@ -1703,13 +1705,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         const int teamRank = mpi::CommRank( _teams->Team(_level) );
         if( _inTargetTeam )
         {
-            AddToMap( sendSizes, _sourceRoot+teamRank, (r*r+r)/2 );
-            AddToMap( recvSizes, _sourceRoot+teamRank, (r*r+r)/2 );
+            AddToMap
+            ( sendSizes, _sourceRoot+teamRank, sizeof(int) );
+            AddToMap
+            ( recvSizes, _sourceRoot+teamRank, sizeof(int) );
+            AddToMap
+            ( sendSizes, _sourceRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
+            AddToMap
+            ( recvSizes, _sourceRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
         }
         else
         {
-            AddToMap( sendSizes, _targetRoot+teamRank, (r*r+r)/2 );
-            AddToMap( recvSizes, _targetRoot+teamRank, (r*r+r)/2 );
+            AddToMap
+            ( sendSizes, _targetRoot+teamRank, sizeof(int) );
+            AddToMap
+            ( recvSizes, _targetRoot+teamRank, sizeof(int) );
+            AddToMap
+            ( sendSizes, _targetRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
+            AddToMap
+            ( recvSizes, _targetRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
         }
         break;
     }
@@ -1732,13 +1746,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
             // Count the exchange R sizes
             if( _inTargetTeam )
             {
-                AddToMap( sendSizes, _sourceRoot, packedRUSize );
-                AddToMap( recvSizes, _sourceRoot, packedRVSize );
+                AddToMap( sendSizes, _sourceRoot, packedRUSize*sizeof(Scalar) );
+                AddToMap( recvSizes, _sourceRoot, packedRVSize*sizeof(Scalar) );
             }
             else
             {
-                AddToMap( sendSizes, _targetRoot, packedRVSize );
-                AddToMap( recvSizes, _targetRoot, packedRUSize );
+                AddToMap( sendSizes, _targetRoot, packedRVSize*sizeof(Scalar) );
+                AddToMap( recvSizes, _targetRoot, packedRUSize*sizeof(Scalar) );
             }
         }
         else
@@ -1749,13 +1763,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
             const int n = Width();
             if( _inTargetTeam )
             {
-                AddToMap( sendSizes, _sourceRoot, m*SF.rank );
-                AddToMap( recvSizes, _sourceRoot, n*SF.rank + m*n );
+                AddToMap
+                ( sendSizes, _sourceRoot, m*SF.rank*sizeof(Scalar) );
+                AddToMap
+                ( recvSizes, _sourceRoot, (n*SF.rank+m*n)*sizeof(Scalar) );
             }
             else
             {
-                AddToMap( sendSizes, _targetRoot, n*SF.rank + m*n );
-                AddToMap( recvSizes, _targetRoot, m*SF.rank );
+                AddToMap
+                ( sendSizes, _targetRoot, (n*SF.rank+m*n)*sizeof(Scalar) );
+                AddToMap
+                ( recvSizes, _targetRoot, m*SF.rank*sizeof(Scalar) );
             }
         }
         break;
@@ -1767,13 +1785,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         {
             _UMap.ResetIterator();
             const Dense<Scalar>& U = *_UMap.CurrentEntry();
-            AddToMap( sendSizes, _sourceRoot, Height()*U.Width() );
+            AddToMap
+            ( sendSizes, _sourceRoot, Height()*U.Width()*sizeof(Scalar) );
         }
         else
         {
             _VMap.ResetIterator();
             const Dense<Scalar>& V = *_VMap.CurrentEntry();
-            AddToMap( recvSizes, _targetRoot, Height()*V.Width() );
+            AddToMap
+            ( recvSizes, _targetRoot, Height()*V.Width()*sizeof(Scalar) );
         }
         break;
     }
@@ -1788,7 +1808,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
-( std::vector<Scalar>& sendBuffer, std::map<int,int>& sendOffsets,
+( std::vector<byte>& sendBuffer, std::map<int,int>& sendOffsets,
+  const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets )
 {
 #ifndef RELEASE
@@ -1803,7 +1824,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesExchangePack
-                ( sendBuffer, sendOffsets, qrBuffer, qrOffsets );
+                ( sendBuffer, sendOffsets, 
+                  halfHeights, halfHeightOffsets, qrBuffer, qrOffsets );
         break;
     }
     case DIST_LOW_RANK:
@@ -1824,18 +1846,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
             break;
         }
 
+        const int* lastHalfHeightsStage = 
+            &halfHeights[halfHeightOffsets[teamLevel]+(log2TeamSize-1)*2];
         const Scalar* lastQRStage = 
             &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
+        halfHeightOffsets[teamLevel] += log2TeamSize*2;
         qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
 
         const int partner = 
             ( _inTargetTeam ? _sourceRoot : _targetRoot ) + teamRank;
-        const int sendOffset = sendOffsets[partner];
+        int sendOffset = sendOffsets[partner];
+
+        const int s = lastHalfHeightsStage[0];
+        const int t = lastHalfHeightsStage[1];
+        const int minDim = std::min(s+t,r);
+        std::memcpy( &sendBuffer[sendOffset], &minDim, sizeof(int) );
+        sendOffset += sizeof(int);
+
+        int offset = 0;
         for( int j=0; j<r; ++j )
+        {
+            const int S = std::min(j+1,s);
+            const int T = std::min(j+1,t);
+            const int P = std::min(j+1,s+t);
             std::memcpy
-            ( &sendBuffer[sendOffset+(j*j+j)/2], 
-              &lastQRStage[j*j+j], (j+1)*sizeof(Scalar) );
-        sendOffsets[partner] += (r*r+r)/2;
+            ( &sendBuffer[sendOffset], &lastQRStage[offset], P*sizeof(Scalar) );
+            sendOffset += P*sizeof(Scalar);
+            offset += S + T;
+        }
+        sendOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         break;
     }
     case SPLIT_LOW_RANK:
@@ -1848,21 +1887,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
                 break;
 
             // Pack R
-            const int minDim = std::min( SF.D.Height(), r );
-
             const int partner = ( _inTargetTeam ? _sourceRoot : _targetRoot );
-            const int sendOffset = sendOffsets[partner];
+            const int minDim = std::min( SF.D.Height(), r );
+            int sendOffset = sendOffsets[partner];
             for( int j=0; j<minDim; ++j )
+            {
                 std::memcpy
-                ( &sendBuffer[sendOffset+(j*j+j)/2],
+                ( &sendBuffer[sendOffset],
                   SF.D.LockedBuffer(0,j), (j+1)*sizeof(Scalar) );
+                sendOffset += (j+1)*sizeof(Scalar);
+            }
             for( int j=minDim; j<r; ++j )
+            {
                 std::memcpy
-                ( &sendBuffer[sendOffset+
-                              (minDim*minDim+minDim)/2+(j-minDim)*minDim],
+                ( &sendBuffer[sendOffset],
                   SF.D.LockedBuffer(0,j), minDim*sizeof(Scalar) );
+                sendOffset += minDim*sizeof(Scalar);
+            }
             sendOffsets[partner] += 
-                (minDim*minDim+minDim)/2 + (r-minDim)*minDim;
+                ((minDim*minDim+minDim)/2 + (r-minDim)*minDim)*sizeof(Scalar);
         }
         else
         {
@@ -1874,10 +1917,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
                 // Copy U into the send buffer
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( &sendBuffer[sendOffset+j*m],
+                    ( &sendBuffer[sendOffset+j*m*sizeof(Scalar)],
                       SF.D.LockedBuffer(0,j), m*sizeof(Scalar) );
 
-                sendOffsets[_sourceRoot] += m*r;
+                sendOffsets[_sourceRoot] += m*r*sizeof(Scalar);
             }
             else
             {
@@ -1888,16 +1931,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
                 int sendOffset = sendOffsets[_targetRoot];
                 for( int j=0; j<r; ++j )
                     std::memcpy
-                    ( &sendBuffer[sendOffset+j*n],
+                    ( &sendBuffer[sendOffset+j*n*sizeof(Scalar)],
                       SF.D.LockedBuffer(0,j), n*sizeof(Scalar) );
-                sendOffset += n*r;
+                sendOffset += n*r*sizeof(Scalar);
 
                 // Copy the condensed dense update into the send buffer
                 for( int j=0; j<n; ++j )
                     std::memcpy
-                    ( &sendBuffer[sendOffset+j*m], _D.LockedBuffer(0,j),
-                      m*sizeof(Scalar) );
-                sendOffsets[_targetRoot] += n*r + m*n;
+                    ( &sendBuffer[sendOffset+j*m*sizeof(Scalar)], 
+                      _D.LockedBuffer(0,j), m*sizeof(Scalar) );
+                sendOffsets[_targetRoot] += (n*r + m*n)*sizeof(Scalar);
             }
         }
         break;
@@ -1913,9 +1956,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
             const int sendOffset = sendOffsets[_sourceRoot];
             for( int j=0; j<r; ++j )
                 std::memcpy
-                ( &sendBuffer[sendOffset+j*height],
+                ( &sendBuffer[sendOffset+j*height*sizeof(Scalar)],
                   U.LockedBuffer(0,j), height*sizeof(Scalar) );
-            sendOffsets[_sourceRoot] += height*r;
+            sendOffsets[_sourceRoot] += height*r*sizeof(Scalar);
             _UMap.Clear();
         }
     }
@@ -1930,7 +1973,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
-( const std::vector<Scalar>& recvBuffer, std::map<int,int>& recvOffsets,
+( const std::vector<byte>& recvBuffer, std::map<int,int>& recvOffsets,
   const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
   const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
@@ -1958,8 +2001,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
     }
     case DIST_LOW_RANK:
     {
-        // This all needs to be rewritten
-        /*
         DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
         if( r <= MaxRank() )
@@ -1971,220 +2012,326 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const unsigned teamRank = mpi::CommRank( team );
         const unsigned log2TeamSize = Log2( teamSize );
 
+        const int*    UHalfHeightsPiece;
+        const int*    VHalfHeightsPiece;
         const Scalar* UQRPiece;
         const Scalar* VQRPiece;
         const Scalar* UTauPiece;
         const Scalar* VTauPiece;
+        const int*    lastUHalfHeightsStage;
+        const int*    lastVHalfHeightsStage;
         const Scalar* lastUQRStage;
         const Scalar* lastVQRStage;
         const Scalar* lastUTauStage;
         const Scalar* lastVTauStage;
 
         // Set up our pointers and form R_U and R_V in X and Y
-        X.Resize( r, r );
-        Y.Resize( r, r );
+        int minDimX, minDimY;
         if( _inTargetTeam && _inSourceTeam )
         {
+            UHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
-            lastUQRStage = 
-                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
-            lastUTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+
+            lastUHalfHeightsStage = &UHalfHeightsPiece[(log2TeamSize-1)*2];
+            lastUQRStage = &UQRPiece[(log2TeamSize-1)*(r*r+r)];
+            lastUTauStage = &UTauPiece[log2TeamSize*r];
+
+            halfHeightOffsets[teamLevel] += log2TeamSize*2;
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
+            VHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             VQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             VTauPiece = &tauBuffer[tauOffsets[teamLevel]];
-            lastVQRStage =
-                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
-            lastVTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+
+            lastVHalfHeightsStage = &VHalfHeightsPiece[(log2TeamSize-1)*2];
+            lastVQRStage = &VQRPiece[(log2TeamSize-1)*(r*r+r)];
+            lastVTauStage = &VTauPiece[log2TeamSize*r];
+
+            halfHeightOffsets[teamLevel] += log2TeamSize*2;
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
+            const int sX = lastUHalfHeightsStage[0];
+            const int tX = lastUHalfHeightsStage[1];
+            const int sY = lastVHalfHeightsStage[0];
+            const int tY = lastVHalfHeightsStage[1];
+            minDimX = std::min(sX+tX,r);
+            minDimY = std::min(sY+tY,r);
+
+            X.Resize( minDimX, r );
+            Y.Resize( minDimY, r );
             hmat_tools::Scale( (Scalar)0, X );
+            int offset = 0;
             for( int j=0; j<r; ++j )
+            {
+                const int S = std::min(j+1,sX);
+                const int T = std::min(j+1,tX);
+                const int P = std::min(j+1,sX+tX);
                 std::memcpy
-                ( X.Buffer(0,j), &lastUQRStage[j*j+j], (j+1)*sizeof(Scalar) );
+                ( X.Buffer(0,j), &lastUQRStage[offset], P*sizeof(Scalar) );
+                offset += (S+T) - P;
+            }
+            offset = 0;
             for( int j=0; j<r; ++j )
+            {
+                const int S = std::min(j+1,sY);
+                const int T = std::min(j+1,tY);
+                const int P = std::min(j+1,sY+tY);
                 std::memcpy
-                ( Y.Buffer(0,j), &lastVQRStage[j*j+j], (j+1)*sizeof(Scalar) );
+                ( Y.Buffer(0,j), &lastVQRStage[offset], P*sizeof(Scalar) );
+                offset += (S+T) - P;
+            }
         }
         else if( _inTargetTeam )
         {
+            UHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
-            lastUQRStage = 
-                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
-            lastUTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+
+            lastUHalfHeightsStage = &UHalfHeightsPiece[(log2TeamSize-1)*2];
+            lastUQRStage = &UQRPiece[(log2TeamSize-1)*(r*r+r)];
+            lastUTauStage = &UTauPiece[log2TeamSize*r];
+
+            halfHeightOffsets[teamLevel] += log2TeamSize*2;
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
+            VHalfHeightsPiece = 0;
             VQRPiece = 0;
             VTauPiece = 0;
+            lastVHalfHeightsStage = 0;
             lastVQRStage = 0;
             lastVTauStage = 0;
 
-            const int partner = _sourceRoot + teamRank;
-            const int recvOffset = recvOffsets[partner];
+            const int sX = lastUHalfHeightsStage[0];
+            const int tX = lastUHalfHeightsStage[1];
+            minDimX = std::min(sX+tX,r);
+            X.Resize( minDimX, r );
             hmat_tools::Scale( (Scalar)0, X );
+            int offset = 0;
             for( int j=0; j<r; ++j )
+            {
+                const int S = std::min(j+1,sX);
+                const int T = std::min(j+1,tX);
+                const int P = std::min(j+1,sX+tX);
                 std::memcpy
-                ( X.Buffer(0,j), &lastUQRStage[j*j+j], 
-                  (j+1)*sizeof(Scalar) );
+                ( X.Buffer(0,j), &lastUQRStage[offset], 
+                  P*sizeof(Scalar) );
+                offset += (S+T) - P;
+            }
+
+            // We need to determine minimum dimension of Y. 
+            const int partner = _sourceRoot + teamRank;
+            int recvOffset = recvOffsets[partner];
+            std::memcpy( &minDimY, &recvBuffer[recvOffset], sizeof(int) );
+            recvOffset += sizeof(int);
+
+            Y.Resize( minDimY, r );
+            hmat_tools::Scale( (Scalar)0, Y );
             for( int j=0; j<r; ++j )
+            {
+                const int P = std::min(j+1,minDimY);
                 std::memcpy
-                ( Y.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
-                  (j+1)*sizeof(Scalar) );
-            recvOffsets[partner] += (r*r+r)/2;
+                ( Y.Buffer(0,j), &recvBuffer[recvOffset], P*sizeof(Scalar) );
+                recvOffset += P*sizeof(Scalar);
+            }
+            recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
         else // _inSourceTeam
         {
+            UHalfHeightsPiece = 0;
             UQRPiece = 0;
             UTauPiece = 0;
+            lastUHalfHeightsStage = 0;
             lastUQRStage = 0;
             lastUTauStage = 0;
 
+            VHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             VQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             VTauPiece = &tauBuffer[tauOffsets[teamLevel]];
-            lastVQRStage = 
-                &qrBuffer[qrOffsets[teamLevel]+(log2TeamSize-1)*(r*r+r)];
-            lastVTauStage = &tauBuffer[tauOffsets[teamLevel]+log2TeamSize*r];
+
+            lastVHalfHeightsStage = &VHalfHeightsPiece[(log2TeamSize-1)*2];
+            lastVQRStage = &VQRPiece[(log2TeamSize-1)*(r*r+r)];
+            lastVTauStage = &VTauPiece[log2TeamSize*r];
+
+            halfHeightOffsets[teamLevel] += log2TeamSize*2;
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
-            hmat_tools::Scale( (Scalar)0, X );
+            const int sY = lastUHalfHeightsStage[0];
+            const int tY = lastUHalfHeightsStage[1];
+            minDimY = std::min(sY+tY,r);
+            Y.Resize( minDimY, r );
+            hmat_tools::Scale( (Scalar)0, Y );
+            int offset = 0;
+            for( int j=0; j<r; ++j )
+            {
+                const int P = std::min(j+1,sY+tY);
+                std::memcpy
+                ( Y.Buffer(0,j), &lastVQRStage[offset], P*sizeof(Scalar) );
+                offset += P*sizeof(Scalar);
+            }
+
+            // Unpack the minimum dimension of X
             const int partner = _targetRoot + teamRank;
-            const int recvOffset = recvOffsets[partner];
+            int recvOffset = recvOffsets[partner];
+            std::memcpy( &minDimX, &recvBuffer[recvOffset], sizeof(int) );
+            recvOffset += sizeof(int);
+
+            // Unpack X
+            X.Resize( minDimX, r );
+            hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<r; ++j )
+            {
+                const int P = std::min(j+1,minDimX);
                 std::memcpy
-                ( X.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
-                  (j+1)*sizeof(Scalar) );
-            for( int j=0; j<r; ++j )
-                std::memcpy
-                ( Y.Buffer(0,j), &lastVQRStage[j*j+j], 
-                  (j+1)*sizeof(Scalar) );
-            recvOffsets[partner] += (r*r+r)/2;
+                ( X.Buffer(0,j), &recvBuffer[recvOffset], P*sizeof(Scalar) );
+                recvOffset += P*sizeof(Scalar);
+            }
+            recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
 
-        // Overwrite X with R_U R_V^[T/H]
-        // HERE: Should switch to a gemm
+        // Overwrite Z with R_U R_V^[T/H]
+        Z.Resize( minDimX, minDimY );
         const char option = ( Conjugated ? 'C' : 'T' );
-        blas::Trmm
-        ( 'R', 'U', option, 'N', r, r, 
-          1, Y.LockedBuffer(), Y.LDim(), X.Buffer(), X.LDim() );
+        blas::Gemm
+        ( 'N', option, minDimX, minDimY, r,
+          (Scalar)1, X.LockedBuffer(), X.LDim(),
+                     Y.LockedBuffer(), Y.LDim(),
+          (Scalar)0, Z.Buffer(),       Z.LDim() );
+        const int minDim = std::min( minDimX, minDimY );
 
-        singularValues.resize( r );
-        work.resize( lapack::SVDWorkSize(r,r) );
-        realWork.resize( lapack::SVDRealWorkSize(r,r) );
+        singularValues.resize( minDim );
+        work.resize( lapack::SVDWorkSize(minDimX,minDimY) );
+        realWork.resize( lapack::SVDRealWorkSize(minDimX,minDimY) );
         if( _inTargetTeam && _inSourceTeam )
         {
-            // Perform an SVD on X, overwriting X with the left singular 
+            // Perform an SVD on Z, overwriting Z with the left singular 
             // vectors and Y with the adjoint of the right singular vectors.
+            Y.Resize( minDim, minDimY );
             lapack::SVD
-            ( 'O', 'S', r, r, X.Buffer(), X.LDim(), 
+            ( 'O', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
               &work[0], work.size(), &realWork[0] );
         }
         else if( _inTargetTeam )
         {
-            // Perform an SVD on X, overwriting X with the left singular 
+            // Perform an SVD on Z, overwriting it with the left singular 
             // vectors.
             lapack::SVD
-            ( 'O', 'N', r, r, X.Buffer(), X.LDim(), 
+            ( 'O', 'N', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, 0, 1, 
               &work[0], work.size(), &realWork[0] );
         }
         else // _inSourceTeam
         {
-            // Perform an SVD on X, overwriting X with the adjoint of the
-            // right singular vectors. Copy X into Y so that we do not have
-            // to check whether they are in Y or X.
+            // Perform an SVD on Z, overwriting Y with the adjoint of the
+            // right singular vectors. 
+            Y.Resize( minDim, minDimY );
             lapack::SVD
-            ( 'N', 'O', r, r, X.Buffer(), X.LDim(), 
-              &singularValues[0], 0, 1, 0, 1, 
+            ( 'N', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
+              &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
               &work[0], work.size(), &realWork[0] );
-            hmat_tools::Copy( X, Y );
         }
 
         const int maxRank = MaxRank();
-        Z.Resize( 2*r, maxRank );
         DF.rank = maxRank;
         if( _inTargetTeam )
         {
             // Form the compressed local portion of U.
 
             // Copy the first maxRank singular vectors, scaled by the singular 
-            // values, into the top of the Z buffer
-            hmat_tools::Scale( (Scalar)0, Z );
+            // values, into the top of the X buffer
+            const int sLast = lastUHalfHeightsStage[0];
+            const int tLast = lastUHalfHeightsStage[1];
+            X.Resize( sLast+tLast, maxRank );
+            hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<maxRank; ++j )
             {
                 const Real sigma = singularValues[j];
-                const Scalar* XCol = X.LockedBuffer(0,j);
-                Scalar* ZCol = Z.Buffer(0,j);
-                for( int i=0; i<r; ++i )
-                    ZCol[i] = sigma*XCol[i];
+                const Scalar* ZCol = Z.LockedBuffer(0,j);
+                Scalar* XCol = X.Buffer(0,j);
+                for( int i=0; i<minDimX; ++i )
+                    XCol[i] = sigma*ZCol[i];
             }
 
             // Backtransform the last stage
             work.resize( r );
             hmat_tools::ApplyPackedQFromLeft
-            ( r, r, r, lastUQRStage, lastUTauStage, Z, &work[0] );
+            ( r, sLast, tLast, lastUQRStage, lastUTauStage, X, &work[0] );
 
-            // Backtransform using the middle stages
+            // Backtransform using the middle stages.
+            // We know that the height cannot increase as we move backwards
+            // (except for at the original stage)
+            int sPrev=sLast, tPrev=tLast;
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
             {
-                const bool rootOfLastStage = !(teamRank & (1u<<(commStage+1)));
-                if( rootOfLastStage )
+                const int sCurr = UHalfHeightsPiece[commStage*2];
+                const int tCurr = UHalfHeightsPiece[commStage*2+1];
+#ifndef RELEASE
+                if( sCurr+tCurr > sPrev+tPrev )
+                    throw std::logic_error("Height increased for ULocal side");
+#endif
+
+                const bool rootOfPrevStage = !(teamRank & (1u<<(commStage+1)));
+                if( rootOfPrevStage )
                 {
-                    // Zero the bottom half of Z 
+                    // Zero the bottom part of X 
                     for( int j=0; j<maxRank; ++j )
-                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memset
+                        ( X.Buffer(sCurr,j), 0, tCurr*sizeof(Scalar) );
                 }
                 else
                 {
-                    // Move the bottom half to the top half and zero the bottom
+                    // Move the bottom part to the top part and zero the bottom
                     for( int j=0; j<maxRank; ++j )
                     {
                         std::memcpy
-                        ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
-                          r*sizeof(Scalar) );
-                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        ( X.Buffer(0,j), X.LockedBuffer(sCurr,j), 
+                          tCurr*sizeof(Scalar) );
+                        std::memset
+                        ( X.Buffer(sCurr,j), 0, tCurr*sizeof(Scalar) );
                     }
                 }
                 hmat_tools::ApplyPackedQFromLeft
-                ( r, r, r, &UQRPiece[commStage*(r*r+r)],
-                  &UTauPiece[(commStage+1)*r], Z, &work[0] );
+                ( r, sCurr, tCurr, &UQRPiece[commStage*(r*r+r)],
+                  &UTauPiece[(commStage+1)*r], X, &work[0] );
+
+                sPrev = sCurr;
+                tPrev = tCurr;
             }
 
             // Backtransform using the original stage
             const int m = DF.ULocal.Height();
-            const int minDim = std::min( m, r );
-            hmat_tools::Copy( DF.ULocal, X );
+            hmat_tools::Copy( DF.ULocal, Z );
             DF.ULocal.Resize( m, maxRank );
             hmat_tools::Scale( (Scalar)0, DF.ULocal );
-            const bool rootOfLastStage = !(teamRank & 0x1);
-            if( rootOfLastStage )
+            const bool rootOfPrevStage = !(teamRank & 0x1);
+            if( rootOfPrevStage )
             {
-                // Copy the first minDim rows of the top half of Z into the 
+                // Copy the first sPrev rows of the top part of X into the 
                 // top of ULocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.ULocal.Buffer(0,j), Z.LockedBuffer(0,j),
-                      minDim*sizeof(Scalar) );
+                    ( DF.ULocal.Buffer(0,j), X.LockedBuffer(0,j),
+                      sPrev*sizeof(Scalar) );
             }
             else
             {
-                // Copy the first minDim rows of the bottom half of Z into
+                // Copy the first tPrev rows of the bottom part of X into
                 // the top of ULocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.ULocal.Buffer(0,j), Z.LockedBuffer(0,j),
-                      minDim*sizeof(Scalar) );
+                    ( DF.ULocal.Buffer(0,j), X.LockedBuffer(sPrev,j),
+                      tPrev*sizeof(Scalar) );
             }
             work.resize( lapack::ApplyQWorkSize('L',m,maxRank) );
+            const int minDim = std::min( m, maxRank );
             lapack::ApplyQ
             ( 'L', 'N', m, maxRank, minDim, 
-              X.LockedBuffer(), X.LDim(), &UTauPiece[0],
+              Z.LockedBuffer(), Z.LDim(), &UTauPiece[0],
               DF.ULocal.Buffer(), DF.ULocal.LDim(),  
               &work[0], work.size() );
         }
@@ -2193,86 +2340,101 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             // Form the compressed local portion of V.
 
             // Copy the first maxRank right singular vectors into the top of
-            // the Z buffer
-            hmat_tools::Scale( (Scalar)0, Z );
+            // the X buffer
+            const int sLast = lastVHalfHeightsStage[0];
+            const int tLast = lastVHalfHeightsStage[1];
+            X.Resize( sLast+tLast, maxRank );
+            hmat_tools::Scale( (Scalar)0, X );
             for( int j=0; j<maxRank; ++j )
             {
                 const Scalar* YRow = Y.LockedBuffer(j,0);
                 const int YLDim = Y.LDim();
-                Scalar* ZCol = Z.Buffer(0,j);
+                Scalar* XCol = X.Buffer(0,j);
                 if( Conjugated )
-                    for( int i=0; i<r; ++i )
-                        ZCol[i] = Conj(YRow[i*YLDim]);
+                    for( int i=0; i<minDimY; ++i )
+                        XCol[i] = Conj(YRow[i*YLDim]);
                 else
-                    for( int i=0; i<r; ++i )
-                        ZCol[i] = YRow[i*YLDim];
+                    for( int i=0; i<minDimY; ++i )
+                        XCol[i] = YRow[i*YLDim];
             }
 
             // Backtransform the last stage
             work.resize( r );
             hmat_tools::ApplyPackedQFromLeft
-            ( r, r, r, lastVQRStage, lastVTauStage, Z, &work[0] );
+            ( r, sLast, tLast, lastVQRStage, lastVTauStage, X, &work[0] );
 
-            // Backtransform using the middle stages
+            // Backtransform using the middle stages.
+            // We know that the height cannot increase as we move backwards
+            // (except for the original stage)
+            int sPrev=sLast, tPrev=tLast;
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
             {
-                const bool rootOfLastStage = !(teamRank & (1u<<(commStage+1)));
-                if( rootOfLastStage )
+                const int sCurr = VHalfHeightsPiece[commStage*2];
+                const int tCurr = VHalfHeightsPiece[commStage*2+1];
+#ifndef RELEASE
+                if( sCurr+tCurr > sPrev+tPrev )
+                    throw std::logic_error("Height increased for VLocal side");
+#endif
+                const bool rootOfPrevStage = !(teamRank & (1u<<(commStage+1)));
+                if( rootOfPrevStage )
                 {
-                    // Zero the bottom half of Z 
+                    // Zero the bottom part of X
                     for( int j=0; j<maxRank; ++j )
-                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        std::memset
+                        ( X.Buffer(sCurr,j), 0, tCurr*sizeof(Scalar) );
                 }
                 else
                 {
-                    // Move the bottom half to the top half and zero the bottom
+                    // Move the bottom part to the top part and zero the bottom
                     for( int j=0; j<maxRank; ++j )
                     {
                         std::memcpy
-                        ( Z.Buffer(0,j), Z.LockedBuffer(r,j), 
-                          r*sizeof(Scalar) );
-                        std::memset( Z.Buffer(r,j), 0, r*sizeof(Scalar) );
+                        ( X.Buffer(0,j), X.LockedBuffer(sCurr,j), 
+                          tCurr*sizeof(Scalar) );
+                        std::memset
+                        ( X.Buffer(sCurr,j), 0, tCurr*sizeof(Scalar) );
                     }
                 }
                 hmat_tools::ApplyPackedQFromLeft
-                ( r, r, r, &VQRPiece[commStage*(r*r+r)],
-                  &VTauPiece[(commStage+1)*r], Z, &work[0] );
+                ( r, sCurr, tCurr, &VQRPiece[commStage*(r*r+r)],
+                  &VTauPiece[(commStage+1)*r], X, &work[0] );
+
+                sPrev = sCurr;
+                tPrev = tCurr;
             }
 
             // Backtransform using the original stage
             const int n = DF.VLocal.Height();
-            const int minDim = std::min( n, r );
-            Dense<Scalar> VLocalCopy;
-            hmat_tools::Copy( DF.VLocal, X );
+            hmat_tools::Copy( DF.VLocal, Z );
             DF.VLocal.Resize( n, maxRank );
             hmat_tools::Scale( (Scalar)0, DF.VLocal );
-            const bool rootOfLastStage = !(teamRank & 0x1);
-            if( rootOfLastStage )
+            const bool rootOfPrevStage = !(teamRank & 0x1);
+            if( rootOfPrevStage )
             {
-                // Copy the first minDim rows of the top half of Z into the 
+                // Copy the first sPrev rows of the top part of X into the 
                 // top of VLocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.VLocal.Buffer(0,j), Z.LockedBuffer(0,j),
-                      minDim*sizeof(Scalar) );
+                    ( DF.VLocal.Buffer(0,j), X.LockedBuffer(0,j),
+                      sPrev*sizeof(Scalar) );
             }
             else
             {
-                // Copy the first minDim rows of the bottom half of Z into
+                // Copy the first tPrev rows of the bottom part of X into
                 // the top of VLocal
                 for( int j=0; j<maxRank; ++j )
                     std::memcpy
-                    ( DF.VLocal.Buffer(0,j), Z.LockedBuffer(0,j),
-                      minDim*sizeof(Scalar) );
+                    ( DF.VLocal.Buffer(0,j), X.LockedBuffer(sPrev,j),
+                      tPrev*sizeof(Scalar) );
             }
             work.resize( lapack::ApplyQWorkSize('L',n,maxRank) );
+            const int minDim = std::min( n, maxRank );
             lapack::ApplyQ
             ( 'L', 'N', n, maxRank, minDim, 
-              X.LockedBuffer(), X.LDim(), &VTauPiece[0],
+              Z.LockedBuffer(), Z.LDim(), &VTauPiece[0],
               DF.VLocal.Buffer(), DF.VLocal.LDim(),  
               &work[0], work.size() );
         }
-        */
         break;
     }
     case SPLIT_LOW_RANK:
@@ -2295,7 +2457,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             if( _inTargetTeam )
             {
                 hmat_tools::Scale( (Scalar)0, X );
-                const int recvOffset = recvOffsets[_sourceRoot];
                 for( int j=0; j<minDimU; ++j )
                     std::memcpy
                     ( X.Buffer(0,j), SF.D.LockedBuffer(0,j), 
@@ -2305,34 +2466,49 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     ( X.Buffer(0,j), SF.D.LockedBuffer(0,j),
                       minDimU*sizeof(Scalar) );
 
+                int recvOffset = recvOffsets[_sourceRoot];
                 hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<minDimV; ++j )
+                {
                     std::memcpy
-                    ( Y.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                    ( Y.Buffer(0,j), &recvBuffer[recvOffset], 
                       (j+1)*sizeof(Scalar) );
+                    recvOffset += (j+1)*sizeof(Scalar);
+                }
                 for( int j=minDimV; j<r; ++j )
+                {
                     std::memcpy
-                    ( Y.Buffer(0,j), 
-                      &recvBuffer[recvOffset+(minDimV*minDimV+minDimV)/2+
-                                  (j-minDimV)*minDimV], 
+                    ( Y.Buffer(0,j), &recvBuffer[recvOffset],
                       minDimV*sizeof(Scalar) );
-                recvOffsets[_sourceRoot] += 
+                    recvOffset += minDimV*sizeof(Scalar);
+                }
+
+                const int packedVSize = 
                     (minDimV*minDimV+minDimV)/2 + (r-minDimV)*minDimV;
+                recvOffsets[_sourceRoot] += packedVSize*sizeof(Scalar);
             }
             else // _inSourceTeam
             {
                 hmat_tools::Scale( (Scalar)0, X );
-                const int recvOffset = recvOffsets[_targetRoot];
+                int recvOffset = recvOffsets[_targetRoot];
                 for( int j=0; j<minDimU; ++j )
+                {
                     std::memcpy
-                    ( X.Buffer(0,j), &recvBuffer[recvOffset+(j*j+j)/2], 
+                    ( X.Buffer(0,j), &recvBuffer[recvOffset], 
                       (j+1)*sizeof(Scalar) );
+                    recvOffset += (j+1)*sizeof(Scalar);
+                }
                 for( int j=minDimU; j<r; ++j )
+                {
                     std::memcpy
-                    ( X.Buffer(0,j),
-                      &recvBuffer[recvOffset+(minDimU*minDimU+minDimU)/2+
-                                  (j-minDimU)*minDimU],
+                    ( X.Buffer(0,j), &recvBuffer[recvOffset],
                       minDimU*sizeof(Scalar) );
+                    recvOffset += minDimU*sizeof(Scalar);
+                }
+
+                const int packedUSize = 
+                    (minDimU*minDimU+minDimU)/2 + (r-minDimU)*minDimU;
+                recvOffsets[_targetRoot] += packedUSize*sizeof(Scalar);
 
                 hmat_tools::Scale( (Scalar)0, Y );
                 for( int j=0; j<minDimV; ++j )
@@ -2343,11 +2519,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     std::memcpy
                     ( Y.Buffer(0,j), SF.D.LockedBuffer(0,j),
                       minDimV*sizeof(Scalar) );
-                recvOffsets[_targetRoot] += 
-                    (minDimU*minDimU+minDimU)/2 + (r-minDimU)*minDimU;
             }
 
-            // Overwrite X with R_U R_V^[T/H]
+            // Overwrite Z with R_U R_V^[T/H]
             Z.Resize( minDimU, minDimV );
             const char option = ( Conjugated ? 'C' : 'T' );
             blas::Gemm
@@ -2446,18 +2620,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 int recvOffset = recvOffsets[_sourceRoot];
                 X.Resize( n, r );
                 for( int j=0; j<r; ++j )
+                {
                     std::memcpy
-                    ( X.Buffer(0,j), &recvBuffer[recvOffset+j*n], 
+                    ( X.Buffer(0,j), &recvBuffer[recvOffset], 
                       n*sizeof(Scalar) );
-                recvOffset += n*r;
+                    recvOffset += n*sizeof(Scalar);
+                }
 
                 // Unpack the dense update
                 Z.Resize( m, n );
                 for( int j=0; j<n; ++j )
+                {
                     std::memcpy
-                    ( Z.Buffer(0,j), &recvBuffer[recvOffset+j*m],
+                    ( Z.Buffer(0,j), &recvBuffer[recvOffset],
                       m*sizeof(Scalar) );
-                recvOffsets[_sourceRoot] += n*r + m*n;
+                    recvOffset += m*sizeof(Scalar);
+                }
+                recvOffsets[_sourceRoot] += (n*r + m*n)*sizeof(Scalar);
 
                 // Add U V^[T/H] onto the dense update
                 const char option = ( Conjugated ? 'C' : 'T' );
@@ -2516,12 +2695,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 // Add U V^[T/H] onto the dense update
                 const char option = ( Conjugated ? 'C' : 'T' );
                 int recvOffset = recvOffsets[_targetRoot];
+                const Scalar* UBuffer = (const Scalar*)&recvBuffer[recvOffset];
                 blas::Gemm
                 ( 'N', option, m, n, r, 
-                  (Scalar)1, &recvBuffer[recvOffset], m,
-                             SF.D.LockedBuffer(),     SF.D.LDim(),
-                  (Scalar)1, _D.Buffer(),             _D.LDim() );
-                recvOffsets[_targetRoot] += m*r;
+                  (Scalar)1, UBuffer,             m,
+                             SF.D.LockedBuffer(), SF.D.LDim(),
+                  (Scalar)1, _D.Buffer(),         _D.LDim() );
+                recvOffsets[_targetRoot] += m*r*sizeof(Scalar);
 
                 if( minDim <= maxRank )
                 {
@@ -2784,12 +2964,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
             // Add U V^[T/H] onto our dense matrix
             const char option = ( Conjugated ? 'C' : 'T' );
+            const Scalar* UBuffer = 
+                (const Scalar*)&recvBuffer[recvOffsets[_targetRoot]];
             blas::Gemm
             ( 'N', option, m, n, r,
-              (Scalar)1, &recvBuffer[recvOffsets[_targetRoot]], m,
-                         V.LockedBuffer(),                      V.LDim(),
-              (Scalar)1, SD.D.Buffer(),                         SD.D.LDim() );
-            recvOffsets[_targetRoot] += m*r;
+              (Scalar)1, UBuffer,          m,
+                         V.LockedBuffer(), V.LDim(),
+              (Scalar)1, SD.D.Buffer(),    SD.D.LDim() );
+            recvOffsets[_targetRoot] += m*r*sizeof(Scalar);
 
             _VMap.Clear();
         }
