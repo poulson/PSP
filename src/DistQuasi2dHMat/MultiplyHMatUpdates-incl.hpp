@@ -131,6 +131,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
           halfHeights, halfHeightOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
 
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream os;
+    os << "out_" << commRank << ".dat";
+    std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
+
     // Start the non-blocking sends
     MPI_Comm comm = _teams->Team( 0 );
     const int numSends = sendSizes.size();
@@ -139,6 +144,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
         const int dest = it->first;
+        file << commRank << " sending " << sendSizes[dest] << " to "
+             << dest << std::endl;
         mpi::ISend
         ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
           comm, sendRequests[offset++] );
@@ -152,6 +159,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
     {
         const int source = it->first;
+        file << commRank << " recving " << recvSizes[source] << " from "
+             << source << std::endl;
         mpi::IRecv
         ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
           comm, recvRequests[offset++] );
@@ -160,6 +169,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     // Unpack as soon as we have received our data
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
+
+    mpi::Barrier( MPI_COMM_WORLD );
+    file << "Finished receiving" << std::endl;
 
     Dense<Scalar> X, Y, Z;
     std::vector<Real> singularValues, realWork;
@@ -1891,27 +1903,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
             break;
 
         const int teamRank = mpi::CommRank( _teams->Team(_level) );
+        const int exchangeSize = sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         if( _inTargetTeam )
         {
-            AddToMap
-            ( sendSizes, _sourceRoot+teamRank, sizeof(int) );
-            AddToMap
-            ( recvSizes, _sourceRoot+teamRank, sizeof(int) );
-            AddToMap
-            ( sendSizes, _sourceRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
-            AddToMap
-            ( recvSizes, _sourceRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
+            AddToMap( sendSizes, _sourceRoot+teamRank, exchangeSize );
+            AddToMap( recvSizes, _sourceRoot+teamRank, exchangeSize );
         }
         else
         {
-            AddToMap
-            ( sendSizes, _targetRoot+teamRank, sizeof(int) );
-            AddToMap
-            ( recvSizes, _targetRoot+teamRank, sizeof(int) );
-            AddToMap
-            ( sendSizes, _targetRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
-            AddToMap
-            ( recvSizes, _targetRoot+teamRank, (r*r+r)/2*sizeof(Scalar) );
+            AddToMap( sendSizes, _targetRoot+teamRank, exchangeSize );
+            AddToMap( recvSizes, _targetRoot+teamRank, exchangeSize );
         }
         break;
     }
@@ -2038,7 +2039,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         const unsigned log2TeamSize = Log2( teamSize );
         if( _inTargetTeam && _inSourceTeam )
         {
-            halfHeightOffsets[teamLevel] += log2TeamSize*2;
+            halfHeightOffsets[teamLevel] += 2*log2TeamSize*2;
             qrOffsets[teamLevel] += 2*log2TeamSize*(r*r+r);
             break;
         }
@@ -2067,8 +2068,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         ( os.str().c_str(), std::ios::out | std::ios::app );
 
         file << "\ns=" << s << ", t=" << t << "\n";
+        std::ostringstream os_send;
+        os_send << "Before send to " << partner;
         hmat_tools::PrintPacked
-        ( file, "Before send", r, s, t, lastQRStage );
+        ( file, os_send.str(), r, s, t, lastQRStage );
 
         int offset = 0;
         for( int j=0; j<r; ++j )
@@ -2250,6 +2253,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         int minDimX, minDimY;
         if( _inTargetTeam && _inSourceTeam )
         {
+            file << "in both teams" << std::endl;
+
             UHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
@@ -2280,6 +2285,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int tY = lastVHalfHeightsStage[1];
             minDimX = std::min(sX+tX,r);
             minDimY = std::min(sY+tY,r);
+
+            file << "sX=" << sX << ", tX=" << tX << ", minDimX=" << minDimX << "\n"
+                 << "sY=" << sY << ", tY=" << tY << ", minDimY=" << minDimY 
+                 << std::endl;
 
             X.Resize( minDimX, r );
             hmat_tools::Scale( (Scalar)0, X );
@@ -2314,6 +2323,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         }
         else if( _inTargetTeam )
         {
+            file << "Just in target team" << std::endl;
+
             UHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
@@ -2336,6 +2347,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int sX = lastUHalfHeightsStage[0];
             const int tX = lastUHalfHeightsStage[1];
             minDimX = std::min(sX+tX,r);
+            
+            file << "sX=" << sX << ", tX=" << tX << ", minDimX=" << minDimX 
+                 << std::endl;
+
             X.Resize( minDimX, r );
             hmat_tools::Scale( (Scalar)0, X );
             int offset = 0;
@@ -2356,6 +2371,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int partner = _sourceRoot + teamRank;
             int recvOffset = recvOffsets[partner];
             std::memcpy( &minDimY, &recvBuffer[recvOffset], sizeof(int) );
+            file << "Unpacked minDimY as " << minDimY << std::endl;
             recvOffset += sizeof(int);
 
             Y.Resize( minDimY, r );
@@ -2368,11 +2384,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 recvOffset += P*sizeof(Scalar);
             }
             file << "\nminDimY=" << minDimY << "\n";
-            Y.Print( file, "unpacked Y" );
+            std::ostringstream os_recv;
+            os_recv << "Recv'd from " << partner;
+            Y.Print( file, os_recv.str() );
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
         else // _inSourceTeam
         {
+            file << "Just in source team" << std::endl;
+
             UHalfHeightsPiece = 0;
             UQRPiece = 0;
             UTauPiece = 0;
@@ -2392,9 +2412,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
 
-            const int sY = lastUHalfHeightsStage[0];
-            const int tY = lastUHalfHeightsStage[1];
+            const int sY = lastVHalfHeightsStage[0];
+            const int tY = lastVHalfHeightsStage[1];
             minDimY = std::min(sY+tY,r);
+
+            file << "sY=" << sY << ", tY=" << tY << ", minDimY=" << minDimY 
+                 << std::endl;
+
             Y.Resize( minDimY, r );
             hmat_tools::Scale( (Scalar)0, Y );
             int offset = 0;
@@ -2414,6 +2438,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int partner = _targetRoot + teamRank;
             int recvOffset = recvOffsets[partner];
             std::memcpy( &minDimX, &recvBuffer[recvOffset], sizeof(int) );
+            file << "Unpacked minDimX as " << minDimX << std::endl;
             recvOffset += sizeof(int);
 
             // Unpack X
@@ -2427,7 +2452,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 recvOffset += P*sizeof(Scalar);
             }
             file << "\nminDimX=" << minDimX << "\n";
-            X.Print( file, "unpacked X QR" );
+            std::ostringstream os_recv;
+            os_recv << "Recv'd from " << partner;
+            X.Print( file, os_recv.str() );
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
 
