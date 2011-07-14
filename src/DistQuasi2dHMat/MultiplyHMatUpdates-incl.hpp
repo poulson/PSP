@@ -1136,6 +1136,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
         const int log2TeamSize = Log2( teamSize );
         const unsigned teamLevel = _teams->TeamLevel(_level);
 
+        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+
         if( _inTargetTeam )
         {
             Dense<Scalar>& ULocal = DF.ULocal;
@@ -1144,10 +1146,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             if( r <= MaxRank() )
                 break;
 
+            std::ostringstream os;
+            os << "out_" << commRank << ".dat";
+            std::ofstream file
+            ( os.str().c_str(), std::ios::out | std::ios::app );
+
+            ULocal.Print( file, "ULocal before QR" );
+
             lapack::QR
             ( m, r, ULocal.Buffer(), ULocal.LDim(), 
               &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+
+            ULocal.Print( file, "ULocal after QR" );
         }
         if( _inSourceTeam )
         {
@@ -1157,10 +1168,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             if( r <= MaxRank() )
                 break;
 
+            std::ostringstream os;
+            os << "out_" << commRank << ".dat";
+            std::ofstream file
+            ( os.str().c_str(), std::ios::out | std::ios::app );
+
+            VLocal.Print( file, "VLocal before QR" );
+
             lapack::QR
             ( n, r, VLocal.Buffer(), VLocal.LDim(), 
               &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+
+            VLocal.Print( file, "VLocal after QR" );
         }
         break;
     }
@@ -1233,20 +1253,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
 #endif
     const int numTeamLevels = _teams->NumLevels();
     const int numSteps = numTeamLevels-1;
+
+    int passes = 0;
     for( int step=0; step<numSteps; ++step )
     {
-        MPI_Comm team = _teams->Team( step );
+        MPI_Comm team = _teams->Team( (numTeamLevels-1)-(step+1) );
         const int teamSize = mpi::CommSize( team );
         const unsigned teamRank = mpi::CommRank( team );
-        const bool haveAnotherComm = ( step < numSteps-1 );
-        // only valid result if we have a next step...
-        const bool rootOfNextStep = !(teamRank & 0x4);
-        const int passes = 2*step;
 
         // Flip the first bit of our rank in this team to get our partner,
         // and then check if our bit is 0 to see if we're the root
-        const unsigned firstPartner = teamRank ^ 0x1;
-        const unsigned firstRoot = !(teamRank & 0x1);
+        const unsigned firstPartner = teamRank ^ (1u << passes);
+        const unsigned firstRoot = !(teamRank & (1u << passes));
 
         // Compute the total message size for this step:
         //   The # of bytes for an int and (r*r+r)/2 scalars.
@@ -1261,6 +1279,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
             }
         }
         std::vector<byte> sendBuffer( msgSize ), recvBuffer( msgSize );
+
+        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+        std::ostringstream os;
+        os << "out_" << commRank << ".dat";
+        std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
 
         // Pack the messages for the firstPartner
         byte* sendHead = &sendBuffer[0];
@@ -1292,9 +1315,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
 
                     // Copy our R out of X
                     for( int j=0; j<r; ++j )
-                        Write
-                        ( sendHead, X.LockedBuffer(0,j), 
-                          std::min(j+1,localHeight) );
+                    {
+                        const int P = std::min(j+1,localHeight);
+                        Write( sendHead, X.LockedBuffer(0,j), P );
+                    }
                 }
                 else
                 {
@@ -1309,16 +1333,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     int qrOffset = qrPieceOffset + (passes-1)*(r*r+r);
                     for( int j=0; j<r; ++j )
                     {
-                        Write
-                        ( sendHead, &qrLevel[qrOffset],
-                          std::min(j+1,localHeight) );
-                        qrOffset += std::min(j+1,localHeight);
+                        const int P = std::min(j+1,localHeight);
+                        Write( sendHead, &qrLevel[qrOffset], P );
+                        qrOffset += P;
                     }
                 }
-                // Move past the padding for this piece
-                const int trunc = r-std::min(localHeight,r);
-                sendHead += (trunc*trunc+trunc)/2*sizeof(Scalar);
+                file << "Wrote localHeight=" << localHeight << std::endl;
+
+                // Move past the padding for this send piece
+                if( localHeight < r )
+                {
+                    const int sendTrunc = r - localHeight;
+                    sendHead += 
+                        (sendTrunc*sendTrunc+sendTrunc)/2*sizeof(Scalar);
+                }
                 
+                // Advance our index to the next send piece
                 qrPieceOffset += log2ParentTeamSize*(r*r+r);
             }
         }
@@ -1328,12 +1358,192 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         ( &sendBuffer[0], msgSize, firstPartner, 0,
           &recvBuffer[0], msgSize, firstPartner, 0, team );
 
-        if( teamSize == 4 )
+        if( teamSize == 2 )
+        {
+            // Unpack the recv messages, perform the QR factorizations, and
+            // store the local height for the next step if there is one
+            const byte* recvHead = &recvBuffer[0];
+            for( int l=0; l<numSteps-step; ++l )
+            {
+                MPI_Comm parentTeam = _teams->Team(l);
+                const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
+                const Dense<Scalar>* const* XLevel = &Xs[XOffsets[l]];
+                Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
+                Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
+                int* halfHeightLevel = &halfHeights[halfHeightOffsets[l]];
+
+                int qrPieceOffset=0, tauPieceOffset=0;
+                for( int k=0; k<numQRs[l]; ++k )
+                {
+                    const Dense<Scalar>& X = *XLevel[k];
+                    const int r = X.Width();
+                    const int halfHeightOffset = 
+                        (k*log2ParentTeamSize+passes)*2;
+
+                    int s, t;
+                    int qrOffset = qrPieceOffset + passes*(r*r+r);
+                    if( step == 0 )
+                    {
+                        if( firstRoot )
+                        {
+                            s = halfHeightLevel[halfHeightOffset];
+                            t = Read<int>( recvHead );
+                            halfHeightLevel[halfHeightOffset+1] = t;
+                            file << "Read t=" << t << ", had s=" << s 
+                                 << " from first teamSize=2 recv with " 
+                                 << "l=" << l << ", step=" << step << std::endl;
+                            for( int j=0; j<r; ++j )
+                            {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+
+                                // Read column strip from X    
+                                std::memcpy
+                                ( &qrLevel[qrOffset], X.LockedBuffer(0,j),
+                                  S*sizeof(Scalar) );
+                                qrOffset += S;
+
+                                // Read column strip from recvBuffer
+                                Read( &qrLevel[qrOffset], recvHead, T );
+                                qrOffset += T;
+                            }
+                        }
+                        else
+                        {
+                            s = Read<int>( recvHead );
+                            t = halfHeightLevel[halfHeightOffset+1];
+                            halfHeightLevel[halfHeightOffset] = s;
+                            file << "Read s=" << s << ", had t=" << t 
+                                 << " from first teamSize=2 recv with" 
+                                 << "l=" << l << ", step=" << step << std::endl;
+                            for( int j=0; j<r; ++j )
+                            {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+
+                                // Read column strip from recvBuffer
+                                Read( &qrLevel[qrOffset], recvHead, S );
+                                qrOffset += S;
+
+                                // Read column strip from X
+                                std::memcpy
+                                ( &qrLevel[qrOffset], X.LockedBuffer(0,j),
+                                  T*sizeof(Scalar) );
+                                qrOffset += T;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        int qrLastOffset = qrPieceOffset + (passes-1)*(r*r+r);
+                        const int sLast = halfHeightLevel[halfHeightOffset-2];
+                        const int tLast = halfHeightLevel[halfHeightOffset-1];
+                        file << "Recalled sLast=" << sLast 
+                             << ", tLast=" << tLast 
+                             << " from first teamSize=2 recv with " 
+                             << "l=" << l << ", step=" << step << std::endl;
+                        if( firstRoot )
+                        {
+                            s = halfHeightLevel[halfHeightOffset];
+                            t = Read<int>( recvHead );
+                            halfHeightLevel[halfHeightOffset+1] = t;
+                            file << "Read t=" << t << ", had s=" << s 
+                                 << " from first teamSize=2 recv with " 
+                                 << "l=" << l << ", step=" << step << std::endl;
+                            for( int j=0; j<r; ++j )
+                            {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+                                const int SLast = std::min(j+1,sLast);
+                                const int TLast = std::min(j+1,tLast);
+
+                                // Read column strip from last qrBuffer
+                                std::memcpy
+                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                                  S*sizeof(Scalar) );
+                                qrOffset += S;
+                                qrLastOffset += SLast + TLast;
+
+                                // Read column strip from recvBuffer
+                                Read( &qrLevel[qrOffset], recvHead, T );
+                                qrOffset += T;
+                            }
+                        }
+                        else
+                        {
+                            s = Read<int>( recvHead );
+                            t = halfHeightLevel[halfHeightOffset+1];
+                            halfHeightLevel[halfHeightOffset] = s;
+                            file << "Read s=" << s << ", had t=" << t 
+                                 << " from first teamSize=2 recv with "
+                                 << "l=" << l << ", step=" << step << std::endl;
+                            for( int j=0; j<r; ++j )
+                            {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+                                const int SLast = std::min(j+1,sLast);
+                                const int TLast = std::min(j+1,tLast);
+
+                                // Read column strip from recvBuffer
+                                Read( &qrLevel[qrOffset], recvHead, S );
+                                qrOffset += S;
+
+                                // Read column strip from last qrBuffer
+                                std::memcpy
+                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                                  T*sizeof(Scalar) );
+                                qrOffset += T;
+                                qrLastOffset += SLast + TLast;
+                            }
+                        }
+                    }
+                    // Move past the padding for this recv piece
+                    const int recvTrunc = 
+                        ( firstRoot ? r-std::min(t,r) : r-std::min(s,r) );
+                    recvHead += 
+                        (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
+                    
+                    file << "\ns=" << s << ", t=" << t << "\n";
+                    hmat_tools::PrintPacked
+                    ( file, "Before PackedQR", 
+                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
+                    file << "\n";
+
+                    hmat_tools::PackedQR
+                    ( r, s, t, 
+                      &qrLevel[qrPieceOffset+passes*(r*r+r)],
+                      &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
+
+                    hmat_tools::PrintPacked
+                    ( file, "After PackedQR", 
+                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
+                    file << "\n";
+
+                    const bool haveAnotherComm = ( l+1 < numSteps-step );
+                    if( haveAnotherComm )
+                    {
+                        const int minDim = std::min(s+t,r);
+                        const bool rootOfNextStep = 
+                            !(teamRank & (1u<<(passes+1)));
+                        if( rootOfNextStep )
+                            halfHeightLevel[halfHeightOffset+2] = minDim;
+                        else
+                            halfHeightLevel[halfHeightOffset+3] = minDim;
+                        file << "Stored minDim=" << minDim << std::endl;
+                    }
+
+                    qrPieceOffset += log2ParentTeamSize*(r*r+r);
+                    tauPieceOffset += (log2ParentTeamSize+1)*r;
+                }
+            }
+            ++passes;
+        }
+        else // teamSize >= 4, so this level splits 4 ways
         {
             // Flip the second bit of our rank in this team to get our partner,
             // and then check if our bit is 0 to see if we're the root
-            const unsigned secondPartner = teamRank ^ 0x2;
-            const bool secondRoot = !(teamRank & 0x2);
+            const unsigned secondPartner = teamRank ^ (1u<<(passes+1));
+            const bool secondRoot = !(teamRank & (1u<<(passes+1)));
 
             // Unpack the recv messages, perform the QR factorizations, and
             // pack the resulting R into the next step and into the next 
@@ -1363,96 +1573,132 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     {
                         if( firstRoot )
                         {
-                            s = halfHeights[halfHeightOffset];
+                            s = halfHeightLevel[halfHeightOffset];
                             t = Read<int>( recvHead );
-                            halfHeights[halfHeightOffset+1] = t;
+                            halfHeightLevel[halfHeightOffset+1] = t;
+                            file << "Read t=" << t << ", had s=" << s 
+                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+
                                 // Read column strip from X    
                                 std::memcpy
                                 ( &qrLevel[qrOffset], X.LockedBuffer(0,j),
-                                  std::min(j+1,s)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,s);
+                                  S*sizeof(Scalar) );
+                                qrOffset += S;
+
                                 // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,t) );
-                                qrOffset += std::min(j+1,t);
+                                Read( &qrLevel[qrOffset], recvHead, T );
+                                qrOffset += T;
                             }
                         }
                         else
                         {
                             s = Read<int>( recvHead );
-                            t = halfHeights[halfHeightOffset+1];
-                            halfHeights[halfHeightOffset] = s;
+                            t = halfHeightLevel[halfHeightOffset+1];
+                            halfHeightLevel[halfHeightOffset] = s;
+                            file << "Read s=" << s << ", had t=" << t 
+                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+
                                 // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,s) );
-                                qrOffset += std::min(j+1,s);
+                                Read( &qrLevel[qrOffset], recvHead, S );
+                                qrOffset += S;
+
                                 // Read column strip from X
                                 std::memcpy
                                 ( &qrLevel[qrOffset], X.LockedBuffer(0,j),
-                                  std::min(j+1,t)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,t);
+                                  T*sizeof(Scalar) );
+                                qrOffset += T;
                             }
                         }
                     }
                     else
                     {
                         int qrLastOffset = qrPieceOffset + (passes-1)*(r*r+r);
-                        const int sLast = halfHeights[halfHeightOffset-2];
-                        const int tLast = halfHeights[halfHeightOffset-1];
+                        const int sLast = halfHeightLevel[halfHeightOffset-2];
+                        const int tLast = halfHeightLevel[halfHeightOffset-1];
+                        file << "sLast=" << sLast 
+                             << ", tLast=" << tLast << " from first tS=4 recv"
+                             << std::endl;
                         if( firstRoot )
                         {
-                            s = halfHeights[halfHeightOffset];
+                            s = halfHeightLevel[halfHeightOffset];
                             t = Read<int>( recvHead );
-                            halfHeights[halfHeightOffset+1] = t;
+                            halfHeightLevel[halfHeightOffset+1] = t;
+                            file << "Read t=" << t << ", had s=" << s 
+                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+                                const int SLast = std::min(j+1,sLast);
+                                const int TLast = std::min(j+1,tLast);
+
                                 // Read column strip from last qrBuffer
                                 std::memcpy
                                 ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
-                                  std::min(j+1,s)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,s);
-                                qrLastOffset += 
-                                    std::min(j+1,sLast)+std::min(j+1,tLast);
+                                  S*sizeof(Scalar) );
+                                qrOffset += S;
+                                qrLastOffset += SLast + TLast;
+
                                 // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,t) );
-                                qrOffset += std::min(j+1,t);
+                                Read( &qrLevel[qrOffset], recvHead, T );
+                                qrOffset += T;
                             }
                         }
                         else
                         {
                             s = Read<int>( recvHead );
-                            t = halfHeights[halfHeightOffset+1];
-                            halfHeights[halfHeightOffset] = s;
+                            t = halfHeightLevel[halfHeightOffset+1];
+                            halfHeightLevel[halfHeightOffset] = s;
+                            file << "Read s=" << s << ", had t=" << t 
+                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
+                                const int S = std::min(j+1,s);
+                                const int T = std::min(j+1,t);
+                                const int SLast = std::min(j+1,sLast);
+                                const int TLast = std::min(j+1,tLast);
+
                                 // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,s) );
-                                qrOffset += std::min(j+1,s);
+                                Read( &qrLevel[qrOffset], recvHead, S );
+                                qrOffset += S;
+
                                 // Read column strip from last qrBuffer
                                 std::memcpy
                                 ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
-                                  std::min(j+1,t)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,t);
-                                qrLastOffset += 
-                                    std::min(j+1,sLast) + std::min(j+1,tLast);
+                                  T*sizeof(Scalar) );
+                                qrOffset += T;
+                                qrLastOffset += SLast + TLast;
                             }
                         }
                     }
+                    // Move past the padding for this recv piece
+                    const int recvTrunc = 
+                        ( firstRoot ? r-std::min(t,r) : r-std::min(s,r) );
+                    recvHead += 
+                        (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
+
+                    file << "\ns=" << s << ", t=" << t << "\n";
+                    hmat_tools::PrintPacked
+                    ( file, "Before PackedQR on 0", 
+                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
                     
                     hmat_tools::PackedQR
                     ( r, s, t, 
                       &qrLevel[qrPieceOffset+passes*(r*r+r)],
                       &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
+
+                    file << "\n";
+                    hmat_tools::PrintPacked
+                    ( file, "After PackedQR on 0", 
+                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
 
                     const int minDim = std::min(s+t,r);
                     Write( sendHead, minDim );
@@ -1460,17 +1706,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         halfHeightLevel[halfHeightOffset+2] = minDim;
                     else
                         halfHeightLevel[halfHeightOffset+3] = minDim;
+                    file << "Wrote minDim=" << minDim << "\n";
                     qrOffset = qrPieceOffset + passes*(r*r+r);
                     for( int j=0; j<r; ++j )
                     {
-                        Write
-                        ( sendHead, &qrLevel[qrOffset], 
-                          std::min(j+1,minDim) );
-                        qrOffset += std::min(j+1,s)+std::min(j+1,t);
+                        const int S = std::min(j+1,s);
+                        const int T = std::min(j+1,t);
+                        const int P = std::min(j+1,s+t);
+                        Write( sendHead, &qrLevel[qrOffset], P );
+                        qrOffset += S + T;
                     }
                     // Move past the send padding
-                    const int trunc = r-std::min(minDim,r);
-                    sendHead += (trunc*trunc+trunc)/2*sizeof(Scalar);
+                    const int sendTrunc = r-std::min(minDim,r);
+                    sendHead += 
+                        (sendTrunc*sendTrunc+sendTrunc)/2*sizeof(Scalar);
 
                     qrPieceOffset += log2ParentTeamSize*(r*r+r);
                     tauPieceOffset += (log2ParentTeamSize+1)*r;
@@ -1507,24 +1756,32 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     int qrLastOffset = qrPieceOffset + passes*(r*r+r);
                     const int sLast = halfHeightLevel[halfHeightOffset-2];
                     const int tLast = halfHeightLevel[halfHeightOffset-1];
+                    file << "Recalled sLast=" << sLast << ", tLast=" << tLast
+                         << " from second teamSize=4 recv" << std::endl;
                     if( secondRoot )
                     {
                         s = halfHeightLevel[halfHeightOffset];
                         t = Read<int>( recvHead );
                         halfHeightLevel[halfHeightOffset+1] = t;
+                        file << "Read t=" << t << ", had s=" << s 
+                             << " from second teamSize=4 recv" << std::endl;
                         for( int j=0; j<r; ++j )
                         {
+                            const int S = std::min(j+1,s);
+                            const int T = std::min(j+1,t);
+                            const int SLast = std::min(j+1,sLast);
+                            const int TLast = std::min(j+1,tLast);
+
                             // Read column strip from last qrBuffer
                             std::memcpy
                             ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
-                              std::min(j+1,s)*sizeof(Scalar) );
-                            qrOffset += std::min(j+1,s);
-                            qrLastOffset += 
-                                std::min(j+1,sLast)+std::min(j+1,tLast);
+                              S*sizeof(Scalar) );
+                            qrOffset += S;
+                            qrLastOffset += SLast + TLast;
+
                             // Read column strip from recvBuffer
-                            Read
-                            ( &qrBuffer[qrOffset], recvHead, std::min(j+1,t) );
-                            qrOffset += std::min(j+1,t);
+                            Read( &qrBuffer[qrOffset], recvHead, T );
+                            qrOffset += T;
                         }
                     }
                     else
@@ -1532,172 +1789,65 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         s = Read<int>( recvHead );
                         t = halfHeightLevel[halfHeightOffset+1];
                         halfHeightLevel[halfHeightOffset] = s;
+                        file << "Read s=" << s << ", had t=" << t 
+                             << " from second teamSize=4 recv" << std::endl;
                         for( int j=0; j<r; ++j )
                         {
+                            const int S = std::min(j+1,s);
+                            const int T = std::min(j+1,t);
+                            const int SLast = std::min(j+1,sLast);
+                            const int TLast = std::min(j+1,tLast);
+
                             // Read column strip from recvBuffer
-                            Read
-                            ( &qrLevel[qrOffset], recvHead, std::min(j+1,s) );
-                            qrOffset += std::min(j+1,s);
+                            Read( &qrLevel[qrOffset], recvHead, S );
+                            qrOffset += S;
+
                             // Read column strip from last qrBuffer
                             std::memcpy
                             ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
-                              std::min(j+1,t)*sizeof(Scalar) );
-                            qrOffset += std::min(j+1,t);
-                            qrLastOffset += 
-                                std::min(j+1,sLast) + std::min(j+1,tLast);
+                              T*sizeof(Scalar) );
+                            qrOffset += T;
+                            qrLastOffset += SLast + TLast;
                         }
                     }
+                    // Move past the padding for this recv piece
+                    const int recvTrunc = 
+                        ( secondRoot ? r-std::min(t,r) : r-std::min(s,r) );
+                    recvHead += 
+                        (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
+
+                    file << "\ns=" << s << ", t=" << t << "\n";
+                    hmat_tools::PrintPacked
+                    ( file, "Before PackedQR", 
+                      r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)] );
 
                     hmat_tools::PackedQR
                     ( r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)], 
                       &tauLevel[tauPieceOffset+(passes+2)*r], &qrWork[0] );
 
+                    file << "\n";
+                    hmat_tools::PrintPacked
+                    ( file, "After PackedQR", 
+                      r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)] );
+
+                    const bool haveAnotherComm = ( l+1 < numSteps-step );
                     if( haveAnotherComm )
                     {
                         const int minDim = std::min(s+t,r);
+                        const bool rootOfNextStep = 
+                            !(teamRank & (1u<<(passes+2)));
                         if( rootOfNextStep )
                             halfHeightLevel[halfHeightOffset+2] = minDim;
                         else
                             halfHeightLevel[halfHeightOffset+3] = minDim;
+                        file << "Stored minDim=" << minDim << std::endl;
                     }
 
                     qrPieceOffset += log2ParentTeamSize*(r*r+r);
                     tauPieceOffset += (log2ParentTeamSize+1)*r;
                 }
             }
-        }
-        else // teamSize == 2
-        {
-            // Unpack the recv messages, perform the QR factorizations, and
-            // store the local height for the next step if there is one
-            const byte* recvHead = &recvBuffer[0];
-            for( int l=0; l<numSteps-step; ++l )
-            {
-                MPI_Comm parentTeam = _teams->Team(l);
-                const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
-                const Dense<Scalar>* const* XLevel = &Xs[XOffsets[l]];
-                Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
-                Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
-                int* halfHeightLevel = &halfHeights[halfHeightOffsets[l]];
-
-                int qrPieceOffset=0, tauPieceOffset=0;
-                for( int k=0; k<numQRs[l]; ++k )
-                {
-                    const Dense<Scalar>& X = *XLevel[k];
-                    const int r = X.Width();
-                    const int halfHeightOffset = 
-                        (k*log2ParentTeamSize+passes)*2;
-
-                    int s, t;
-                    int qrOffset = qrPieceOffset + passes*(r*r+r);
-                    if( step == 0 )
-                    {
-                        if( firstRoot )
-                        {
-                            s = halfHeightLevel[halfHeightOffset];
-                            t = Read<int>( recvHead );
-                            halfHeightLevel[halfHeightOffset+1] = t;
-                            for( int j=0; j<r; ++j )
-                            {
-                                // Read column strip from X    
-                                std::memcpy
-                                ( &qrLevel[qrOffset], X.LockedBuffer(0,j),
-                                  std::min(j+1,s)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,s);
-                                // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,t) );
-                                qrOffset += std::min(j+1,t);
-                            }
-                        }
-                        else
-                        {
-                            s = Read<int>( recvHead );
-                            t = halfHeightLevel[halfHeightOffset+1];
-                            halfHeightLevel[halfHeightOffset] = s;
-                            for( int j=0; j<r; ++j )
-                            {
-                                // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,s) );
-                                qrOffset += std::min(j+1,s);
-                                // Read column strip from X
-                                std::memcpy
-                                ( &qrLevel[qrOffset], X.LockedBuffer(0,j),
-                                  std::min(j+1,t)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,t);
-                            }
-                        }
-                    }
-                    else
-                    {
-                        int qrLastOffset = qrPieceOffset + (passes-1)*(r*r+r);
-                        const int sLast = halfHeightLevel[halfHeightOffset-2];
-                        const int tLast = halfHeightLevel[halfHeightOffset-1];
-                        if( firstRoot )
-                        {
-                            s = halfHeightLevel[halfHeightOffset];
-                            t = Read<int>( recvHead );
-                            halfHeightLevel[halfHeightOffset+1] = t;
-                            for( int j=0; j<r; ++j )
-                            {
-                                // Read column strip from last qrBuffer
-                                std::memcpy
-                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
-                                  std::min(j+1,s)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,s);
-                                qrLastOffset += 
-                                    std::min(j+1,sLast)+std::min(j+1,tLast);
-                                // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,t) );
-                                qrOffset += std::min(j+1,t);
-                            }
-                        }
-                        else
-                        {
-                            s = Read<int>( recvHead );
-                            t = halfHeightLevel[halfHeightOffset+1];
-                            halfHeightLevel[halfHeightOffset] = s;
-                            for( int j=0; j<r; ++j )
-                            {
-                                // Read column strip from recvBuffer
-                                Read
-                                ( &qrLevel[qrOffset], recvHead,
-                                  std::min(j+1,s) );
-                                qrOffset += std::min(j+1,s);
-                                // Read column strip from last qrBuffer
-                                std::memcpy
-                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
-                                  std::min(j+1,t)*sizeof(Scalar) );
-                                qrOffset += std::min(j+1,t);
-                                qrLastOffset += 
-                                    std::min(j+1,sLast) + std::min(j+1,tLast);
-                            }
-                        }
-                    }
-                    
-                    hmat_tools::PackedQR
-                    ( r, s, t, 
-                      &qrLevel[qrPieceOffset+passes*(r*r+r)],
-                      &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
-
-                    if( haveAnotherComm )
-                    {
-                        const int minDim = std::min(s+t,r);
-                        if( rootOfNextStep )
-                            halfHeightLevel[halfHeightOffset+2] = minDim;
-                        else
-                            halfHeightLevel[halfHeightOffset+3] = minDim;
-                    }
-
-                    qrPieceOffset += log2ParentTeamSize*(r*r+r);
-                    tauPieceOffset += (log2ParentTeamSize+1)*r;
-                }
-            }
+            passes += 2;
         }
     }
 #ifndef RELEASE
@@ -1735,11 +1885,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
     }
     case DIST_LOW_RANK:
     {
-        if( _inTargetTeam && _inSourceTeam )
-            break;
         const DistLowRank& DF = *_block.data.DF;
         const int r = DF.rank;
-        if( r <= MaxRank() )
+        if( (_inTargetTeam && _inSourceTeam) || r <= MaxRank() )
             break;
 
         const int teamRank = mpi::CommRank( _teams->Team(_level) );
@@ -1890,6 +2038,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         const unsigned log2TeamSize = Log2( teamSize );
         if( _inTargetTeam && _inSourceTeam )
         {
+            halfHeightOffsets[teamLevel] += log2TeamSize*2;
             qrOffsets[teamLevel] += 2*log2TeamSize*(r*r+r);
             break;
         }
@@ -1911,7 +2060,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         std::memcpy( &sendBuffer[sendOffset], &minDim, sizeof(int) );
         sendOffset += sizeof(int);
 
-        hmat_tools::PrintPacked( "lastQR pack", r, s, t, lastQRStage );
+        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+        std::ostringstream os;
+        os << "out_" << commRank << ".dat";
+        std::ofstream file
+        ( os.str().c_str(), std::ios::out | std::ios::app );
+
+        file << "\ns=" << s << ", t=" << t << "\n";
+        hmat_tools::PrintPacked
+        ( file, "Before send", r, s, t, lastQRStage );
+
         int offset = 0;
         for( int j=0; j<r; ++j )
         {
@@ -2082,6 +2240,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const Scalar* lastUTauStage;
         const Scalar* lastVTauStage;
 
+        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+        std::ostringstream os;
+        os << "out_" << commRank << ".dat";
+        std::ofstream file
+        ( os.str().c_str(), std::ios::out | std::ios::app );
+
         // Set up our pointers and form R_U and R_V in X and Y
         int minDimX, minDimY;
         if( _inTargetTeam && _inSourceTeam )
@@ -2130,6 +2294,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 offset += S+T;
             }
 
+            file << "\nsX=" << sX << ", tX=" << tX << "\n";
+            X.Print( file, "Unpacked (not recv'd) X" );
+
             Y.Resize( minDimY, r );
             hmat_tools::Scale( (Scalar)0, Y );
             offset = 0;
@@ -2142,6 +2309,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), &lastVQRStage[offset], P*sizeof(Scalar) );
                 offset += S+T;
             }
+            file << "\nsY=" << sY << ", tY=" << tY << "\n";
+            Y.Print( file, "Unpacked (not recv'd) Y" );
         }
         else if( _inTargetTeam )
         {
@@ -2180,6 +2349,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                   P*sizeof(Scalar) );
                 offset += S+T;
             }
+            file << "\nsX=" << sX << ", tX=" << tX << "\n";
+            X.Print( file, "Unpacked (not recv'd) X" );
 
             // We need to determine minimum dimension of Y. 
             const int partner = _sourceRoot + teamRank;
@@ -2196,7 +2367,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), &recvBuffer[recvOffset], P*sizeof(Scalar) );
                 recvOffset += P*sizeof(Scalar);
             }
-            Y.Print( "unpacked Y" );
+            file << "\nminDimY=" << minDimY << "\n";
+            Y.Print( file, "unpacked Y" );
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
         else // _inSourceTeam
@@ -2235,6 +2407,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), &lastVQRStage[offset], P*sizeof(Scalar) );
                 offset += S+T;
             }
+            file << "\nsY=" << sY << ", tY=" << tY << "\n";
+            Y.Print( file, "unpacked (not recv'd) Y" );
 
             // Unpack the minimum dimension of X
             const int partner = _targetRoot + teamRank;
@@ -2252,7 +2426,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( X.Buffer(0,j), &recvBuffer[recvOffset], P*sizeof(Scalar) );
                 recvOffset += P*sizeof(Scalar);
             }
-            X.Print( "unpacked X QR" );
+            file << "\nminDimX=" << minDimX << "\n";
+            X.Print( file, "unpacked X QR" );
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
 
