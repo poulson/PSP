@@ -241,6 +241,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
     }
     if( C._block.type == EMPTY )
         A.MultiplyHMatMainSetUp( B, C );
+    if( A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
 
     // Handle all H H cases here
     const bool admissibleC = C.Admissible();
@@ -1898,7 +1905,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -2469,7 +2477,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -2924,7 +2933,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3717,7 +3727,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCountC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3797,7 +3808,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsPackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3882,7 +3894,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsUnpackC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -4054,7 +4067,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeC");
 #endif
     const DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
-    if( !A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam )
+    if( (!A._inTargetTeam && !A._inSourceTeam && !B._inSourceTeam) ||
+        A.Height() == 0 || A.Width() == 0 || B.Width() == 0 )
     {
 #ifndef RELEASE
         PopCallStack();
