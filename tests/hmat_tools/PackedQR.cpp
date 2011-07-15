@@ -87,7 +87,8 @@ main( int argc, char* argv[] )
         }
 
         // Allocate a workspace and perform the packed QR
-        std::vector<std::complex<double> > tau( std::min(s+t,r) ), work(s+t);
+        std::vector<std::complex<double> > 
+            tau( std::min(s+t,r) ), work(std::max(s+t,r));
         psp::hmat_tools::PackedQR( r, s, t, &packedA[0], &tau[0], &work[0] );
         if( print )
         {

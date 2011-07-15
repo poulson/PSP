@@ -376,7 +376,9 @@ main( int argc, char* argv[] )
         }
 
         // Compute the error norms and put ZLocal = YLocal-ZLocal
-        double myNormVars[6] = { 0., 0., 0., 0., 0., 0. };
+        double myInfTruth=0, myInfError=0, 
+               myL1Truth=0, myL1Error=0, 
+               myL2SquaredTruth=0, myL2SquaredError=0;
         for( int j=0; j<XLocal.Width(); ++j )
         {
             for( int i=0; i<localHeight; ++i )
@@ -388,31 +390,39 @@ main( int argc, char* argv[] )
                 ZLocal.Set( i, j, error );
 
                 // RHS norms
-                myNormVars[0] = std::max(myNormVars[0],truthMag);
-                myNormVars[1] += truthMag;
-                myNormVars[2] += truthMag*truthMag;
+                myInfTruth = std::max(myInfTruth,truthMag);
+                myL1Truth += truthMag;
+                myL2SquaredTruth += truthMag*truthMag;
                 // Error norms
-                myNormVars[3] = std::max(myNormVars[3],errorMag);
-                myNormVars[4] += errorMag;
-                myNormVars[5] += errorMag*errorMag;
+                myInfError = std::max(myInfError,errorMag);
+                myL1Error += errorMag;
+                myL2SquaredError += errorMag*errorMag;
             }
         }
-        double normVars[6];
-        psp::mpi::Reduce( myNormVars, normVars, 6, 0, MPI_SUM, MPI_COMM_WORLD );
+        double infTruth, infError, 
+               L1Truth, L1Error, 
+               L2SquaredTruth, L2SquaredError;
+        psp::mpi::Reduce
+        ( &myInfTruth, &infTruth, 1, 0, MPI_MAX, MPI_COMM_WORLD );
+        psp::mpi::Reduce
+        ( &myInfError, &infError, 1, 0, MPI_MAX, MPI_COMM_WORLD );
+        psp::mpi::Reduce
+        ( &myL1Truth, &L1Truth, 1, 0, MPI_SUM, MPI_COMM_WORLD );
+        psp::mpi::Reduce
+        ( &myL1Error, &L1Error, 1, 0, MPI_SUM, MPI_COMM_WORLD );
+        psp::mpi::Reduce
+        ( &myL2SquaredTruth, &L2SquaredTruth, 1, 0, MPI_SUM, MPI_COMM_WORLD );
+        psp::mpi::Reduce
+        ( &myL2SquaredError, &L2SquaredError, 1, 0, MPI_SUM, MPI_COMM_WORLD );
         if( commRank == 0 )
         {
-            const double infTruth = normVars[0];
-            const double L1Truth = normVars[1];
-            const double L2Truth = sqrt(normVars[2]);
-            const double infError = normVars[3];
-            const double L1Error = normVars[4];
-            const double L2Error = sqrt(normVars[5]);
             std::cout << "||ABX||_oo    = " << infTruth << "\n"
                       << "||ABX||_1     = " << L1Truth << "\n"
-                      << "||ABX||_2     = " << L2Truth << "\n"
+                      << "||ABX||_2     = " << sqrt(L2SquaredTruth) << "\n"
                       << "||CX-ABX||_oo = " << infError << "\n"
                       << "||CX-ABX||_1  = " << L1Error << "\n"
-                      << "||CX-ABX||_2  = " << L2Error << std::endl;
+                      << "||CX-ABX||_2  = " << sqrt(L2SquaredError) 
+                      << std::endl;
         }
 
         if( print )

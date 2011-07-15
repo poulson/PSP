@@ -283,6 +283,14 @@ MultiplyHMatUpdatesLowRankCountAndResize
     {
         DistLowRank& DF = *_block.data.DF;
 
+        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+        std::ostringstream os;
+        os << "out_" << commRank << ".dat";
+        std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
+
+        file << "\noffsets=" << _targetOffset << ", " << _sourceOffset
+             << std::endl;
+
         // Compute the new rank
         if( _inTargetTeam )
         {
@@ -290,16 +298,23 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _colXMap.Size();
             _colXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_colXMap.Increment() )
+            {
                 rank += _colXMap.CurrentEntry()->Width();
+                _colXMap.CurrentEntry()->Print( file, "colXMap entry" );
+            }
 
             // Add the low-rank updates
             numEntries = _UMap.Size();
             _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_UMap.Increment() )
+            {
                 rank += _UMap.CurrentEntry()->Width();
+                _UMap.CurrentEntry()->Print( file, "UMap entry" );
+            }
 
             // Add the rank of the original low-rank matrix
             rank += DF.ULocal.Width();
+            DF.ULocal.Print( file, "DF.ULocal" );
         }
         else if( _inSourceTeam )
         {
@@ -307,16 +322,23 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _rowXMap.Size();
             _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
+            {
                 rank += _rowXMap.CurrentEntry()->Width();
+                _rowXMap.CurrentEntry()->Print( file, "rowXMap entry" );
+            }
 
             // Add the low-rank updates
             numEntries = _VMap.Size();
             _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_VMap.Increment() )
+            {
                 rank += _VMap.CurrentEntry()->Width();
+                _VMap.CurrentEntry()->Print( file, "VMap entry" );
+            }
 
             // Add the rank of the original low-rank matrix
             rank += DF.VLocal.Width();
+            DF.VLocal.Print( file, "DF.VLocal" );
         }
 
         // Store the rank and create the space
@@ -1163,6 +1185,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             std::ofstream file
             ( os.str().c_str(), std::ios::out | std::ios::app );
 
+            file << "\noffsets=" << _targetOffset << ", " << _sourceOffset
+                 << std::endl;
             ULocal.Print( file, "ULocal before QR" );
 
             lapack::QR
@@ -1185,6 +1209,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             std::ofstream file
             ( os.str().c_str(), std::ios::out | std::ios::app );
 
+            file << "\noffsets=" << _targetOffset << ", " << _sourceOffset
+                 << std::endl;
             VLocal.Print( file, "VLocal before QR" );
 
             lapack::QR
@@ -2067,7 +2093,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         std::ofstream file
         ( os.str().c_str(), std::ios::out | std::ios::app );
 
-        file << "\ns=" << s << ", t=" << t << "\n";
+        file << "\noffsets=" << _targetOffset << ", " << _sourceOffset 
+             << std::endl;
+        file << "s=" << s << ", t=" << t << "\n";
         std::ostringstream os_send;
         os_send << "Before send to " << partner;
         hmat_tools::PrintPacked
@@ -2248,6 +2276,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         os << "out_" << commRank << ".dat";
         std::ofstream file
         ( os.str().c_str(), std::ios::out | std::ios::app );
+
+        file << "\noffsets=" << _targetOffset << ", " << _sourceOffset 
+             << std::endl;
 
         // Set up our pointers and form R_U and R_V in X and Y
         int minDimX, minDimY;
@@ -2458,7 +2489,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
 
-        /*
         // Overwrite Z with R_U R_V^[T/H]
         Z.Resize( minDimX, minDimY );
         const char option = ( Conjugated ? 'C' : 'T' );
@@ -2468,6 +2498,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                      Y.LockedBuffer(), Y.LDim(),
           (Scalar)0, Z.Buffer(),       Z.LDim() );
         const int minDim = std::min( minDimX, minDimY );
+
+        Z.Print( file, "Z := X Y^[T/H]" );
 
         singularValues.resize( minDim );
         work.resize( lapack::SVDWorkSize(minDimX,minDimY) );
@@ -2481,6 +2513,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             ( 'O', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
               &work[0], work.size(), &realWork[0] );
+            Z.Print( file, "Left singular vectors" );
+            Y.Print( file, "Adjoint of right singular vectors" );
         }
         else if( _inTargetTeam )
         {
@@ -2490,6 +2524,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             ( 'O', 'N', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, 0, 1, 
               &work[0], work.size(), &realWork[0] );
+            Z.Print( file, "Left singular vectors" );
         }
         else // _inSourceTeam
         {
@@ -2500,11 +2535,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             ( 'N', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
               &work[0], work.size(), &realWork[0] );
+            Y.Print( file, "Adjoint of right singular vectors" );
         }
 
         const int newRank = std::min(minDim,MaxRank());
         DF.rank = newRank;
-        // Temporarily disable this section to test for segfaults
         if( _inTargetTeam )
         {
             // Form the compressed local portion of U.
@@ -2523,6 +2558,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 for( int i=0; i<minDimX; ++i )
                     XCol[i] = sigma*ZCol[i];
             }
+
+            X.Print( file, "X := Z Sigma" );
 
             // Backtransform the last stage
             work.resize( r );
@@ -2596,10 +2633,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             }
             work.resize( lapack::ApplyQWorkSize('L',m,newRank) );
             lapack::ApplyQ
-            ( 'L', 'N', m, newRank, std::min(m,newRank), 
+            ( 'L', 'N', m, newRank, std::min(m,r), 
               Z.LockedBuffer(), Z.LDim(), &UTauPiece[0],
               DF.ULocal.Buffer(), DF.ULocal.LDim(),  
               &work[0], work.size() );
+            DF.ULocal.Print( file, "Backtransformed Z sigma" );
         }
         if( _inSourceTeam )
         {
@@ -2623,6 +2661,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     for( int i=0; i<minDimY; ++i )
                         XCol[i] = YRow[i*YLDim];
             }
+
+            X.Print( file, "X := Y^[T/H]" );
 
             // Backtransform the last stage
             work.resize( r );
@@ -2695,12 +2735,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             }
             work.resize( lapack::ApplyQWorkSize('L',n,newRank) );
             lapack::ApplyQ
-            ( 'L', 'N', n, newRank, std::min(n,newRank),
+            ( 'L', 'N', n, newRank, std::min(n,r),
               Z.LockedBuffer(), Z.LDim(), &VTauPiece[0],
               DF.VLocal.Buffer(), DF.VLocal.LDim(),  
               &work[0], work.size() );
+            DF.VLocal.Print( file, "Backtransformed X" );
         }
-        */
         break;
     }
     case SPLIT_LOW_RANK:
@@ -3011,10 +3051,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                         const int DLDim = _D.LDim();
                         if( Conjugated )
                             for( int i=0; i<n; ++i )
-                                VCol[i] = DRow[i*DLDim];
+                                VCol[i] = Conj(DRow[i*DLDim]);
                         else
                             for( int i=0; i<n; ++i )
-                                VCol[i] = Conj(DRow[i*DLDim]);
+                                VCol[i] = DRow[i*DLDim];
                     }
                 }
             }
@@ -3203,10 +3243,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     const int YLDim = Y.LDim();
                     if( Conjugated )
                         for( int i=0; i<n; ++i )
-                            VCol[i] = YRow[i*YLDim];
+                            VCol[i] = Conj(YRow[i*YLDim]);
                     else
                         for( int i=0; i<n; ++i )
-                            VCol[i] = Conj(YRow[i*YLDim]);
+                            VCol[i] = YRow[i*YLDim];
                 }
             }
             _D.Clear();

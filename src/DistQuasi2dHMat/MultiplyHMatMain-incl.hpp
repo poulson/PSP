@@ -3785,6 +3785,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
             }
             break;
         }
+        case DIST_LOW_RANK_GHOST:
+        {
+            const DistLowRank& DFA = *A._block.data.DF;
+            const DistLowRankGhost& DFGB = *B._block.data.DFG;
+            const unsigned teamLevel = A._teams->TeamLevel(A._level);
+            sizes[teamLevel] += DFA.rank*DFGB.rank;
+            break;
+        }
         default:
             break;
         }
@@ -3871,6 +3879,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
             }
             break;
         }
+        case DIST_LOW_RANK_GHOST:
+        {
+            const DistLowRank& DFA = *A._block.data.DF;
+            const DistLowRankGhost& DFGB = *B._block.data.DFG;
+            MPI_Comm team = _teams->Team( _level );
+            const int teamRank = mpi::CommRank( team );
+            if( teamRank == 0 && DFA.rank != 0 && DFGB.rank != 0 )
+            {
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
+                std::memcpy
+                ( &buffer[offsets[teamLevel]],
+                  C._ZMap.Get( key ).LockedBuffer(),
+                  DFA.rank*DFGB.rank*sizeof(Scalar) );
+                offsets[teamLevel] += DFA.rank*DFGB.rank;
+            }
+            break;
+        }
         default:
             break;
         }
@@ -3950,6 +3975,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
                 ( C._ZMap.Get( key ).Buffer(), &buffer[offsets[teamLevel]],
                   DFA.rank*DFB.rank*sizeof(Scalar) );
                 offsets[teamLevel] += DFA.rank*DFB.rank;
+            }
+            break;
+        }
+        case DIST_LOW_RANK_GHOST:
+        {
+            const DistLowRank& DFA = *A._block.data.DF;
+            const DistLowRankGhost& DFGB = *B._block.data.DFG;
+            if( DFA.rank != 0 && DFGB.rank != 0 )
+            {
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
+                std::memcpy
+                ( C._ZMap.Get( key ).Buffer(), &buffer[offsets[teamLevel]],
+                  DFA.rank*DFGB.rank*sizeof(Scalar) );
+                offsets[teamLevel] += DFA.rank*DFGB.rank;
             }
             break;
         }
@@ -4370,6 +4409,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             C._VMap.Set( key, new Dense<Scalar> );
             Dense<Scalar>& UC = C._UMap.Get( key );
             Dense<Scalar>& VC = C._VMap.Get( key );
+
             if( A._inTargetTeam && DFA.rank != 0 && DFB.rank != 0 )
             {
                 Dense<Scalar>& ZC = C._ZMap.Get( key );
@@ -4391,6 +4431,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             const DistLowRankGhost& DFGB = *B._block.data.DFG; 
             C._UMap.Set( key, new Dense<Scalar>( A.LocalHeight(), DFGB.rank ) );
             Dense<Scalar>& UC = C._UMap.Get( key );
+            
             if( DFA.rank != 0 && DFGB.rank != 0 )
             {
                 Dense<Scalar>& ZC = C._ZMap.Get( key );

@@ -221,11 +221,7 @@ void psp::hmat_tools::ApplyPackedQFromLeft
     const int BLDim = B.LDim();
     const int minDim = std::min(s+t,r);
 
-    const int packedATopSize = (s*s+s)/2 + (r-s)*s;
-    const int packedABottomSize = (t*t+t)/2 + (r-t)*t;
-    const int packedASize = packedATopSize + packedABottomSize;
-
-    int jCol = packedASize;
+    int jCol = (s*s+s)/2 + (minDim-s)*s + (t*t+t)/2 + (minDim-t)*t;
     for( int j=minDim-1; j>=0; --j )
     {
         const int S = std::min(j+1,s);
@@ -402,11 +398,7 @@ void psp::hmat_tools::ApplyPackedQAdjointFromRight
     const int BLDim = B.LDim();
     const int minDim = std::min(s+t,r);
 
-    const int packedATopSize = (s*s+s)/2 + (r-s)*s;
-    const int packedABottomSize = (t*t+t)/2 + (r-t)*t;
-    const int packedASize = packedATopSize + packedABottomSize;
-
-    int jCol = packedASize;
+    int jCol = (s*s+s)/2 + (minDim-s)*s + (t*t+t)/2 + (minDim-t)*t;
     for( int j=minDim-1; j>=0; --j )
     {
         const int S = std::min(j+1,s);
