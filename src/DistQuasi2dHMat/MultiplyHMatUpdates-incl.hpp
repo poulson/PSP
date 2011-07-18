@@ -93,7 +93,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         MultiplyHMatUpdatesLocalQR( tauBuffer, tauOffsetsCopy, qrWork );
 
         // Perform the parallel portion of the TSQR algorithm
-        MultiplyHMatUpdatesParallelQR
+        MultiplyHMatParallelQR
         ( numQRs, Xs, XOffsets, halfHeights, halfHeightOffsets,
           qrBuffer, qrOffsets, tauBuffer, tauOffsets, qrWork );
     }
@@ -131,11 +131,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
           halfHeights, halfHeightOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
 
-    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-    std::ostringstream os;
-    os << "out_" << commRank << ".dat";
-    std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
-
     // Start the non-blocking sends
     MPI_Comm comm = _teams->Team( 0 );
     const int numSends = sendSizes.size();
@@ -144,8 +139,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
         const int dest = it->first;
-        file << commRank << " sending " << sendSizes[dest] << " to "
-             << dest << std::endl;
         mpi::ISend
         ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
           comm, sendRequests[offset++] );
@@ -159,8 +152,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
     {
         const int source = it->first;
-        file << commRank << " recving " << recvSizes[source] << " from "
-             << source << std::endl;
         mpi::IRecv
         ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
           comm, recvRequests[offset++] );
@@ -169,9 +160,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     // Unpack as soon as we have received our data
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
-
-    mpi::Barrier( MPI_COMM_WORLD );
-    file << "Finished receiving" << std::endl;
 
     Dense<Scalar> X, Y, Z;
     std::vector<Real> singularValues, realWork;
@@ -283,14 +271,6 @@ MultiplyHMatUpdatesLowRankCountAndResize
     {
         DistLowRank& DF = *_block.data.DF;
 
-        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-        std::ostringstream os;
-        os << "out_" << commRank << ".dat";
-        std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
-
-        file << "\noffsets=" << _targetOffset << ", " << _sourceOffset
-             << std::endl;
-
         // Compute the new rank
         if( _inTargetTeam )
         {
@@ -298,23 +278,16 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _colXMap.Size();
             _colXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_colXMap.Increment() )
-            {
                 rank += _colXMap.CurrentEntry()->Width();
-                _colXMap.CurrentEntry()->Print( file, "colXMap entry" );
-            }
 
             // Add the low-rank updates
             numEntries = _UMap.Size();
             _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_UMap.Increment() )
-            {
                 rank += _UMap.CurrentEntry()->Width();
-                _UMap.CurrentEntry()->Print( file, "UMap entry" );
-            }
 
             // Add the rank of the original low-rank matrix
             rank += DF.ULocal.Width();
-            DF.ULocal.Print( file, "DF.ULocal" );
         }
         else if( _inSourceTeam )
         {
@@ -322,23 +295,16 @@ MultiplyHMatUpdatesLowRankCountAndResize
             int numEntries = _rowXMap.Size();
             _rowXMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
-            {
                 rank += _rowXMap.CurrentEntry()->Width();
-                _rowXMap.CurrentEntry()->Print( file, "rowXMap entry" );
-            }
 
             // Add the low-rank updates
             numEntries = _VMap.Size();
             _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i,_VMap.Increment() )
-            {
                 rank += _VMap.CurrentEntry()->Width();
-                _VMap.CurrentEntry()->Print( file, "VMap entry" );
-            }
 
             // Add the rank of the original low-rank matrix
             rank += DF.VLocal.Width();
-            DF.VLocal.Print( file, "DF.VLocal" );
         }
 
         // Store the rank and create the space
@@ -1180,21 +1146,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             if( r <= MaxRank() )
                 break;
 
-            std::ostringstream os;
-            os << "out_" << commRank << ".dat";
-            std::ofstream file
-            ( os.str().c_str(), std::ios::out | std::ios::app );
-
-            file << "\noffsets=" << _targetOffset << ", " << _sourceOffset
-                 << std::endl;
-            ULocal.Print( file, "ULocal before QR" );
-
             lapack::QR
             ( m, r, ULocal.Buffer(), ULocal.LDim(), 
               &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
-
-            ULocal.Print( file, "ULocal after QR" );
         }
         if( _inSourceTeam )
         {
@@ -1204,21 +1159,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
             if( r <= MaxRank() )
                 break;
 
-            std::ostringstream os;
-            os << "out_" << commRank << ".dat";
-            std::ofstream file
-            ( os.str().c_str(), std::ios::out | std::ios::app );
-
-            file << "\noffsets=" << _targetOffset << ", " << _sourceOffset
-                 << std::endl;
-            VLocal.Print( file, "VLocal before QR" );
-
             lapack::QR
             ( n, r, VLocal.Buffer(), VLocal.LDim(), 
               &tauBuffer[tauOffsets[teamLevel]], &qrWork[0], qrWork.size() );
             tauOffsets[teamLevel] += (log2TeamSize+1)*r;
-
-            VLocal.Print( file, "VLocal after QR" );
         }
         break;
     }
@@ -1274,7 +1218,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
 ( const std::vector<int>& numQRs, 
   const std::vector<Dense<Scalar>*>& Xs,
   const std::vector<int>& XOffsets,
@@ -1287,7 +1231,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         std::vector<Scalar>& qrWork ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesParallelQR");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatParallelQR");
 #endif
     const int numTeamLevels = _teams->NumLevels();
     const int numSteps = numTeamLevels-1;
@@ -1318,11 +1262,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         }
         std::vector<byte> sendBuffer( msgSize ), recvBuffer( msgSize );
 
-        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-        std::ostringstream os;
-        os << "out_" << commRank << ".dat";
-        std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
-
         // Pack the messages for the firstPartner
         byte* sendHead = &sendBuffer[0];
         for( int l=0; l<numSteps-step; ++l )
@@ -1340,21 +1279,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                 const int r = X.Width();
                 const int halfHeightOffset = (k*log2ParentTeamSize+passes)*2;
 
-                int localHeight;
+                int halfHeight;
                 if( step == 0 )
                 {
                     // The first iteration bootstraps the local height from X
-                    localHeight = X.Height();
+                    halfHeight = std::min(X.Height(),r);
                     if( firstRoot )
-                        halfHeightLevel[halfHeightOffset] = localHeight;
+                        halfHeightLevel[halfHeightOffset] = halfHeight;
                     else
-                        halfHeightLevel[halfHeightOffset+1] = localHeight;
-                    Write( sendHead, localHeight );
+                        halfHeightLevel[halfHeightOffset+1] = halfHeight;
+                    Write( sendHead, halfHeight );
 
                     // Copy our R out of X
                     for( int j=0; j<r; ++j )
                     {
-                        const int P = std::min(j+1,localHeight);
+                        const int P = std::min(j+1,halfHeight);
                         Write( sendHead, X.LockedBuffer(0,j), P );
                     }
                 }
@@ -1362,26 +1301,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                 {
                     // All but the first iteration read from halfHeights
                     if( firstRoot )
-                        localHeight = halfHeightLevel[halfHeightOffset];
+                        halfHeight = halfHeightLevel[halfHeightOffset];
                     else
-                        localHeight = halfHeightLevel[halfHeightOffset+1];
-                    Write( sendHead, localHeight );
+                        halfHeight = halfHeightLevel[halfHeightOffset+1];
+                    Write( sendHead, halfHeight );
 
                     // Copy our R out of the last qrBuffer step
                     int qrOffset = qrPieceOffset + (passes-1)*(r*r+r);
                     for( int j=0; j<r; ++j )
                     {
-                        const int P = std::min(j+1,localHeight);
+                        const int P = std::min(j+1,halfHeight);
                         Write( sendHead, &qrLevel[qrOffset], P );
                         qrOffset += P;
                     }
                 }
-                file << "Wrote localHeight=" << localHeight << std::endl;
 
                 // Move past the padding for this send piece
-                if( localHeight < r )
+                if( halfHeight < r )
                 {
-                    const int sendTrunc = r - localHeight;
+                    const int sendTrunc = r - halfHeight;
                     sendHead += 
                         (sendTrunc*sendTrunc+sendTrunc)/2*sizeof(Scalar);
                 }
@@ -1427,9 +1365,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             s = halfHeightLevel[halfHeightOffset];
                             t = Read<int>( recvHead );
                             halfHeightLevel[halfHeightOffset+1] = t;
-                            file << "Read t=" << t << ", had s=" << s 
-                                 << " from first teamSize=2 recv with " 
-                                 << "l=" << l << ", step=" << step << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
@@ -1451,9 +1386,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             s = Read<int>( recvHead );
                             t = halfHeightLevel[halfHeightOffset+1];
                             halfHeightLevel[halfHeightOffset] = s;
-                            file << "Read s=" << s << ", had t=" << t 
-                                 << " from first teamSize=2 recv with" 
-                                 << "l=" << l << ", step=" << step << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
@@ -1473,34 +1405,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     }
                     else
                     {
-                        int qrLastOffset = qrPieceOffset + (passes-1)*(r*r+r);
-                        const int sLast = halfHeightLevel[halfHeightOffset-2];
-                        const int tLast = halfHeightLevel[halfHeightOffset-1];
-                        file << "Recalled sLast=" << sLast 
-                             << ", tLast=" << tLast 
-                             << " from first teamSize=2 recv with " 
-                             << "l=" << l << ", step=" << step << std::endl;
+                        int qrPrevOffset = qrPieceOffset + (passes-1)*(r*r+r);
+                        const int sPrev = halfHeightLevel[halfHeightOffset-2];
+                        const int tPrev = halfHeightLevel[halfHeightOffset-1];
                         if( firstRoot )
                         {
                             s = halfHeightLevel[halfHeightOffset];
                             t = Read<int>( recvHead );
                             halfHeightLevel[halfHeightOffset+1] = t;
-                            file << "Read t=" << t << ", had s=" << s 
-                                 << " from first teamSize=2 recv with " 
-                                 << "l=" << l << ", step=" << step << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
                                 const int T = std::min(j+1,t);
-                                const int SLast = std::min(j+1,sLast);
-                                const int TLast = std::min(j+1,tLast);
+                                const int SPrev = std::min(j+1,sPrev);
+                                const int TPrev = std::min(j+1,tPrev);
 
-                                // Read column strip from last qrBuffer
+                                // Read column strip from the previous qrBuffer
                                 std::memcpy
-                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                                ( &qrLevel[qrOffset], &qrLevel[qrPrevOffset],
                                   S*sizeof(Scalar) );
                                 qrOffset += S;
-                                qrLastOffset += SLast + TLast;
+                                qrPrevOffset += SPrev + TPrev;
 
                                 // Read column strip from recvBuffer
                                 Read( &qrLevel[qrOffset], recvHead, T );
@@ -1512,26 +1437,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             s = Read<int>( recvHead );
                             t = halfHeightLevel[halfHeightOffset+1];
                             halfHeightLevel[halfHeightOffset] = s;
-                            file << "Read s=" << s << ", had t=" << t 
-                                 << " from first teamSize=2 recv with "
-                                 << "l=" << l << ", step=" << step << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
                                 const int T = std::min(j+1,t);
-                                const int SLast = std::min(j+1,sLast);
-                                const int TLast = std::min(j+1,tLast);
+                                const int SPrev = std::min(j+1,sPrev);
+                                const int TPrev = std::min(j+1,tPrev);
 
                                 // Read column strip from recvBuffer
                                 Read( &qrLevel[qrOffset], recvHead, S );
                                 qrOffset += S;
 
-                                // Read column strip from last qrBuffer
+                                // Read column strip from the previous qrBuffer
                                 std::memcpy
-                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                                ( &qrLevel[qrOffset], &qrLevel[qrPrevOffset],
                                   T*sizeof(Scalar) );
                                 qrOffset += T;
-                                qrLastOffset += SLast + TLast;
+                                qrPrevOffset += SPrev + TPrev;
                             }
                         }
                     }
@@ -1541,21 +1463,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     recvHead += 
                         (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
                     
-                    file << "\ns=" << s << ", t=" << t << "\n";
-                    hmat_tools::PrintPacked
-                    ( file, "Before PackedQR", 
-                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
-                    file << "\n";
-
                     hmat_tools::PackedQR
                     ( r, s, t, 
                       &qrLevel[qrPieceOffset+passes*(r*r+r)],
                       &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
-
-                    hmat_tools::PrintPacked
-                    ( file, "After PackedQR", 
-                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
-                    file << "\n";
 
                     const bool haveAnotherComm = ( l+1 < numSteps-step );
                     if( haveAnotherComm )
@@ -1567,7 +1478,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             halfHeightLevel[halfHeightOffset+2] = minDim;
                         else
                             halfHeightLevel[halfHeightOffset+3] = minDim;
-                        file << "Stored minDim=" << minDim << std::endl;
                     }
 
                     qrPieceOffset += log2ParentTeamSize*(r*r+r);
@@ -1578,8 +1488,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
         }
         else // teamSize >= 4, so this level splits 4 ways
         {
-            // Flip the second bit of our rank in this team to get our partner,
-            // and then check if our bit is 0 to see if we're the root
             const unsigned secondPartner = teamRank ^ (1u<<(passes+1));
             const bool secondRoot = !(teamRank & (1u<<(passes+1)));
 
@@ -1614,8 +1522,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             s = halfHeightLevel[halfHeightOffset];
                             t = Read<int>( recvHead );
                             halfHeightLevel[halfHeightOffset+1] = t;
-                            file << "Read t=" << t << ", had s=" << s 
-                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
@@ -1637,8 +1543,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             s = Read<int>( recvHead );
                             t = halfHeightLevel[halfHeightOffset+1];
                             halfHeightLevel[halfHeightOffset] = s;
-                            file << "Read s=" << s << ", had t=" << t 
-                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
@@ -1658,32 +1562,27 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     }
                     else
                     {
-                        int qrLastOffset = qrPieceOffset + (passes-1)*(r*r+r);
-                        const int sLast = halfHeightLevel[halfHeightOffset-2];
-                        const int tLast = halfHeightLevel[halfHeightOffset-1];
-                        file << "sLast=" << sLast 
-                             << ", tLast=" << tLast << " from first tS=4 recv"
-                             << std::endl;
+                        int qrPrevOffset = qrPieceOffset + (passes-1)*(r*r+r);
+                        const int sPrev = halfHeightLevel[halfHeightOffset-2];
+                        const int tPrev = halfHeightLevel[halfHeightOffset-1];
                         if( firstRoot )
                         {
                             s = halfHeightLevel[halfHeightOffset];
                             t = Read<int>( recvHead );
                             halfHeightLevel[halfHeightOffset+1] = t;
-                            file << "Read t=" << t << ", had s=" << s 
-                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
                                 const int T = std::min(j+1,t);
-                                const int SLast = std::min(j+1,sLast);
-                                const int TLast = std::min(j+1,tLast);
+                                const int SPrev = std::min(j+1,sPrev);
+                                const int TPrev = std::min(j+1,tPrev);
 
                                 // Read column strip from last qrBuffer
                                 std::memcpy
-                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                                ( &qrLevel[qrOffset], &qrLevel[qrPrevOffset],
                                   S*sizeof(Scalar) );
                                 qrOffset += S;
-                                qrLastOffset += SLast + TLast;
+                                qrPrevOffset += SPrev + TPrev;
 
                                 // Read column strip from recvBuffer
                                 Read( &qrLevel[qrOffset], recvHead, T );
@@ -1695,14 +1594,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             s = Read<int>( recvHead );
                             t = halfHeightLevel[halfHeightOffset+1];
                             halfHeightLevel[halfHeightOffset] = s;
-                            file << "Read s=" << s << ", had t=" << t 
-                                 << " from first teamSize=4 recv" << std::endl;
                             for( int j=0; j<r; ++j )
                             {
                                 const int S = std::min(j+1,s);
                                 const int T = std::min(j+1,t);
-                                const int SLast = std::min(j+1,sLast);
-                                const int TLast = std::min(j+1,tLast);
+                                const int SPrev = std::min(j+1,sPrev);
+                                const int TPrev = std::min(j+1,tPrev);
 
                                 // Read column strip from recvBuffer
                                 Read( &qrLevel[qrOffset], recvHead, S );
@@ -1710,10 +1607,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
 
                                 // Read column strip from last qrBuffer
                                 std::memcpy
-                                ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                                ( &qrLevel[qrOffset], &qrLevel[qrPrevOffset],
                                   T*sizeof(Scalar) );
                                 qrOffset += T;
-                                qrLastOffset += SLast + TLast;
+                                qrPrevOffset += SPrev + TPrev;
                             }
                         }
                     }
@@ -1723,20 +1620,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     recvHead += 
                         (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
 
-                    file << "\ns=" << s << ", t=" << t << "\n";
-                    hmat_tools::PrintPacked
-                    ( file, "Before PackedQR on 0", 
-                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
-                    
                     hmat_tools::PackedQR
                     ( r, s, t, 
                       &qrLevel[qrPieceOffset+passes*(r*r+r)],
                       &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
-
-                    file << "\n";
-                    hmat_tools::PrintPacked
-                    ( file, "After PackedQR on 0", 
-                      r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)] );
 
                     const int minDim = std::min(s+t,r);
                     Write( sendHead, minDim );
@@ -1744,7 +1631,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         halfHeightLevel[halfHeightOffset+2] = minDim;
                     else
                         halfHeightLevel[halfHeightOffset+3] = minDim;
-                    file << "Wrote minDim=" << minDim << "\n";
                     qrOffset = qrPieceOffset + passes*(r*r+r);
                     for( int j=0; j<r; ++j )
                     {
@@ -1787,35 +1673,31 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     const Dense<Scalar>& X = *XLevel[k];
                     const int r = X.Width();
                     const int halfHeightOffset 
-                        = (k*log2ParentTeamSize+passes+1)*2;
+                        = (k*log2ParentTeamSize+(passes+1))*2;
 
                     int s, t;
                     int qrOffset = qrPieceOffset + (passes+1)*(r*r+r);
-                    int qrLastOffset = qrPieceOffset + passes*(r*r+r);
-                    const int sLast = halfHeightLevel[halfHeightOffset-2];
-                    const int tLast = halfHeightLevel[halfHeightOffset-1];
-                    file << "Recalled sLast=" << sLast << ", tLast=" << tLast
-                         << " from second teamSize=4 recv" << std::endl;
+                    int qrPrevOffset = qrPieceOffset + passes*(r*r+r);
+                    const int sPrev = halfHeightLevel[halfHeightOffset-2];
+                    const int tPrev = halfHeightLevel[halfHeightOffset-1];
                     if( secondRoot )
                     {
                         s = halfHeightLevel[halfHeightOffset];
                         t = Read<int>( recvHead );
                         halfHeightLevel[halfHeightOffset+1] = t;
-                        file << "Read t=" << t << ", had s=" << s 
-                             << " from second teamSize=4 recv" << std::endl;
                         for( int j=0; j<r; ++j )
                         {
                             const int S = std::min(j+1,s);
                             const int T = std::min(j+1,t);
-                            const int SLast = std::min(j+1,sLast);
-                            const int TLast = std::min(j+1,tLast);
+                            const int SPrev = std::min(j+1,sPrev);
+                            const int TPrev = std::min(j+1,tPrev);
 
                             // Read column strip from last qrBuffer
                             std::memcpy
-                            ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                            ( &qrLevel[qrOffset], &qrLevel[qrPrevOffset],
                               S*sizeof(Scalar) );
                             qrOffset += S;
-                            qrLastOffset += SLast + TLast;
+                            qrPrevOffset += SPrev + TPrev;
 
                             // Read column strip from recvBuffer
                             Read( &qrBuffer[qrOffset], recvHead, T );
@@ -1827,14 +1709,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                         s = Read<int>( recvHead );
                         t = halfHeightLevel[halfHeightOffset+1];
                         halfHeightLevel[halfHeightOffset] = s;
-                        file << "Read s=" << s << ", had t=" << t 
-                             << " from second teamSize=4 recv" << std::endl;
                         for( int j=0; j<r; ++j )
                         {
                             const int S = std::min(j+1,s);
                             const int T = std::min(j+1,t);
-                            const int SLast = std::min(j+1,sLast);
-                            const int TLast = std::min(j+1,tLast);
+                            const int SPrev = std::min(j+1,sPrev);
+                            const int TPrev = std::min(j+1,tPrev);
 
                             // Read column strip from recvBuffer
                             Read( &qrLevel[qrOffset], recvHead, S );
@@ -1842,10 +1722,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
 
                             // Read column strip from last qrBuffer
                             std::memcpy
-                            ( &qrLevel[qrOffset], &qrLevel[qrLastOffset],
+                            ( &qrLevel[qrOffset], &qrLevel[qrPrevOffset],
                               T*sizeof(Scalar) );
                             qrOffset += T;
-                            qrLastOffset += SLast + TLast;
+                            qrPrevOffset += SPrev + TPrev;
                         }
                     }
                     // Move past the padding for this recv piece
@@ -1854,19 +1734,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                     recvHead += 
                         (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
 
-                    file << "\ns=" << s << ", t=" << t << "\n";
-                    hmat_tools::PrintPacked
-                    ( file, "Before PackedQR", 
-                      r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)] );
-
                     hmat_tools::PackedQR
                     ( r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)], 
                       &tauLevel[tauPieceOffset+(passes+2)*r], &qrWork[0] );
-
-                    file << "\n";
-                    hmat_tools::PrintPacked
-                    ( file, "After PackedQR", 
-                      r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)] );
 
                     const bool haveAnotherComm = ( l+1 < numSteps-step );
                     if( haveAnotherComm )
@@ -1878,7 +1748,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesParallelQR
                             halfHeightLevel[halfHeightOffset+2] = minDim;
                         else
                             halfHeightLevel[halfHeightOffset+3] = minDim;
-                        file << "Stored minDim=" << minDim << std::endl;
                     }
 
                     qrPieceOffset += log2ParentTeamSize*(r*r+r);
@@ -2087,20 +1956,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         std::memcpy( &sendBuffer[sendOffset], &minDim, sizeof(int) );
         sendOffset += sizeof(int);
 
-        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-        std::ostringstream os;
-        os << "out_" << commRank << ".dat";
-        std::ofstream file
-        ( os.str().c_str(), std::ios::out | std::ios::app );
-
-        file << "\noffsets=" << _targetOffset << ", " << _sourceOffset 
-             << std::endl;
-        file << "s=" << s << ", t=" << t << "\n";
-        std::ostringstream os_send;
-        os_send << "Before send to " << partner;
-        hmat_tools::PrintPacked
-        ( file, os_send.str(), r, s, t, lastQRStage );
-
         int offset = 0;
         for( int j=0; j<r; ++j )
         {
@@ -2271,21 +2126,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const Scalar* lastUTauStage;
         const Scalar* lastVTauStage;
 
-        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-        std::ostringstream os;
-        os << "out_" << commRank << ".dat";
-        std::ofstream file
-        ( os.str().c_str(), std::ios::out | std::ios::app );
-
-        file << "\noffsets=" << _targetOffset << ", " << _sourceOffset 
-             << std::endl;
-
         // Set up our pointers and form R_U and R_V in X and Y
         int minDimX, minDimY;
         if( _inTargetTeam && _inSourceTeam )
         {
-            file << "in both teams" << std::endl;
-
             UHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
@@ -2317,10 +2161,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             minDimX = std::min(sX+tX,r);
             minDimY = std::min(sY+tY,r);
 
-            file << "sX=" << sX << ", tX=" << tX << ", minDimX=" << minDimX << "\n"
-                 << "sY=" << sY << ", tY=" << tY << ", minDimY=" << minDimY 
-                 << std::endl;
-
             X.Resize( minDimX, r );
             hmat_tools::Scale( (Scalar)0, X );
             int offset = 0;
@@ -2334,9 +2174,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 offset += S+T;
             }
 
-            file << "\nsX=" << sX << ", tX=" << tX << "\n";
-            X.Print( file, "Unpacked (not recv'd) X" );
-
             Y.Resize( minDimY, r );
             hmat_tools::Scale( (Scalar)0, Y );
             offset = 0;
@@ -2349,13 +2186,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), &lastVQRStage[offset], P*sizeof(Scalar) );
                 offset += S+T;
             }
-            file << "\nsY=" << sY << ", tY=" << tY << "\n";
-            Y.Print( file, "Unpacked (not recv'd) Y" );
         }
         else if( _inTargetTeam )
         {
-            file << "Just in target team" << std::endl;
-
             UHalfHeightsPiece = &halfHeights[halfHeightOffsets[teamLevel]];
             UQRPiece = &qrBuffer[qrOffsets[teamLevel]];
             UTauPiece = &tauBuffer[tauOffsets[teamLevel]];
@@ -2379,9 +2212,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int tX = lastUHalfHeightsStage[1];
             minDimX = std::min(sX+tX,r);
             
-            file << "sX=" << sX << ", tX=" << tX << ", minDimX=" << minDimX 
-                 << std::endl;
-
             X.Resize( minDimX, r );
             hmat_tools::Scale( (Scalar)0, X );
             int offset = 0;
@@ -2395,14 +2225,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                   P*sizeof(Scalar) );
                 offset += S+T;
             }
-            file << "\nsX=" << sX << ", tX=" << tX << "\n";
-            X.Print( file, "Unpacked (not recv'd) X" );
 
             // We need to determine minimum dimension of Y. 
             const int partner = _sourceRoot + teamRank;
             int recvOffset = recvOffsets[partner];
             std::memcpy( &minDimY, &recvBuffer[recvOffset], sizeof(int) );
-            file << "Unpacked minDimY as " << minDimY << std::endl;
             recvOffset += sizeof(int);
 
             Y.Resize( minDimY, r );
@@ -2414,16 +2241,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), &recvBuffer[recvOffset], P*sizeof(Scalar) );
                 recvOffset += P*sizeof(Scalar);
             }
-            file << "\nminDimY=" << minDimY << "\n";
-            std::ostringstream os_recv;
-            os_recv << "Recv'd from " << partner;
-            Y.Print( file, os_recv.str() );
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
         else // _inSourceTeam
         {
-            file << "Just in source team" << std::endl;
-
             UHalfHeightsPiece = 0;
             UQRPiece = 0;
             UTauPiece = 0;
@@ -2447,9 +2268,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int tY = lastVHalfHeightsStage[1];
             minDimY = std::min(sY+tY,r);
 
-            file << "sY=" << sY << ", tY=" << tY << ", minDimY=" << minDimY 
-                 << std::endl;
-
             Y.Resize( minDimY, r );
             hmat_tools::Scale( (Scalar)0, Y );
             int offset = 0;
@@ -2462,14 +2280,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), &lastVQRStage[offset], P*sizeof(Scalar) );
                 offset += S+T;
             }
-            file << "\nsY=" << sY << ", tY=" << tY << "\n";
-            Y.Print( file, "unpacked (not recv'd) Y" );
 
             // Unpack the minimum dimension of X
             const int partner = _targetRoot + teamRank;
             int recvOffset = recvOffsets[partner];
             std::memcpy( &minDimX, &recvBuffer[recvOffset], sizeof(int) );
-            file << "Unpacked minDimX as " << minDimX << std::endl;
             recvOffset += sizeof(int);
 
             // Unpack X
@@ -2482,10 +2297,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( X.Buffer(0,j), &recvBuffer[recvOffset], P*sizeof(Scalar) );
                 recvOffset += P*sizeof(Scalar);
             }
-            file << "\nminDimX=" << minDimX << "\n";
-            std::ostringstream os_recv;
-            os_recv << "Recv'd from " << partner;
-            X.Print( file, os_recv.str() );
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
 
@@ -2499,46 +2310,25 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
           (Scalar)0, Z.Buffer(),       Z.LDim() );
         const int minDim = std::min( minDimX, minDimY );
 
-        Z.Print( file, "Z := X Y^[T/H]" );
-
+        // Perform an SVD on Z, overwriting Z with the left singular vectors
+        // and Y with the adjoint of the right singular vectors. 
+        //
+        // NOTE: Even though we potentially only need either the left or right
+        //       singular vectors, we must be careful to ensure that the signs
+        //       are chosen consistently with our partner process. Though we could
+        //       adopt an implicit convention, it is likely easier to just compute
+        //       both for now.
         singularValues.resize( minDim );
         work.resize( lapack::SVDWorkSize(minDimX,minDimY) );
         realWork.resize( lapack::SVDRealWorkSize(minDimX,minDimY) );
-        if( _inTargetTeam && _inSourceTeam )
-        {
-            // Perform an SVD on Z, overwriting Z with the left singular 
-            // vectors and Y with the adjoint of the right singular vectors.
-            Y.Resize( minDim, minDimY );
-            lapack::SVD
-            ( 'O', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
-              &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
-              &work[0], work.size(), &realWork[0] );
-            Z.Print( file, "Left singular vectors" );
-            Y.Print( file, "Adjoint of right singular vectors" );
-        }
-        else if( _inTargetTeam )
-        {
-            // Perform an SVD on Z, overwriting it with the left singular 
-            // vectors.
-            lapack::SVD
-            ( 'O', 'N', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
-              &singularValues[0], 0, 1, 0, 1, 
-              &work[0], work.size(), &realWork[0] );
-            Z.Print( file, "Left singular vectors" );
-        }
-        else // _inSourceTeam
-        {
-            // Perform an SVD on Z, overwriting Y with the adjoint of the
-            // right singular vectors. 
-            Y.Resize( minDim, minDimY );
-            lapack::SVD
-            ( 'N', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
-              &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
-              &work[0], work.size(), &realWork[0] );
-            Y.Print( file, "Adjoint of right singular vectors" );
-        }
+        Y.Resize( minDim, minDimY );
+        lapack::SVD
+        ( 'O', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
+          &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
+          &work[0], work.size(), &realWork[0] );
 
         const int newRank = std::min(minDim,MaxRank());
+        X.Resize( 2*r, newRank );
         DF.rank = newRank;
         if( _inTargetTeam )
         {
@@ -2559,25 +2349,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     XCol[i] = sigma*ZCol[i];
             }
 
-            X.Print( file, "X := Z Sigma" );
-
             // Backtransform the last stage
-            work.resize( r );
+            work.resize( newRank );
             hmat_tools::ApplyPackedQFromLeft
             ( r, sLast, tLast, lastUQRStage, lastUTauStage, X, &work[0] );
 
             // Backtransform using the middle stages.
             // We know that the height cannot increase as we move backwards
-            // (except for at the original stage)
+            // (except for the original stage)
             int sPrev=sLast, tPrev=tLast;
             for( int commStage=log2TeamSize-2; commStage>=0; --commStage )
             {
                 const int sCurr = UHalfHeightsPiece[commStage*2];
                 const int tCurr = UHalfHeightsPiece[commStage*2+1];
-#ifndef RELEASE
-                if( sCurr+tCurr > sPrev+tPrev )
-                    throw std::logic_error("Height increased for ULocal side");
-#endif
+                X.Resize( sCurr+tCurr, newRank );
 
                 const bool rootOfPrevStage = !(teamRank & (1u<<(commStage+1)));
                 if( rootOfPrevStage )
@@ -2637,7 +2422,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
               Z.LockedBuffer(), Z.LDim(), &UTauPiece[0],
               DF.ULocal.Buffer(), DF.ULocal.LDim(),  
               &work[0], work.size() );
-            DF.ULocal.Print( file, "Backtransformed Z sigma" );
         }
         if( _inSourceTeam )
         {
@@ -2662,10 +2446,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                         XCol[i] = YRow[i*YLDim];
             }
 
-            X.Print( file, "X := Y^[T/H]" );
-
             // Backtransform the last stage
-            work.resize( r );
+            work.resize( newRank );
             hmat_tools::ApplyPackedQFromLeft
             ( r, sLast, tLast, lastVQRStage, lastVTauStage, X, &work[0] );
 
@@ -2677,10 +2459,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             {
                 const int sCurr = VHalfHeightsPiece[commStage*2];
                 const int tCurr = VHalfHeightsPiece[commStage*2+1];
-#ifndef RELEASE
-                if( sCurr+tCurr > sPrev+tPrev )
-                    throw std::logic_error("Height increased for VLocal side");
-#endif
+                X.Resize( sCurr+tCurr, newRank );
+
                 const bool rootOfPrevStage = !(teamRank & (1u<<(commStage+1)));
                 if( rootOfPrevStage )
                 {
@@ -2733,13 +2513,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                     ( DF.VLocal.Buffer(0,j), X.LockedBuffer(sPrev,j),
                       tPrev*sizeof(Scalar) );
             }
+
             work.resize( lapack::ApplyQWorkSize('L',n,newRank) );
             lapack::ApplyQ
             ( 'L', 'N', n, newRank, std::min(n,r),
               Z.LockedBuffer(), Z.LDim(), &VTauPiece[0],
               DF.VLocal.Buffer(), DF.VLocal.LDim(),  
               &work[0], work.size() );
-            DF.VLocal.Print( file, "Backtransformed X" );
         }
         break;
     }

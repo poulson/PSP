@@ -828,6 +828,18 @@ private:
                           DistQuasi2dHMat<Scalar,Conjugated>& C ) const;
     void MultiplyHMatMainPostcomputeCCleanup(); // to be called from C
 
+    void MultiplyHMatParallelQR
+    ( const std::vector<int>& numQRs,
+      const std::vector<Dense<Scalar>*>& Xs,      
+      const std::vector<int>& XOffsets,
+            std::vector<int>& halfHeights,
+      const std::vector<int>& halfHeightOffsets,
+            std::vector<Scalar>& qrBuffer,
+      const std::vector<int>& qrOffsets,
+            std::vector<Scalar>& tauBuffer,
+      const std::vector<int>& tauOffsets,
+            std::vector<Scalar>& qrWork ) const;
+
     void MultiplyHMatFHHPrecompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C );
@@ -933,17 +945,6 @@ private:
     void MultiplyHMatUpdatesLocalQR
     ( std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
-    void MultiplyHMatUpdatesParallelQR
-    ( const std::vector<int>& numQRs,
-      const std::vector<Dense<Scalar>*>& Xs,      
-      const std::vector<int>& XOffsets,
-            std::vector<int>& halfHeights,
-      const std::vector<int>& halfHeightOffsets,
-            std::vector<Scalar>& qrBuffer,
-      const std::vector<int>& qrOffsets,
-            std::vector<Scalar>& tauBuffer,
-      const std::vector<int>& tauOffsets,
-            std::vector<Scalar>& qrWork ) const;
     void MultiplyHMatUpdatesExchangeCount
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
     void MultiplyHMatUpdatesExchangePack

@@ -274,7 +274,7 @@ psp::Dense<Scalar>::Resize( int height, int width )
     if( _type == SYMMETRIC && height != width )
         throw std::logic_error("Destroyed symmetry of symmetric matrix");
 #endif
-    if( height > _height )
+    if( height > _ldim )
     {
         // We cannot trivially preserve the old contents
         _ldim = std::max( height, 1 );
