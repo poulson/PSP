@@ -1136,8 +1136,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
         const int log2TeamSize = Log2( teamSize );
         const unsigned teamLevel = _teams->TeamLevel(_level);
 
-        const int commRank = mpi::CommRank( MPI_COMM_WORLD );
-
         if( _inTargetTeam )
         {
             Dense<Scalar>& ULocal = DF.ULocal;
@@ -1233,15 +1231,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatParallelQR");
 #endif
+    const int globalRank = mpi::CommRank( _teams->Team(0) );
     const int numTeamLevels = _teams->NumLevels();
     const int numSteps = numTeamLevels-1;
 
     int passes = 0;
     for( int step=0; step<numSteps; ++step )
     {
-        MPI_Comm team = _teams->Team( (numTeamLevels-1)-(step+1) );
+        MPI_Comm team = _teams->Team( (numSteps-1)-step );
         const int teamSize = mpi::CommSize( team );
-        const unsigned teamRank = mpi::CommRank( team );
+        const int teamRank = mpi::CommRank( team );
 
         // Flip the first bit of our rank in this team to get our partner,
         // and then check if our bit is 0 to see if we're the root
@@ -1300,19 +1299,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
                 else
                 {
                     // All but the first iteration read from halfHeights
-                    if( firstRoot )
-                        halfHeight = halfHeightLevel[halfHeightOffset];
-                    else
-                        halfHeight = halfHeightLevel[halfHeightOffset+1];
+                    const int sPrev = halfHeightLevel[halfHeightOffset-2];
+                    const int tPrev = halfHeightLevel[halfHeightOffset-1];
+                    const int halfHeight = std::min(sPrev+tPrev,r);
                     Write( sendHead, halfHeight );
 
                     // Copy our R out of the last qrBuffer step
                     int qrOffset = qrPieceOffset + (passes-1)*(r*r+r);
                     for( int j=0; j<r; ++j )
                     {
+                        const int SPrev = std::min(j+1,sPrev);
+                        const int TPrev = std::min(j+1,tPrev);
                         const int P = std::min(j+1,halfHeight);
                         Write( sendHead, &qrLevel[qrOffset], P );
-                        qrOffset += P;
+                        qrOffset += SPrev + TPrev;
                     }
                 }
 
@@ -1343,6 +1343,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
             {
                 MPI_Comm parentTeam = _teams->Team(l);
                 const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
+
+                bool rootOfNextStep = false;
+                const bool haveAnotherComm = ( l+1 < numSteps-step );
+                if( haveAnotherComm )
+                    rootOfNextStep = !(globalRank & (1u<<(passes+1)));
+
                 const Dense<Scalar>* const* XLevel = &Xs[XOffsets[l]];
                 Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
                 Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
@@ -1462,18 +1468,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
                         ( firstRoot ? r-std::min(t,r) : r-std::min(s,r) );
                     recvHead += 
                         (recvTrunc*recvTrunc+recvTrunc)/2*sizeof(Scalar);
-                    
-                    hmat_tools::PackedQR
-                    ( r, s, t, 
-                      &qrLevel[qrPieceOffset+passes*(r*r+r)],
-                      &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
 
-                    const bool haveAnotherComm = ( l+1 < numSteps-step );
+                    hmat_tools::PackedQR
+                    ( r, s, t, &qrLevel[qrPieceOffset+passes*(r*r+r)],
+                      &tauLevel[tauPieceOffset+(passes+1)*r], &qrWork[0] );
+                    
                     if( haveAnotherComm )
                     {
                         const int minDim = std::min(s+t,r);
-                        const bool rootOfNextStep = 
-                            !(teamRank & (1u<<(passes+1)));
                         if( rootOfNextStep )
                             halfHeightLevel[halfHeightOffset+2] = minDim;
                         else
@@ -1500,6 +1502,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
             {
                 MPI_Comm parentTeam = _teams->Team(l);
                 const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
+
                 const Dense<Scalar>* const* XLevel = &Xs[XOffsets[l]];
                 Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
                 Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
@@ -1662,6 +1665,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
             {
                 MPI_Comm parentTeam = _teams->Team(l);
                 const int log2ParentTeamSize = Log2(mpi::CommSize(parentTeam));
+                
+                bool rootOfNextStep = false;
+                const bool haveAnotherComm = ( l+1 < numSteps-step );
+                if( haveAnotherComm )
+                    rootOfNextStep = !(globalRank & (1u<<(passes+2)));
+
                 const Dense<Scalar>* const* XLevel = &Xs[XOffsets[l]];
                 Scalar* qrLevel = &qrBuffer[qrOffsets[l]];
                 Scalar* tauLevel = &tauBuffer[tauOffsets[l]];
@@ -1738,12 +1747,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
                     ( r, s, t, &qrLevel[qrPieceOffset+(passes+1)*(r*r+r)], 
                       &tauLevel[tauPieceOffset+(passes+2)*r], &qrWork[0] );
 
-                    const bool haveAnotherComm = ( l+1 < numSteps-step );
                     if( haveAnotherComm )
                     {
                         const int minDim = std::min(s+t,r);
-                        const bool rootOfNextStep = 
-                            !(teamRank & (1u<<(passes+2)));
                         if( rootOfNextStep )
                             halfHeightLevel[halfHeightOffset+2] = minDim;
                         else
@@ -2315,9 +2321,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         //
         // NOTE: Even though we potentially only need either the left or right
         //       singular vectors, we must be careful to ensure that the signs
-        //       are chosen consistently with our partner process. Though we could
-        //       adopt an implicit convention, it is likely easier to just compute
-        //       both for now.
+        //       are chosen consistently with our partner process. Though we 
+        //       could adopt an implicit convention, it is likely easier to 
+        //       just compute both for now.
         singularValues.resize( minDim );
         work.resize( lapack::SVDWorkSize(minDimX,minDimY) );
         realWork.resize( lapack::SVDRealWorkSize(minDimX,minDimY) );
