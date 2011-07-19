@@ -920,7 +920,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorSums
     MultiplyVectorSumsPack( context, buffer, offsetsCopy );
 
     // Perform the reduces with log2(p) messages
-    _teams->TreeSumToRoots( buffer, sizes, offsets );
+    _teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of teamunicators have data)
     MultiplyVectorSumsUnpack( context, buffer, offsets );
@@ -956,7 +956,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorSums
     TransposeMultiplyVectorSumsPack( context, buffer, offsetsCopy );
 
     // Perform the reduces with log2(p) messages
-    _teams->TreeSumToRoots( buffer, sizes, offsets );
+    _teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of teamunicators have data)
     TransposeMultiplyVectorSumsUnpack( context, buffer, offsets );
@@ -1998,7 +1998,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyVectorBroadcasts
     MultiplyVectorBroadcastsPack( context, buffer, offsetsCopy );
 
     // Perform the broadcasts with log2(p) messages
-    _teams->TreeBroadcasts( buffer, sizes, offsets );
+    _teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers 
     MultiplyVectorBroadcastsUnpack( context, buffer, offsets );
@@ -2035,7 +2035,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyVectorBroadcasts
     TransposeMultiplyVectorBroadcastsPack( context, buffer, offsetsCopy );
 
     // Perform the broadcasts with log2(p) messages
-    _teams->TreeBroadcasts( buffer, sizes, offsets );
+    _teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers 
     TransposeMultiplyVectorBroadcastsUnpack( context, buffer, offsets );

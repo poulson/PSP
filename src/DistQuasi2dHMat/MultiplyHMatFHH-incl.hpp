@@ -140,7 +140,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
     A.MultiplyHMatFHHSumsPack( B, C, buffer, offsetsCopy );
 
     // Perform the reduces with log2(p) messages
-    A._teams->TreeSumToRoots( buffer, sizes, offsets );
+    A._teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of communicators have data)
     A.MultiplyHMatFHHSumsUnpack( B, C, buffer, offsets );
@@ -662,7 +662,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     A.MultiplyHMatFHHBroadcastsPack( B, C, buffer, offsetsCopy );
 
     // Perform the broadcasts with log2(p) messages
-    A._teams->TreeBroadcasts( buffer, sizes, offsets );
+    A._teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers
     A.MultiplyHMatFHHBroadcastsUnpack( B, C, buffer, offsets );
@@ -1235,19 +1235,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     {
         // Generate offsets and sizes for each entire level
         const unsigned numAllReduces = numTeamLevels-1;
-        std::vector<int> sizes(numAllReduces), offsets(numAllReduces);
-        totalAllReduceSize = 0;
+        std::vector<int> sizes(numAllReduces);
         for( unsigned teamLevel=0; teamLevel<numAllReduces; ++teamLevel )
-        {
-            offsets[teamLevel] = totalAllReduceSize;
             sizes[teamLevel] = r*r*(2*numTargetFHH[teamLevel]+
                                       numSourceFHH[teamLevel]);
 
-            totalAllReduceSize += 2*numTargetFHH[teamLevel]*r*r;
-            totalAllReduceSize += numSourceFHH[teamLevel]*r*r;
-        }
-
-        A._teams->TreeSums( allReduceBuffer, sizes, offsets );
+        A._teams->TreeSums( allReduceBuffer, sizes );
     }
 
     // Finish forming the low-rank approximation

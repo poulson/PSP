@@ -1214,7 +1214,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     A.MultiplyHMatMainSumsPackC( B, C, buffer, offsetsCopy );
 
     // Perform the reduces with log2(p) messages
-    A._teams->TreeSumToRoots( buffer, sizes, offsets );
+    A._teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of communicators have data)
     A.MultiplyHMatMainSumsUnpackA( buffer, offsets );
@@ -3519,7 +3519,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     A.MultiplyHMatMainBroadcastsPackC( B, C, buffer, offsetsCopy );
 
     // Perform the broadcasts with log2(p) messages
-    A._teams->TreeBroadcasts( buffer, sizes, offsets );
+    A._teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers
     A.MultiplyHMatMainBroadcastsUnpackA( buffer, offsets );

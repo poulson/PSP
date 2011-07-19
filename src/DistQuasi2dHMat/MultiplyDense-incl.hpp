@@ -334,7 +334,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePrecompute
                             ( nodeContext.Child(t,s), 
                               alpha, XLocalSub, YLocalSub );
                     }
-
                 }
                 else // teamRank == 1
                 {
@@ -976,7 +975,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseSums
     MultiplyDenseSumsPack( context, buffer, offsetsCopy );
 
     // Perform the reduces with log2(p) messages
-    _teams->TreeSumToRoots( buffer, sizes, offsets );
+    _teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     MultiplyDenseSumsUnpack( context, buffer, offsets );
@@ -1012,7 +1011,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseSums
     TransposeMultiplyDenseSumsPack( context, buffer, offsetsCopy );
 
     // Perform the reduces with log2(p) messages
-    _teams->TreeSumToRoots( buffer, sizes, offsets );
+    _teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of subcommunicators have data)
     TransposeMultiplyDenseSumsUnpack( context, buffer, offsets );
@@ -1537,6 +1536,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataPack
             if( teamRank == 0 )
             {
                 Dense<Scalar>& Z = *context.block.data.Z;
+#ifndef RELEASE
+                if( Z.Height() != Z.LDim() )
+                    throw std::logic_error
+                    ("Z's height did not match its ldim for DIST_LOW_RANK");
+#endif
                 std::memcpy
                 ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
                   Z.Height()*Z.Width()*sizeof(Scalar) );
@@ -1552,6 +1556,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataPack
         if( SF.rank != 0 )
         {
             Dense<Scalar>& Z = *context.block.data.Z;
+#ifndef RELEASE
+                if( Z.Height() != Z.LDim() )
+                    throw std::logic_error
+                    ("Z's height did not match its ldim for SPLIT_LOW_RANK");
+#endif
             std::memcpy
             ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
               Z.Height()*Z.Width()*sizeof(Scalar) );
@@ -1565,6 +1574,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassDataPack
         if( Height() != 0 )
         {
             Dense<Scalar>& Z = *context.block.data.Z;
+#ifndef RELEASE
+                if( Z.Height() != Z.LDim() )
+                    throw std::logic_error
+                    ("Z's height did not match its ldim for SPLIT_DENSE");
+#endif
             std::memcpy
             ( &buffer[offsets[_targetRoot]], Z.LockedBuffer(),
               Z.Height()*Z.Width()*sizeof(Scalar) );
@@ -2113,7 +2127,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcasts
     MultiplyDenseBroadcastsPack( context, buffer, offsetsCopy );
 
     // Perform the broadcasts with log2(p) messages
-    _teams->TreeBroadcasts( buffer, sizes, offsets );
+    _teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers 
     MultiplyDenseBroadcastsUnpack( context, buffer, offsets );
@@ -2150,7 +2164,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::TransposeMultiplyDenseBroadcasts
     TransposeMultiplyDenseBroadcastsPack( context, buffer, offsetsCopy );
 
     // Perform the broadcasts with log2(p) messages
-    _teams->TreeBroadcasts( buffer, sizes, offsets );
+    _teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers 
     TransposeMultiplyDenseBroadcastsUnpack( context, buffer, offsets );
@@ -2288,6 +2302,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDenseBroadcastsPack
         {
             const DistLowRank& DF = *_block.data.DF;
             const Dense<Scalar>& Z = *context.block.data.Z;
+#ifndef RELEASE
+            if( Z.LDim() != DF.rank )
+                throw std::logic_error("Z's height did not match its ldim");
+#endif
             std::memcpy
             ( &buffer[offsets[_level]], Z.LockedBuffer(), 
               DF.rank*numRhs*sizeof(Scalar) );

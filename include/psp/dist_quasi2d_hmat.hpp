@@ -39,32 +39,24 @@ public:
     class Teams
     {
     private:
-        std::vector<MPI_Comm> _teams, _crossTeams, _rootTeams;
+        std::vector<MPI_Comm> _teams, _crossTeams;
     public:
         Teams( MPI_Comm comm );
         ~Teams();
 
         unsigned NumLevels() const;
-        unsigned NumRootLevels() const;
         unsigned TeamLevel( unsigned level ) const;
         MPI_Comm Team( unsigned level ) const;
         MPI_Comm CrossTeam( unsigned inverseLevel ) const;
-        MPI_Comm RootTeam( unsigned inverseLevel ) const;
 
         void TreeSums
-        (       std::vector<Scalar>& buffer,
-          const std::vector<int>& sizes,
-          const std::vector<int>& offsets ) const;
+        ( std::vector<Scalar>& buffer, const std::vector<int>& sizes ) const;
 
         void TreeSumToRoots
-        (       std::vector<Scalar>& buffer, 
-          const std::vector<int>& sizes,
-          const std::vector<int>& offsets ) const;
+        ( std::vector<Scalar>& buffer, const std::vector<int>& sizes ) const;
 
         void TreeBroadcasts
-        (       std::vector<Scalar>& buffer,
-          const std::vector<int>& sizes,
-          const std::vector<int>& offsets ) const;
+        ( std::vector<Scalar>& buffer, const std::vector<int>& sizes ) const;
     };
 
     /*
@@ -1395,14 +1387,10 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
 
     // Simple (yet slow) method for computing the number of teams
     // (and how many we're the root of)
-    unsigned numLevels=1, numRootLevels=1;
-    unsigned teamSize=p;
+    unsigned numLevels=1, teamSize=p;
     while( teamSize != 1 )
     {
         ++numLevels;
-        if( rank % teamSize == 0 )
-            ++numRootLevels;
-
         if( teamSize >= 4 )
             teamSize >>= 2;
         else // teamSize == 2
@@ -1430,30 +1418,22 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
         const int level = numLevels-1-inverseLevel;
         const int teamRank = mpi::CommRank( _teams[level] );
         teamSize = mpi::CommSize( _teams[level] );
-        const int color = teamRank;
-        const int key = rank/teamSize;
-        mpi::CommSplit( comm, color, key, _crossTeams[inverseLevel] );
-    }
+        const int teamSizePrev = mpi::CommSize( _teams[level+1] );
 
-    _rootTeams.resize( numRootLevels );
-    mpi::CommDup( _teams[numLevels-1], _rootTeams[0] );
-    for( unsigned inverseLevel=1; inverseLevel<numLevels; ++inverseLevel )
-    {
-        const int level = numLevels-1-inverseLevel;
-        teamSize = mpi::CommSize( _teams[level] );
-        if( inverseLevel < numRootLevels )
+        int color, key;
+        if( teamSize == 2 )
         {
-            const int color = (rank/teamSize) / 4;
-            const int key = (rank/teamSize) % 4;
-            mpi::CommSplit( comm, color, key, _rootTeams[inverseLevel] );
+            color = rank / 2;
+            key = rank % 2;
         }
         else
         {
-            const int color = MPI_UNDEFINED;
-            const int key = 0;
-            MPI_Comm dummy;
-            mpi::CommSplit( comm, color, key, dummy );
+            const int mod = rank % teamSizePrev;
+            color = (rank/teamSize)*teamSizePrev + mod;
+            key = (rank/teamSizePrev) % 4;
         }
+
+        mpi::CommSplit( comm, color, key, _crossTeams[inverseLevel] );
     }
 #ifndef RELEASE
     PopCallStack();
@@ -1471,8 +1451,6 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::~Teams()
         mpi::CommFree( _teams[i] );
     for( unsigned i=0; i<_crossTeams.size(); ++i )
         mpi::CommFree( _crossTeams[i] );
-    for( unsigned i=0; i<_rootTeams.size(); ++i )
-        mpi::CommFree( _rootTeams[i] );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1483,13 +1461,6 @@ inline unsigned
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::NumLevels() const
 {
     return _teams.size();
-}
-
-template<typename Scalar,bool Conjugated>
-inline unsigned
-DistQuasi2dHMat<Scalar,Conjugated>::Teams::NumRootLevels() const
-{
-    return _rootTeams.size();
 }
 
 template<typename Scalar,bool Conjugated>
@@ -1522,25 +1493,9 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::CrossTeam
 }
 
 template<typename Scalar,bool Conjugated>
-inline MPI_Comm
-DistQuasi2dHMat<Scalar,Conjugated>::Teams::RootTeam
-( unsigned inverseLevel ) const
-{
-#ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::Teams::RootTeam");
-    if( inverseLevel >= _rootTeams.size() )
-        throw std::logic_error("Invalid root team request");
-    PopCallStack();
-#endif
-    return _rootTeams[inverseLevel];
-}
-
-template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
-(       std::vector<Scalar>& buffer, 
-  const std::vector<int>& sizes,
-  const std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, const std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Teams::TreeSums");
@@ -1552,7 +1507,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
     for( int i=0; i<numAllReduces; ++i )
         totalSize += sizes[i];
 
-    if( numLevels == 1 || totalSize == 0 )
+    if( totalSize == 0 )
     {
 #ifndef RELEASE
     PopCallStack();
@@ -1565,14 +1520,13 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
     int partialSize = totalSize;
     for( int i=0; i<numAllReduces; ++i )
     {
-        if( partialSize != 0 )
-        {
-            MPI_Comm crossTeam = CrossTeam( i );
-            mpi::AllReduce
-            ( (const Scalar*)MPI_IN_PLACE, &buffer[0], partialSize, MPI_SUM,
-              crossTeam );
-            partialSize -= sizes[numAllReduces-1-i];
-        }
+        if( partialSize == 0 )
+            break;
+        MPI_Comm crossTeam = CrossTeam( i+1 );
+        mpi::AllReduce
+        ( (const Scalar*)MPI_IN_PLACE, &buffer[0], partialSize, MPI_SUM,
+          crossTeam );
+        partialSize -= sizes[numAllReduces-1-i];
     }
 #ifndef RELEASE
     PopCallStack();
@@ -1582,9 +1536,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSums
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
-(       std::vector<Scalar>& buffer, 
-  const std::vector<int>& sizes,
-  const std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, const std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Teams::TreeSumToRoots");
@@ -1596,7 +1548,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
     for( int i=0; i<numReduces; ++i )
         totalSize += sizes[i];
 
-    if( numLevels == 1 || totalSize == 0 )
+    if( totalSize == 0 )
     {
 #ifndef RELEASE
     PopCallStack();
@@ -1605,31 +1557,20 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
     }
 
     // Use O(log(p)) custom method: 
-    // - Reduce onto the root of our smallest nontrivial communicator
-    // - Continue using the root teams to finish the reduction
-    MPI_Comm smallTeam = Team( numLevels-2 );
-    const int smallTeamRank = mpi::CommRank( smallTeam );
-    if( smallTeamRank == 0 )
-        mpi::Reduce
-        ( (const Scalar*)MPI_IN_PLACE, &buffer[0], totalSize,
-          0, MPI_SUM, smallTeam );
-    else
-        mpi::Reduce( &buffer[0], 0, totalSize, 0, MPI_SUM, smallTeam );
-
-    int partialSize = totalSize - sizes[numReduces-1];
-    const int numRootLevels = NumRootLevels();
-    for( int i=1; i<numRootLevels; ++i )
+    // - Reduce to the root of each cross communicator
+    int partialSize = totalSize;
+    for( int i=0; i<numReduces; ++i )
     {
         if( partialSize == 0 )
             break;
-        MPI_Comm rootTeam = RootTeam( i );
-        const int rootTeamRank = mpi::CommRank( rootTeam );
-        if( rootTeamRank == 0 )
+        MPI_Comm crossTeam = CrossTeam( i+1 );
+        const int crossTeamRank = mpi::CommRank( crossTeam );
+        if( crossTeamRank == 0 )
             mpi::Reduce
-            ( (const Scalar*)MPI_IN_PLACE, &buffer[0], partialSize,
-              0, MPI_SUM, rootTeam );
+            ( (const Scalar*)MPI_IN_PLACE, &buffer[0], 
+              partialSize, 0, MPI_SUM, crossTeam );
         else
-            mpi::Reduce( &buffer[0], 0, partialSize, 0, MPI_SUM, rootTeam );
+            mpi::Reduce( &buffer[0], 0, partialSize, 0, MPI_SUM, crossTeam );
         partialSize -= sizes[numReduces-1-i];
     }
 #ifndef RELEASE
@@ -1640,9 +1581,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeSumToRoots
 template<typename Scalar,bool Conjugated>
 inline void
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeBroadcasts
-(       std::vector<Scalar>& buffer, 
-  const std::vector<int>& sizes,
-  const std::vector<int>& offsets ) const
+( std::vector<Scalar>& buffer, const std::vector<int>& sizes ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Teams::TreeBroadcasts");
@@ -1654,7 +1593,7 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeBroadcasts
     for( int i=0; i<numBroadcasts; ++i )
         totalSize += sizes[i];
 
-    if( numLevels == 1 || totalSize == 0 )
+    if( totalSize == 0 )
     {
 #ifndef RELEASE
     PopCallStack();
@@ -1663,19 +1602,14 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::TreeBroadcasts
     }
 
     // Use O(log(p)) custom method: 
-    // - Broadcasts from the root of our smallest nontrivial communicator
-    // - Continue broadcasting from the roots of the root teams
-    MPI_Comm smallTeam = Team( numLevels-2 );
-    mpi::Broadcast( &buffer[0], totalSize, 0, smallTeam );
-
-    int partialSize = totalSize - sizes[numBroadcasts-1];
-    const int numRootLevels = NumRootLevels();
-    for( int i=1; i<numRootLevels; ++i )
+    // - Broadcast over each cross communicator
+    int partialSize = totalSize;
+    for( int i=0; i<numBroadcasts; ++i )
     {
         if( partialSize == 0 )
             break;
-        MPI_Comm rootTeam = RootTeam( i );
-        mpi::Broadcast( &buffer[0], partialSize, 0, rootTeam );
+        MPI_Comm crossTeam = CrossTeam( i+1 );
+        mpi::Broadcast( &buffer[0], partialSize, 0, crossTeam );
         partialSize -= sizes[numBroadcasts-1-i];
     }
 #ifndef RELEASE

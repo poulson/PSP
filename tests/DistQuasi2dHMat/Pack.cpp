@@ -381,7 +381,8 @@ main( int argc, char* argv[] )
         {
             for( int i=0; i<YLocal.Height(); ++i )
             {
-                if( std::abs(YLocalTruth.Get(i,j)-YLocal.Get(i,j)) > 1e-8 )
+                double error = std::abs(YLocalTruth.Get(i,j)-YLocal.Get(i,j));
+                if( error > 1e-8 )
                 {
                     std::ostringstream ss;
                     ss << "Answer differed at local index (" 
@@ -390,6 +391,7 @@ main( int argc, char* argv[] )
                        << YLocal.Get(i,j) << std::endl;
                     throw std::logic_error( ss.str().c_str() );
                 }
+                YLocal.Set(i,j,error);
             }
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
@@ -431,7 +433,8 @@ main( int argc, char* argv[] )
         {
             for( int i=0; i<ZLocal.Height(); ++i )
             {
-                if( std::abs(ZLocalTruth.Get(i,j)-ZLocal.Get(i,j)) > 1e-8 )
+                double error = std::abs(ZLocalTruth.Get(i,j)-ZLocal.Get(i,j));
+                if( error > 1e-8 )
                 {
                     std::ostringstream ss;
                     ss << "Answer differed at local index (" 
@@ -440,6 +443,7 @@ main( int argc, char* argv[] )
                        << ZLocal.Get(i,j) << std::endl;
                     throw std::logic_error( ss.str().c_str() );
                 }
+                ZLocal.Set(i,j,error);
             }
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
