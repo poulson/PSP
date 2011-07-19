@@ -1010,8 +1010,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     // Set up the space for the packed 2r x r matrices and taus.
     int numTotalQRs=0, numQRSteps=0, qrTotalSize=0, tauTotalSize=0;
     std::vector<int> XOffsets(numTeamLevels), halfHeightOffsets(numTeamLevels),
-                     qrOffsets(numTeamLevels), qrPieceSizes(numTeamLevels), 
-                     tauOffsets(numTeamLevels), tauPieceSizes(numTeamLevels);
+                     qrOffsets(numTeamLevels), tauOffsets(numTeamLevels);
     for( unsigned teamLevel=0; teamLevel<numTeamLevels; ++teamLevel )
     {
         MPI_Comm team = C._teams->Team( teamLevel );
@@ -1023,13 +1022,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         qrOffsets[teamLevel] = qrTotalSize;
         tauOffsets[teamLevel] = tauTotalSize;
 
-        qrPieceSizes[teamLevel] = log2TeamSize*(r*r+r);
-        tauPieceSizes[teamLevel] = (log2TeamSize+1)*r;
-
         numTotalQRs += numQRs[teamLevel];
         numQRSteps += numQRs[teamLevel]*log2TeamSize;
-        qrTotalSize += numQRs[teamLevel]*qrPieceSizes[teamLevel];
-        tauTotalSize += numQRs[teamLevel]*tauPieceSizes[teamLevel];
+        qrTotalSize += numQRs[teamLevel]*log2TeamSize*(r*r+r);
+        tauTotalSize += numQRs[teamLevel]*(log2TeamSize+1)*r;
     }
 
     std::vector<Dense<Scalar>*> Xs( numTotalQRs );
@@ -1068,14 +1064,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 
     // Perform the large local QR's and pack into the QR buffer as appropriate
     {
-        std::vector<int> XOffsetsCopy, qrOffsetsCopy, tauOffsetsCopy;
+        std::vector<int> XOffsetsCopy, tauOffsetsCopy;
         XOffsetsCopy = XOffsets;
-        qrOffsetsCopy = qrOffsets;
         tauOffsetsCopy = tauOffsets;
 
         C.MultiplyHMatFHHFinalizeLocalQR
-        ( Xs, XOffsetsCopy, 
-          qrBuffer, qrOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
+        ( Xs, XOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
     }
 
     C.MultiplyHMatParallelQR
@@ -1101,8 +1095,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         {
             Dense<Scalar>& X = *XLevel[k];
             const int* halfHeightsPiece = &halfHeightsLevel[k*log2TeamSize*2];
-            const Scalar* qrPiece = &qrLevel[k*qrPieceSizes[teamLevel]];
-            const Scalar* tauPiece = &tauLevel[k*tauPieceSizes[teamLevel]];
+            const Scalar* qrPiece = &qrLevel[k*log2TeamSize*(r*r+r)];
+            const Scalar* tauPiece = &tauLevel[k*(log2TeamSize+1)*r];
 
            if( log2TeamSize > 0 )
            {
@@ -1215,8 +1209,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         }
     }
     XOffsets.clear();
-    qrOffsets.clear(); qrPieceSizes.clear(); qrBuffer.clear();
-    tauOffsets.clear(); tauPieceSizes.clear(); tauBuffer.clear();
+    qrOffsets.clear(); qrBuffer.clear();
+    tauOffsets.clear(); tauBuffer.clear();
     qrWork.clear();
     Z.Clear();
 
@@ -1237,8 +1231,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         const unsigned numAllReduces = numTeamLevels-1;
         std::vector<int> sizes(numAllReduces);
         for( unsigned teamLevel=0; teamLevel<numAllReduces; ++teamLevel )
-            sizes[teamLevel] = r*r*(2*numTargetFHH[teamLevel]+
-                                      numSourceFHH[teamLevel]);
+            sizes[teamLevel] = (2*numTargetFHH[teamLevel]+
+                                  numSourceFHH[teamLevel])*r*r;
 
         A._teams->TreeSums( allReduceBuffer, sizes );
     }
@@ -1265,6 +1259,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeCounts");
 #endif
+    if( Height() == 0 || Width() == 0 )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1288,13 +1290,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
         {
             const unsigned teamLevel = _teams->TeamLevel(_level);
             numQRs[teamLevel] += _colXMap.Size();
-            ++numTargetFHH[teamLevel];
+            numTargetFHH[teamLevel] += _colXMap.Size();
         }
         if( _inSourceTeam )
         {
             const unsigned teamLevel = _teams->TeamLevel(_level);
             numQRs[teamLevel] += _rowXMap.Size();
-            ++numSourceFHH[teamLevel];
+            numSourceFHH[teamLevel] += _rowXMap.Size();
         }
         break;
     default:
@@ -1347,13 +1349,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                 if( C._inTargetTeam ) 
                 {
                     // Handle the middle update, Omega2' (alpha A B Omega1)
-                    const Dense<Scalar>& X = C._colXMap.Get( A._sourceOffset );
+                    const int key = A._sourceOffset;
+                    const Dense<Scalar>& X = C._colXMap.Get( key );
                     const Dense<Scalar>& Omega2 = A._rowOmega;
                     const unsigned teamLevel = C._teams->TeamLevel(C._level);
                     Scalar* middleUpdate = 
                         &allReduceBuffer[middleOffsets[teamLevel]];
                     blas::Gemm
-                    ( 'C', 'N', rank, rank, A.LocalHeight(),
+                    ( 'C', 'N', rank, rank, X.Height(),
                       (Scalar)1, Omega2.LockedBuffer(), Omega2.LDim(),
                                  X.LockedBuffer(),      X.LDim(),
                       (Scalar)0, middleUpdate,          rank );
@@ -1390,13 +1393,20 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
 ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
-  std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
   std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
   std::vector<Scalar>& qrWork )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeLocalQR");
 #endif
+    if( Height() == 0 || Width() == 0 )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
     switch( _block.type )
     {
     case DIST_NODE:
@@ -1407,8 +1417,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatFHHFinalizeLocalQR
-                ( Xs, XOffsets, qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
-                  qrWork );
+                ( Xs, XOffsets, tauBuffer, tauOffsets, qrWork );
         break;
     }
     case DIST_LOW_RANK:
@@ -1417,9 +1426,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
     {
         MPI_Comm team = _teams->Team( _level );
         const unsigned teamLevel = _teams->TeamLevel(_level);
-        const int teamRank = mpi::CommRank( team );
-        const int teamSize = mpi::CommSize( team );
-        const int log2TeamSize = Log2( teamSize );
+        const int log2TeamSize = Log2( mpi::CommSize( team ) );
         const int r = SampleRank( MaxRank() );
 
         if( _inTargetTeam )
@@ -1436,34 +1443,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                   &tauBuffer[tauOffsets[teamLevel]], 
                   &qrWork[0], qrWork.size() );
                 tauOffsets[teamLevel] += (log2TeamSize+1)*r;
-                if( log2TeamSize > 0 )
-                {
-                    std::memset
-                    ( &qrBuffer[qrOffsets[teamLevel]], 0, 
-                      (r*r+r)*sizeof(Scalar) );
-                    const bool root = !(teamRank & 0x1);
-                    if( root )
-                    {
-                        // Copy our R into the upper triangle of the next
-                        // matrix to factor (which is 2r x r)
-                        for( int j=0; j<X.Width(); ++j )
-                            std::memcpy
-                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
-                              X.LockedBuffer(0,j), 
-                              std::min(X.Height(),j+1)*sizeof(Scalar) );
-                    }
-                    else
-                    {
-                        // Copy our R into the lower triangle of the next
-                        // matrix to factor (which is 2r x r)
-                        for( int j=0; j<X.Width(); ++j )
-                            std::memcpy
-                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
-                              X.LockedBuffer(0,j), 
-                              std::min(X.Height(),j+1)*sizeof(Scalar) );
-                    }
-                    qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
-                }
             }
         }
         if( _inSourceTeam )
@@ -1480,34 +1459,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
                   &tauBuffer[tauOffsets[teamLevel]], 
                   &qrWork[0], qrWork.size() );
                 tauOffsets[teamLevel] += (log2TeamSize+1)*r;
-                if( log2TeamSize > 0 )
-                {
-                    std::memset
-                    ( &qrBuffer[qrOffsets[teamLevel]], 0, 
-                      (r*r+r)*sizeof(Scalar) );
-                    const bool root = !(teamRank & 0x1);
-                    if( root )
-                    {
-                        // Copy our R into the upper triangle of the next
-                        // matrix to factor (which is 2r x r)
-                        for( int j=0; j<X.Width(); ++j )
-                            std::memcpy
-                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)],
-                              X.LockedBuffer(0,j), 
-                              std::min(X.Height(),j+1)*sizeof(Scalar) );
-                    }
-                    else
-                    {
-                        // Copy our R into the lower triangle of the next
-                        // matrix to factor (which is 2r x r)
-                        for( int j=0; j<X.Width(); ++j )
-                            std::memcpy
-                            ( &qrBuffer[qrOffsets[teamLevel]+(j*j+j)+(j+1)],
-                              X.LockedBuffer(0,j), 
-                              std::min(X.Height(),j+1)*sizeof(Scalar) );
-                    }
-                    qrOffsets[teamLevel] += log2TeamSize*(r*r+r);
-                }
             }
         }
         break;
@@ -1589,7 +1540,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                       (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
                                  Omega1.LockedBuffer(), Omega1.LDim(),
                       (Scalar)0, rightUpdate,           rank );
-
                     rightOffsets[teamLevel] += rank*rank;
                 }
             }

@@ -905,7 +905,6 @@ private:
             std::vector<int>& middleOffsets ) const;
     void MultiplyHMatFHHFinalizeLocalQR
     ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
-      std::vector<Scalar>& qrBuffer,  std::vector<int>& qrOffsets,
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
     void MultiplyHMatFHHFinalizeOuterUpdates
