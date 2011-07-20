@@ -1438,7 +1438,6 @@ DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
     for( unsigned inverseLevel=1; inverseLevel<numLevels; ++inverseLevel )
     {
         const int level = numLevels-1-inverseLevel;
-        const int teamRank = mpi::CommRank( _teams[level] );
         teamSize = mpi::CommSize( _teams[level] );
         const int teamSizePrev = mpi::CommSize( _teams[level+1] );
 

@@ -1278,7 +1278,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
                 const int r = X.Width();
                 const int halfHeightOffset = (k*log2ParentTeamSize+passes)*2;
 
-                int halfHeight;
+                int halfHeight = 0; // initialize so compiler's don't complain
                 if( step == 0 )
                 {
                     // The first iteration bootstraps the local height from X
