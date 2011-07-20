@@ -27,6 +27,8 @@
 
 namespace psp {
 
+// A distributed H-matrix class that requires a power of two number of processes.
+// It does not yet support symmetry.
 template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMat
 {
@@ -144,6 +146,27 @@ public:
 
     // A := alpha A
     void Scale( Scalar alpha );
+
+    // A := conj(A)
+    void Conjugate();
+
+    // A := conj(B)
+    void ConjugateFrom( const DistQuasi2dHMat<Scalar,Conjugated>& B );
+
+    // A := B
+    void CopyFrom( const DistQuasi2dHMat<Scalar,Conjugated>& B );
+
+    // A := A^T
+    void Transpose();
+
+    // A := B^T
+    void TransposeFrom( const DistQuasi2dHMat<Scalar,Conjugated>& B );
+
+    // A := A^H
+    void Adjoint();
+
+    // A := B^H
+    void AdjointFrom( const DistQuasi2dHMat<Scalar,Conjugated>& B );
 
     // y := alpha H x
     void Multiply
@@ -1377,7 +1400,7 @@ inline
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::Teams( MPI_Comm comm )
 {
 #ifndef RELEASE
-    PushCallStack("Teams::Teams");
+    PushCallStack("DistQuasi2dHMat::Teams::Teams");
 #endif
     const int rank = mpi::CommRank( comm );
     const int p = mpi::CommSize( comm );
@@ -1444,7 +1467,7 @@ inline
 DistQuasi2dHMat<Scalar,Conjugated>::Teams::~Teams()
 {
 #ifndef RELEASE
-    PushCallStack("Teams::~Teams");
+    PushCallStack("DistQuasi2dHMat::Teams::~Teams");
 #endif
     for( unsigned i=0; i<_teams.size(); ++i )
         mpi::CommFree( _teams[i] );
