@@ -98,6 +98,11 @@ public:
 
     DistQuasi2dHMat
     ( int numLevels, int maxRank, bool stronglyAdmissible, 
+      int xSize, int ySize, int zSize,
+      const Teams& teams );
+
+    DistQuasi2dHMat
+    ( int numLevels, int maxRank, bool stronglyAdmissible, 
       int xSizeSource, int xSizeTarget, 
       int ySizeSource, int ySizeTarget, int zSize, 
       const Teams& teams );
@@ -120,6 +125,20 @@ public:
 
     int FirstLocalRow() const;
     int FirstLocalCol() const;
+
+    int FirstLocalXTarget() const;
+    int FirstLocalXSource() const;
+    int FirstLocalYTarget() const;
+    int FirstLocalYSource() const;
+    int FirstLocalZSource() const;
+    int FirstLocalZTarget() const;
+
+    int LocalXTargetSize() const;
+    int LocalXSourceSize() const;
+    int LocalYTargetSize() const;
+    int LocalYSourceSize() const;
+    int LocalZTargetSize() const;
+    int LocalZSourceSize() const;
 
     void RequireRoot() const;
 
@@ -454,10 +473,10 @@ private:
       const Quasi2dHMat<Scalar,Conjugated>& H );
 
     static void ComputeLocalDimensionRecursion
-    ( int& localDim, int p, int rank, int xSize, int ySize, int zSize );
+    ( int& localDim, int& xSize, int& ySize, int& zSize, int p, int rank );
 
     static void ComputeFirstLocalIndexRecursion
-    ( int& firstLocalIndex, int p, int rank, int xSize, int ySize, int zSize );
+    ( int& firstLocalIndex, int xSize, int ySize, int zSize, int p, int rank );
 
     static void ComputeLocalSizesRecursion
     ( int* localSizes, int teamSize, int xSize, int ySize, int zSize );

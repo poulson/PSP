@@ -23,7 +23,7 @@
 void Usage()
 {
     std::cout << "Ghost <xSize> <ySize> <zSize> <numLevels> "
-                 "<strongly admissible?> <r> <print?> <print structure?>" 
+                 "<strongly admissible?> <maxRank> <print?> <print structure?>" 
               << std::endl;
 }
 
@@ -105,7 +105,7 @@ main( int argc, char* argv[] )
     const int zSize = atoi( argv[3] );
     const int numLevels = atoi( argv[4] );
     const bool stronglyAdmissible = atoi( argv[5] );
-    const int r = atoi( argv[6] );
+    const int maxRank = atoi( argv[6] );
     const bool print = atoi( argv[7] );
     const bool printStructure = atoi( argv[8] );
 
@@ -182,7 +182,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStartTime = psp::mpi::WallTime();
-        Quasi2d H( S, numLevels, r, stronglyAdmissible, xSize, ySize, zSize );
+        Quasi2d H
+        ( S, numLevels, maxRank, stronglyAdmissible, xSize, ySize, zSize );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStopTime = psp::mpi::WallTime();
         if( rank == 0 )

@@ -123,8 +123,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalHeight
         throw std::logic_error("Must use a power of two number of processes");
 #endif
     int localHeight;
-    ComputeLocalDimensionRecursion
-    ( localHeight, p, rank, H._xSizeTarget, H._ySizeTarget, H._zSize );
+    int xSize = H._xSizeTarget;
+    int ySize = H._ySizeTarget;
+    int zSize = H._zSize;
+    ComputeLocalDimensionRecursion( localHeight, xSize, ySize, zSize, p, rank );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -142,8 +144,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalWidth
         throw std::logic_error("Must use a power of two number of processes");
 #endif
     int localWidth;
-    ComputeLocalDimensionRecursion
-    ( localWidth, p, rank, H._xSizeSource, H._ySizeSource, H._zSize );
+    int xSize = H._xSizeSource;
+    int ySize = H._ySizeSource;
+    int zSize = H._zSize;
+    ComputeLocalDimensionRecursion( localWidth, xSize, ySize, zSize, p, rank );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -162,7 +166,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeFirstLocalRow
 #endif
     int firstLocalRow = 0;
     ComputeFirstLocalIndexRecursion
-    ( firstLocalRow, p, rank, H._xSizeTarget, H._ySizeTarget, H._zSize );
+    ( firstLocalRow, H._xSizeTarget, H._ySizeTarget, H._zSize, p, rank );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -181,7 +185,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeFirstLocalCol
 #endif
     int firstLocalCol = 0;
     ComputeFirstLocalIndexRecursion
-    ( firstLocalCol, p, rank, H._xSizeSource, H._ySizeSource, H._zSize );
+    ( firstLocalCol, H._xSizeSource, H._ySizeSource, H._zSize, p, rank );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -677,7 +681,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::PackRecursion
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalDimensionRecursion
-( int& localDim, int p, int rank, int xSize, int ySize, int zSize )
+( int& localDim, int& xSize, int& ySize, int& zSize, int p, int rank )
 {
     if( p >= 4 )
     {
@@ -690,10 +694,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalDimensionRecursion
         const int xRightSize = xSize - xLeftSize;
         const int yBottomSize = ySize/2;
         const int yTopSize = ySize - yBottomSize;
+
+        xSize = ( onRight ? xRightSize : xLeftSize   );
+        ySize = ( onTop   ? yTopSize   : yBottomSize );
         ComputeLocalDimensionRecursion
-        ( localDim, p/4, subteamRank, 
-          (onRight ? xRightSize : xLeftSize),
-          (onTop ? yTopSize : yBottomSize), zSize );
+        ( localDim, xSize, ySize, zSize, p/4, subteamRank );
     }
     else if( p == 2 )
     {
@@ -702,10 +707,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalDimensionRecursion
 
         const int yBottomSize = ySize/2;
         const int yTopSize = ySize - yBottomSize;
+
+        xSize = xSize;
+        ySize = ( subteam ? yTopSize : yBottomSize );
         ComputeLocalDimensionRecursion
-        ( localDim, p/2, subteamRank,
-          xSize, 
-          (subteam ? yTopSize : yBottomSize), zSize );
+        ( localDim, xSize, ySize, zSize, p/2, subteamRank );
     }
     else // p == 1
         localDim = xSize*ySize*zSize;
@@ -714,7 +720,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeLocalDimensionRecursion
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeFirstLocalIndexRecursion
-( int& firstLocalIndex, int p, int rank, int xSize, int ySize, int zSize )
+( int& firstLocalIndex, int xSize, int ySize, int zSize, int p, int rank )
 {
     if( p >= 4 )
     {
@@ -736,10 +742,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeFirstLocalIndexRecursion
         else if( onRight )
             firstLocalIndex += xLeftSize*yBottomSize*zSize;
 
+        const int xSizeNew = ( onRight ? xRightSize : xLeftSize   );
+        const int ySizeNew = ( onTop   ? yTopSize   : yBottomSize );
         ComputeFirstLocalIndexRecursion
-        ( firstLocalIndex, p/4, subteamRank,
-          (onRight ? xRightSize : xLeftSize),
-          (onTop ? yTopSize : yBottomSize), zSize );
+        ( firstLocalIndex, xSizeNew, ySizeNew, zSize, p/4, subteamRank );
     }
     else if( p == 2 )
     {
@@ -753,10 +759,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::ComputeFirstLocalIndexRecursion
         if( subteam )
             firstLocalIndex += xSize*yBottomSize*zSize;
 
+        const int ySizeNew = ( subteam ? yTopSize : yBottomSize );
         ComputeFirstLocalIndexRecursion
-        ( firstLocalIndex, p/2, subteamRank,
-          xSize, 
-          (subteam ? yTopSize : yBottomSize), zSize );
+        ( firstLocalIndex, xSize, ySizeNew, zSize, p/2, subteamRank );
     }
 }
 

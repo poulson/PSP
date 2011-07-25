@@ -54,6 +54,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 ( int numLevels, int maxRank, bool stronglyAdmissible, 
+  int xSize, int ySize, int zSize,
+  const Teams& teams )
+: _numLevels(numLevels), _maxRank(maxRank), 
+  _sourceOffset(0), _targetOffset(0), 
+  _stronglyAdmissible(stronglyAdmissible), 
+  _xSizeSource(xSize), _xSizeTarget(xSize),
+  _ySizeSource(ySize), _ySizeTarget(ySize), _zSize(zSize), 
+  _xSource(0), _xTarget(0), _ySource(0), _yTarget(0), 
+  _teams(&teams), _level(0),
+  _inSourceTeam(true), _inTargetTeam(true), 
+  _sourceRoot(0), _targetRoot(0),
+  _haveDenseUpdate(false), _storedDenseUpdate(false),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+{ 
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");
+#endif
+    const int numTeamLevels = teams.NumLevels();
+    if( numTeamLevels > numLevels )
+        throw std::logic_error("Too many processes for this H-matrix depth");
+    BuildTree();
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
+( int numLevels, int maxRank, bool stronglyAdmissible, 
   int xSizeSource, int xSizeTarget, 
   int ySizeSource, int ySizeTarget, int zSize,
   const Teams& teams )
@@ -106,8 +135,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalHeight() const
     {
         int teamSize = mpi::CommSize( _teams->Team(_level) );
         int teamRank = mpi::CommRank( _teams->Team(_level) );
+        int xSize = _xSizeTarget;
+        int ySize = _ySizeTarget;
+        int zSize = _zSize;
         ComputeLocalDimensionRecursion
-        ( localHeight, teamSize, teamRank, _xSizeTarget, _ySizeTarget, _zSize );
+        ( localHeight, xSize, ySize, zSize, teamSize, teamRank );
     }
     else
         localHeight = 0;
@@ -129,9 +161,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalHeightPartner() const
     {
         int teamSize = mpi::CommSize( _teams->Team(_level) );
         int teamRank = mpi::CommRank( _teams->Team(_level) );
+        int xSize = _xSizeTarget;
+        int ySize = _ySizeTarget;
+        int zSize = _zSize;
         ComputeLocalDimensionRecursion
-        ( localHeightPartner, teamSize, teamRank, 
-          _xSizeTarget, _ySizeTarget, _zSize );
+        ( localHeightPartner, xSize, ySize, zSize, teamSize, teamRank );
     }
     else
         localHeightPartner = 0;
@@ -153,8 +187,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalWidth() const
     {
         int teamSize = mpi::CommSize( _teams->Team(_level) );
         int teamRank = mpi::CommRank( _teams->Team(_level) );
+        int xSize = _xSizeSource;
+        int ySize = _ySizeSource;
+        int zSize = _zSize;
         ComputeLocalDimensionRecursion
-        ( localWidth, teamSize, teamRank, _xSizeSource, _ySizeSource, _zSize );
+        ( localWidth, xSize, ySize, zSize, teamSize, teamRank );
     }
     else
         localWidth = 0;
@@ -176,9 +213,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalWidthPartner() const
     {
         int teamSize = mpi::CommSize( _teams->Team(_level) );
         int teamRank = mpi::CommRank( _teams->Team(_level) );
+        int xSize = _xSizeSource;
+        int ySize = _ySizeSource;
+        int zSize = _zSize;
         ComputeLocalDimensionRecursion
-        ( localWidthPartner, teamSize, teamRank, 
-          _xSizeSource, _ySizeSource, _zSize );
+        ( localWidthPartner, xSize, ySize, zSize, teamSize, teamRank );
     }
     else
         localWidthPartner = 0;
@@ -201,8 +240,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalRow() const
         int teamSize = mpi::CommSize( _teams->Team(_level) );
         int teamRank = mpi::CommRank( _teams->Team(_level) );
         ComputeFirstLocalIndexRecursion
-        ( firstLocalRow, teamSize, teamRank, 
-          _xSizeTarget, _ySizeTarget, _zSize );
+        ( firstLocalRow, _xSizeTarget, _ySizeTarget, _zSize,
+          teamSize, teamRank );
     }
 #ifndef RELEASE
     PopCallStack();
@@ -223,14 +262,162 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalCol() const
         int teamSize = mpi::CommSize( _teams->Team(_level) );
         int teamRank = mpi::CommRank( _teams->Team(_level) );
         ComputeFirstLocalIndexRecursion
-        ( firstLocalCol, teamSize, teamRank, 
-          _xSizeSource, _ySizeSource, _zSize );
+        ( firstLocalCol, _xSizeSource, _ySizeSource, _zSize,
+          teamSize, teamRank );
     }
 #ifndef RELEASE
     PopCallStack();
 #endif
     return firstLocalCol;
 }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalXTarget() const
+{ return _xTarget << (_numLevels-1); }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalXSource() const
+{ return _xSource << (_numLevels-1); }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalYTarget() const
+{ return _yTarget << (_numLevels-1); }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalYSource() const
+{ return _ySource << (_numLevels-1); }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalZTarget() const
+{ return 0; }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::FirstLocalZSource() const
+{ return _zSize; }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalXTargetSize() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::LocalXTargetSize");
+#endif
+    int xSize;
+    if( _inTargetTeam )
+    {
+        int localHeight;
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
+        xSize = _xSizeTarget;
+        int ySize = _ySizeTarget;
+        int zSize = _zSize;
+        ComputeLocalDimensionRecursion
+        ( localHeight, xSize, ySize, zSize, teamSize, teamRank );
+    }
+    else
+        xSize = 0;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return xSize;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalXSourceSize() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::LocalXSourceSize");
+#endif
+    int xSize;
+    if( _inSourceTeam )
+    {
+        int localWidth;
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
+        xSize = _xSizeSource;
+        int ySize = _ySizeSource;
+        int zSize = _zSize;
+        ComputeLocalDimensionRecursion
+        ( localWidth, xSize, ySize, zSize, teamSize, teamRank );
+    }
+    else
+        xSize = 0;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return xSize;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalYTargetSize() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::LocalYTargetSize");
+#endif
+    int ySize;
+    if( _inTargetTeam )
+    {
+        int localHeight;
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
+        int xSize = _xSizeTarget;
+        ySize = _ySizeTarget;
+        int zSize = _zSize;
+        ComputeLocalDimensionRecursion
+        ( localHeight, xSize, ySize, zSize, teamSize, teamRank );
+    }
+    else
+        ySize = 0;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return ySize;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalYSourceSize() const
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::LocalYSourceSize");
+#endif
+    int ySize;
+    if( _inSourceTeam )
+    {
+        int localWidth;
+        int teamSize = mpi::CommSize( _teams->Team(_level) );
+        int teamRank = mpi::CommRank( _teams->Team(_level) );
+        int xSize = _xSizeSource;
+        ySize = _ySizeSource;
+        int zSize = _zSize;
+        ComputeLocalDimensionRecursion
+        ( localWidth, xSize, ySize, zSize, teamSize, teamRank );
+    }
+    else
+        ySize = 0;
+#ifndef RELEASE
+    PopCallStack();
+#endif
+    return ySize;
+}
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalZTargetSize() const
+{ return _zSize; }
+
+template<typename Scalar,bool Conjugated>
+int
+psp::DistQuasi2dHMat<Scalar,Conjugated>::LocalZSourceSize() const
+{ return _zSize; }
 
 template<typename Scalar,bool Conjugated>
 void
