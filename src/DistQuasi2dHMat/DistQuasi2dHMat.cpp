@@ -39,7 +39,7 @@ template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 ( const Teams& teams )
 : _numLevels(0), _maxRank(0), 
-  _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
+  _sourceOffset(0), _targetOffset(0), 
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _teams(&teams), _level(0),
@@ -53,29 +53,34 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
-( int numLevels, int maxRank, bool stronglyAdmissible,
-  int sourceOffset, int targetOffset,
-  int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
-  int zSize, int xSource, int xTarget, int ySource, int yTarget,
-  const Teams& teams, unsigned level, 
-  bool inSourceTeam, bool inTargetTeam, 
-  int sourceRoot, int targetRoot )
+( int numLevels, int maxRank, bool stronglyAdmissible, 
+  int xSizeSource, int xSizeTarget, 
+  int ySizeSource, int ySizeTarget, int zSize,
+  const Teams& teams )
 : _numLevels(numLevels), _maxRank(maxRank), 
-  _sourceOffset(sourceOffset), _targetOffset(targetOffset), 
-  /*_symmetric(false),*/
+  _sourceOffset(0), _targetOffset(0), 
   _stronglyAdmissible(stronglyAdmissible), 
   _xSizeSource(xSizeSource), _xSizeTarget(xSizeTarget),
   _ySizeSource(ySizeSource), _ySizeTarget(ySizeTarget), _zSize(zSize), 
-  _xSource(xSource), _xTarget(xTarget),
-  _ySource(ySource), _yTarget(yTarget), _teams(&teams), _level(level),
-  _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
-  _sourceRoot(sourceRoot), _targetRoot(targetRoot),
+  _xSource(0), _xTarget(0), _ySource(0), _yTarget(0), 
+  _teams(&teams), _level(0),
+  _inSourceTeam(true), _inTargetTeam(true), 
+  _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
   _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
-    _block.type = EMPTY;
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");
+#endif
+    const int numTeamLevels = teams.NumLevels();
+    if( numTeamLevels > numLevels )
+        throw std::logic_error("Too many processes for this H-matrix depth");
+    BuildTree();
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
-
+    
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::~DistQuasi2dHMat()
 { 
@@ -421,7 +426,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::BlockTypeString
 template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
 : _numLevels(0), _maxRank(0), 
-  _sourceOffset(0), _targetOffset(0), /*_symmetric(false),*/
+  _sourceOffset(0), _targetOffset(0), 
   _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
   _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0), _teams(0), _level(0),
@@ -431,6 +436,319 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
   _beganRowSpaceComp(false), _beganColSpaceComp(false)
 { 
     _block.type = EMPTY;
+}
+
+template<typename Scalar,bool Conjugated>
+psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
+( int numLevels, int maxRank, bool stronglyAdmissible,
+  int sourceOffset, int targetOffset,
+  int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
+  int zSize, int xSource, int xTarget, int ySource, int yTarget,
+  const Teams& teams, unsigned level, 
+  bool inSourceTeam, bool inTargetTeam, 
+  int sourceRoot, int targetRoot )
+: _numLevels(numLevels), _maxRank(maxRank), 
+  _sourceOffset(sourceOffset), _targetOffset(targetOffset), 
+  _stronglyAdmissible(stronglyAdmissible), 
+  _xSizeSource(xSizeSource), _xSizeTarget(xSizeTarget),
+  _ySizeSource(ySizeSource), _ySizeTarget(ySizeTarget), _zSize(zSize), 
+  _xSource(xSource), _xTarget(xTarget),
+  _ySource(ySource), _yTarget(yTarget), _teams(&teams), _level(level),
+  _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
+  _sourceRoot(sourceRoot), _targetRoot(targetRoot),
+  _haveDenseUpdate(false), _storedDenseUpdate(false),
+  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+{ 
+    _block.type = EMPTY;
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::BuildTree()
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::BuildTree");
+#endif
+    MPI_Comm team = _teams->Team(_level);
+    const int teamSize = mpi::CommSize( team );
+    const int teamRank = mpi::CommRank( team );
+    if( Admissible() ) // low rank
+    {
+        if( teamSize > 1 )
+        {
+            _block.type = DIST_LOW_RANK;
+            _block.data.DF = new DistLowRank;
+            _block.data.DF->rank = 0;
+            _block.data.DF->ULocal.Resize( LocalHeight(), 0 );
+            _block.data.DF->VLocal.Resize( LocalWidth(),  0 );
+        }
+        else if( _sourceRoot == _targetRoot )
+        {
+            _block.type = LOW_RANK;
+            _block.data.F = new LowRank<Scalar,Conjugated>;
+            _block.data.F->U.Resize( Height(), 0 );
+            _block.data.F->V.Resize( Width(),  0 );
+        }
+        else
+        {
+            _block.type = SPLIT_LOW_RANK;
+            _block.data.SF = new SplitLowRank;
+            _block.data.SF->rank = 0;
+            if( _inTargetTeam )
+                _block.data.SF->D.Resize( Height(), 0 );
+            else
+                _block.data.SF->D.Resize( Width(), 0 );
+        }
+    }
+    else if( _numLevels > 1 ) // recurse
+    {
+        _block.data.N = NewNode();
+        Node& node = *_block.data.N;        
+
+        if( teamSize >= 4 )
+        {
+            _block.type = DIST_NODE;
+
+            const int subteam = teamRank/(teamSize/4);
+            // Top-left block
+            for( int t=0,tOffset=0; t<2; tOffset+=node.targetSizes[t],++t )
+            {
+                const int targetRoot = _targetRoot + t*(teamSize/4);
+                for( int s=0,sOffset=0; s<2; sOffset+=node.sourceSizes[s],++s )
+                {
+                    const int sourceRoot = _sourceRoot + s*(teamSize/4);
+
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[0], node.yTargetSizes[0],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource, 2*_yTarget,
+                          *_teams, _level+1,
+                          _inSourceTeam && (s==subteam),
+                          _inTargetTeam && (t==subteam),
+                          sourceRoot, targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+            // Top-right block
+            for( int t=0,tOffset=0; t<2; tOffset+=node.targetSizes[t],++t )
+            {
+                const int targetRoot = _targetRoot + t*(teamSize/4);
+                for( int s=2,sOffset=node.sourceSizes[0]+node.sourceSizes[1];
+                     s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    const int sourceRoot = _sourceRoot + s*(teamSize/4);
+
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[1], node.yTargetSizes[0],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource+1, 2*_yTarget,
+                          *_teams, _level+1,
+                          _inSourceTeam && (s==subteam),
+                          _inTargetTeam && (t==subteam),
+                          sourceRoot, targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+            // Bottom-left block
+            for( int t=2,tOffset=node.targetSizes[0]+node.targetSizes[1];
+                 t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                const int targetRoot = _targetRoot + t*(teamSize/4);
+                for( int s=0,sOffset=0; s<2; sOffset+=node.sourceSizes[s],++s )
+                {
+                    const int sourceRoot = _sourceRoot + s*(teamSize/4);
+
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[0], node.yTargetSizes[1],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource, 2*_yTarget+1,
+                          *_teams, _level+1,
+                          _inSourceTeam && (s==subteam),
+                          _inTargetTeam && (t==subteam),
+                          sourceRoot, targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+            // Bottom-right block
+            for( int t=2,tOffset=node.targetSizes[0]+node.targetSizes[1];
+                t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                const int targetRoot = _targetRoot + t*(teamSize/4);
+                for( int s=2,sOffset=node.sourceSizes[0]+node.sourceSizes[1];
+                     s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    const int sourceRoot = _sourceRoot + s*(teamSize/4);
+
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[1], node.yTargetSizes[1],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource+1, 2*_yTarget+1,
+                          *_teams, _level+1,
+                          _inSourceTeam && (s==subteam),
+                          _inTargetTeam && (t==subteam),
+                          sourceRoot, targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+        }
+        else if( teamSize == 2 )
+        {
+            _block.type = DIST_NODE;
+
+            const bool inUpperTeam = ( teamRank >= teamSize/2 );
+            const bool inLeftSourceTeam = ( !inUpperTeam && _inSourceTeam );
+            const bool inRightSourceTeam = ( inUpperTeam && _inSourceTeam );
+            const bool inTopTargetTeam = ( !inUpperTeam && _inTargetTeam );
+            const bool inBottomTargetTeam = ( inUpperTeam && _inTargetTeam );
+
+            // Top-left block
+            for( int t=0,tOffset=0; t<2; tOffset+=node.targetSizes[t],++t )
+            {
+                for( int s=0,sOffset=0; s<2; sOffset+=node.sourceSizes[s],++s )
+                {
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[0], node.yTargetSizes[0],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource, 2*_yTarget,
+                          *_teams, _level+1,
+                          inLeftSourceTeam, inTopTargetTeam,
+                          _sourceRoot, _targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+            // Top-right block
+            for( int t=0,tOffset=0; t<2; tOffset+=node.targetSizes[t],++t )
+            {
+                for( int s=2,sOffset=node.sourceSizes[0]+node.sourceSizes[1];
+                     s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[1], node.yTargetSizes[0],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource+1, 2*_yTarget,
+                          *_teams, _level+1,
+                          inRightSourceTeam, inTopTargetTeam,
+                          _sourceRoot+1, _targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+            // Bottom-left block
+            for( int t=2,tOffset=node.targetSizes[0]+node.targetSizes[1];
+                 t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                for( int s=0,sOffset=0; s<2; sOffset+=node.sourceSizes[s],++s )
+                {
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[0], node.yTargetSizes[1],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource, 2*_yTarget+1,
+                          *_teams, _level+1,
+                          inLeftSourceTeam, inBottomTargetTeam,
+                          _sourceRoot, _targetRoot+1 );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+            // Bottom-right block
+            for( int t=2,tOffset=node.targetSizes[0]+node.targetSizes[1];
+                 t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                for( int s=2,sOffset=node.sourceSizes[0]+node.sourceSizes[1];
+                     s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[1], node.yTargetSizes[1],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource+1, 2*_yTarget+1,
+                          *_teams, _level+1,
+                          inRightSourceTeam, inBottomTargetTeam,
+                          _sourceRoot+1, _targetRoot+1 );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+        }
+        else // teamSize == 1 
+        {
+            _block.type = ( _sourceRoot==_targetRoot ? NODE : SPLIT_NODE );
+
+            for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
+            {
+                for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
+                {
+                    node.children[s+4*t] =
+                        new DistQuasi2dHMat<Scalar,Conjugated>
+                        ( _numLevels-1, _maxRank, _stronglyAdmissible,
+                          _sourceOffset+sOffset, _targetOffset+tOffset,
+                          node.xSourceSizes[s&1], node.xTargetSizes[t&1],
+                          node.ySourceSizes[s/2], node.yTargetSizes[t/2],
+                          _zSize,
+                          2*_xSource+(s&1), 2*_xTarget+(t&1),
+                          2*_ySource+(s/2), 2*_yTarget+(t/2),
+                          *_teams, _level+1,
+                          _inSourceTeam, _inTargetTeam,
+                          _sourceRoot, _targetRoot );
+                    node.Child(t,s).BuildTree();
+                }
+            }
+        }
+    }
+    else // dense
+    {
+        if( _sourceRoot == _targetRoot )
+        {
+            _block.type = DENSE;
+            _block.data.D = new Dense<Scalar>( Height(), Width() );
+        }
+        else if( _sourceRoot == _targetRoot )
+        {
+            _block.type = SPLIT_DENSE;
+            _block.data.SD = new SplitDense;
+            if( _inSourceTeam )
+                _block.data.SD->D.Resize( Height(), Width() );
+        }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 namespace {

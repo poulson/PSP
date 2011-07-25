@@ -27,8 +27,9 @@
 
 namespace psp {
 
-// A distributed H-matrix class that requires a power of two number of processes.
-// It does not yet support symmetry.
+// A distributed H-matrix class that assumes a quasi2d box domain and requires
+// a power of two number of processes. It does not yet support implicit 
+// symmetry.
 template<typename Scalar,bool Conjugated>
 class DistQuasi2dHMat
 {
@@ -94,16 +95,17 @@ public:
      * Public non-static member functions
      */
     DistQuasi2dHMat( const Teams& teams );
+
     DistQuasi2dHMat
     ( int numLevels, int maxRank, bool stronglyAdmissible, 
-      int sourceOffset, int targetOffset,
-      int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
-      int zSize, int xSource, int xTarget, int ySource, int yTarget,
-      const Teams& teams, unsigned level, 
-      bool inSourceTeam, bool inTargetTeam, 
-      int sourceRoot, int targetRoot );
+      int xSizeSource, int xSizeTarget, 
+      int ySizeSource, int ySizeTarget, int zSize, 
+      const Teams& teams );
+
     DistQuasi2dHMat( const byte* packedPiece, const Teams& teams );
+
     ~DistQuasi2dHMat();
+
     void Clear();
 
     int Height() const;
@@ -463,6 +465,25 @@ private:
     /*
      * Private non-static member functions
      */
+    
+    // This default constructure is purposely not publically accessible
+    // because many routines are not functional without _teams set.
+    // This only constructs one level of the H-matrix.
+    DistQuasi2dHMat();
+   
+    // This only constructs one level of the H-matrix
+    DistQuasi2dHMat
+    ( int numLevels, int maxRank, bool stronglyAdmissible, 
+      int sourceOffset, int targetOffset,
+      int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
+      int zSize, int xSource, int xTarget, int ySource, int yTarget,
+      const Teams& teams, unsigned level, 
+      bool inSourceTeam, bool inTargetTeam, 
+      int sourceRoot, int targetRoot );
+
+    // Continue to fill the H-matrix tree
+    void BuildTree(); 
+
     bool Admissible() const;
     bool Admissible( int xSource, int xTarget, int ySource, int yTarget ) const;
 
@@ -470,10 +491,6 @@ private:
     ( std::ofstream& file, int globalheight ) const;
     void MScriptWriteLocalStructureRecursion( std::ofstream& file ) const;
     
-    // This default constructure is purposely not publically accessible
-    // because many routines are not functional without _teams set.
-    DistQuasi2dHMat();
-
     void UnpackRecursion( const byte*& head );
 
     void FillTargetStructureRecursion
