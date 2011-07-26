@@ -22,7 +22,7 @@
 
 void Usage()
 {
-    std::cout << "Ghost <xSize> <ySize> <zSize> <numLevels> "
+    std::cout << "Multiply <xSize> <ySize> <zSize> <numLevels> "
                  "<strongly admissible?> <maxRank> <print?> <print structure?> "
                  "<multiply identity?>" << std::endl;
 }

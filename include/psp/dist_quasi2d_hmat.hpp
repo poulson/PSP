@@ -94,19 +94,25 @@ public:
     /*
      * Public non-static member functions
      */
+
+    // Generate an empty H-matrix.
     DistQuasi2dHMat( const Teams& teams );
 
+    // Generate an uninitialized H-matrix tree.
     DistQuasi2dHMat
     ( int numLevels, int maxRank, bool stronglyAdmissible, 
       int xSize, int ySize, int zSize,
       const Teams& teams );
 
+    // Generate an uninitialized H-matrix tree.
     DistQuasi2dHMat
     ( int numLevels, int maxRank, bool stronglyAdmissible, 
       int xSizeSource, int xSizeTarget, 
       int ySizeSource, int ySizeTarget, int zSize, 
       const Teams& teams );
 
+    // Unpack our portion of a distributed H-matrix. The buffer should have been
+    // generated from the above 'Pack' routine.
     DistQuasi2dHMat( const byte* packedPiece, const Teams& teams );
 
     ~DistQuasi2dHMat();
@@ -164,6 +170,10 @@ public:
 
     // Return to the minimal local structure
     void PruneGhostNodes();
+
+    // Set every admissible block to a random 'maxRank' matrix, and every dense
+    // matrix to a random matrix.
+    void SetToRandom();
 
     // A := alpha A
     void Scale( Scalar alpha );

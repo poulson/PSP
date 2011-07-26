@@ -29,6 +29,7 @@
 #include "./MultiplyVector-incl.hpp"
 #include "./RedistQuasi2dHMat-incl.hpp"
 #include "./Scale-incl.hpp"
+#include "./SetToRandom-incl.hpp"
 #include "./Transpose-incl.hpp"
 
 //----------------------------------------------------------------------------//
@@ -40,9 +41,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 ( const Teams& teams )
 : _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), 
-  _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
-  _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _teams(&teams), _level(0),
+  _stronglyAdmissible(false), 
+  _xSizeSource(0), _xSizeTarget(0),
+  _ySizeSource(0), _ySizeTarget(0), _zSize(0), 
+  _xSource(0), _xTarget(0), _ySource(0), _yTarget(0), 
+  _teams(&teams), _level(0),
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
@@ -614,9 +617,12 @@ template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
 : _numLevels(0), _maxRank(0), 
   _sourceOffset(0), _targetOffset(0), 
-  _stronglyAdmissible(false), _xSizeSource(0), _xSizeTarget(0),
-  _ySizeSource(0), _ySizeTarget(0), _zSize(0), _xSource(0), _xTarget(0),
-  _ySource(0), _yTarget(0), _teams(0), _level(0),
+  _stronglyAdmissible(false), 
+  _xSizeSource(0), _xSizeTarget(0), 
+  _ySizeSource(0), _ySizeTarget(0), _zSize(0),
+  _xSource(0), _xTarget(0), 
+  _ySource(0), _yTarget(0), 
+  _teams(0), _level(0),
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
@@ -640,7 +646,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _xSizeSource(xSizeSource), _xSizeTarget(xSizeTarget),
   _ySizeSource(ySizeSource), _ySizeTarget(ySizeTarget), _zSize(zSize), 
   _xSource(xSource), _xTarget(xTarget),
-  _ySource(ySource), _yTarget(yTarget), _teams(&teams), _level(level),
+  _ySource(ySource), _yTarget(yTarget), 
+  _teams(&teams), _level(level),
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _sourceRoot(sourceRoot), _targetRoot(targetRoot),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
@@ -659,7 +666,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::BuildTree()
     MPI_Comm team = _teams->Team(_level);
     const int teamSize = mpi::CommSize( team );
     const int teamRank = mpi::CommRank( team );
-    if( Admissible() ) // low rank
+    if( !_inSourceTeam && !_inTargetTeam )
+        _block.type = EMPTY;
+    else if( Admissible() ) // low rank
     {
         if( teamSize > 1 )
         {
@@ -802,7 +811,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::BuildTree()
         {
             _block.type = DIST_NODE;
 
-            const bool inUpperTeam = ( teamRank >= teamSize/2 );
+            const bool inUpperTeam = ( teamRank == 1 );
             const bool inLeftSourceTeam = ( !inUpperTeam && _inSourceTeam );
             const bool inRightSourceTeam = ( inUpperTeam && _inSourceTeam );
             const bool inTopTargetTeam = ( !inUpperTeam && _inTargetTeam );
@@ -925,7 +934,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::BuildTree()
             _block.type = DENSE;
             _block.data.D = new Dense<Scalar>( Height(), Width() );
         }
-        else if( _sourceRoot == _targetRoot )
+        else
         {
             _block.type = SPLIT_DENSE;
             _block.data.SD = new SplitDense;

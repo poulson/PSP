@@ -137,7 +137,7 @@ private:
 
     void UnpackRecursion( const byte*& head );
 
-    // y += alpha A x
+   // y += alpha A x
     void UpdateVectorWithNodeSymmetric
     ( Scalar alpha, const Vector<Scalar>& x, Vector<Scalar>& y ) const;
 
@@ -218,6 +218,8 @@ public:
 
     ~Quasi2dHMat();
     void Clear();
+
+    void SetToRandom();
 
     // Fulfillments of AbstractHMat
     virtual int Height() const;

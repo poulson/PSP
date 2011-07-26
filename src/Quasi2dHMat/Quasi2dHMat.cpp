@@ -25,6 +25,7 @@
 #include "./MultiplyHMat-incl.hpp"
 #include "./MultiplyVector-incl.hpp"
 #include "./Pack-incl.hpp"
+#include "./SetToRandom-incl.hpp"
 
 //----------------------------------------------------------------------------//
 // Public static routines                                                     //

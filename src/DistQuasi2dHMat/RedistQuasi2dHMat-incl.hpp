@@ -1003,7 +1003,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
             if( teamSize != 2 )
                 throw std::logic_error("Team size was not 2 as expected");
 #endif
-            const bool inUpperTeam = ( teamRank >= teamSize/2 );
+            const bool inUpperTeam = ( teamRank == 1 );
             const bool inLeftSourceTeam = ( !inUpperTeam && _inSourceTeam );
             const bool inRightSourceTeam = ( inUpperTeam && _inSourceTeam );
             const bool inTopTargetTeam = ( !inUpperTeam && _inTargetTeam );
@@ -1097,31 +1097,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::UnpackRecursion
         break;
     }
     case SPLIT_NODE:
-    {
-        _block.data.N = NewNode();
-        Node& node = *_block.data.N;
-
-        for( int t=0,tOffset=0; t<4; tOffset+=node.targetSizes[t],++t )
-        {
-            for( int s=0,sOffset=0; s<4; sOffset+=node.sourceSizes[s],++s )
-            {
-                node.children[s+4*t] = 
-                    new DistQuasi2dHMat<Scalar,Conjugated>
-                    ( _numLevels-1, _maxRank, _stronglyAdmissible,
-                      _sourceOffset+sOffset, _targetOffset+tOffset,
-                      node.xSourceSizes[s&1], node.xTargetSizes[t&1],
-                      node.ySourceSizes[s/2], node.yTargetSizes[t/2],
-                      _zSize,
-                      2*_xSource+(s&1), 2*_xTarget+(t&1),
-                      2*_ySource+(s/2), 2*_yTarget+(t/2),
-                      *_teams, _level+1, 
-                      _inSourceTeam, _inTargetTeam,
-                      _sourceRoot, _targetRoot );
-                node.Child(t,s).UnpackRecursion( head );
-            }
-        }
-        break;
-    }
     case NODE:
     {
         _block.data.N = NewNode();

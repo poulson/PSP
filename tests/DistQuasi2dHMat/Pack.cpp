@@ -27,65 +27,6 @@ void Usage()
               << std::endl;
 }
 
-template<typename Real>
-void
-FormRow
-( int x, int y, int z, int xSize, int ySize, int zSize, 
-  std::vector< std::complex<Real> >& row, std::vector<int>& colIndices )
-{
-    typedef std::complex<Real> Scalar;
-    const int rowIdx = x + xSize*y + xSize*ySize*z;
-
-    row.resize( 0 );
-    colIndices.resize( 0 );
-
-    // Set up the diagonal entry
-    colIndices.push_back( rowIdx );
-    row.push_back( (Scalar)8 );
-
-    // Front connection to (x-1,y,z)
-    if( x != 0 )
-    {
-        colIndices.push_back( (x-1) + xSize*y + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Back connection to (x+1,y,z)
-    if( x != xSize-1 )
-    {
-        colIndices.push_back( (x+1) + xSize*y + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Left connection to (x,y-1,z)
-    if( y != 0 )
-    {
-        colIndices.push_back( x + xSize*(y-1) + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Right connection to (x,y+1,z)
-    if( y != ySize-1 )
-    {
-        colIndices.push_back( x + xSize*(y+1) + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Top connection to (x,y,z-1)
-    if( z != 0 )
-    {
-        colIndices.push_back( x + xSize*y + xSize*ySize*(z-1) );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Bottom connection to (x,y,z+1)
-    if( z != zSize-1 )
-    {
-        colIndices.push_back( x + xSize*y + xSize*ySize*(z+1) );
-        row.push_back( (Scalar)-1 );
-    }
-}
-
 int
 main( int argc, char* argv[] )
 {
@@ -112,6 +53,8 @@ main( int argc, char* argv[] )
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
 
+    const bool symmetric = false;
+
     if( rank == 0 )
     {
         std::cout << "----------------------------------------------------\n"
@@ -126,55 +69,7 @@ main( int argc, char* argv[] )
         typedef psp::Quasi2dHMat<Scalar,false> Quasi2d;
         typedef psp::DistQuasi2dHMat<Scalar,false> DistQuasi2d;
 
-        psp::Sparse<Scalar> S;
-        S.height = m;
-        S.width = n;
-        S.symmetric = false;
-
-        std::vector<int> map;
-        Quasi2d::BuildNaturalToHierarchicalMap
-        ( map, xSize, ySize, zSize, numLevels );
-
-        std::vector<int> inverseMap( m );
-        for( int i=0; i<m; ++i )
-            inverseMap[map[i]] = i;
-
-        if( rank == 0 )
-        {
-            std::cout << "Filling sparse matrices...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double fillStartTime = psp::mpi::WallTime();
-        std::vector<Scalar> row;
-        std::vector<int> colIndices;
-        for( int i=0; i<m; ++i )
-        {
-            S.rowOffsets.push_back( S.nonzeros.size() );
-            const int iNatural = inverseMap[i];
-            const int x = iNatural % xSize;
-            const int y = (iNatural/xSize) % ySize;
-            const int z = iNatural/(xSize*ySize);
-
-            FormRow
-            ( x, y, z, xSize, ySize, zSize, row, colIndices );
-
-            for( unsigned j=0; j<row.size(); ++j )
-            {
-                S.nonzeros.push_back( row[j] );
-                S.columnIndices.push_back( map[colIndices[j]] );
-            }
-        }
-        S.rowOffsets.push_back( S.nonzeros.size() );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double fillStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
-                      << std::endl;
-        }
-
-        // Convert to H-matrix form
+        // Build a random H-matrix
         if( rank == 0 )
         {
             std::cout << "Constructing H-matrices...";
@@ -183,7 +78,9 @@ main( int argc, char* argv[] )
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStartTime = psp::mpi::WallTime();
         Quasi2d H
-        ( S, numLevels, maxRank, stronglyAdmissible, xSize, ySize, zSize );
+        ( numLevels, maxRank, symmetric, 
+          stronglyAdmissible, xSize, ySize, zSize );
+        H.SetToRandom();
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -196,30 +93,6 @@ main( int argc, char* argv[] )
             {
                 H.LatexWriteStructure("H_serial_structure");
                 H.MScriptWriteStructure("H_serial_structure");
-            }
-        }
-
-        // Invert the H-matrix
-        if( rank == 0 )
-        {
-            std::cout << "Inverting H-matrices...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double invertStartTime = psp::mpi::WallTime();
-        H.DirectInvert();
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double invertStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << invertStopTime-invertStartTime
-                      << " seconds." << std::endl;
-            if( print )
-                H.Print("inv(H)");
-            if( printStructure )
-            {
-                H.LatexWriteStructure("invH_serial_structure");
-                H.MScriptWriteStructure("invH_serial_structure");
             }
         }
 

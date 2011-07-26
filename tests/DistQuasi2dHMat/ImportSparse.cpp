@@ -141,6 +141,8 @@ main( int argc, char* argv[] )
                       << "localXSize  = " << localXSize << "\n"
                       << "localYSize  = " << localYSize << "\n"
                       << "localZSize  = " << localZSize << std::endl;
+
+            std::cout << "This routine is not yet finished." << std::endl;
         }
     }
     catch( std::exception& e )

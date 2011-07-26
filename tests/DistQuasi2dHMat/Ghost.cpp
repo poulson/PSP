@@ -23,67 +23,8 @@
 void Usage()
 {
     std::cout << "Ghost <xSize> <ySize> <zSize> <numLevels> "
-                 "<strongly admissible?> <maxRank> <print?> <print structure?>" 
+                 "<strongly admissible?> <maxRank> <print structure?>" 
               << std::endl;
-}
-
-template<typename Real>
-void
-FormRow
-( int x, int y, int z, int xSize, int ySize, int zSize, 
-  std::vector< std::complex<Real> >& row, std::vector<int>& colIndices )
-{
-    typedef std::complex<Real> Scalar;
-    const int rowIdx = x + xSize*y + xSize*ySize*z;
-
-    row.resize( 0 );
-    colIndices.resize( 0 );
-
-    // Set up the diagonal entry
-    colIndices.push_back( rowIdx );
-    row.push_back( (Scalar)8 );
-
-    // Front connection to (x-1,y,z)
-    if( x != 0 )
-    {
-        colIndices.push_back( (x-1) + xSize*y + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Back connection to (x+1,y,z)
-    if( x != xSize-1 )
-    {
-        colIndices.push_back( (x+1) + xSize*y + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Left connection to (x,y-1,z)
-    if( y != 0 )
-    {
-        colIndices.push_back( x + xSize*(y-1) + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Right connection to (x,y+1,z)
-    if( y != ySize-1 )
-    {
-        colIndices.push_back( x + xSize*(y+1) + xSize*ySize*z );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Top connection to (x,y,z-1)
-    if( z != 0 )
-    {
-        colIndices.push_back( x + xSize*y + xSize*ySize*(z-1) );
-        row.push_back( (Scalar)-1 );
-    }
-
-    // Bottom connection to (x,y,z+1)
-    if( z != zSize-1 )
-    {
-        colIndices.push_back( x + xSize*y + xSize*ySize*(z+1) );
-        row.push_back( (Scalar)-1 );
-    }
 }
 
 int
@@ -93,7 +34,7 @@ main( int argc, char* argv[] )
     const int rank = psp::mpi::CommRank( MPI_COMM_WORLD );
     const int p = psp::mpi::CommSize( MPI_COMM_WORLD );
 
-    if( argc < 9 )
+    if( argc < 8 )
     {
         if( rank == 0 )
             Usage();
@@ -106,8 +47,7 @@ main( int argc, char* argv[] )
     const int numLevels = atoi( argv[4] );
     const bool stronglyAdmissible = atoi( argv[5] );
     const int maxRank = atoi( argv[6] );
-    const bool print = atoi( argv[7] );
-    const bool printStructure = atoi( argv[8] );
+    const bool printStructure = atoi( argv[7] );
 
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
@@ -115,173 +55,20 @@ main( int argc, char* argv[] )
     if( rank == 0 )
     {
         std::cout << "----------------------------------------------------\n"
-                  << "Testing complex double Quasi2dHMat packing/unpacking\n"
-                  << "into DistQuasi2dHMat                                \n"
+                  << "Testing formation of ghost nodes\n"
                   << "----------------------------------------------------" 
                   << std::endl;
     }
     try
     {
         typedef std::complex<double> Scalar;
-        typedef psp::Quasi2dHMat<Scalar,false> Quasi2d;
         typedef psp::DistQuasi2dHMat<Scalar,false> DistQuasi2d;
 
-        psp::Sparse<Scalar> S;
-        S.height = m;
-        S.width = n;
-        S.symmetric = false;
-
-        std::vector<int> map;
-        Quasi2d::BuildNaturalToHierarchicalMap
-        ( map, xSize, ySize, zSize, numLevels );
-
-        std::vector<int> inverseMap( m );
-        for( int i=0; i<m; ++i )
-            inverseMap[map[i]] = i;
-
-        if( rank == 0 )
-        {
-            std::cout << "Filling sparse matrices...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double fillStartTime = psp::mpi::WallTime();
-        std::vector<Scalar> row;
-        std::vector<int> colIndices;
-        for( int i=0; i<m; ++i )
-        {
-            S.rowOffsets.push_back( S.nonzeros.size() );
-            const int iNatural = inverseMap[i];
-            const int x = iNatural % xSize;
-            const int y = (iNatural/xSize) % ySize;
-            const int z = iNatural/(xSize*ySize);
-
-            FormRow
-            ( x, y, z, xSize, ySize, zSize, row, colIndices );
-
-            for( unsigned j=0; j<row.size(); ++j )
-            {
-                S.nonzeros.push_back( row[j] );
-                S.columnIndices.push_back( map[colIndices[j]] );
-            }
-        }
-        S.rowOffsets.push_back( S.nonzeros.size() );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double fillStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << fillStopTime-fillStartTime << " seconds." 
-                      << std::endl;
-        }
-
-        // Convert to H-matrix form
-        if( rank == 0 )
-        {
-            std::cout << "Constructing H-matrices...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double constructStartTime = psp::mpi::WallTime();
-        Quasi2d H
-        ( S, numLevels, maxRank, stronglyAdmissible, xSize, ySize, zSize );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double constructStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << constructStopTime-constructStartTime 
-                      << " seconds." << std::endl;
-            if( print )
-                H.Print("H");
-            if( printStructure )
-            {
-                H.LatexWriteStructure("H_serial_structure");
-                H.MScriptWriteStructure("H_serial_structure");
-            }
-        }
-
-        // Set up our subcommunicators and compute the packed sizes
+        // Create a random distributed H-matrix
         DistQuasi2d::Teams teams( MPI_COMM_WORLD );
-        std::vector<std::size_t> packedSizes;
-        DistQuasi2d::PackedSizes( packedSizes, H, teams ); 
-        const std::size_t myMaxSize = 
-            *(std::max_element( packedSizes.begin(), packedSizes.end() ));
-
-        // Pack for a DistQuasi2dHMat
-        if( rank == 0 )
-        {
-            std::cout << "Packing H-matrix for distribution...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double packStartTime = psp::mpi::WallTime();
-        std::vector<psp::byte> sendBuffer( p*myMaxSize );
-        std::vector<psp::byte*> packedPieces( p );
-        for( int i=0; i<p; ++i )
-            packedPieces[i] = &sendBuffer[i*myMaxSize];
-        DistQuasi2d::Pack( packedPieces, H, teams );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double packStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << packStopTime-packStartTime << " seconds."
-                      << std::endl;
-        }
-
-        // Compute the maximum package size
-        int myIntMaxSize, intMaxSize;
-        {
-            myIntMaxSize = myMaxSize;
-            psp::mpi::AllReduce
-            ( &myIntMaxSize, &intMaxSize, 1, MPI_MAX, MPI_COMM_WORLD );
-        }
-        if( rank == 0 )
-        {
-            std::cout << "Maximum per-process message size: " 
-                      << ((double)intMaxSize)/(1024.*1024.) << " MB." 
-                      << std::endl;
-        }
- 
-        // AllToAll
-        if( rank == 0 )
-        {
-            std::cout << "AllToAll redistribution...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double allToAllStartTime = psp::mpi::WallTime();
-        std::vector<psp::byte> recvBuffer( p*intMaxSize );
-        psp::mpi::AllToAll
-        ( &sendBuffer[0], myIntMaxSize, &recvBuffer[0], intMaxSize,
-          MPI_COMM_WORLD );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double allToAllStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << allToAllStopTime-allToAllStartTime
-                      << " seconds." << std::endl;
-        }
-
-        // Unpack our part of the matrix defined by process 0
-        if( rank == 0 )
-        {
-            std::cout << "Unpacking...";
-            std::cout.flush();
-        }
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double unpackStartTime = psp::mpi::WallTime();
-        DistQuasi2d distH( &recvBuffer[0], teams );
-        psp::mpi::Barrier( MPI_COMM_WORLD );
-        double unpackStopTime = psp::mpi::WallTime();
-        if( rank == 0 )
-        {
-            std::cout << "done: " << unpackStopTime-unpackStartTime
-                      << " seconds." << std::endl;
-        }
-        if( printStructure )
-        {
-            distH.LatexWriteLocalStructure("distH_structure");
-            distH.MScriptWriteLocalStructure("distH_structure");
-        }
+        DistQuasi2d H
+        ( numLevels, maxRank, stronglyAdmissible, xSize, ySize, zSize, teams );
+        H.SetToRandom();
 
         // Form the ghost nodes
         if( rank == 0 )
@@ -291,8 +78,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStartTime = psp::mpi::WallTime();
-        distH.FormTargetGhostNodes();
-        distH.FormSourceGhostNodes();
+        H.FormTargetGhostNodes();
+        H.FormSourceGhostNodes();
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStopTime = psp::mpi::WallTime();
         if( rank == 0 )
@@ -302,8 +89,8 @@ main( int argc, char* argv[] )
         }
         if( printStructure )
         {
-            distH.LatexWriteLocalStructure("distH_ghosted_structure");
-            distH.MScriptWriteLocalStructure("distH_ghosted_structure");
+            H.LatexWriteLocalStructure("H_ghosted_structure");
+            H.MScriptWriteLocalStructure("H_ghosted_structure");
         }
 
         // Form the ghost nodes again
@@ -314,8 +101,8 @@ main( int argc, char* argv[] )
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStartTime2 = psp::mpi::WallTime();
-        distH.FormTargetGhostNodes();
-        distH.FormSourceGhostNodes();
+        H.FormTargetGhostNodes();
+        H.FormSourceGhostNodes();
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double ghostStopTime2 = psp::mpi::WallTime();
         if( rank == 0 )

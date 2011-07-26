@@ -22,11 +22,12 @@
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::Scale( Scalar alpha )
+psp::DistQuasi2dHMat<Scalar,Conjugated>::SetToRandom()
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::Scale");
+    PushCallStack("DistQuasi2dHMat::SetToRandom");
 #endif
+    const int maxRank = MaxRank();
     switch( _block.type )
     {
     case DIST_NODE:
@@ -34,58 +35,58 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Scale( Scalar alpha )
     case NODE:
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                _block.data.N->Child(t,s).Scale( alpha );
+                _block.data.N->Child(t,s).SetToRandom();
         break;
-
     case DIST_LOW_RANK:
-        if( alpha == (Scalar)0 )
-        {
-            _block.data.DF->rank = 0;
-            if( _inTargetTeam )
-            {
-                Dense<Scalar>& ULocal = _block.data.DF->ULocal;
-                ULocal.Resize( ULocal.Height(), 0, ULocal.Height() );
-            }
-            if( _inSourceTeam )
-            {
-                Dense<Scalar>& VLocal = _block.data.DF->VLocal;
-                VLocal.Resize( VLocal.Height(), 0, VLocal.Height() );
-            }
-        }
-        else if( _inTargetTeam )
-            hmat_tools::Scale( alpha, _block.data.DF->ULocal );
+    {
+        DistLowRank& DF = *_block.data.DF;
+        const int localHeight = DF.ULocal.Height();
+        const int localWidth = DF.VLocal.Height();
+
+        DF.rank = maxRank;
+        DF.ULocal.Resize( localHeight, maxRank );
+        DF.VLocal.Resize( localHeight, maxRank );
+        ParallelGaussianRandomVectors( DF.ULocal );
+        ParallelGaussianRandomVectors( DF.VLocal );
         break;
+    }
     case SPLIT_LOW_RANK:
-        if( alpha == (Scalar)0 )
-        {
-            _block.data.SF->rank = 0;
-            Dense<Scalar>& D = _block.data.SF->D;
-            D.Resize( D.Height(), 0, D.Height() );
-        }
-        else if( _inTargetTeam )
-            hmat_tools::Scale( alpha, _block.data.SF->D );
+    {
+        SplitLowRank& SF = *_block.data.SF;
+        const int length = SF.D.Height();
+
+        SF.rank = maxRank;
+        SF.D.Resize( length, maxRank );
+        ParallelGaussianRandomVectors( SF.D );
         break;
+    }
     case LOW_RANK:
-        hmat_tools::Scale( alpha, *_block.data.F );
+    {
+        LowRank<Scalar,Conjugated>& F = *_block.data.F;
+        const int height = F.U.Height();
+        const int width = F.V.Height();
+
+        F.U.Resize( height, maxRank );
+        F.V.Resize( width, maxRank );
+        ParallelGaussianRandomVectors( F.U );
+        ParallelGaussianRandomVectors( F.V );
         break;
+    }
     case DIST_LOW_RANK_GHOST:
-        if( alpha == (Scalar)0 )
-            _block.data.DFG->rank = 0;
-        break;
+        _block.data.DFG->rank = maxRank;
+       break;
     case SPLIT_LOW_RANK_GHOST:
-        if( alpha == (Scalar)0 )
-            _block.data.SFG->rank = 0;
+        _block.data.SFG->rank = maxRank;
         break;
     case LOW_RANK_GHOST:
-        if( alpha == (Scalar)0 )
-            _block.data.FG->rank = 0;
+        _block.data.FG->rank = maxRank;
         break;
     case SPLIT_DENSE:
         if( _inSourceTeam )
-            hmat_tools::Scale( alpha, _block.data.SD->D );
+            ParallelGaussianRandomVectors( _block.data.SD->D );
         break;
     case DENSE:
-        hmat_tools::Scale( alpha, *_block.data.D );
+        ParallelGaussianRandomVectors( *_block.data.D );
         break;
     default:
         break;
