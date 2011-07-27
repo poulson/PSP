@@ -626,6 +626,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
         MPI_Comm team = _teams->Team( _level );
         const int teamSize = mpi::CommSize( team );
         const int teamRank = mpi::CommRank( team );
+        std::cout << "DIST_NODE, level=" << _level << ", rank=" << rank << ": ";
 
         int newRank = rank;
         if( teamSize == 2 )
@@ -635,6 +636,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 const int tStart = (teamRank==0 ? 0 : 2);
                 const int tStop = (teamRank==0 ? 2 : 4);
                 const int numEntries = _UMap.Size();
+                std::cout << "_UMap.Size()=" << numEntries << " ";
                 _UMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                 {
@@ -660,6 +662,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 const int sStart = (teamRank==0 ? 0 : 2);
                 const int sStop = (teamRank==0 ? 2 : 4);
                 const int numEntries = _VMap.Size();
+                std::cout << "_VMap.Size()=" << numEntries << " ";
                 _VMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                 {
@@ -685,6 +688,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
             if( _inTargetTeam )
             {
                 const int numEntries = _UMap.Size();
+                std::cout << "_UMap.Size()=" << numEntries << " ";
                 _UMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                 {
@@ -701,6 +705,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
             {
                 newRank = rank;
                 const int numEntries = _VMap.Size();
+                std::cout << "_VMap.Size()=" << numEntries << " ";
                 _VMap.ResetIterator();
                 for( int i=0; i<numEntries; ++i )
                 {
@@ -714,6 +719,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 }
             }
         }
+        std::cout << " newRank=" << newRank << std::endl;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
@@ -722,11 +728,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
     case SPLIT_NODE:
     case NODE:
     {
+        std::cout << "(SPLIT_)NODE, level=" << _level 
+                  << ", rank=" << rank << ": ";
         Node& node = *_block.data.N;
         int newRank = rank;
         if( _inTargetTeam )
         {
             const int numEntries = _UMap.Size();
+            std::cout << "_UMap.Size()=" << numEntries << " ";
             _UMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
@@ -749,6 +758,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
         {
             newRank = rank;
             const int numEntries = _VMap.Size();
+            std::cout << "_VMap.Size()=" << numEntries << " ";
             _VMap.ResetIterator();
             for( int i=0; i<numEntries; ++i )
             {
@@ -767,6 +777,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 _VMap.EraseCurrentEntry();
             }
         }
+        std::cout << " newRank=" << newRank << std::endl;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
                 node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
@@ -776,6 +787,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
     case SPLIT_LOW_RANK:
     case LOW_RANK:
     {
+        std::cout << "(DIST_/SPLIT_)LOW_RANK, level=" << _level 
+                  << ", rank=" << rank << ": ";
+        std::cout.flush();
         int newRank = rank;
         if( _inTargetTeam )
         {
@@ -788,6 +802,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 mainU = &_block.data.F->U;
 
             int numEntries = _colXMap.Size();
+            std::cout << "_colXMap.Size()=" << numEntries << " ";
+            std::cout.flush();
             _colXMap.ResetIterator();
             for( int entry=0; entry<numEntries; ++entry )
             {
@@ -803,6 +819,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
             }
 
             numEntries = _UMap.Size();
+            std::cout << "_UMap.Size()=" << numEntries << " ";
+            std::cout.flush();
             _UMap.ResetIterator();
             for( int entry=0; entry<numEntries; ++entry )
             {
@@ -830,6 +848,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 mainV = &_block.data.F->V;
             
             int numEntries = _rowXMap.Size();
+            std::cout << "_rowXMap.Size()=" << numEntries << " ";
+            std::cout.flush();
             _rowXMap.ResetIterator();
             for( int entry=0; entry<numEntries; ++entry )
             {
@@ -845,6 +865,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
             }
 
             numEntries = _VMap.Size();
+            std::cout << "_VMap.Size()=" << numEntries << " ";
+            std::cout.flush();
             _VMap.ResetIterator();
             for( int entry=0; entry<numEntries; ++entry )
             {
@@ -859,6 +881,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                 newRank += r;
             }
         }
+        std::cout << " newRank=" << newRank << std::endl;
         break;
     }
     default:

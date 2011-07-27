@@ -23,7 +23,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                DistQuasi2dHMat<Scalar,Conjugated>& C )
+                DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPrecompute");
@@ -61,30 +62,34 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
         {
             if( admissibleC )
             {
-                C._colFHHContextMap.Set( key, new MultiplyDenseContext );
-                MultiplyDenseContext& colContext = 
-                    C._colFHHContextMap.Get( key );
-                colContext.numRhs = sampleRank;
-                C._colXMap.Set
-                ( key, new Dense<Scalar>( A.LocalHeight(), sampleRank ) );
-                Dense<Scalar>& colX = C._colXMap.Get( key );
-                hmat_tools::Scale( (Scalar)0, colX );
-                A.MultiplyDenseInitialize( colContext, sampleRank );
-                A.MultiplyDensePrecompute( colContext, alpha, B._colT, colX );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    C._colFHHContextMap.Set( key, new MultiplyDenseContext );
+                    MultiplyDenseContext& colContext = 
+                        C._colFHHContextMap.Get( key );
+                    colContext.numRhs = sampleRank;
+                    C._colXMap.Set
+                    ( key, new Dense<Scalar>( A.LocalHeight(), sampleRank ) );
+                    Dense<Scalar>& colX = C._colXMap.Get( key );
+                    hmat_tools::Scale( (Scalar)0, colX );
+                    A.MultiplyDenseInitialize( colContext, sampleRank );
+                    A.MultiplyDensePrecompute
+                    ( colContext, alpha, B._colT, colX );
 
-                C._rowFHHContextMap.Set( key, new MultiplyDenseContext );
-                MultiplyDenseContext& rowContext = 
-                    C._rowFHHContextMap.Get( key );
-                rowContext.numRhs = sampleRank;
-                C._rowXMap.Set
-                ( key, new Dense<Scalar>( B.LocalWidth(), sampleRank ) );
-                Dense<Scalar>& rowX = C._rowXMap.Get( key );
-                hmat_tools::Scale( (Scalar)0, rowX );
-                B.AdjointMultiplyDenseInitialize( rowContext, sampleRank );
-                B.AdjointMultiplyDensePrecompute
-                ( rowContext, Conj(alpha), A._rowT, rowX );
+                    C._rowFHHContextMap.Set( key, new MultiplyDenseContext );
+                    MultiplyDenseContext& rowContext = 
+                        C._rowFHHContextMap.Get( key );
+                    rowContext.numRhs = sampleRank;
+                    C._rowXMap.Set
+                    ( key, new Dense<Scalar>( B.LocalWidth(), sampleRank ) );
+                    Dense<Scalar>& rowX = C._rowXMap.Get( key );
+                    hmat_tools::Scale( (Scalar)0, rowX );
+                    B.AdjointMultiplyDenseInitialize( rowContext, sampleRank );
+                    B.AdjointMultiplyDensePrecompute
+                    ( rowContext, Conj(alpha), A._rowT, rowX );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -93,7 +98,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHPrecompute
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s),
+                              startLevel, endLevel );
             }
             break;
         }
@@ -114,7 +120,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                DistQuasi2dHMat<Scalar,Conjugated>& C )
+                DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSums");
@@ -126,7 +133,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
     const unsigned numReduces = numTeamLevels-1;
     std::vector<int> sizes( numReduces );
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
-    A.MultiplyHMatFHHSumsCount( B, C, sizes );
+    A.MultiplyHMatFHHSumsCount( B, C, sizes, startLevel, endLevel );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -137,13 +144,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSums
     for( unsigned i=0,offset=0; i<numReduces; offset+=sizes[i],++i )
         offsets[i] = offset;
     std::vector<int> offsetsCopy = offsets;
-    A.MultiplyHMatFHHSumsPack( B, C, buffer, offsetsCopy );
+    A.MultiplyHMatFHHSumsPack
+    ( B, C, buffer, offsetsCopy, startLevel, endLevel );
 
     // Perform the reduces with log2(p) messages
     A._teams->TreeSumToRoots( buffer, sizes );
 
     // Unpack the reduced buffers (only roots of communicators have data)
-    A.MultiplyHMatFHHSumsUnpack( B, C, buffer, offsets );
+    A.MultiplyHMatFHHSumsUnpack( B, C, buffer, offsets, startLevel, endLevel );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -154,7 +162,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<int>& sizes ) const
+        std::vector<int>& sizes,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsCount");
@@ -182,10 +191,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                A.MultiplyDenseSumsCount( sizes, sampleRank );
-                B.TransposeMultiplyDenseSumsCount( sizes, sampleRank );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDenseSumsCount( sizes, sampleRank );
+                    B.TransposeMultiplyDenseSumsCount( sizes, sampleRank );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -194,7 +206,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHSumsCount
-                            ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), sizes,
+                              startLevel, endLevel );
             }
             break;
         default:
@@ -215,7 +228,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
 ( DistQuasi2dHMat<Scalar,Conjugated>& B,
   DistQuasi2dHMat<Scalar,Conjugated>& C,
-  std::vector<Scalar>& buffer, std::vector<int>& offsets )
+  std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsPack");
@@ -243,12 +257,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                A.MultiplyDenseSumsPack
-                ( C._colFHHContextMap.Get( key ), buffer, offsets );
-                B.TransposeMultiplyDenseSumsPack
-                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDenseSumsPack
+                    ( C._colFHHContextMap.Get( key ), buffer, offsets );
+                    B.TransposeMultiplyDenseSumsPack
+                    ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -258,7 +275,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHSumsPack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets );
+                              buffer, offsets, startLevel, endLevel );
             }
             break;
         default:
@@ -279,7 +296,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
 ( DistQuasi2dHMat<Scalar,Conjugated>& B,
   DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets )
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHSumsUnpack");
@@ -307,12 +325,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                A.MultiplyDenseSumsUnpack
-                ( C._colFHHContextMap.Get( key ), buffer, offsets );
-                B.TransposeMultiplyDenseSumsUnpack
-                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDenseSumsUnpack
+                    ( C._colFHHContextMap.Get( key ), buffer, offsets );
+                    B.TransposeMultiplyDenseSumsUnpack
+                    ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -322,7 +343,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHSumsUnpack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets );
+                              buffer, offsets, startLevel, endLevel );
             }
             break;
         default:
@@ -342,7 +363,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                DistQuasi2dHMat<Scalar,Conjugated>& C )
+                DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassData");
@@ -351,7 +373,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
 
     // Compute send and recv sizes
     std::map<int,int> sendSizes, recvSizes;
-    A.MultiplyHMatFHHPassDataCount( B, C, sendSizes, recvSizes );
+    A.MultiplyHMatFHHPassDataCount
+    ( B, C, sendSizes, recvSizes, startLevel, endLevel );
 
     // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
@@ -371,7 +394,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
     // Fill the send buffer
     std::vector<Scalar> sendBuffer(totalSendSize);
     std::map<int,int> offsets = sendOffsets;
-    A.MultiplyHMatFHHPassDataPack( B, C, sendBuffer, offsets );
+    A.MultiplyHMatFHHPassDataPack
+    ( B, C, sendBuffer, offsets, startLevel, endLevel );
 
     // Start the non-blocking sends
     MPI_Comm comm = _teams->Team( 0 );
@@ -402,7 +426,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassData
     // Unpack as soon as we have received our data
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
-    A.MultiplyHMatFHHPassDataUnpack( B, C, recvBuffer, recvOffsets );
+    A.MultiplyHMatFHHPassDataUnpack
+    ( B, C, recvBuffer, recvOffsets, startLevel, endLevel );
 
     // Don't exit until we know that the data was sent
     for( int i=0; i<numSends; ++i )
@@ -417,7 +442,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::map<int,int>& sendSizes, std::map<int,int>& recvSizes ) const
+        std::map<int,int>& sendSizes, std::map<int,int>& recvSizes,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataCount");
@@ -453,12 +479,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
         {
             if( admissibleC )
             {
-                A.MultiplyDensePassDataCount
-                ( sendSizes, recvSizes, sampleRank );
-                B.TransposeMultiplyDensePassDataCount
-                ( sendSizes, recvSizes, sampleRank );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDensePassDataCount
+                    ( sendSizes, recvSizes, sampleRank );
+                    B.TransposeMultiplyDensePassDataCount
+                    ( sendSizes, recvSizes, sampleRank );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -468,7 +497,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHPassDataCount
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              sendSizes, recvSizes );
+                              sendSizes, recvSizes, startLevel, endLevel );
             }
             break;
         }
@@ -489,7 +518,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
 ( DistQuasi2dHMat<Scalar,Conjugated>& B,
   DistQuasi2dHMat<Scalar,Conjugated>& C,
-  std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets )
+  std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataPack");
@@ -526,13 +556,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
         {
             if( admissibleC )
             {
-                A.MultiplyDensePassDataPack
-                ( C._colFHHContextMap.Get( key ), sendBuffer, offsets );
-                B.TransposeMultiplyDensePassDataPack
-                ( C._rowFHHContextMap.Get( key ), 
-                  A._rowT, sendBuffer, offsets );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDensePassDataPack
+                    ( C._colFHHContextMap.Get( key ), sendBuffer, offsets );
+                    B.TransposeMultiplyDensePassDataPack
+                    ( C._rowFHHContextMap.Get( key ), 
+                      A._rowT, sendBuffer, offsets );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -542,7 +575,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHPassDataPack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              sendBuffer, offsets );
+                              sendBuffer, offsets, startLevel, endLevel );
             }
             break;
         }
@@ -563,7 +596,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
 ( DistQuasi2dHMat<Scalar,Conjugated>& B,
   DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets )
+  const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPassDataUnpack");
@@ -600,12 +634,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
         {
             if( admissibleC )
             {
-                A.MultiplyDensePassDataUnpack
-                ( C._colFHHContextMap.Get( key ), recvBuffer, offsets );
-                B.TransposeMultiplyDensePassDataUnpack
-                ( C._rowFHHContextMap.Get( key ), recvBuffer, offsets );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDensePassDataUnpack
+                    ( C._colFHHContextMap.Get( key ), recvBuffer, offsets );
+                    B.TransposeMultiplyDensePassDataUnpack
+                    ( C._rowFHHContextMap.Get( key ), recvBuffer, offsets );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -615,7 +652,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHPassDataUnpack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              recvBuffer, offsets );
+                              recvBuffer, offsets, startLevel, endLevel );
             }
             break;
         }
@@ -635,7 +672,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                DistQuasi2dHMat<Scalar,Conjugated>& C )
+                DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcasts");
@@ -647,7 +685,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     const unsigned numBroadcasts = numTeamLevels-1;
     std::vector<int> sizes( numBroadcasts );
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
-    A.MultiplyHMatFHHBroadcastsCount( B, C, sizes );
+    A.MultiplyHMatFHHBroadcastsCount( B, C, sizes, startLevel, endLevel );
 
     // Pack all of the data to be broadcast into a single buffer
     // (only roots of communicators contribute)
@@ -659,13 +697,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcasts
     for( unsigned i=0,offset=0; i<numBroadcasts; offset+=sizes[i],++i )
         offsets[i] = offset;
     std::vector<int> offsetsCopy = offsets;
-    A.MultiplyHMatFHHBroadcastsPack( B, C, buffer, offsetsCopy );
+    A.MultiplyHMatFHHBroadcastsPack
+    ( B, C, buffer, offsetsCopy, startLevel, endLevel );
 
     // Perform the broadcasts with log2(p) messages
     A._teams->TreeBroadcasts( buffer, sizes );
 
     // Unpack the broadcasted buffers
-    A.MultiplyHMatFHHBroadcastsUnpack( B, C, buffer, offsets );
+    A.MultiplyHMatFHHBroadcastsUnpack
+    ( B, C, buffer, offsets, startLevel, endLevel );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -676,7 +716,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-        std::vector<int>& sizes ) const
+        std::vector<int>& sizes,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsCount");
@@ -704,10 +745,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                A.MultiplyDenseBroadcastsCount( sizes, sampleRank );
-                B.TransposeMultiplyDenseBroadcastsCount( sizes, sampleRank );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDenseBroadcastsCount( sizes, sampleRank );
+                    B.TransposeMultiplyDenseBroadcastsCount
+                    ( sizes, sampleRank );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -716,7 +761,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHBroadcastsCount
-                            ( nodeB.Child(r,s), nodeC.Child(t,s), sizes );
+                            ( nodeB.Child(r,s), nodeC.Child(t,s), sizes,
+                              startLevel, endLevel );
             }
             break;
         default:
@@ -737,7 +783,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
-  std::vector<Scalar>& buffer, std::vector<int>& offsets ) const
+  std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsPack");
@@ -765,12 +812,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                A.MultiplyDenseBroadcastsPack
-                ( C._colFHHContextMap.Get( key ), buffer, offsets );
-                B.TransposeMultiplyDenseBroadcastsPack
-                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDenseBroadcastsPack
+                    ( C._colFHHContextMap.Get( key ), buffer, offsets );
+                    B.TransposeMultiplyDenseBroadcastsPack
+                    ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -780,7 +830,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHBroadcastsPack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets );
+                              buffer, offsets, startLevel, endLevel );
             }
             break;
         default:
@@ -801,7 +851,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
 ( DistQuasi2dHMat<Scalar,Conjugated>& B,
   DistQuasi2dHMat<Scalar,Conjugated>& C,
-  const std::vector<Scalar>& buffer, std::vector<int>& offsets )
+  const std::vector<Scalar>& buffer, std::vector<int>& offsets,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHBroadcastsUnpack");
@@ -829,12 +880,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
         case DIST_NODE_GHOST:
             if( admissibleC )
             {
-                A.MultiplyDenseBroadcastsUnpack
-                ( C._colFHHContextMap.Get( key ), buffer, offsets );
-                B.TransposeMultiplyDenseBroadcastsUnpack
-                ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    A.MultiplyDenseBroadcastsUnpack
+                    ( C._colFHHContextMap.Get( key ), buffer, offsets );
+                    B.TransposeMultiplyDenseBroadcastsUnpack
+                    ( C._rowFHHContextMap.Get( key ), buffer, offsets );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -844,7 +898,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHBroadcastsUnpack
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets );
+                              buffer, offsets, startLevel, endLevel );
             }
             break;
         default:
@@ -864,15 +918,16 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcompute
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                DistQuasi2dHMat<Scalar,Conjugated>& C )
+                DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcompute");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
-    A.MultiplyHMatFHHPostcomputeC( alpha, B, C );
-    C.MultiplyHMatFHHPostcomputeCCleanup();
+    A.MultiplyHMatFHHPostcomputeC( alpha, B, C, startLevel, endLevel );
+    C.MultiplyHMatFHHPostcomputeCCleanup( startLevel, endLevel );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -882,7 +937,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
-                      DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+                      DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcomputeC");
@@ -919,17 +975,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
         {
             if( admissibleC )
             {
-                // Finish computing A B Omega1
-                A.MultiplyDensePostcompute
-                ( C._colFHHContextMap.Get( key ), 
-                  alpha, B._colT, C._colXMap.Get( key ) );
+                if( A._level >= startLevel && A._level < endLevel )
+                {
+                    // Finish computing A B Omega1
+                    A.MultiplyDensePostcompute
+                    ( C._colFHHContextMap.Get( key ), 
+                      alpha, B._colT, C._colXMap.Get( key ) );
 
-                // Finish computing B' A' Omega2
-                B.AdjointMultiplyDensePostcompute
-                ( C._rowFHHContextMap.Get( key ), 
-                  Conj(alpha), A._rowT, C._rowXMap.Get( key ) );
+                    // Finish computing B' A' Omega2
+                    B.AdjointMultiplyDensePostcompute
+                    ( C._rowFHHContextMap.Get( key ), 
+                      Conj(alpha), A._rowT, C._rowXMap.Get( key ) );
+                }
             }
-            else
+            else if( A._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -938,7 +997,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
                     for( int s=0; s<4; ++s )
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatFHHPostcomputeC
-                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s) );
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s),
+                              startLevel, endLevel );
             }
             break;
         }
@@ -957,7 +1017,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeCCleanup()
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeCCleanup
+( int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHPostcomputeCCleanup");
@@ -975,10 +1036,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeCCleanup()
     case NODE:
     case NODE_GHOST:
     {
-        Node& nodeC = *C._block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                nodeC.Child(t,s).MultiplyHMatFHHPostcomputeCCleanup();
+        if( C._level >= startLevel && C._level < endLevel - 1 )
+        {
+            Node& nodeC = *C._block.data.N;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    nodeC.Child(t,s).MultiplyHMatFHHPostcomputeCCleanup
+                    ( startLevel, endLevel );
+        }
         break;
     }
     default:
@@ -993,7 +1058,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
-        DistQuasi2dHMat<Scalar,Conjugated>& C ) const
+        DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalize");
@@ -1005,7 +1071,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
     std::vector<int> numQRs(numTeamLevels,0), 
                      numTargetFHH(numTeamLevels,0), 
                      numSourceFHH(numTeamLevels,0);
-    C.MultiplyHMatFHHFinalizeCounts( numQRs, numTargetFHH, numSourceFHH );
+    C.MultiplyHMatFHHFinalizeCounts
+    ( numQRs, numTargetFHH, numSourceFHH, startLevel, endLevel );
 
     // Set up the space for the packed 2r x r matrices and taus.
     int numTotalQRs=0, numQRSteps=0, qrTotalSize=0, tauTotalSize=0;
@@ -1059,7 +1126,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         std::vector<int> middleOffsetsCopy = middleOffsets;
 
         A.MultiplyHMatFHHFinalizeMiddleUpdates
-        ( B, C, allReduceBuffer, middleOffsetsCopy );
+        ( B, C, allReduceBuffer, middleOffsetsCopy, startLevel, endLevel );
     }
 
     // Perform the large local QR's and pack into the QR buffer as appropriate
@@ -1069,7 +1136,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         tauOffsetsCopy = tauOffsets;
 
         C.MultiplyHMatFHHFinalizeLocalQR
-        ( Xs, XOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork );
+        ( Xs, XOffsetsCopy, tauBuffer, tauOffsetsCopy, qrWork, 
+          startLevel, endLevel );
     }
 
     C.MultiplyHMatParallelQR
@@ -1221,7 +1289,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
         rightOffsetsCopy = rightOffsets;
 
         A.MultiplyHMatFHHFinalizeOuterUpdates
-        ( B, C, allReduceBuffer, leftOffsetsCopy, rightOffsetsCopy );
+        ( B, C, allReduceBuffer, leftOffsetsCopy, rightOffsetsCopy,
+          startLevel, endLevel );
     }
 
     // Perform a custom AllReduce on the buffers to finish forming
@@ -1244,7 +1313,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalize
                       svdRealWork( lapack::SVDRealWorkSize(r,r) ); 
     A.MultiplyHMatFHHFinalizeFormLowRank
     ( B, C, allReduceBuffer, leftOffsets, middleOffsets, rightOffsets,
-      singularValues, U, VH, svdWork, svdRealWork );
+      singularValues, U, VH, svdWork, svdRealWork, startLevel, endLevel );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1254,7 +1323,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
 ( std::vector<int>& numQRs, 
-  std::vector<int>& numTargetFHH, std::vector<int>& numSourceFHH )
+  std::vector<int>& numTargetFHH, std::vector<int>& numSourceFHH,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeCounts");
@@ -1273,11 +1343,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
     case SPLIT_NODE:
     case NODE:
     {
-        Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFHHFinalizeCounts
-                ( numQRs, numTargetFHH, numSourceFHH );
+        if( _level < endLevel - 1 )
+        {
+            Node& node = *_block.data.N;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MultiplyHMatFHHFinalizeCounts
+                    ( numQRs, numTargetFHH, numSourceFHH, 
+                      startLevel, endLevel );
+        }
         break;
     }
     case DIST_LOW_RANK:
@@ -1286,17 +1360,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
         // TODO: Think about avoiding the expensive F += H H proceduce in the 
         //       case where there is already a dense update. We could simply
         //       add H H onto the dense update.
-        if( _inTargetTeam )
+        if( _level >= startLevel && _level < endLevel )
         {
-            const unsigned teamLevel = _teams->TeamLevel(_level);
-            numQRs[teamLevel] += _colXMap.Size();
-            numTargetFHH[teamLevel] += _colXMap.Size();
-        }
-        if( _inSourceTeam )
-        {
-            const unsigned teamLevel = _teams->TeamLevel(_level);
-            numQRs[teamLevel] += _rowXMap.Size();
-            numSourceFHH[teamLevel] += _rowXMap.Size();
+            if( _inTargetTeam )
+            {
+                const unsigned teamLevel = _teams->TeamLevel(_level);
+                numQRs[teamLevel] += _colXMap.Size();
+                numTargetFHH[teamLevel] += _colXMap.Size();
+            }
+            if( _inSourceTeam )
+            {
+                const unsigned teamLevel = _teams->TeamLevel(_level);
+                numQRs[teamLevel] += _rowXMap.Size();
+                numSourceFHH[teamLevel] += _rowXMap.Size();
+            }
         }
         break;
     default:
@@ -1313,7 +1390,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<Scalar>& allReduceBuffer,
-        std::vector<int>& middleOffsets ) const
+        std::vector<int>& middleOffsets,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeMiddleUpdates");
@@ -1346,7 +1424,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
         case NODE_GHOST:
             if( C.Admissible() )
             {
-                if( C._inTargetTeam ) 
+                if( C._inTargetTeam && 
+                    C._level >= startLevel && C._level < endLevel ) 
                 {
                     // Handle the middle update, Omega2' (alpha A B Omega1)
                     const int key = A._sourceOffset;
@@ -1363,7 +1442,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                     middleOffsets[teamLevel] += rank*rank;
                 }
             }
-            else
+            else if( C._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1374,7 +1453,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                             nodeA.Child(t,r).
                             MultiplyHMatFHHFinalizeMiddleUpdates
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              allReduceBuffer, middleOffsets );
+                              allReduceBuffer, middleOffsets, 
+                              startLevel, endLevel );
             }
             break;
         default:
@@ -1394,7 +1474,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
 ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
   std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-  std::vector<Scalar>& qrWork )
+  std::vector<Scalar>& qrWork,
+  int startLevel, int endLevel )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeLocalQR");
@@ -1413,52 +1494,59 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
     case SPLIT_NODE:
     case NODE:
     {
-        Node& node = *_block.data.N;
-        for( int t=0; t<4; ++t )
-            for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatFHHFinalizeLocalQR
-                ( Xs, XOffsets, tauBuffer, tauOffsets, qrWork );
+        if( _level < endLevel - 1 )
+        {
+            Node& node = *_block.data.N;
+            for( int t=0; t<4; ++t )
+                for( int s=0; s<4; ++s )
+                    node.Child(t,s).MultiplyHMatFHHFinalizeLocalQR
+                    ( Xs, XOffsets, tauBuffer, tauOffsets, qrWork,
+                      startLevel, endLevel );
+        }
         break;
     }
     case DIST_LOW_RANK:
     case SPLIT_LOW_RANK:
     case LOW_RANK:
     {
-        MPI_Comm team = _teams->Team( _level );
-        const unsigned teamLevel = _teams->TeamLevel(_level);
-        const int log2TeamSize = Log2( mpi::CommSize( team ) );
-        const int r = SampleRank( MaxRank() );
-
-        if( _inTargetTeam )
+        if( _level >= startLevel && _level < endLevel )
         {
-            _colXMap.ResetIterator();
-            const unsigned numEntries = _colXMap.Size();
-            for( unsigned i=0; i<numEntries; ++i,_colXMap.Increment() )
-            {
-                Dense<Scalar>& X = *_colXMap.CurrentEntry();
-                Xs[XOffsets[teamLevel]++] = &X;
+            MPI_Comm team = _teams->Team( _level );
+            const unsigned teamLevel = _teams->TeamLevel(_level);
+            const int log2TeamSize = Log2( mpi::CommSize( team ) );
+            const int r = SampleRank( MaxRank() );
 
-                lapack::QR
-                ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]], 
-                  &qrWork[0], qrWork.size() );
-                tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+            if( _inTargetTeam )
+            {
+                _colXMap.ResetIterator();
+                const unsigned numEntries = _colXMap.Size();
+                for( unsigned i=0; i<numEntries; ++i,_colXMap.Increment() )
+                {
+                    Dense<Scalar>& X = *_colXMap.CurrentEntry();
+                    Xs[XOffsets[teamLevel]++] = &X;
+
+                    lapack::QR
+                    ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
+                      &tauBuffer[tauOffsets[teamLevel]], 
+                      &qrWork[0], qrWork.size() );
+                    tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+                }
             }
-        }
-        if( _inSourceTeam )
-        {
-            _rowXMap.ResetIterator();
-            const int numEntries = _rowXMap.Size();
-            for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
+            if( _inSourceTeam )
             {
-                Dense<Scalar>& X = *_rowXMap.CurrentEntry();
-                Xs[XOffsets[teamLevel]++] = &X;
+                _rowXMap.ResetIterator();
+                const int numEntries = _rowXMap.Size();
+                for( int i=0; i<numEntries; ++i,_rowXMap.Increment() )
+                {
+                    Dense<Scalar>& X = *_rowXMap.CurrentEntry();
+                    Xs[XOffsets[teamLevel]++] = &X;
                 
-                lapack::QR
-                ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
-                  &tauBuffer[tauOffsets[teamLevel]], 
-                  &qrWork[0], qrWork.size() );
-                tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+                    lapack::QR
+                    ( X.Height(), X.Width(), X.Buffer(), X.LDim(), 
+                      &tauBuffer[tauOffsets[teamLevel]], 
+                      &qrWork[0], qrWork.size() );
+                    tauOffsets[teamLevel] += (log2TeamSize+1)*r;
+                }
             }
         }
         break;
@@ -1478,7 +1566,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
         DistQuasi2dHMat<Scalar,Conjugated>& C,
         std::vector<Scalar>& allReduceBuffer,
         std::vector<int>& leftOffsets,
-        std::vector<int>& rightOffsets ) const
+        std::vector<int>& rightOffsets,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeOuterUpdates");
@@ -1511,39 +1600,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
         case NODE_GHOST:
             if( C.Admissible() )
             {
-                const int key = A._sourceOffset;
-                const unsigned teamLevel = C._teams->TeamLevel(C._level);
-                if( C._inTargetTeam ) 
+                if( C._level >= startLevel && C._level < endLevel )
                 {
-                    // Handle the left update, Q1' Omega2
-                    const Dense<Scalar>& Q1 = C._colXMap.Get( key );
-                    const Dense<Scalar>& Omega2 = A._rowOmega;
-                    Scalar* leftUpdate = 
-                        &allReduceBuffer[leftOffsets[teamLevel]];
-                    blas::Gemm
-                    ( 'C', 'N', Q1.Width(), rank, A.LocalHeight(),
-                      (Scalar)1, Q1.LockedBuffer(),     Q1.LDim(),
-                                 Omega2.LockedBuffer(), Omega2.LDim(),
-                      (Scalar)0, leftUpdate,            rank );
-                    leftOffsets[teamLevel] += rank*rank;
-                }
-                if( C._inSourceTeam )
-                {
-                    // Handle the right update, Q2' Omega1
-                    const Dense<Scalar>& Q2 = C._rowXMap.Get( key );
-                    const Dense<Scalar>& Omega1 = B._colOmega;
-                    Scalar* rightUpdate = 
-                        &allReduceBuffer[rightOffsets[teamLevel]];
+                    const int key = A._sourceOffset;
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
+                    if( C._inTargetTeam ) 
+                    {
+                        // Handle the left update, Q1' Omega2
+                        const Dense<Scalar>& Q1 = C._colXMap.Get( key );
+                        const Dense<Scalar>& Omega2 = A._rowOmega;
+                        Scalar* leftUpdate = 
+                            &allReduceBuffer[leftOffsets[teamLevel]];
+                        blas::Gemm
+                        ( 'C', 'N', Q1.Width(), rank, A.LocalHeight(),
+                          (Scalar)1, Q1.LockedBuffer(),     Q1.LDim(),
+                                     Omega2.LockedBuffer(), Omega2.LDim(),
+                          (Scalar)0, leftUpdate,            rank );
+                        leftOffsets[teamLevel] += rank*rank;
+                    }
+                    if( C._inSourceTeam )
+                    {
+                        // Handle the right update, Q2' Omega1
+                        const Dense<Scalar>& Q2 = C._rowXMap.Get( key );
+                        const Dense<Scalar>& Omega1 = B._colOmega;
+                        Scalar* rightUpdate = 
+                            &allReduceBuffer[rightOffsets[teamLevel]];
 
-                    blas::Gemm
-                    ( 'C', 'N', Q2.Width(), rank, B.LocalWidth(),
-                      (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
-                                 Omega1.LockedBuffer(), Omega1.LDim(),
-                      (Scalar)0, rightUpdate,           rank );
-                    rightOffsets[teamLevel] += rank*rank;
+                        blas::Gemm
+                        ( 'C', 'N', Q2.Width(), rank, B.LocalWidth(),
+                          (Scalar)1, Q2.LockedBuffer(),     Q2.LDim(),
+                                     Omega1.LockedBuffer(), Omega1.LDim(),
+                          (Scalar)0, rightUpdate,           rank );
+                        rightOffsets[teamLevel] += rank*rank;
+                    }
                 }
             }
-            else
+            else if( C._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1554,7 +1646,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                             nodeA.Child(t,r).
                             MultiplyHMatFHHFinalizeOuterUpdates
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              allReduceBuffer, leftOffsets, rightOffsets );
+                              allReduceBuffer, leftOffsets, rightOffsets,
+                              startLevel, endLevel );
             }
             break;
         default:
@@ -1582,7 +1675,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
         std::vector<Scalar>& U,
         std::vector<Scalar>& VH,
         std::vector<Scalar>& svdWork,
-        std::vector<Real>& svdRealWork ) const
+        std::vector<Real>& svdRealWork,
+  int startLevel, int endLevel ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatFHHFinalizeFormLowRank");
@@ -1615,75 +1709,80 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
         case NODE_GHOST:
             if( C.Admissible() )
             {
-                const int key = A._sourceOffset;
-                const unsigned teamLevel = C._teams->TeamLevel(C._level);
-                if( C._inTargetTeam ) 
+                if( C._level >= startLevel && C._level < endLevel )
                 {
-                    // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
-                    // in the place of X.
-                    Dense<Scalar>& X = C._colXMap.Get( key );
-                    Scalar* leftUpdate = 
-                        &allReduceBuffer[leftOffsets[teamLevel]];
-                    const Scalar* middleUpdate = 
-                        &allReduceBuffer[middleOffsets[teamLevel]];
+                    const int key = A._sourceOffset;
+                    const unsigned teamLevel = C._teams->TeamLevel(C._level);
+                    if( C._inTargetTeam ) 
+                    {
+                        // Form Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
+                        // in the place of X.
+                        Dense<Scalar>& X = C._colXMap.Get( key );
+                        Scalar* leftUpdate = 
+                            &allReduceBuffer[leftOffsets[teamLevel]];
+                        const Scalar* middleUpdate = 
+                            &allReduceBuffer[middleOffsets[teamLevel]];
 
-                    lapack::AdjointPseudoInverse
-                    ( X.Width(), rank, leftUpdate, rank, &singularValues[0],
-                      &U[0], rank, &VH[0], rank, &svdWork[0], svdWork.size(),
-                      &svdRealWork[0] );
+                        lapack::AdjointPseudoInverse
+                        ( X.Width(), rank, leftUpdate, rank, &singularValues[0],
+                          &U[0], rank, &VH[0], rank, &svdWork[0], 
+                          svdWork.size(), &svdRealWork[0] );
 
-                    // We can use the VH space to hold the product 
-                    // pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
-                    blas::Gemm
-                    ( 'N', 'N', X.Width(), rank, rank, 
-                      (Scalar)1, leftUpdate,   rank, 
-                                 middleUpdate, rank, 
-                      (Scalar)0, &VH[0],       rank );
+                        // We can use the VH space to hold the product 
+                        // pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
+                        blas::Gemm
+                        ( 'N', 'N', X.Width(), rank, rank, 
+                          (Scalar)1, leftUpdate,   rank, 
+                                     middleUpdate, rank, 
+                          (Scalar)0, &VH[0],       rank );
 
-                    // Q1 := X.
-                    Dense<Scalar> Q1;
-                    hmat_tools::Copy( X, Q1 );
-                    X.Resize( X.Height(), rank );
+                        // Q1 := X.
+                        Dense<Scalar> Q1;
+                        hmat_tools::Copy( X, Q1 );
+                        X.Resize( X.Height(), rank );
 
-                    // Form X := Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
-                    blas::Gemm
-                    ( 'N', 'N', Q1.Height(), rank, Q1.Width(),
-                      (Scalar)1, Q1.LockedBuffer(), Q1.LDim(),
-                                 &VH[0],            rank, 
-                      (Scalar)0, X.Buffer(),        X.LDim() );
+                        // Form 
+                        // X := Q1 pinv(Q1' Omega2)' (Omega2' alpha A B Omega1)
+                        blas::Gemm
+                        ( 'N', 'N', Q1.Height(), rank, Q1.Width(),
+                          (Scalar)1, Q1.LockedBuffer(), Q1.LDim(),
+                                     &VH[0],            rank, 
+                          (Scalar)0, X.Buffer(),        X.LDim() );
 
-                    leftOffsets[teamLevel] += rank*rank;
-                    middleOffsets[teamLevel] += rank*rank;
-                }
-                if( C._inSourceTeam )
-                {
-                    // Form Q2 pinv(Q2' Omega1)' or its conjugate
-                    Dense<Scalar>& X = C._rowXMap.Get( key );
-                    Scalar* rightUpdate = 
-                        &allReduceBuffer[rightOffsets[teamLevel]];
+                        leftOffsets[teamLevel] += rank*rank;
+                        middleOffsets[teamLevel] += rank*rank;
+                    }
+                    if( C._inSourceTeam )
+                    {
+                        // Form Q2 pinv(Q2' Omega1)' or its conjugate
+                        Dense<Scalar>& X = C._rowXMap.Get( key );
+                        Scalar* rightUpdate = 
+                            &allReduceBuffer[rightOffsets[teamLevel]];
 
-                    lapack::AdjointPseudoInverse
-                    ( X.Width(), rank, rightUpdate, rank, &singularValues[0],
-                      &U[0], rank, &VH[0], rank, &svdWork[0], svdWork.size(),
-                      &svdRealWork[0] );
+                        lapack::AdjointPseudoInverse
+                        ( X.Width(), rank, rightUpdate, rank, 
+                          &singularValues[0],
+                          &U[0], rank, &VH[0], rank, 
+                          &svdWork[0], svdWork.size(), &svdRealWork[0] );
 
-                    // Q2 := X
-                    Dense<Scalar> Q2;
-                    hmat_tools::Copy( X, Q2 );
-                    X.Resize( X.Height(), rank );
+                        // Q2 := X
+                        Dense<Scalar> Q2;
+                        hmat_tools::Copy( X, Q2 );
+                        X.Resize( X.Height(), rank );
 
-                    blas::Gemm
-                    ( 'N', 'N', Q2.Height(), rank, Q2.Width(),
-                      (Scalar)1, Q2.LockedBuffer(), Q2.LDim(),
-                                 rightUpdate,       rank,
-                      (Scalar)0, X.Buffer(),        X.LDim() );
-                    if( !Conjugated )
-                        hmat_tools::Conjugate( X );
+                        blas::Gemm
+                        ( 'N', 'N', Q2.Height(), rank, Q2.Width(),
+                          (Scalar)1, Q2.LockedBuffer(), Q2.LDim(),
+                                     rightUpdate,       rank,
+                          (Scalar)0, X.Buffer(),        X.LDim() );
+                        if( !Conjugated )
+                            hmat_tools::Conjugate( X );
 
-                    rightOffsets[teamLevel] += rank*rank;
+                        rightOffsets[teamLevel] += rank*rank;
+                    }
                 }
             }
-            else
+            else if( C._level < endLevel - 1 )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1695,7 +1794,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
                               allReduceBuffer,
                               leftOffsets, middleOffsets, rightOffsets, 
-                              singularValues, U, VH, svdWork, svdRealWork );
+                              singularValues, U, VH, svdWork, svdRealWork,
+                              startLevel, endLevel );
             }
             break;
         default:

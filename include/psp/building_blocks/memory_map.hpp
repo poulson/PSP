@@ -163,6 +163,8 @@ public:
 #ifndef RELEASE
         PushCallStack("MemoryMap::Erase");
 #endif
+        delete _baseMap[key];
+        _baseMap[key] = 0;
         _baseMap.erase( key );
         _it = _baseMap.begin();
         _currentIndex = 0;
@@ -176,6 +178,8 @@ public:
 #ifndef RELEASE
         PushCallStack("MemoryMap::EraseCurrentEntry");
 #endif
+        delete _it->second;
+        _it->second = 0;
         _baseMap.erase( _it++ );
 #ifndef RELEASE
         PopCallStack();
@@ -187,8 +191,8 @@ public:
         typename std::map<T1,T2*>::iterator it; 
         for( it=_baseMap.begin(); it!=_baseMap.end(); it++ )
         {
-            delete (*it).second;
-            (*it).second = 0;
+            delete it->second;
+            it->second = 0;
         }
         _baseMap.clear();
     }

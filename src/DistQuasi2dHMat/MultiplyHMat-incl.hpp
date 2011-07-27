@@ -33,6 +33,24 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Multiply");
+#endif
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+
+    A.MultiplyHMatFullAccumulate( alpha, B, C );
+    //A.MultiplyHMatSingleLevelAccumulate( alpha, B, C );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatFullAccumulate");
     if( Width() != B.Height() )
         throw std::logic_error("Attempted nonconformal matrix-matrix multiply");
     if( _numLevels != B._numLevels )
@@ -52,22 +70,78 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
     B.FormSourceGhostNodes();
     A.MultiplyHMatFormGhostRanks( B );
 
-    A.MultiplyHMatMainPrecompute( alpha, B, C );
-    A.MultiplyHMatMainSums( B, C );
-    A.MultiplyHMatMainPassData( alpha, B, C );
+    const int startLevel = 0;
+    const int endLevel = A.NumLevels();
+    A.MultiplyHMatMainPrecompute( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatMainSums( B, C, startLevel, endLevel );
+    A.MultiplyHMatMainPassData( alpha, B, C, startLevel, endLevel );
 
-    A.MultiplyHMatMainBroadcasts( B, C );
-    A.MultiplyHMatMainPostcompute( alpha, B, C );
-    A.MultiplyHMatFHHPrecompute( alpha, B, C );
-    A.MultiplyHMatFHHSums( alpha, B, C );
-    A.MultiplyHMatFHHPassData( alpha, B, C );
-    A.MultiplyHMatFHHBroadcasts( alpha, B, C );
-    A.MultiplyHMatFHHPostcompute( alpha, B, C );
-    A.MultiplyHMatFHHFinalize( B, C );
+    A.MultiplyHMatMainBroadcasts( B, C, startLevel, endLevel );
+    A.MultiplyHMatMainPostcompute( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatFHHPrecompute( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatFHHSums( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatFHHPassData( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatFHHBroadcasts( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatFHHPostcompute( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatFHHFinalize( B, C, startLevel, endLevel );
 
     C.MultiplyHMatUpdates();
 #ifndef RELEASE
     PopCallStack();
 #endif
 }
+
+template<typename Scalar,bool Conjugated>
+void
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
+( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                DistQuasi2dHMat<Scalar,Conjugated>& C )
+{
+#ifndef RELEASE
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatSingleLevelAccumulate");
+    if( Width() != B.Height() )
+        throw std::logic_error("Attempted nonconformal matrix-matrix multiply");
+    if( _numLevels != B._numLevels )
+        throw std::logic_error("H-matrices must have same number of levels");
+    if( _zSize != B._zSize )
+        throw std::logic_error("Mismatched z sizes");
+    if( _level != B._level )
+        throw std::logic_error("Mismatched levels");
+#endif
+    DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
+    A.RequireRoot();
+    A.PruneGhostNodes();
+    B.PruneGhostNodes();
+    C.Clear();
+
+    A.FormTargetGhostNodes();
+    B.FormSourceGhostNodes();
+    A.MultiplyHMatFormGhostRanks( B );
+
+    const int numLevels = A.NumLevels();
+    for( int level=0; level<numLevels; ++level )
+    {
+        const int startLevel = level;
+        const int endLevel = level+1;
+
+        A.MultiplyHMatMainPrecompute( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatMainSums( B, C, startLevel, endLevel );
+        A.MultiplyHMatMainPassData( alpha, B, C, startLevel, endLevel );
+
+        A.MultiplyHMatMainBroadcasts( B, C, startLevel, endLevel );
+        A.MultiplyHMatMainPostcompute( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatFHHPrecompute( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatFHHSums( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatFHHPassData( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatFHHBroadcasts( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatFHHPostcompute( alpha, B, C, startLevel, endLevel );
+        A.MultiplyHMatFHHFinalize( B, C, startLevel, endLevel );
+
+        C.MultiplyHMatUpdates();
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
 
