@@ -36,8 +36,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
-    A.MultiplyHMatFullAccumulate( alpha, B, C );
-    //A.MultiplyHMatSingleLevelAccumulate( alpha, B, C );
+    //A.MultiplyHMatFullAccumulate( alpha, B, C );
+    A.MultiplyHMatSingleLevelAccumulate( alpha, B, C );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -143,5 +143,4 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
     PopCallStack();
 #endif
 }
-
 
