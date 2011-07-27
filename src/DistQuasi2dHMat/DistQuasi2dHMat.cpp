@@ -637,7 +637,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   int sourceOffset, int targetOffset,
   int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
   int zSize, int xSource, int xTarget, int ySource, int yTarget,
-  const Teams& teams, unsigned level, 
+  const Teams& teams, int level, 
   bool inSourceTeam, bool inTargetTeam, 
   int sourceRoot, int targetRoot )
 : _numLevels(numLevels), _maxRank(maxRank), 

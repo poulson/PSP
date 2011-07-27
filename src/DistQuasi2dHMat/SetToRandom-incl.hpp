@@ -45,7 +45,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::SetToRandom()
 
         DF.rank = maxRank;
         DF.ULocal.Resize( localHeight, maxRank );
-        DF.VLocal.Resize( localHeight, maxRank );
+        DF.VLocal.Resize( localWidth, maxRank );
         ParallelGaussianRandomVectors( DF.ULocal );
         ParallelGaussianRandomVectors( DF.VLocal );
         break;

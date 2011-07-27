@@ -54,9 +54,6 @@ main( int argc, char* argv[] )
     const int maxRank = atoi( argv[6] );
     const bool printStructure = atoi( argv[7] );
 
-    const int m = xSize*ySize*zSize;
-    const int n = xSize*ySize*zSize;
-
     if( commRank == 0 )
     {
         std::cout << "----------------------------------------------------\n"

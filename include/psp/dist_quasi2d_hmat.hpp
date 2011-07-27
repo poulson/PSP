@@ -507,7 +507,7 @@ private:
       int sourceOffset, int targetOffset,
       int xSizeSource, int xSizeTarget, int ySizeSource, int ySizeTarget,
       int zSize, int xSource, int xTarget, int ySource, int yTarget,
-      const Teams& teams, unsigned level, 
+      const Teams& teams, int level, 
       bool inSourceTeam, bool inTargetTeam, 
       int sourceRoot, int targetRoot );
 
@@ -1098,7 +1098,7 @@ private:
     Block _block;
 
     const Teams* _teams;
-    unsigned _level;
+    int _level;
     bool _inSourceTeam, _inTargetTeam;
     int _sourceRoot, _targetRoot;
 
