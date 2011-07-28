@@ -275,19 +275,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             case NODE:
             case NODE_GHOST:
             {
-                if( A._level < endLevel - 1 )
-                {
-                    // Start H += H H
-                    Node& nodeA = *A._block.data.N;
-                    Node& nodeB = *B._block.data.N;
-                    Node& nodeC = *C._block.data.N;
-                    for( int t=0; t<4; ++t )
-                        for( int s=0; s<4; ++s )
-                            for( int r=0; r<4; ++r )
-                                nodeA.Child(t,r).MultiplyHMatMainPrecompute
-                                ( alpha, nodeB.Child(r,s), nodeC.Child(t,s),
-                                  startLevel, endLevel );
-                }
+                // Start H += H H
+                Node& nodeA = *A._block.data.N;
+                Node& nodeB = *B._block.data.N;
+                Node& nodeC = *C._block.data.N;
+                for( int t=0; t<4; ++t )
+                    for( int s=0; s<4; ++s )
+                        for( int r=0; r<4; ++r )
+                            nodeA.Child(t,r).MultiplyHMatMainPrecompute
+                            ( alpha, nodeB.Child(r,s), nodeC.Child(t,s),
+                              startLevel, endLevel );
 #ifndef RELEASE
                 PopCallStack();
 #endif
@@ -1258,7 +1255,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountA
         if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
             TransposeMultiplyDenseSumsCount( sizes, _rowContext.numRhs );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1293,7 +1290,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackA
         if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )   
             TransposeMultiplyDenseSumsPack( _rowContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1328,7 +1325,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackA
         if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
             TransposeMultiplyDenseSumsUnpack( _rowContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1362,7 +1359,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDenseSumsCount( sizes, _colContext.numRhs );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1397,7 +1394,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDenseSumsPack( _colContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1432,7 +1429,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDenseSumsUnpack( _colContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1468,7 +1465,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( !admissibleC && A._level < endLevel - 1 )
+        {
+            if( !admissibleC && A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1481,6 +1479,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
                               startLevel, endLevel );
             }
             break;
+        }
         case DIST_LOW_RANK:
         {
             if( A._level >= startLevel && A._level < endLevel )
@@ -1552,7 +1551,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( !admissibleC && A._level < endLevel - 1 )
+        {
+            if( !admissibleC && A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1565,11 +1565,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
                               buffer, offsets, startLevel, endLevel );
             }
             break;
+        }
         case DIST_LOW_RANK:
+        {
             if( A._level >= startLevel && A._level < endLevel )
                 A.MultiplyDenseSumsPack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
+        }
         default:
             break;
         }
@@ -1578,10 +1581,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
         switch( B._block.type )
         {
         case DIST_NODE:
+        {
             if( A._level >= startLevel && A._level < endLevel )
                 B.TransposeMultiplyDenseSumsPack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
+        }
         case DIST_LOW_RANK:
         {
             if( A._level >= startLevel && A._level < endLevel )
@@ -1632,7 +1637,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( !admissibleC && A._level < endLevel - 1 )
+        {
+            if( !admissibleC && A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1645,11 +1651,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
                               buffer, offsets, startLevel, endLevel );
             }
             break;
+        }
         case DIST_LOW_RANK:
+        {
             if( A._level >= startLevel && A._level < endLevel )
                 A.MultiplyDenseSumsUnpack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
+        }
         default:
             break;
         }
@@ -1658,10 +1667,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
         switch( B._block.type )
         {
         case DIST_NODE:
+        {
             if( A._level >= startLevel && A._level < endLevel )
                 B.TransposeMultiplyDenseSumsUnpack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
+        }
         case DIST_LOW_RANK:
         {
             if( A._level >= startLevel && A._level < endLevel )
@@ -1799,7 +1810,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
             TransposeMultiplyDensePassDataCount
             ( sendSizes, recvSizes, _rowContext.numRhs );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1835,7 +1846,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
             TransposeMultiplyDensePassDataPack
             ( _rowContext, _rowOmega, sendBuffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1871,7 +1882,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
             TransposeMultiplyDensePassDataUnpack
             ( _rowContext, recvBuffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1907,7 +1918,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
             MultiplyDensePassDataCount
             ( sendSizes, recvSizes, _colContext.numRhs );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1942,7 +1953,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDensePassDataPack( _colContext, sendBuffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1977,7 +1988,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDensePassDataUnpack( _colContext, recvBuffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -2037,7 +2048,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
             case NODE:
             case NODE_GHOST:
             {
-                if( A._level < endLevel - 1 )
+                if( A._level+1 < endLevel )
                 {
                     // Start H += H H
                     const Node& nodeA = *A._block.data.N;
@@ -2622,7 +2633,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
             case NODE:
             case NODE_GHOST:
             {
-                if( A._level < endLevel - 1 )
+                if( A._level+1 < endLevel )
                 {
                     // Start H += H H
                     const Node& nodeA = *A._block.data.N;
@@ -3090,7 +3101,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
             case NODE:
             case NODE_GHOST:
             {
-                if( A._level < endLevel - 1 )
+                if( A._level+1 < endLevel )
                 {
                     // Start H += H H
                     const Node& nodeA = *A._block.data.N;
@@ -3689,7 +3700,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountA
         if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
             TransposeMultiplyDenseBroadcastsCount( sizes, _rowContext.numRhs );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -3725,7 +3736,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackA
             TransposeMultiplyDenseBroadcastsPack
             ( _rowContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -3761,7 +3772,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackA
             TransposeMultiplyDenseBroadcastsUnpack
             ( _rowContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -3795,7 +3806,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDenseBroadcastsCount( sizes, _colContext.numRhs );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -3830,7 +3841,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDenseBroadcastsPack( _colContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             const Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -3865,7 +3876,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackB
         if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
             MultiplyDenseBroadcastsUnpack( _colContext, buffer, offsets );
 
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -3910,7 +3921,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( !admissibleC && A._level < endLevel - 1 )
+        {
+            if( !admissibleC && A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -3923,6 +3935,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
                               startLevel, endLevel );
             }
             break;
+        }
         case DIST_LOW_RANK:
         {
             if( A._level >= startLevel && A._level < endLevel )
@@ -4014,7 +4027,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( !admissibleC && A._level < endLevel - 1 )
+        {
+            if( !admissibleC && A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -4027,6 +4041,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
                               buffer, offsets, startLevel, endLevel );
             }
             break;
+        }
         case DIST_LOW_RANK:
             if( A._level >= startLevel && A._level < endLevel )
                 A.MultiplyDenseBroadcastsPack
@@ -4126,7 +4141,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( !admissibleC && A._level < endLevel - 1 )
+            if( !admissibleC && A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -4246,7 +4261,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( A._level < endLevel - 1 )
+        if( A._level+1 < endLevel )
         {
             Node& nodeA = *A._block.data.N;
             for( int t=0; t<4; ++t )
@@ -4287,7 +4302,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( B._level < endLevel - 1 )
+        if( B._level+1 < endLevel )
         {
             Node& nodeB = *B._block.data.N;
             for( int t=0; t<4; ++t )
@@ -4347,7 +4362,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
             case NODE:
             case NODE_GHOST:
             {
-                if( A._level < endLevel - 1 )
+                if( A._level+1 < endLevel )
                 {
                     const Node& nodeA = *A._block.data.N;
                     const Node& nodeB = *B._block.data.N;
@@ -5467,7 +5482,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeCCleanup
     case NODE:
     case NODE_GHOST:
     {
-        if( C._level < endLevel - 1 )
+        if( C._level+1 < endLevel )
         {
             Node& nodeC = *C._block.data.N;
             for( int t=0; t<4; ++t )

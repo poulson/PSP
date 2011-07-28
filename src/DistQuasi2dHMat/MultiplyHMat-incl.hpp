@@ -72,12 +72,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
 
     const int startLevel = 0;
     const int endLevel = A.NumLevels();
+
     A.MultiplyHMatMainPrecompute( alpha, B, C, startLevel, endLevel );
     A.MultiplyHMatMainSums( B, C, startLevel, endLevel );
     A.MultiplyHMatMainPassData( alpha, B, C, startLevel, endLevel );
-
     A.MultiplyHMatMainBroadcasts( B, C, startLevel, endLevel );
     A.MultiplyHMatMainPostcompute( alpha, B, C, startLevel, endLevel );
+
     A.MultiplyHMatFHHPrecompute( alpha, B, C, startLevel, endLevel );
     A.MultiplyHMatFHHSums( alpha, B, C, startLevel, endLevel );
     A.MultiplyHMatFHHPassData( alpha, B, C, startLevel, endLevel );
@@ -127,9 +128,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
         A.MultiplyHMatMainPrecompute( alpha, B, C, startLevel, endLevel );
         A.MultiplyHMatMainSums( B, C, startLevel, endLevel );
         A.MultiplyHMatMainPassData( alpha, B, C, startLevel, endLevel );
-
         A.MultiplyHMatMainBroadcasts( B, C, startLevel, endLevel );
         A.MultiplyHMatMainPostcompute( alpha, B, C, startLevel, endLevel );
+
         A.MultiplyHMatFHHPrecompute( alpha, B, C, startLevel, endLevel );
         A.MultiplyHMatFHHSums( alpha, B, C, startLevel, endLevel );
         A.MultiplyHMatFHHPassData( alpha, B, C, startLevel, endLevel );

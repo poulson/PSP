@@ -89,7 +89,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPrecompute
                     ( rowContext, Conj(alpha), A._rowT, rowX );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -197,7 +197,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsCount
                     B.TransposeMultiplyDenseSumsCount( sizes, sampleRank );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -265,7 +265,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsPack
                     ( C._rowFHHContextMap.Get( key ), buffer, offsets );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -333,7 +333,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHSumsUnpack
                     ( C._rowFHHContextMap.Get( key ), buffer, offsets );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -487,7 +487,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataCount
                     ( sendSizes, recvSizes, sampleRank );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -565,7 +565,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataPack
                       A._rowT, sendBuffer, offsets );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -642,7 +642,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPassDataUnpack
                     ( C._rowFHHContextMap.Get( key ), recvBuffer, offsets );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -752,7 +752,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsCount
                     ( sizes, sampleRank );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -820,7 +820,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsPack
                     ( C._rowFHHContextMap.Get( key ), buffer, offsets );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -888,7 +888,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHBroadcastsUnpack
                     ( C._rowFHHContextMap.Get( key ), buffer, offsets );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 Node& nodeA = *A._block.data.N;
                 Node& nodeB = *B._block.data.N;
@@ -988,7 +988,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeC
                       Conj(alpha), A._rowT, C._rowXMap.Get( key ) );
                 }
             }
-            else if( A._level < endLevel - 1 )
+            else if( A._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1036,7 +1036,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHPostcomputeCCleanup
     case NODE:
     case NODE_GHOST:
     {
-        if( C._level >= startLevel && C._level < endLevel - 1 )
+        if( C._level+1 < endLevel )
         {
             Node& nodeC = *C._block.data.N;
             for( int t=0; t<4; ++t )
@@ -1343,7 +1343,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeCounts
     case SPLIT_NODE:
     case NODE:
     {
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1442,7 +1442,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeMiddleUpdates
                     middleOffsets[teamLevel] += rank*rank;
                 }
             }
-            else if( C._level < endLevel - 1 )
+            else if( C._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1494,7 +1494,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeLocalQR
     case SPLIT_NODE:
     case NODE:
     {
-        if( _level < endLevel - 1 )
+        if( _level+1 < endLevel )
         {
             Node& node = *_block.data.N;
             for( int t=0; t<4; ++t )
@@ -1635,7 +1635,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeOuterUpdates
                     }
                 }
             }
-            else if( C._level < endLevel - 1 )
+            else if( C._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
@@ -1782,7 +1782,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFHHFinalizeFormLowRank
                     }
                 }
             }
-            else if( C._level < endLevel - 1 )
+            else if( C._level+1 < endLevel )
             {
                 const Node& nodeA = *A._block.data.N;
                 const Node& nodeB = *B._block.data.N;
