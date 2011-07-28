@@ -128,7 +128,7 @@ struct RealBase
 { typedef Real type; };
 
 template<typename Real>
-struct RealBase< std::complex<Real> >
+struct RealBase<std::complex<Real> >
 { typedef Real type; };
 
 // Create a wrappers around real and std::complex<real> types so that they
@@ -154,24 +154,29 @@ public:
 };
 
 template<typename Real>
-class ScalarWrapper< std::complex<Real> >
+class ScalarWrapper<std::complex<Real> >
 {
     const std::complex<Real>& _value;
 public:
     ScalarWrapper( const std::complex<Real>& alpha ) : _value(alpha) { }
 
     friend std::ostream& operator<<
-    ( std::ostream& out, const ScalarWrapper< std::complex<Real> >& alpha )
+    ( std::ostream& os, const ScalarWrapper<std::complex<Real> >& alpha )
     {
-        out << std::real(alpha._value) << "+" << std::imag(alpha._value) << "i";
-        return out;
+        os << std::real(alpha._value) << "+" << std::imag(alpha._value) << "i";
+        return os;
     }
 };
 
-template<typename Scalar>
-ScalarWrapper<Scalar>
-WrapScalar( Scalar alpha )
-{ return ScalarWrapper<Scalar>( alpha ); }
+template<typename Real>
+const ScalarWrapper<Real>
+WrapScalar( const Real& alpha )
+{ return ScalarWrapper<Real>( alpha ); }
+
+template<typename Real>
+const ScalarWrapper<std::complex<Real> >
+WrapScalar( const std::complex<Real>& alpha )
+{ return ScalarWrapper<std::complex<Real> >( alpha ); }
 
 // These should typically only be used when not in RELEASE mode
 void PushCallStack( const std::string& s );

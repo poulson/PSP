@@ -461,7 +461,7 @@ void psp::hmat_tools::PrintPacked
             const int Tj = std::min(j+1,t);
 
             const Scalar value = packedA[jCol+i];
-            os << ScalarWrapper<Scalar>(value) << " ";
+            os << WrapScalar(value) << " ";
 
             jCol += Sj + Tj;
         }
@@ -487,7 +487,7 @@ void psp::hmat_tools::PrintPacked
             const int Tj = std::min(j+1,t);
 
             const Scalar value = packedA[jCol+Sj+i];
-            os << ScalarWrapper<Scalar>(value) << " ";
+            os << WrapScalar(value) << " ";
 
             jCol += Sj + Tj;
         }

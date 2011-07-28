@@ -95,8 +95,7 @@ main( int argc, char* argv[] )
             psp::hmat_tools::PrintPacked( "packedQR:", r, s, t, &packedA[0] );
             std::cout << "\ntau:\n";
             for( unsigned j=0; j<tau.size(); ++j )
-                std::cout << 
-                    psp::ScalarWrapper<std::complex<double> >(tau[j]) << "\n";
+                std::cout << psp::WrapScalar(tau[j]) << "\n";
             std::cout << std::endl;
         }
 
