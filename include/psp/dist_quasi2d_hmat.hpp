@@ -779,6 +779,9 @@ private:
     void MultiplyHMatSingleLevelAccumulate
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C );
+    void MultiplyHMatSingleUpdateAccumulate
+    ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
+                    DistQuasi2dHMat<Scalar,Conjugated>& C );
 
     void MultiplyHMatFormGhostRanks( DistQuasi2dHMat<Scalar,Conjugated>& B );   
     void MultiplyHMatFormGhostRanksCount
@@ -797,11 +800,14 @@ private:
     void MultiplyHMatMainPrecompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel, 
+      int startUpdate, int endUpdate, int update );
 
     void MultiplyHMatMainSums
     ( DistQuasi2dHMat<Scalar,Conjugated>& B, 
-      DistQuasi2dHMat<Scalar,Conjugated>& C, int startLevel, int endLevel );
+      DistQuasi2dHMat<Scalar,Conjugated>& C, 
+      int startLevel, int endLevel, 
+      int startUpdate, int endUpdate );
     // To be called from A
     void MultiplyHMatMainSumsCountA
     ( std::vector<int>& sizes, int startLevel, int endLevel ) const;
@@ -820,26 +826,31 @@ private:
     void MultiplyHMatMainSumsUnpackB
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       int startLevel, int endLevel );
-    // To be called from C
+    // To be called from A
     void MultiplyHMatMainSumsCountC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
       const DistQuasi2dHMat<Scalar,Conjugated>& C,
-      std::vector<int>& sizes, int startLevel, int endLevel ) const;
+      std::vector<int>& sizes, 
+      int startLevel, int endLevel, 
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatMainSumsPackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel ) const; 
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const; 
     void MultiplyHMatMainSumsUnpackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
 
     void MultiplyHMatMainPassData
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate );
     // To be called from A
     void MultiplyHMatMainPassDataCountA
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes,
@@ -850,7 +861,7 @@ private:
     void MultiplyHMatMainPassDataUnpackA
     ( const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets,
       int startLevel, int endLevel );
-    // To be called from A
+    // To be called from B
     void MultiplyHMatMainPassDataCountB
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes,
       int startLevel, int endLevel ) const;
@@ -865,21 +876,25 @@ private:
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
       const DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::map<int,int>& sendSizes, std::map<int,int>& recvSizes,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatMainPassDataPackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatMainPassDataUnpackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
 
     void MultiplyHMatMainBroadcasts
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
-      DistQuasi2dHMat<Scalar,Conjugated>& C, int startLevel, int endLevel );
+      DistQuasi2dHMat<Scalar,Conjugated>& C, 
+      int startLevel, int endLevel, int startUpdate, int endUpdate );
     // To be called from A
     void MultiplyHMatMainBroadcastsCountA
     ( std::vector<int>& sizes, int startLevel, int endLevel ) const;
@@ -898,34 +913,40 @@ private:
     void MultiplyHMatMainBroadcastsUnpackB
     ( const std::vector<Scalar>& buffer, std::vector<int>& offsets,
       int startLevel, int endLevel );
-    // To be called from C
+    // To be called from A
     void MultiplyHMatMainBroadcastsCountC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
       const DistQuasi2dHMat<Scalar,Conjugated>& C, 
-      std::vector<int>& sizes, int startLevel, int endLevel ) const;
+      std::vector<int>& sizes, 
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatMainBroadcastsPackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatMainBroadcastsUnpackC
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
 
     void MultiplyHMatMainPostcompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel, 
+      int startUpdate, int endUpdate );
     void MultiplyHMatMainPostcomputeA // To be called from A
     ( int startLevel, int endLevel ); 
     void MultiplyHMatMainPostcomputeB // To be called from B
     ( int startLevel, int endLevel ); 
-    void MultiplyHMatMainPostcomputeC
+    void MultiplyHMatMainPostcomputeC // To be called from A
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatMainPostcomputeCCleanup // To be called from C
     ( int startLevel, int endLevel ); 
 
@@ -945,82 +966,99 @@ private:
     void MultiplyHMatFHHPrecompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update );
 
     void MultiplyHMatFHHSums
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel, 
+      int startUpdate, int endUpdate );
     void MultiplyHMatFHHSumsCount
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
-            std::vector<int>& sizes, int startLevel, int endLevel ) const;
+            std::vector<int>& sizes, 
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHSumsPack
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
       DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update );
     void MultiplyHMatFHHSumsUnpack
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
       DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update );
 
     void MultiplyHMatFHHPassData
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate );
     void MultiplyHMatFHHPassDataCount
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
             std::map<int,int>& sendSizes, std::map<int,int>& recvSizes,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHPassDataPack
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
       DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update );
     void MultiplyHMatFHHPassDataUnpack
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
       DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update );
 
     void MultiplyHMatFHHBroadcasts
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate );
     void MultiplyHMatFHHBroadcastsCount
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
             std::vector<int>& sizes, 
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHBroadcastsPack
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
       std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHBroadcastsUnpack
     ( DistQuasi2dHMat<Scalar,Conjugated>& B,
       DistQuasi2dHMat<Scalar,Conjugated>& C,
       const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update );
 
     void MultiplyHMatFHHPostcompute
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                     DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel );
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate );
     void MultiplyHMatFHHPostcomputeC
     ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                           DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHPostcomputeCCleanup
     ( int startLevel, int endLevel ); // To be called from C
 
     void MultiplyHMatFHHFinalize
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate ) const;
     void MultiplyHMatFHHFinalizeCounts // To be called from C
     ( std::vector<int>& numQrs, 
       std::vector<int>& numTargetFHH, std::vector<int>& numSourceFHH,
@@ -1030,7 +1068,8 @@ private:
             DistQuasi2dHMat<Scalar,Conjugated>& C,
             std::vector<Scalar>& allReduceBuffer,
             std::vector<int>& middleOffsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHFinalizeLocalQR
     ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets,
       std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
@@ -1042,7 +1081,8 @@ private:
             std::vector<Scalar>& allReduceBuffer,
             std::vector<int>& leftOffsets, 
             std::vector<int>& rightOffsets,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
     void MultiplyHMatFHHFinalizeFormLowRank
     ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
             DistQuasi2dHMat<Scalar,Conjugated>& C,
@@ -1055,7 +1095,8 @@ private:
             std::vector<Scalar>& VH,
             std::vector<Scalar>& svdWork,
             std::vector<Real>& svdRealWork,
-      int startLevel, int endLevel ) const;
+      int startLevel, int endLevel,
+      int startUpdate, int endUpdate, int update ) const;
 
     void MultiplyHMatUpdates();
     void MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const;
@@ -1114,7 +1155,8 @@ private:
     // order to capture the column and row space, respectively, of H. These 
     // variables could be mutable since they do not effect the usage of the 
     // logical state of the class and simply help avoid redundant computation.
-    bool _beganRowSpaceComp, _beganColSpaceComp;
+    bool _beganRowSpaceComp, _finishedRowSpaceComp,
+         _beganColSpaceComp, _finishedColSpaceComp;
     Dense<Scalar> _colOmega, _rowOmega, _colT, _rowT;
     MultiplyDenseContext _colContext, _rowContext;
 };

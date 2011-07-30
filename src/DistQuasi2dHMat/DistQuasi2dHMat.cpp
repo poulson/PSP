@@ -49,7 +49,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _finishedRowSpaceComp(false),
+  _beganColSpaceComp(false), _finishedColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }
@@ -69,7 +70,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _finishedRowSpaceComp(false),
+  _beganColSpaceComp(false), _finishedColSpaceComp(false)
 { 
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");
@@ -99,7 +101,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _finishedRowSpaceComp(false),
+  _beganColSpaceComp(false), _finishedColSpaceComp(false)
 { 
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");
@@ -626,7 +629,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat()
   _inSourceTeam(true), _inTargetTeam(true), 
   _sourceRoot(0), _targetRoot(0),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _finishedRowSpaceComp(false),
+  _beganColSpaceComp(false), _finishedColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }
@@ -651,7 +655,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
   _inSourceTeam(inSourceTeam), _inTargetTeam(inTargetTeam),
   _sourceRoot(sourceRoot), _targetRoot(targetRoot),
   _haveDenseUpdate(false), _storedDenseUpdate(false),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _finishedRowSpaceComp(false),
+  _beganColSpaceComp(false), _finishedColSpaceComp(false)
 { 
     _block.type = EMPTY;
 }

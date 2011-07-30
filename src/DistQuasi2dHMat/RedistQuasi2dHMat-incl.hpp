@@ -815,7 +815,8 @@ template<typename Scalar,bool Conjugated>
 psp::DistQuasi2dHMat<Scalar,Conjugated>::DistQuasi2dHMat
 ( const byte* packedSub, const Teams& teams )
 : _haveDenseUpdate(false), _storedDenseUpdate(false),
-  _beganRowSpaceComp(false), _beganColSpaceComp(false)
+  _beganRowSpaceComp(false), _finishedRowSpaceComp(false),
+  _beganColSpaceComp(false), _finishedColSpaceComp(false)
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::DistQuasi2dHMat");

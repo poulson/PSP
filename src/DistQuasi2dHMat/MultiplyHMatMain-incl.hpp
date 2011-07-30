@@ -226,7 +226,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                 DistQuasi2dHMat<Scalar,Conjugated>& C,
-  int startLevel, int endLevel )
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPrecompute");
@@ -284,7 +285,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainPrecompute
                             ( alpha, nodeB.Child(r,s), nodeC.Child(t,s),
-                              startLevel, endLevel );
+                              startLevel, endLevel, startUpdate, endUpdate, r );
 #ifndef RELEASE
                 PopCallStack();
 #endif
@@ -299,7 +300,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             break;
         }
     }
-    else if( A._level >= startLevel && A._level < endLevel )
+    else if( A._level >= startLevel && A._level < endLevel && 
+             update >= startUpdate && update < endUpdate )
     {
         // Handle precomputation of A's row space
         if( !A._beganRowSpaceComp )
@@ -381,7 +383,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
         }
     }
 
-    if( A._level < startLevel || A._level >= endLevel )
+    if( A._level < startLevel || A._level >= endLevel || 
+        update < startUpdate  || update >= endUpdate )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -1126,10 +1129,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPrecompute
             if( admissibleC )
             {
                 LowRank<Scalar,Conjugated>& FC = *C._block.data.F;
-                LowRank<Scalar,Conjugated> update;
-                hmat_tools::Multiply( alpha, DA, FB, update );
+                LowRank<Scalar,Conjugated> temp;
+                hmat_tools::Multiply( alpha, DA, FB, temp );
                 hmat_tools::RoundedUpdate
-                ( C.MaxRank(), (Scalar)1, update, (Scalar)1, FC );
+                ( C.MaxRank(), (Scalar)1, temp, (Scalar)1, FC );
             }
             else
             {
@@ -1196,7 +1199,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
 ( DistQuasi2dHMat<Scalar,Conjugated>& B, DistQuasi2dHMat<Scalar,Conjugated>& C,
-  int startLevel, int endLevel )
+  int startLevel, int endLevel,
+  int startUpdate, int endUpdate )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSums");
@@ -1210,7 +1214,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     std::memset( &sizes[0], 0, numReduces*sizeof(int) );
     A.MultiplyHMatMainSumsCountA( sizes, startLevel, endLevel );
     B.MultiplyHMatMainSumsCountB( sizes, startLevel, endLevel );
-    A.MultiplyHMatMainSumsCountC( B, C, sizes, startLevel, endLevel );
+    A.MultiplyHMatMainSumsCountC
+    ( B, C, sizes, startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Pack all of the data to be reduced into a single buffer
     int totalSize = 0;
@@ -1224,7 +1229,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     A.MultiplyHMatMainSumsPackA( buffer, offsetsCopy, startLevel, endLevel );
     B.MultiplyHMatMainSumsPackB( buffer, offsetsCopy, startLevel, endLevel );
     A.MultiplyHMatMainSumsPackC
-    ( B, C, buffer, offsetsCopy, startLevel, endLevel );
+    ( B, C, buffer, offsetsCopy, 
+      startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Perform the reduces with log2(p) messages
     A._teams->TreeSumToRoots( buffer, sizes );
@@ -1233,7 +1239,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSums
     A.MultiplyHMatMainSumsUnpackA( buffer, offsets, startLevel, endLevel );
     B.MultiplyHMatMainSumsUnpackB( buffer, offsets, startLevel, endLevel );
     A.MultiplyHMatMainSumsUnpackC
-    ( B, C, buffer, offsets, startLevel, endLevel );
+    ( B, C, buffer, offsets, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -1252,7 +1258,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountA
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDenseSumsCount( sizes, _rowContext.numRhs );
 
         if( _level+1 < endLevel )
@@ -1287,7 +1294,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackA
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )   
+        if( _level >= startLevel && _level < endLevel && 
+            _beganRowSpaceComp && !_finishedRowSpaceComp )   
             TransposeMultiplyDenseSumsPack( _rowContext, buffer, offsets );
 
         if( _level+1 < endLevel )
@@ -1322,7 +1330,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackA
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDenseSumsUnpack( _rowContext, buffer, offsets );
 
         if( _level+1 < endLevel )
@@ -1356,7 +1365,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountB
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDenseSumsCount( sizes, _colContext.numRhs );
 
         if( _level+1 < endLevel )
@@ -1391,7 +1401,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackB
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDenseSumsPack( _colContext, buffer, offsets );
 
         if( _level+1 < endLevel )
@@ -1426,7 +1437,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackB
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDenseSumsUnpack( _colContext, buffer, offsets );
 
         if( _level+1 < endLevel )
@@ -1452,7 +1464,9 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
   const DistQuasi2dHMat<Scalar,Conjugated>& C,
-  std::vector<int>& sizes, int startLevel, int endLevel ) const
+  std::vector<int>& sizes, 
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsCountC");
@@ -1476,13 +1490,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainSumsCountC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), sizes,
-                              startLevel, endLevel );
+                              startLevel, endLevel, startUpdate, endUpdate, r );
             }
             break;
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFB = *B._block.data.DF;
                 A.MultiplyDenseSumsCount( sizes, DFB.rank );
@@ -1498,7 +1513,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
         {
         case DIST_NODE:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 B.TransposeMultiplyDenseSumsCount( sizes, DFA.rank );
@@ -1507,15 +1523,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsCountC
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate &&
+                A._inSourceTeam )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRank& DFB = *B._block.data.DF;
-                if( A._inSourceTeam )
-                {
-                    const unsigned teamLevel = A._teams->TeamLevel(A._level);
-                    sizes[teamLevel] += DFA.rank*DFB.rank;
-                }
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
+                sizes[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
         }
@@ -1537,7 +1552,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B, 
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel,
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsPackC");
@@ -1562,13 +1578,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainSumsPackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets, startLevel, endLevel );
+                              buffer, offsets, startLevel, endLevel,
+                              startUpdate, endUpdate, r );
             }
             break;
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 A.MultiplyDenseSumsPack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
@@ -1582,18 +1600,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsPackC
         {
         case DIST_NODE:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 B.TransposeMultiplyDenseSumsPack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate &&
+                A._inSourceTeam )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRank& DFB = *B._block.data.DF;
-                if( A._inSourceTeam && DFA.rank != 0 && DFB.rank != 0 )
+                if( DFA.rank != 0 && DFB.rank != 0 )
                 {
                     const unsigned teamLevel = A._teams->TeamLevel(A._level);
                     std::memcpy
@@ -1623,7 +1644,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  int startLevel, int endLevel ) const 
+  int startLevel, int endLevel,
+  int startUpdate, int endUpdate, int update ) const 
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainSumsUnpackC");
@@ -1648,13 +1670,15 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainSumsUnpackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets, startLevel, endLevel );
+                              buffer, offsets, startLevel, endLevel,
+                              startUpdate, endUpdate, r );
             }
             break;
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 A.MultiplyDenseSumsUnpack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
@@ -1668,18 +1692,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainSumsUnpackC
         {
         case DIST_NODE:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 B.TransposeMultiplyDenseSumsUnpack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate &&
+                A._inSourceTeam )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRank& DFB = *B._block.data.DF;
-                if( A._inSourceTeam && DFA.rank != 0 && DFB.rank != 0 )
+                if( DFA.rank != 0 && DFB.rank != 0 )
                 {
                     const unsigned teamLevel = A._teams->TeamLevel(A._level);
                     std::memcpy
@@ -1707,7 +1734,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                 DistQuasi2dHMat<Scalar,Conjugated>& C,
-  int startLevel, int endLevel )
+  int startLevel, int endLevel, int startUpdate, int endUpdate )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassData");
@@ -1721,7 +1748,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     B.MultiplyHMatMainPassDataCountB
     ( sendSizes, recvSizes, startLevel, endLevel );
     A.MultiplyHMatMainPassDataCountC
-    ( B, C, sendSizes, recvSizes, startLevel, endLevel );
+    ( B, C, sendSizes, recvSizes, 
+      startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
@@ -1746,7 +1774,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     B.MultiplyHMatMainPassDataPackB
     ( sendBuffer, offsets, startLevel, endLevel );
     A.MultiplyHMatMainPassDataPackC
-    ( B, C, sendBuffer, offsets, startLevel, endLevel );
+    ( B, C, sendBuffer, offsets, 
+      startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Start the non-blocking sends
     MPI_Comm comm = _teams->Team( 0 );
@@ -1782,7 +1811,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     B.MultiplyHMatMainPassDataUnpackB
     ( recvBuffer, recvOffsets, startLevel, endLevel );
     A.MultiplyHMatMainPassDataUnpackC
-    ( B, C, recvBuffer, recvOffsets, startLevel, endLevel );
+    ( B, C, recvBuffer, recvOffsets, 
+      startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Don't exit until we know that the data was sent
     for( int i=0; i<numSends; ++i )
@@ -1806,7 +1836,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountA
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDensePassDataCount
             ( sendSizes, recvSizes, _rowContext.numRhs );
 
@@ -1842,7 +1873,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackA
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDensePassDataPack
             ( _rowContext, _rowOmega, sendBuffer, offsets );
 
@@ -1878,7 +1910,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackA
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDensePassDataUnpack
             ( _rowContext, recvBuffer, offsets );
 
@@ -1914,7 +1947,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountB
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDensePassDataCount
             ( sendSizes, recvSizes, _colContext.numRhs );
 
@@ -1950,7 +1984,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackB
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDensePassDataPack( _colContext, sendBuffer, offsets );
 
         if( _level+1 < endLevel )
@@ -1985,7 +2020,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackB
     case DIST_NODE:
     case SPLIT_NODE:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDensePassDataUnpack( _colContext, recvBuffer, offsets );
 
         if( _level+1 < endLevel )
@@ -2012,7 +2048,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
   const DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::map<int,int>& sendSizes, std::map<int,int>& recvSizes,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataCountC");
@@ -2059,7 +2096,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
                             for( int r=0; r<4; ++r )
                                 nodeA.Child(t,r).MultiplyHMatMainPassDataCountC
                                 ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                                  sendSizes, recvSizes, startLevel, endLevel );
+                                  sendSizes, recvSizes, startLevel, endLevel,
+                                  startUpdate, endUpdate, r );
                 }
 #ifndef RELEASE
                 PopCallStack();
@@ -2076,7 +2114,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataCountC
         }
     }
 
-    if( A._level < startLevel || A._level >= endLevel )
+    if( A._level < startLevel || A._level >= endLevel ||
+        update < startUpdate  || update >= endUpdate )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -2596,7 +2635,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<Scalar>& sendBuffer, std::map<int,int>& offsets,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataPackC");
@@ -2644,7 +2684,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
                             for( int r=0; r<4; ++r )
                                 nodeA.Child(t,r).MultiplyHMatMainPassDataPackC
                                 ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                                  sendBuffer, offsets, startLevel, endLevel );
+                                  sendBuffer, offsets, startLevel, endLevel,
+                                  startUpdate, endUpdate, r );
                 }
 #ifndef RELEASE
                 PopCallStack();
@@ -2661,7 +2702,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataPackC
         }
     }
 
-    if( A._level < startLevel || A._level >= endLevel )
+    if( A._level < startLevel || A._level >= endLevel ||
+        update < startUpdate  || update >= endUpdate )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3064,7 +3106,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   const std::vector<Scalar>& recvBuffer, std::map<int,int>& offsets,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel,
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPassDataUnpackC");
@@ -3112,7 +3155,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
                             for( int r=0; r<4; ++r )
                                 nodeA.Child(t,r).MultiplyHMatMainPassDataUnpackC
                                 ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                                  recvBuffer, offsets, startLevel, endLevel );
+                                  recvBuffer, offsets, startLevel, endLevel,
+                                  startUpdate, endUpdate, r );
                 }
 #ifndef RELEASE
                 PopCallStack();
@@ -3129,7 +3173,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassDataUnpackC
         }
     }
 
-    if( A._level < startLevel || A._level >= endLevel )
+    if( A._level < startLevel || A._level >= endLevel ||
+        update < startUpdate  || update >= endUpdate )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -3636,7 +3681,8 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
 ( DistQuasi2dHMat<Scalar,Conjugated>& B,
-  DistQuasi2dHMat<Scalar,Conjugated>& C, int startLevel, int endLevel )
+  DistQuasi2dHMat<Scalar,Conjugated>& C, 
+  int startLevel, int endLevel, int startUpdate, int endUpdate )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcasts");
@@ -3650,7 +3696,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     std::memset( &sizes[0], 0, numBroadcasts*sizeof(int) );
     A.MultiplyHMatMainBroadcastsCountA( sizes, startLevel, endLevel );
     B.MultiplyHMatMainBroadcastsCountB( sizes, startLevel, endLevel );
-    A.MultiplyHMatMainBroadcastsCountC( B, C, sizes, startLevel, endLevel );
+    A.MultiplyHMatMainBroadcastsCountC
+    ( B, C, sizes, startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Pack all of the data to be broadcast into a single buffer
     // (only roots of communicators contribute)
@@ -3667,7 +3714,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     B.MultiplyHMatMainBroadcastsPackB
     ( buffer, offsetsCopy, startLevel, endLevel );
     A.MultiplyHMatMainBroadcastsPackC
-    ( B, C, buffer, offsetsCopy, startLevel, endLevel );
+    ( B, C, buffer, offsetsCopy, 
+      startLevel, endLevel, startUpdate, endUpdate, 0 );
 
     // Perform the broadcasts with log2(p) messages
     A._teams->TreeBroadcasts( buffer, sizes );
@@ -3678,7 +3726,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcasts
     B.MultiplyHMatMainBroadcastsUnpackB
     ( buffer, offsets, startLevel, endLevel );
     A.MultiplyHMatMainBroadcastsUnpackC
-    ( B, C, buffer, offsets, startLevel, endLevel );
+    ( B, C, buffer, offsets, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -3697,7 +3745,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountA
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDenseBroadcastsCount( sizes, _rowContext.numRhs );
 
         if( _level+1 < endLevel )
@@ -3732,7 +3781,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackA
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDenseBroadcastsPack
             ( _rowContext, buffer, offsets );
 
@@ -3768,7 +3818,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackA
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganRowSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganRowSpaceComp && !_finishedRowSpaceComp )
             TransposeMultiplyDenseBroadcastsUnpack
             ( _rowContext, buffer, offsets );
 
@@ -3803,7 +3854,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountB
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDenseBroadcastsCount( sizes, _colContext.numRhs );
 
         if( _level+1 < endLevel )
@@ -3838,7 +3890,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackB
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDenseBroadcastsPack( _colContext, buffer, offsets );
 
         if( _level+1 < endLevel )
@@ -3873,7 +3926,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackB
     case DIST_NODE:
     case DIST_NODE_GHOST:
     {
-        if( _beganColSpaceComp && _level >= startLevel && _level < endLevel )
+        if( _level >= startLevel && _level < endLevel &&
+            _beganColSpaceComp && !_finishedColSpaceComp )
             MultiplyDenseBroadcastsUnpack( _colContext, buffer, offsets );
 
         if( _level+1 < endLevel )
@@ -3899,7 +3953,9 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
   const DistQuasi2dHMat<Scalar,Conjugated>& C, 
-  std::vector<int>& sizes, int startLevel, int endLevel ) const
+  std::vector<int>& sizes, 
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsCountC");
@@ -3932,13 +3988,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainBroadcastsCountC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), sizes,
-                              startLevel, endLevel );
+                              startLevel, endLevel, startUpdate, endUpdate, r );
             }
             break;
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFB = *B._block.data.DF;
                 A.MultiplyDenseBroadcastsCount( sizes, DFB.rank );
@@ -3954,7 +4011,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
         {
         case DIST_NODE:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 B.TransposeMultiplyDenseBroadcastsCount( sizes, DFA.rank );
@@ -3963,21 +4021,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsCountC
         }
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate &&
+                A._inTargetTeam )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRank& DFB = *B._block.data.DF;
-                if( A._inTargetTeam )
-                {
-                    const unsigned teamLevel = A._teams->TeamLevel(A._level);
-                    sizes[teamLevel] += DFA.rank*DFB.rank;
-                }
+                const unsigned teamLevel = A._teams->TeamLevel(A._level);
+                sizes[teamLevel] += DFA.rank*DFB.rank;
             }
             break;
         }
         case DIST_LOW_RANK_GHOST:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRankGhost& DFGB = *B._block.data.DFG;
@@ -4004,7 +4062,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B, 
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel,
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsPackC");
@@ -4038,12 +4097,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainBroadcastsPackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets, startLevel, endLevel );
+                              buffer, offsets, startLevel, endLevel,
+                              startUpdate, endUpdate, r );
             }
             break;
         }
         case DIST_LOW_RANK:
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 A.MultiplyDenseBroadcastsPack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
@@ -4055,20 +4116,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 B.TransposeMultiplyDenseBroadcastsPack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate &&
+                A._inTargetTeam )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRank& DFB = *B._block.data.DF;
                 MPI_Comm team = _teams->Team( _level );
                 const int teamRank = mpi::CommRank( team );
-                if( A._inTargetTeam && teamRank == 0 && 
-                    DFA.rank != 0 && DFB.rank != 0 )
+                if( teamRank == 0 && DFA.rank != 0 && DFB.rank != 0 )
                 {
                     const unsigned teamLevel = A._teams->TeamLevel(A._level);
                     std::memcpy
@@ -4082,7 +4145,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsPackC
         }
         case DIST_LOW_RANK_GHOST:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRankGhost& DFGB = *B._block.data.DFG;
@@ -4118,7 +4182,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
 ( const DistQuasi2dHMat<Scalar,Conjugated>& B,
         DistQuasi2dHMat<Scalar,Conjugated>& C,
   const std::vector<Scalar>& buffer, std::vector<int>& offsets,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainBroadcastsUnpackC");
@@ -4151,11 +4216,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
                         for( int r=0; r<4; ++r )
                             nodeA.Child(t,r).MultiplyHMatMainBroadcastsUnpackC
                             ( nodeB.Child(r,s), nodeC.Child(t,s), 
-                              buffer, offsets, startLevel, endLevel );
+                              buffer, offsets, startLevel, endLevel,
+                              startUpdate, endUpdate, r );
             }
             break;
         case DIST_LOW_RANK:
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 A.MultiplyDenseBroadcastsUnpack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
@@ -4167,17 +4234,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
         switch( B._block.type )
         {
         case DIST_NODE:
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
                 B.TransposeMultiplyDenseBroadcastsUnpack
                 ( C._mainContextMap.Get( key ), buffer, offsets );
             break;
         case DIST_LOW_RANK:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate &&
+                A._inTargetTeam )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRank& DFB = *B._block.data.DF;
-                if( A._inTargetTeam && DFA.rank != 0 && DFB.rank != 0 )
+                if( DFA.rank != 0 && DFB.rank != 0 )
                 {
                     const unsigned teamLevel = A._teams->TeamLevel(A._level);
                     std::memcpy
@@ -4190,7 +4260,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainBroadcastsUnpackC
         }
         case DIST_LOW_RANK_GHOST:
         {
-            if( A._level >= startLevel && A._level < endLevel )
+            if( A._level >= startLevel && A._level < endLevel &&
+                update >= startUpdate && update < endUpdate )
             {
                 const DistLowRank& DFA = *A._block.data.DF;
                 const DistLowRankGhost& DFGB = *B._block.data.DFG;
@@ -4222,7 +4293,7 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcompute
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
                 DistQuasi2dHMat<Scalar,Conjugated>& C,
-  int startLevel, int endLevel )
+  int startLevel, int endLevel, int startUpdate, int endUpdate )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcompute");
@@ -4231,7 +4302,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcompute
 
     A.MultiplyHMatMainPostcomputeA( startLevel, endLevel );
     B.MultiplyHMatMainPostcomputeB( startLevel, endLevel );
-    A.MultiplyHMatMainPostcomputeC( alpha, B, C, startLevel, endLevel );
+    A.MultiplyHMatMainPostcomputeC
+    ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
     C.MultiplyHMatMainPostcomputeCCleanup( startLevel, endLevel );
 #ifndef RELEASE
     PopCallStack();
@@ -4249,11 +4321,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeA
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
     // Handle postcomputation of A's row space
-    if( A._beganRowSpaceComp && A._level >= startLevel && A._level < endLevel )
+    if( A._level >= startLevel && A._level < endLevel &&
+        A._beganRowSpaceComp && !A._finishedRowSpaceComp )
     {
         A.AdjointMultiplyDensePostcompute
         ( A._rowContext, (Scalar)1, A._rowOmega, A._rowT );
         A._rowContext.Clear();
+        A._finishedRowSpaceComp = true;
     }
 
     switch( A._block.type )
@@ -4290,11 +4364,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeB
     DistQuasi2dHMat<Scalar,Conjugated>& B = *this;
 
     // Handle postcomputation of B's column space
-    if( B._beganColSpaceComp && B._level >= startLevel && B._level < endLevel )
+    if( B._level >= startLevel && B._level < endLevel &&
+        B._beganColSpaceComp && !B._finishedColSpaceComp )
     {
         B.MultiplyDensePostcompute
         ( B._colContext, (Scalar)1, B._colOmega, B._colT );
         B._colContext.Clear();
+        B._finishedColSpaceComp = true;
     }
 
     switch( B._block.type )
@@ -4325,7 +4401,8 @@ void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
 ( Scalar alpha, const DistQuasi2dHMat<Scalar,Conjugated>& B,
                       DistQuasi2dHMat<Scalar,Conjugated>& C,
-  int startLevel, int endLevel ) const
+  int startLevel, int endLevel, 
+  int startUpdate, int endUpdate, int update ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatMainPostcomputeC");
@@ -4372,7 +4449,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
                             for( int r=0; r<4; ++r )
                                 nodeA.Child(t,r).MultiplyHMatMainPostcomputeC
                                 ( alpha, nodeB.Child(r,s), nodeC.Child(t,s),
-                                  startLevel, endLevel );
+                                  startLevel, endLevel,
+                                  startUpdate, endUpdate, r );
                 }
 #ifndef RELEASE
                 PopCallStack();
@@ -4389,7 +4467,8 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPostcomputeC
         }
     }
 
-    if( A._level < startLevel || A._level >= endLevel )
+    if( A._level < startLevel || A._level >= endLevel ||
+        update < startUpdate || update >= endUpdate )
     {
 #ifndef RELEASE
         PopCallStack();
