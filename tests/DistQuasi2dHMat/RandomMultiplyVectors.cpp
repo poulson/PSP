@@ -22,9 +22,9 @@
 
 void Usage()
 {
-    std::cout << "MultiplyRandom <xSize> <ySize> <zSize> <numLevels> "
-                 "<strongly admissible?> <maxRank> <print structure?>"
-              << std::endl;
+    std::cout << "RandomMultiplyVector <xSize> <ySize> <zSize> <numLevels> "
+                 "<strongly admissible?> <maxRank> <numVectors> "
+                 "<print structure?>" << std::endl;
 }
 
 int
@@ -39,7 +39,7 @@ main( int argc, char* argv[] )
     seed.d[1] = 21U;
     psp::SeedParallelLcg( commRank, commSize, seed );
 
-    if( argc < 8 )
+    if( argc < 9 )
     {
         if( commRank == 0 )
             Usage();
@@ -52,13 +52,14 @@ main( int argc, char* argv[] )
     const int numLevels = atoi( argv[4] );
     const bool stronglyAdmissible = atoi( argv[5] );
     const int maxRank = atoi( argv[6] );
-    const bool printStructure = atoi( argv[7] );
+    const int numVectors = atoi( argv[7] );
+    const bool printStructure = atoi( argv[8] );
 
     if( commRank == 0 )
     {
         std::cout << "----------------------------------------------------\n"
-                  << "Testing performance of H-matrix/H-matrix mult on    \n"
-                  << "random matrices\n"
+                  << "Testing performance of H-matrix/vector mult with    \n"
+                  << "random matrix\n"
                   << "----------------------------------------------------" 
                   << std::endl;
     }
@@ -67,21 +68,18 @@ main( int argc, char* argv[] )
         typedef std::complex<double> Scalar;
         typedef psp::DistQuasi2dHMat<Scalar,false> DistQuasi2d;
 
-        // Set up two random distributed H-matrices
+        // Set up a random H-matrix
         if( commRank == 0 )
         {
-            std::cout << "Creating random distributed H-matrices for "
-                      <<  "performance testing...";
+            std::cout << "Creating random distributed H-matrix for performance "
+                      << "testing...";
             std::cout.flush();
         }
         const double createStartTime = psp::mpi::WallTime();
         DistQuasi2d::Teams teams( MPI_COMM_WORLD );
         DistQuasi2d A
         ( numLevels, maxRank, stronglyAdmissible, xSize, ySize, zSize, teams );
-        DistQuasi2d B
-        ( numLevels, maxRank, stronglyAdmissible, xSize, ySize, zSize, teams );
         A.SetToRandom();
-        B.SetToRandom();
         const double createStopTime = psp::mpi::WallTime();
         if( commRank == 0 )
         {
@@ -91,41 +89,32 @@ main( int argc, char* argv[] )
 
         if( printStructure )
         {
-            if( commRank == 0 )
-            {
-                std::cout 
-                    << "numLevels: " << numLevels << "\n"
-                    << "maxRank:   " << maxRank << "\n"
-                    << "stronglyAdmissible: " << stronglyAdmissible << "\n"
-                    << "xSize:              " << xSize << "\n"
-                    << "ySize:              " << ySize << "\n"
-                    << "zSize:              " << zSize << std::endl;
-            }
             A.LatexWriteLocalStructure("A_structure");
             A.MScriptWriteLocalStructure("A_structure");
         }
 
-        // Attempt to multiply the two matrices
+        // Generate random vectors
+        const int localHeight = A.LocalHeight();
+        const int localWidth = A.LocalWidth();
+        psp::Dense<Scalar> X( localWidth, numVectors );
+        psp::ParallelGaussianRandomVectors( X );
+
+        // Multiply against random vectors
+        psp::Dense<Scalar> Y;
         if( commRank == 0 )
         {
-            std::cout << "Multiplying distributed H-matrices...";
+            std::cout << "Multiplying distributed H-matrix against vectors...";
             std::cout.flush();
         }
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStartTime = psp::mpi::WallTime();
-        DistQuasi2d C( teams );
-        A.Multiply( (Scalar)1, B, C );
+        A.Multiply( (Scalar)1, X, Y );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStopTime = psp::mpi::WallTime();
         if( commRank == 0 )
         {
             std::cout << "done: " << multStopTime-multStartTime
                       << " seconds." << std::endl;
-        }
-        if( printStructure )
-        {
-            C.LatexWriteLocalStructure("C_ghosted_structure");
-            C.MScriptWriteLocalStructure("C_ghosted_structure");
         }
     }
     catch( std::exception& e )

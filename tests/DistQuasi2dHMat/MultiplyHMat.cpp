@@ -22,9 +22,10 @@
 
 void Usage()
 {
-    std::cout << "Multiply <xSize> <ySize> <zSize> <numLevels> "
-                 "<strongly admissible?> <maxRank> <print?> <print structure?> "
-                 "<multiply identity?>" << std::endl;
+    std::cout << "MultiplyHMat <xSize> <ySize> <zSize> <numLevels> "
+                 "<strongly admissible?> <maxRank> <multType> "
+                 "<print?> <print structure?> <multiply identity?>" 
+              << std::endl;
 }
 
 template<typename Real>
@@ -98,7 +99,7 @@ main( int argc, char* argv[] )
     seed.d[1] = 21U;
     psp::SeedParallelLcg( commRank, commSize, seed );
 
-    if( argc < 10 )
+    if( argc < 11 )
     {
         if( commRank == 0 )
             Usage();
@@ -111,9 +112,10 @@ main( int argc, char* argv[] )
     const int numLevels = atoi( argv[4] );
     const bool stronglyAdmissible = atoi( argv[5] );
     const int maxRank = atoi( argv[6] );
-    const bool print = atoi( argv[7] );
-    const bool printStructure = atoi( argv[8] );
-    const bool multiplyIdentity = atoi( argv[9] );
+    const int multType = atoi( argv[7] );
+    const bool print = atoi( argv[8] );
+    const bool printStructure = atoi( argv[9] );
+    const bool multiplyIdentity = atoi( argv[10] );
 
     const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
@@ -121,8 +123,7 @@ main( int argc, char* argv[] )
     if( commRank == 0 )
     {
         std::cout << "----------------------------------------------------\n"
-                  << "Testing complex double Quasi2dHMat packing/unpacking\n"
-                  << "into DistQuasi2dHMat                                \n"
+                  << "Testing H-matrix mult using generated matrices      \n"
                   << "----------------------------------------------------" 
                   << std::endl;
     }
@@ -312,7 +313,7 @@ main( int argc, char* argv[] )
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStartTime = psp::mpi::WallTime();
         DistQuasi2d C( teams );
-        A.Multiply( (Scalar)1, B, C );
+        A.Multiply( (Scalar)1, B, C, multType );
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double multStopTime = psp::mpi::WallTime();
         if( commRank == 0 )

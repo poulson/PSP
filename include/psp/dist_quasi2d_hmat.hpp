@@ -223,12 +223,14 @@ public:
     // C := alpha A B 
     void Multiply
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                    DistQuasi2dHMat<Scalar,Conjugated>& C );
+                    DistQuasi2dHMat<Scalar,Conjugated>& C,
+      int multType=0 );
 
     // C := alpha A B + beta C
     void Multiply
     ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-      Scalar beta,  DistQuasi2dHMat<Scalar,Conjugated>& C );
+      Scalar beta,  DistQuasi2dHMat<Scalar,Conjugated>& C,
+      int multType=0 );
 
     // y := alpha H^T x
     void TransposeMultiply

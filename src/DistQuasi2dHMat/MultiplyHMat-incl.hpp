@@ -29,16 +29,22 @@ template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::Multiply
 ( Scalar alpha, DistQuasi2dHMat<Scalar,Conjugated>& B,
-                DistQuasi2dHMat<Scalar,Conjugated>& C )
+                DistQuasi2dHMat<Scalar,Conjugated>& C,
+  int multType )
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Multiply");
+    if( multType < 0 || multType > 2 )
+        throw std::logic_error("Invalid multiplication type");
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
-    //A.MultiplyHMatFullAccumulate( alpha, B, C );
-    //A.MultiplyHMatSingleLevelAccumulate( alpha, B, C );
-    A.MultiplyHMatSingleUpdateAccumulate( alpha, B, C );
+    if( multType == 0 )
+        A.MultiplyHMatSingleUpdateAccumulate( alpha, B, C );
+    else if( multType == 1 )
+        A.MultiplyHMatSingleLevelAccumulate( alpha, B, C );
+    else
+        A.MultiplyHMatFullAccumulate( alpha, B, C );
 #ifndef RELEASE
     PopCallStack();
 #endif
