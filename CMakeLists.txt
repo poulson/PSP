@@ -25,7 +25,7 @@ set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 2)
 
 option(RELEASE "Avoid unnecessary assertions." OFF)
-option(VIEW_MATRICES "Print/draw the preconditioner matrices." OFF)
+option(TIME_MULTIPLY "Instrument H-matrix multiply with timers." OFF)
 option(BUILT_PETSC_WITH_X11 "Was petsc-dev built with X11 support?" OFF)
 
 if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
@@ -71,10 +71,10 @@ endif(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
 #endif(NOT X11_LIB)
 
 # Dynamic library
-find_library(DL_LIB NAMES dl)
-if(NOT DL_LIB)
-  message(FATAL_ERROR "Could not find dl library.")
-endif(NOT DL_LIB)
+#find_library(DL_LIB NAMES dl)
+#if(NOT DL_LIB)
+#  message(FATAL_ERROR "Could not find dl library.")
+#endif(NOT DL_LIB)
 
 option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
@@ -278,10 +278,10 @@ endif(BUILD_TESTS)
 # Create a dummy library in order to be able to force the math libraries
 # to be linked last
 add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
-set(EXTERNAL_LIBS "${PETSC_LIB}")
+#set(EXTERNAL_LIBS "${PETSC_LIB}")
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
-list(APPEND EXTERNAL_LIBS "${X11_LIB}")
-list(APPEND EXTERNAL_LIBS "${DL_LIB}")
+#list(APPEND EXTERNAL_LIBS "${X11_LIB}")
+#list(APPEND EXTERNAL_LIBS "${DL_LIB}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
 # Copy the headers into the build directory
@@ -305,7 +305,7 @@ add_library(psp STATIC ${PSP_SRC})
 
 # Build the test drivers if necessary
 if(BUILD_TESTS)
-  # Build teh building_blocks tests
+  # Build the building_blocks tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/building_blocks")
   foreach(TEST ${BUILDING_BLOCKS_TESTS}) 
     add_executable(building_blocks-${TEST} 

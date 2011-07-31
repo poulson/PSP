@@ -73,9 +73,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
     B.PruneGhostNodes();
     C.Clear();
 
+#ifdef TIME_MULTIPLY
+    Timer timer; 
+    timer.Start( 0 );
+#endif
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
+#ifdef TIME_MULTIPLY
+    timer.Stop( 0 );
+    timer.Start( 1 );
+#endif
     A.MultiplyHMatFormGhostRanks( B );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 1 );
+#endif
 
     const int startLevel = 0;
     const int endLevel = A.NumLevels();
@@ -83,31 +94,110 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
     const int startUpdate = 0;
     const int endUpdate = 4;
 
+#ifdef TIME_MULTIPLY
+    timer.Start( 2 );
+#endif
     A.MultiplyHMatMainPrecompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 2 );
+    timer.Start( 3 );
+#endif
     A.MultiplyHMatMainSums
     ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 3 );
+    timer.Start( 4 );
+#endif
     A.MultiplyHMatMainPassData
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 4 );
+    timer.Start( 5 );
+#endif
     A.MultiplyHMatMainBroadcasts
     ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 5 );
+    timer.Start( 6 );
+#endif
     A.MultiplyHMatMainPostcompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 6 );
+#endif
 
+#ifdef TIME_MULTIPLY
+    timer.Start( 7 );
+#endif
     A.MultiplyHMatFHHPrecompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 7 );
+    timer.Start( 8 );
+#endif
     A.MultiplyHMatFHHSums
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 8 );
+    timer.Start( 9 );
+#endif
     A.MultiplyHMatFHHPassData
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 9 );
+    timer.Start( 10 );
+#endif
     A.MultiplyHMatFHHBroadcasts
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 10 );
+    timer.Start( 11 );
+#endif
     A.MultiplyHMatFHHPostcompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 11 );
+    timer.Start( 12 );
+#endif
     A.MultiplyHMatFHHFinalize
     ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 12 );
+#endif
 
+#ifdef TIME_MULTIPLY
+    timer.Start( 13 );
+#endif
     C.MultiplyHMatUpdates();
+#ifdef TIME_MULTIPLY
+    timer.Stop( 13 );
+#endif
+
+#ifdef TIME_MULTIPLY
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream os;
+    os << "Multiply-full-" << commRank << ".log";
+    std::ofstream file( os.str().c_str() );
+
+    file << "Form ghost nodes: " << timer.GetTime( 0 ) << " seconds.\n"
+         << "Form ghost ranks: " << timer.GetTime( 1 ) << " seconds.\n"
+         << "Main precompute:  " << timer.GetTime( 2 ) << " seconds.\n"
+         << "Main summations:  " << timer.GetTime( 3 ) << " seconds.\n"
+         << "Main pass data:   " << timer.GetTime( 4 ) << " seconds.\n"
+         << "Main broadcasts:  " << timer.GetTime( 5 ) << " seconds.\n"
+         << "Main postcompute: " << timer.GetTime( 6 ) << " seconds.\n"
+         << "FHH precompute:   " << timer.GetTime( 7 ) << " seconds.\n"
+         << "FHH summations:   " << timer.GetTime( 8 ) << " seconds.\n"
+         << "FHH pass data:    " << timer.GetTime( 9 ) << " seconds.\n"
+         << "FHH broadcasts:   " << timer.GetTime( 10 ) << " seconds.\n"
+         << "FHH postcompute:  " << timer.GetTime( 11 ) << " seconds.\n"
+         << "FHH finalize:     " << timer.GetTime( 12 ) << " seconds.\n"
+         << "Updates:          " << timer.GetTime( 13 ) << " seconds.\n"
+         << std::endl;
+    file.close();
+#endif
+
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -136,9 +226,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
     B.PruneGhostNodes();
     C.Clear();
 
+#ifdef TIME_MULTIPLY
+    Timer timer; 
+    timer.Start( 0 );
+#endif
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
+#ifdef TIME_MULTIPLY
+    timer.Stop( 0 );
+    timer.Start( 1 );
+#endif
     A.MultiplyHMatFormGhostRanks( B );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 1 );
+#endif
 
     const int startUpdate = 0;
     const int endUpdate = 4;
@@ -149,32 +250,111 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
         const int startLevel = level;
         const int endLevel = level+1;
 
+#ifdef TIME_MULTIPLY
+        timer.Start( 2 );
+#endif
         A.MultiplyHMatMainPrecompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 2 );
+        timer.Start( 3 );
+#endif
         A.MultiplyHMatMainSums
         ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 3 );
+        timer.Start( 4 );
+#endif
         A.MultiplyHMatMainPassData
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 4 );
+        timer.Start( 5 );
+#endif
         A.MultiplyHMatMainBroadcasts
         ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 5 );
+        timer.Start( 6 );
+#endif
         A.MultiplyHMatMainPostcompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 6 );
+#endif
 
+#ifdef TIME_MULTIPLY
+        timer.Start( 7 );
+#endif
         A.MultiplyHMatFHHPrecompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 7 );
+        timer.Start( 8 );
+#endif
         A.MultiplyHMatFHHSums
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 8 );
+        timer.Start( 9 );
+#endif
         A.MultiplyHMatFHHPassData
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 9 );
+        timer.Start( 10 );
+#endif
         A.MultiplyHMatFHHBroadcasts
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 10 );
+        timer.Start( 11 );
+#endif
         A.MultiplyHMatFHHPostcompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 11 );
+        timer.Start( 12 );
+#endif
         A.MultiplyHMatFHHFinalize
         ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+        timer.Stop( 12 );
+#endif
 
+#ifdef TIME_MULTIPLY
+        timer.Start( 13 );
+#endif
         C.MultiplyHMatUpdates();
+#ifdef TIME_MULTIPLY
+        timer.Stop( 13 );
+#endif
     }
+
+#ifdef TIME_MULTIPLY
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream os;
+    os << "Multiply-singleLevel-" << commRank << ".log";
+    std::ofstream file( os.str().c_str() );
+
+    file << "Form ghost nodes: " << timer.GetTime( 0 ) << " seconds.\n"
+         << "Form ghost ranks: " << timer.GetTime( 1 ) << " seconds.\n"
+         << "Main precompute:  " << timer.GetTime( 2 ) << " seconds.\n"
+         << "Main summations:  " << timer.GetTime( 3 ) << " seconds.\n"
+         << "Main pass data:   " << timer.GetTime( 4 ) << " seconds.\n"
+         << "Main broadcasts:  " << timer.GetTime( 5 ) << " seconds.\n"
+         << "Main postcompute: " << timer.GetTime( 6 ) << " seconds.\n"
+         << "FHH precompute:   " << timer.GetTime( 7 ) << " seconds.\n"
+         << "FHH summations:   " << timer.GetTime( 8 ) << " seconds.\n"
+         << "FHH pass data:    " << timer.GetTime( 9 ) << " seconds.\n"
+         << "FHH broadcasts:   " << timer.GetTime( 10 ) << " seconds.\n"
+         << "FHH postcompute:  " << timer.GetTime( 11 ) << " seconds.\n"
+         << "FHH finalize:     " << timer.GetTime( 12 ) << " seconds.\n"
+         << "Updates:          " << timer.GetTime( 13 ) << " seconds.\n"
+         << std::endl;
+    file.close();
+#endif
+
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -203,9 +383,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
     B.PruneGhostNodes();
     C.Clear();
 
+#ifdef TIME_MULTIPLY
+    Timer timer; 
+    timer.Start( 0 );
+#endif
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
+#ifdef TIME_MULTIPLY
+    timer.Stop( 0 );
+    timer.Start( 1 );
+#endif
     A.MultiplyHMatFormGhostRanks( B );
+#ifdef TIME_MULTIPLY
+    timer.Stop( 1 );
+#endif
 
     const int numLevels = A.NumLevels();
     for( int level=0; level<numLevels; ++level )
@@ -218,33 +409,112 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
             const int startUpdate = update;
             const int endUpdate = update+1;
 
+#ifdef TIME_MULTIPLY
+            timer.Start( 2 );
+#endif
             A.MultiplyHMatMainPrecompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 2 );
+            timer.Start( 3 );
+#endif
             A.MultiplyHMatMainSums
             ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 3 );
+            timer.Start( 4 );
+#endif
             A.MultiplyHMatMainPassData
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 4 );
+            timer.Start( 5 );
+#endif
             A.MultiplyHMatMainBroadcasts
             ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 5 );
+            timer.Start( 6 );
+#endif
             A.MultiplyHMatMainPostcompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 6 );
+#endif
 
+#ifdef TIME_MULTIPLY
+            timer.Start( 7 );
+#endif
             A.MultiplyHMatFHHPrecompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 7 );
+            timer.Start( 8 );
+#endif
             A.MultiplyHMatFHHSums
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 8 );
+            timer.Start( 9 );
+#endif
             A.MultiplyHMatFHHPassData
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 9 );
+            timer.Start( 10 );
+#endif
             A.MultiplyHMatFHHBroadcasts
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 10 );
+            timer.Start( 11 );
+#endif
             A.MultiplyHMatFHHPostcompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 11 );
+            timer.Start( 12 );
+#endif
             A.MultiplyHMatFHHFinalize
             ( B, C, startLevel, endLevel, startUpdate, endUpdate );
+#ifdef TIME_MULTIPLY
+            timer.Stop( 12 );
+#endif
 
+#ifdef TIME_MULTIPLY
+            timer.Start( 13 );
+#endif
             C.MultiplyHMatUpdates();
+#ifdef TIME_MULTIPLY
+            timer.Stop( 13 );
+#endif
         }
     }
+
+#ifdef TIME_MULTIPLY
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream os;
+    os << "Multiply-singleUpdate-" << commRank << ".log";
+    std::ofstream file( os.str().c_str() );
+
+    file << "Form ghost nodes: " << timer.GetTime( 0 ) << " seconds.\n"
+         << "Form ghost ranks: " << timer.GetTime( 1 ) << " seconds.\n"
+         << "Main precompute:  " << timer.GetTime( 2 ) << " seconds.\n"
+         << "Main summations:  " << timer.GetTime( 3 ) << " seconds.\n"
+         << "Main pass data:   " << timer.GetTime( 4 ) << " seconds.\n"
+         << "Main broadcasts:  " << timer.GetTime( 5 ) << " seconds.\n"
+         << "Main postcompute: " << timer.GetTime( 6 ) << " seconds.\n"
+         << "FHH precompute:   " << timer.GetTime( 7 ) << " seconds.\n"
+         << "FHH summations:   " << timer.GetTime( 8 ) << " seconds.\n"
+         << "FHH pass data:    " << timer.GetTime( 9 ) << " seconds.\n"
+         << "FHH broadcasts:   " << timer.GetTime( 10 ) << " seconds.\n"
+         << "FHH postcompute:  " << timer.GetTime( 11 ) << " seconds.\n"
+         << "FHH finalize:     " << timer.GetTime( 12 ) << " seconds.\n"
+         << "Updates:          " << timer.GetTime( 13 ) << " seconds.\n"
+         << std::endl;
+    file.close();
+#endif
+
 #ifndef RELEASE
     PopCallStack();
 #endif
