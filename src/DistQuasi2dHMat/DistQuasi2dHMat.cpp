@@ -533,7 +533,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Admissible
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::LatexWriteLocalStructure
-( const std::string& basename ) const
+( const std::string basename ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::LatexWriteLocalStructure");
@@ -563,7 +563,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::LatexWriteLocalStructure
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::MScriptWriteLocalStructure
-( const std::string& basename ) const
+( const std::string basename ) const
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MScriptWriteLocalStructure");

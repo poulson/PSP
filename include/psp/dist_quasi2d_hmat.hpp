@@ -157,9 +157,9 @@ public:
      * Routines for visualizing the locally known H-matrix structure
      */
     // Compile this output with pdflatex+TikZ
-    void LatexWriteLocalStructure( const std::string& basename ) const;
+    void LatexWriteLocalStructure( const std::string basename ) const;
     // This can be visualized with util/PlotHStructure.m and Octave/Matlab
-    void MScriptWriteLocalStructure( const std::string& basename ) const;
+    void MScriptWriteLocalStructure( const std::string basename ) const;
 
     // Unpack this process's portion of the DistQuasi2dHMat
     std::size_t Unpack

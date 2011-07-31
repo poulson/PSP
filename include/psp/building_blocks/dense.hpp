@@ -80,8 +80,8 @@ public:
 
     void Set( int i, int j, Scalar value );
     Scalar Get( int i, int j ) const;
-    void Print( std::ostream& os, const std::string& tag ) const;
-    void Print( const std::string& tag ) const;
+    void Print( std::ostream& os, const std::string tag ) const;
+    void Print( const std::string tag ) const;
 
     Scalar* Buffer( int i=0, int j=0 );
     const Scalar* LockedBuffer( int i=0, int j=0 ) const;
@@ -375,7 +375,7 @@ psp::Dense<Scalar>::Get( int i, int j ) const
 
 template<typename Scalar>
 inline void
-psp::Dense<Scalar>::Print( std::ostream& os, const std::string& tag ) const
+psp::Dense<Scalar>::Print( std::ostream& os, const std::string tag ) const
 {
 #ifndef RELEASE
     PushCallStack("Dense::Print");
@@ -409,7 +409,7 @@ psp::Dense<Scalar>::Print( std::ostream& os, const std::string& tag ) const
 
 template<typename Scalar>
 inline void
-psp::Dense<Scalar>::Print( const std::string& tag ) const
+psp::Dense<Scalar>::Print( const std::string tag ) const
 {
     Print( std::cout, tag );
 }

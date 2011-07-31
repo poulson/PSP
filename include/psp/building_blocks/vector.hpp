@@ -54,7 +54,7 @@ public:
 
     void Set( int i, Scalar value );
     Scalar Get( int i ) const;
-    void Print( const std::string& tag ) const;
+    void Print( const std::string tag ) const;
 
     Scalar* Buffer( int i=0 );
     const Scalar* LockedBuffer( int i=0 ) const;
@@ -193,7 +193,7 @@ psp::Vector<Scalar>::Get( int i ) const
 
 template<typename Scalar>
 inline void
-psp::Vector<Scalar>::Print( const std::string& tag ) const
+psp::Vector<Scalar>::Print( const std::string tag ) const
 {
 #ifndef RELEASE
     PushCallStack("Vector::Print");

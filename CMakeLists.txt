@@ -268,7 +268,7 @@ set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 # for the various build modes
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(BUILDING_BLOCKS_TESTS MemoryMap ParallelLcg)
+  set(BUILDING_BLOCKS_TESTS MemoryMap ParallelLcg Timer)
   set(HMAT_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix PackedQR)
   set(QUASI2D_TESTS Invert LowRankConstructor MultiplyHMat Pack)
   set(DIST_QUASI2D_TESTS Ghost ImportSparse MultiplyHMat Pack 

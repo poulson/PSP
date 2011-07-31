@@ -44,7 +44,7 @@ struct LowRank
     int Width() const { return V.Height(); }
     int Rank() const { return U.Width(); }
 
-    void Print( const std::string& tag ) const
+    void Print( const std::string tag ) const
     { 
         std::cout << tag << ":\n";
         U.Print( "U" );

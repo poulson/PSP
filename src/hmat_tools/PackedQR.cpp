@@ -435,7 +435,7 @@ void psp::hmat_tools::ApplyPackedQAdjointFromRight
 
 template<typename Scalar>
 void psp::hmat_tools::PrintPacked
-( std::ostream& os, const std::string& msg, 
+( std::ostream& os, const std::string msg, 
   const int r, const int s, const int t,
   const Scalar* packedA )
 {
@@ -504,7 +504,7 @@ void psp::hmat_tools::PrintPacked
 
 template<typename Scalar>
 void psp::hmat_tools::PrintPacked
-( const std::string& msg, 
+( const std::string msg, 
   const int r, const int s, const int t,
   const Scalar* packedA )
 {
@@ -633,28 +633,28 @@ template void psp::hmat_tools::ApplyPackedQAdjointFromRight
         std::complex<double>* RESTRICT work );
 
 template void psp::hmat_tools::PrintPacked
-( std::ostream& os, const std::string& msg,
+( std::ostream& os, const std::string msg,
   const int r, const int s, const int t, const float* packedA );
 template void psp::hmat_tools::PrintPacked
-( std::ostream& os, const std::string& msg,
+( std::ostream& os, const std::string msg,
   const int r, const int s, const int t, const double* packedA );
 template void psp::hmat_tools::PrintPacked
-( std::ostream& os, const std::string& msg,
+( std::ostream& os, const std::string msg,
   const int r, const int s, const int t, const std::complex<float>* packedA );
 template void psp::hmat_tools::PrintPacked
-( std::ostream& os, const std::string& msg,
+( std::ostream& os, const std::string msg,
   const int r, const int s, const int t, const std::complex<double>* packedA );
 
 template void psp::hmat_tools::PrintPacked
-( const std::string& msg,
+( const std::string msg,
   const int r, const int s, const int t, const float* packedA );
 template void psp::hmat_tools::PrintPacked
-( const std::string& msg,
+( const std::string msg,
   const int r, const int s, const int t, const double* packedA );
 template void psp::hmat_tools::PrintPacked
-( const std::string& msg,
+( const std::string msg,
   const int r, const int s, const int t, const std::complex<float>* packedA );
 template void psp::hmat_tools::PrintPacked
-( const std::string& msg,
+( const std::string msg,
   const int r, const int s, const int t, const std::complex<double>* packedA );
 

@@ -258,16 +258,16 @@ public:
      * Write a representation of the H-matrix structure to file. 
      */
     // Compile this output with pdflatex+TikZ
-    void LatexWriteStructure( const std::string& filebase ) const;
+    void LatexWriteStructure( const std::string filebase ) const;
     // This can be visualized with util/PlotHStructure.m and Octave/Matlab
-    void MScriptWriteStructure( const std::string& filebase ) const;
+    void MScriptWriteStructure( const std::string filebase ) const;
 
     //------------------------------------------------------------------------//
     // Fulfillments of AbstractHMat interface                                 //
     //------------------------------------------------------------------------//
 
     // Multiply the H-matrix by identity and print the result
-    virtual void Print( const std::string& tag ) const;
+    virtual void Print( const std::string tag ) const;
 
     // y := alpha H x + beta y
     virtual void Multiply

@@ -27,6 +27,8 @@
 #include <cstring> // for std::memset and std::memcpy
 #include <vector> 
 
+#include "psp/building_blocks/timer.hpp"
+
 #include "psp/building_blocks/blas.hpp"
 #include "psp/building_blocks/lapack.hpp"
 
@@ -820,11 +822,11 @@ void ApplyPackedQAdjointFromRight
 
 template<typename Scalar>
 void PrintPacked
-( std::ostream& os, const std::string& msg,
+( std::ostream& os, const std::string msg,
   const int r, const int s, const int t, const Scalar* packedA );
 template<typename Scalar>
 void PrintPacked
-( const std::string& msg,
+( const std::string msg,
   const int r, const int s, const int t, const Scalar* packedA );
 
 } // namespace hmat_tools

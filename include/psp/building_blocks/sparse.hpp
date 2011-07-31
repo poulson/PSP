@@ -33,7 +33,7 @@ struct Sparse
     std::vector<int> columnIndices;
     std::vector<int> rowOffsets;
 
-    void Print( const std::string& tag ) const;
+    void Print( const std::string tag ) const;
 };
 
 } // namespace psp
@@ -44,7 +44,7 @@ struct Sparse
 
 template<typename Scalar>
 inline void
-psp::Sparse<Scalar>::Print( const std::string& tag ) const
+psp::Sparse<Scalar>::Print( const std::string tag ) const
 {
 #ifndef RELEASE
     PushCallStack("Sparse::Print");

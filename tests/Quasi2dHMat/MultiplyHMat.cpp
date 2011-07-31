@@ -97,8 +97,15 @@ main( int argc, char* argv[] )
     psp::SeedSerialLcg( seed );
 
     const int commSize = psp::mpi::CommSize( MPI_COMM_WORLD );
+    const int commRank = psp::mpi::CommRank( MPI_COMM_WORLD );
     if( commSize != 1 )
-        throw std::logic_error("This must be run with a single process");
+    {
+        if( commRank == 0 )
+            std::cerr << "This test must be run with a single MPI process" 
+                      << std::endl;
+        MPI_Finalize();
+        return 0;
+    }
 
     if( argc < 10 )
     {

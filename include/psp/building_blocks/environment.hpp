@@ -179,7 +179,7 @@ WrapScalar( const std::complex<Real>& alpha )
 { return ScalarWrapper<std::complex<Real> >( alpha ); }
 
 // These should typically only be used when not in RELEASE mode
-void PushCallStack( const std::string& s );
+void PushCallStack( const std::string s );
 void PopCallStack();
 void DumpCallStack();
 

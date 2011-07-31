@@ -24,7 +24,7 @@ namespace {
 std::stack<std::string> callStack; 
 }
 
-void psp::PushCallStack( const std::string& s ) 
+void psp::PushCallStack( const std::string s ) 
 { 
     ::callStack.push(s); 
 }

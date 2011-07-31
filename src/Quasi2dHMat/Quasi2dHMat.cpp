@@ -274,8 +274,7 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Clear()
 
 template<typename Scalar,bool Conjugated>
 void
-psp::Quasi2dHMat<Scalar,Conjugated>::Print
-( const std::string& tag ) const
+psp::Quasi2dHMat<Scalar,Conjugated>::Print( const std::string tag ) const
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMat::Print");
@@ -297,7 +296,7 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Print
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMat<Scalar,Conjugated>::LatexWriteStructure
-( const std::string& filebase ) const
+( const std::string filebase ) const
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMat::LatexWriteStructure");
@@ -322,7 +321,7 @@ psp::Quasi2dHMat<Scalar,Conjugated>::LatexWriteStructure
 template<typename Scalar,bool Conjugated>
 void
 psp::Quasi2dHMat<Scalar,Conjugated>::MScriptWriteStructure
-( const std::string& filebase ) const
+( const std::string filebase ) const
 {
 #ifndef RELEASE
     PushCallStack("Quasi2dHMat::MScriptWriteStructure");
