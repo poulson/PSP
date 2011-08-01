@@ -94,7 +94,6 @@ main( int argc, char* argv[] )
         }
 
         // Generate random vectors
-        const int localHeight = A.LocalHeight();
         const int localWidth = A.LocalWidth();
         psp::Dense<Scalar> X( localWidth, numVectors );
         psp::ParallelGaussianRandomVectors( X );

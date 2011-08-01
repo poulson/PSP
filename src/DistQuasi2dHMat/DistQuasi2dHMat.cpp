@@ -446,7 +446,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Rank() const
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::Rank");
 #endif
-    int rank;
+    int rank = 0; // initialize to avoid compiler warnings
     switch( _block.type )
     {
     case DIST_LOW_RANK:
@@ -468,9 +468,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::Rank() const
         rank = _block.data.FG->rank;
         break;
     default:
-#ifndef RELEASE
         throw std::logic_error("Can only request rank of low-rank blocks");
-#endif
         break;
     }
 #ifndef RELEASE

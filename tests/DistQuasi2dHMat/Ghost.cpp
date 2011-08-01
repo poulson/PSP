@@ -32,7 +32,6 @@ main( int argc, char* argv[] )
 {
     MPI_Init( &argc, &argv );
     const int rank = psp::mpi::CommRank( MPI_COMM_WORLD );
-    const int p = psp::mpi::CommSize( MPI_COMM_WORLD );
 
     if( argc < 8 )
     {
@@ -48,9 +47,6 @@ main( int argc, char* argv[] )
     const bool stronglyAdmissible = atoi( argv[5] );
     const int maxRank = atoi( argv[6] );
     const bool printStructure = atoi( argv[7] );
-
-    const int m = xSize*ySize*zSize;
-    const int n = xSize*ySize*zSize;
 
     if( rank == 0 )
     {

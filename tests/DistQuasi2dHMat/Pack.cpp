@@ -50,9 +50,7 @@ main( int argc, char* argv[] )
     const bool print = atoi( argv[7] );
     const bool printStructure = atoi( argv[8] );
 
-    const int m = xSize*ySize*zSize;
     const int n = xSize*ySize*zSize;
-
     const bool symmetric = false;
 
     if( rank == 0 )
