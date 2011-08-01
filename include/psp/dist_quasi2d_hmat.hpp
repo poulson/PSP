@@ -1123,7 +1123,11 @@ private:
       const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       Dense<Scalar>& X, Dense<Scalar>& Y, Dense<Scalar>& Z,
       std::vector<Real>& singularValues,
-      std::vector<Scalar>& work, std::vector<Real>& realWork );
+      std::vector<Scalar>& work, std::vector<Real>& realWork
+#ifdef TIME_MULTIPLY  // Yes, this is ugly, but it is sufficient for now
+      , Timer& timer
+#endif
+    );
 
     /*
      * Private data

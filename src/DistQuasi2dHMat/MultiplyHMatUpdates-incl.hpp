@@ -234,10 +234,58 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     Dense<Scalar> X, Y, Z;
     std::vector<Real> singularValues, realWork;
     std::vector<Scalar> work;
+#ifdef TIME_MULTIPLY
+    Timer finTimer;
+    MultiplyHMatUpdatesExchangeFinalize
+    ( recvBuffer, recvOffsets, halfHeights, halfHeightOffsets,
+      qrBuffer, qrOffsets, tauBuffer, tauOffsets,
+      X, Y, Z, singularValues, work, realWork, finTimer );
+
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream finOs;
+    finOs << "Multiply-ExchangeFinalize-" << commRank << ".log";
+    std::ofstream finFile( finOs.str().c_str(), std::ios::out | std::ios::app );
+    finFile 
+        << "DIST_LOW_RANK:  " << finTimer.GetTime( 0 ) << " secs.\n"
+        << "SPLIT_LOW_RANK: " << finTimer.GetTime( 7 ) << " secs.\n"
+        << "LOW_RANK:       " << finTimer.GetTime( 15 ) << " secs.\n"
+        << "SPLIT_DENSE:    " << finTimer.GetTime( 21 ) << " secs.\n"
+        << "DENSE:          " << finTimer.GetTime( 22 ) << " secs.\n"
+        << std::endl;
+    finFile 
+        << "DIST_LOW_RANK breakdown: \n"
+        << " Form Z:                  " << finTimer.GetTime( 1 ) << " secs.\n"
+        << " SVD:                     " << finTimer.GetTime( 2 ) << " secs.\n"
+        << " Target packed backtrans: " << finTimer.GetTime( 3 ) << " secs.\n"
+        << " Target local backtrans:  " << finTimer.GetTime( 4 ) << " secs.\n"
+        << " Source packed backtrans: " << finTimer.GetTime( 5 ) << " secs.\n"
+        << " Source local backtrans:  " << finTimer.GetTime( 6 ) << " secs.\n"
+        << std::endl;
+    finFile 
+        << "SPLIT_LOW_RANK breakdown: \n"
+        << " w/o dense: " << finTimer.GetTime( 8 ) << " secs.\n"
+        << "  Form Z:           " << finTimer.GetTime( 9 ) << " secs.\n"
+        << "  Target SVD:       " << finTimer.GetTime( 10 ) << " secs.\n"
+        << "  Target backtrans: " << finTimer.GetTime( 11 ) << " secs.\n"
+        << "  Source SVD:       " << finTimer.GetTime( 12 ) << " secs.\n"
+        << "  Source backtrans: " << finTimer.GetTime( 13 ) << " secs.\n"
+        << " with dense: " << finTimer.GetTime( 14 ) << " secs.\n"
+        << std::endl;
+    finFile 
+        << "LOW_RANK breakdown: \n"
+        << " w/o dense: " << finTimer.GetTime( 16 ) << " secs.\n"
+        << "  Form Z:    " << finTimer.GetTime( 17 ) << " secs.\n"
+        << "  SVD:       " << finTimer.GetTime( 18 ) << " secs.\n"    
+        << "  backtrans: " << finTimer.GetTime( 19 ) << " secs.\n"
+        << " with dense: " << finTimer.GetTime( 20 ) << " secs.\n"
+        << std::endl;
+    finFile.close();
+#else
     MultiplyHMatUpdatesExchangeFinalize
     ( recvBuffer, recvOffsets, halfHeights, halfHeightOffsets,
       qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
       X, Y, Z, singularValues, work, realWork );
+#endif
 
 #ifdef TIME_MULTIPLY
     mpi::Barrier( MPI_COMM_WORLD );
@@ -253,7 +301,6 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 11 );
 
-    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
     std::ostringstream os;
     os << "Multiply-Updates-" << commRank << ".log";
     std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
@@ -2200,7 +2247,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
   const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
   Dense<Scalar>& X, Dense<Scalar>& Y, Dense<Scalar>& Z,
   std::vector<Real>& singularValues, 
-  std::vector<Scalar>& work, std::vector<Real>& realWork )
+  std::vector<Scalar>& work, std::vector<Real>& realWork 
+#ifdef TIME_MULTIPLY 
+  , Timer& timer
+#endif
+)
 {
 #ifndef RELEASE
     PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeFinalize");
@@ -2225,7 +2276,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 node.Child(t,s).MultiplyHMatUpdatesExchangeFinalize
                 ( recvBuffer, recvOffsets, halfHeights, halfHeightOffsets,
                   qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
-                  X, Y, Z, singularValues, work, realWork );
+                  X, Y, Z, singularValues, work, realWork 
+#ifdef TIME_MULTIPLY
+                  , timer
+#endif
+                );
         break;
     }
     case DIST_LOW_RANK:
@@ -2235,24 +2290,22 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         if( r <= MaxRank() )
             break;
 
+#ifdef TIME_MULTIPLY
+        timer.Start( 0 ); // Start the timer for the entire DIST_LOW_RANK update
+#endif
+
         MPI_Comm team = _teams->Team( _level );
         const unsigned teamLevel = _teams->TeamLevel( _level );
         const unsigned teamSize = mpi::CommSize( team );
         const unsigned teamRank = mpi::CommRank( team );
         const unsigned log2TeamSize = Log2( teamSize );
 
-        const int*    UHalfHeightsPiece;
-        const int*    VHalfHeightsPiece;
-        const Scalar* UQRPiece;
-        const Scalar* VQRPiece;
-        const Scalar* UTauPiece;
-        const Scalar* VTauPiece;
-        const int*    lastUHalfHeightsStage;
-        const int*    lastVHalfHeightsStage;
-        const Scalar* lastUQRStage;
-        const Scalar* lastVQRStage;
-        const Scalar* lastUTauStage;
-        const Scalar* lastVTauStage;
+        const int    *UHalfHeightsPiece, *VHalfHeightsPiece;
+        const Scalar *UQRPiece, *VQRPiece;
+        const Scalar *UTauPiece, *VTauPiece;
+        const int    *lastUHalfHeightsStage, *lastVHalfHeightsStage;
+        const Scalar *lastUQRStage, *lastVQRStage;
+        const Scalar *lastUTauStage, *lastVTauStage;
 
         // Set up our pointers and form R_U and R_V in X and Y
         int minDimX, minDimY;
@@ -2428,6 +2481,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             recvOffsets[partner] += sizeof(int) + (r*r+r)/2*sizeof(Scalar);
         }
 
+#ifdef TIME_MULTIPLY
+        timer.Start( 1 ); // Start the Z := R_U R_V^[T/H] timer
+#endif
+
         // Overwrite Z with R_U R_V^[T/H]
         Z.Resize( minDimX, minDimY );
         const char option = ( Conjugated ? 'C' : 'T' );
@@ -2436,7 +2493,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
           (Scalar)1, X.LockedBuffer(), X.LDim(),
                      Y.LockedBuffer(), Y.LDim(),
           (Scalar)0, Z.Buffer(),       Z.LDim() );
-        const int minDim = std::min( minDimX, minDimY );
+
+#ifdef TIME_MULTIPLY
+        timer.Stop( 1 ); // Stop the Z := R_U R_V^[T/H] timer
+        timer.Start( 2 ); // Start the SVD timer
+#endif
 
         // Perform an SVD on Z, overwriting Z with the left singular vectors
         // and Y with the adjoint of the right singular vectors. 
@@ -2446,6 +2507,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         //       are chosen consistently with our partner process. Though we 
         //       could adopt an implicit convention, it is likely easier to 
         //       just compute both for now.
+        const int minDim = std::min( minDimX, minDimY );
         singularValues.resize( minDim );
         work.resize( lapack::SVDWorkSize(minDimX,minDimY) );
         realWork.resize( lapack::SVDRealWorkSize(minDimX,minDimY) );
@@ -2455,11 +2517,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
           &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
           &work[0], work.size(), &realWork[0] );
 
+#ifdef TIME_MULTIPLY
+        timer.Stop( 2 ); // Stop the SVD timer
+#endif
+
         const int newRank = std::min(minDim,MaxRank());
         X.Resize( 2*r, newRank );
         DF.rank = newRank;
         if( _inTargetTeam )
         {
+#ifdef TIME_MULTIPLY
+            timer.Start( 3 ); // Time the target packed Q backtransformations
+#endif
             // Form the compressed local portion of U.
 
             // Copy the first newRank singular vectors, scaled by the singular 
@@ -2520,6 +2589,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 tPrev = tCurr;
             }
 
+#ifdef TIME_MULTIPLY
+            timer.Stop( 3 ); // Stop the target packed backtransformation timer
+            timer.Start( 4 ); // Start the target local backtransformation timer
+#endif
+
             // Backtransform using the original stage
             const int m = DF.ULocal.Height();
             hmat_tools::Copy( DF.ULocal, Z );
@@ -2550,9 +2624,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
               Z.LockedBuffer(), Z.LDim(), &UTauPiece[0],
               DF.ULocal.Buffer(), DF.ULocal.LDim(),  
               &work[0], work.size() );
+
+#ifdef TIME_MULTIPLY
+            timer.Stop( 4 ); // Stop the target local backtransformation timer
+#endif
         }
         if( _inSourceTeam )
         {
+#ifdef TIME_MULTIPLY
+            timer.Start( 5 ); // Time the source packed Q backtransformations
+#endif
+
             // Form the compressed local portion of V.
 
             // Copy the first newRank right singular vectors into the top of
@@ -2617,6 +2699,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 tPrev = tCurr;
             }
 
+#ifdef TIME_MULTIPLY
+            timer.Stop( 5 ); // Stop the source packed backtransformation timer
+            timer.Start( 6 ); // Start the source local backtransformation timer
+#endif
+
             // Backtransform using the original stage
             const int n = DF.VLocal.Height();
             hmat_tools::Copy( DF.VLocal, Z );
@@ -2648,7 +2735,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
               Z.LockedBuffer(), Z.LDim(), &VTauPiece[0],
               DF.VLocal.Buffer(), DF.VLocal.LDim(),  
               &work[0], work.size() );
+
+#ifdef TIME_MULTIPLY
+            timer.Stop( 6 ); // Stop the source local backtransformation timer
+#endif
         }
+
+#ifdef TIME_MULTIPLY
+        timer.Stop( 0 ); // Stop the timer for the entire DIST_LOW_RANK update
+#endif
+
         break;
     }
     case SPLIT_LOW_RANK:
@@ -2657,13 +2753,17 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         const int r = SF.rank;
         const int minDimU = std::min( Height(), r );
         const int minDimV = std::min( Width(), r );
-        const int minDim = std::min( minDimU, minDimV );
         const unsigned teamLevel = _teams->TeamLevel( _level );
 
         if( !_haveDenseUpdate )
         {
             if( r <= MaxRank() )
                 break;
+
+#ifdef TIME_MULTIPLY
+            timer.Start( 7 ); // time SPLIT_LOW_RANK update
+            timer.Start( 8 ); // time SPLIT_LOW_RANK update w/o dense
+#endif
 
             // Form R_U and R_V
             X.Resize( minDimU, r );
@@ -2735,6 +2835,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                       minDimV*sizeof(Scalar) );
             }
 
+#ifdef TIME_MULTIPLY
+            timer.Start( 9 ); // Start the Z := R_U R_V^[T/H] timer
+#endif
+
             // Overwrite Z with R_U R_V^[T/H]
             Z.Resize( minDimU, minDimV );
             const char option = ( Conjugated ? 'C' : 'T' );
@@ -2744,6 +2848,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                          Y.LockedBuffer(), Y.LDim(),
               (Scalar)0, Z.Buffer(),       Z.LDim() );
 
+#ifdef TIME_MULTIPLY
+            timer.Stop( 9 ); // Stop the Z := R_U R_V^[T/H] timer
+#endif
+
+            const int minDim = std::min( minDimU, minDimV );
             singularValues.resize( minDim );
             work.resize( lapack::SVDWorkSize(minDimU,minDimV) );
             realWork.resize( lapack::SVDRealWorkSize(minDimU,minDimV) );
@@ -2751,12 +2860,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             SF.rank = newRank;
             if( _inTargetTeam )
             {
+#ifdef TIME_MULTIPLY
+                timer.Start( 10 ); // Start the target SVD timer
+#endif
+
                 // Perform an SVD on Z, overwriting Z with the left singular 
                 // vectors.
                 lapack::SVD
                 ( 'O', 'N', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
                   &singularValues[0], 0, 1, 0, 1, 
                   &work[0], work.size(), &realWork[0] );
+
+#ifdef TIME_MULTIPLY
+                timer.Stop( 10 ); // Stop the target SVD timer
+                timer.Start( 11 ); // Start the target backtransformation timer
+#endif
 
                 // Backtransform U
                 const int m = SF.D.Height();
@@ -2782,15 +2900,28 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                   SF.D.Buffer(),    SF.D.LDim(),  
                   &work[0], work.size() );
                 tauOffsets[teamLevel] += r; // this is an upper bound
+
+#ifdef TIME_MULTIPLY
+                timer.Stop( 11 ); // Stop the target backtransformation timer
+#endif
             }
             else // _inSourceTeam
             {
+#ifdef TIME_MULTIPLY
+                timer.Start( 12 ); // Start the source SVD timer
+#endif
+
                 // Perform an SVD on Z, overwriting Z with the adjoint of the
                 // right singular vectors.
                 lapack::SVD
                 ( 'N', 'O', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
                   &singularValues[0], 0, 1, 0, 1, 
                   &work[0], work.size(), &realWork[0] );
+
+#ifdef TIME_MULTIPLY
+                timer.Stop( 12 ); // Stop the source SVD timer
+                timer.Start( 13 ); // Start the source backtransformation timer
+#endif
 
                 // Backtransform V
                 const int n = SF.D.Height();
@@ -2819,10 +2950,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                   SF.D.Buffer(),    SF.D.LDim(),  
                   &work[0], work.size() );
                 tauOffsets[teamLevel] += r; // this is an upper bound
+#ifdef TIME_MULTIPLY
+                timer.Stop( 13 ); // Stop the source backtransformation timer
+#endif
             }
+#ifdef TIME_MULTIPLY
+            timer.Stop( 8 ); // Stop SPLIT_LOW_RANK w/o dense timer
+            timer.Stop( 7 ); // Stop SPLIT_LOW_RANK timer
+#endif
         }
         else
         {
+#ifdef TIME_MULTIPLY
+            timer.Start( 7 ); // Start SPLIT_LOW_RANK timer
+            timer.Start( 14 ); // Start SPLIT_LOW_RANK w/ dense timer
+#endif
             const int m = Height();
             const int n = Width();
             const int minDim = std::min( m, n );
@@ -2969,6 +3111,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             _D.Clear();
             _haveDenseUpdate = false;
             _storedDenseUpdate = false;
+#ifdef TIME_MULTIPLY
+            timer.Stop( 7 ); // Stop SPLIT_LOW_RANK timer
+            timer.Stop( 14 ); // Stop SPLIT_LOW_RANK w/ dense timer
+#endif
         }
         break;
     }
@@ -2986,6 +3132,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             if( r <= MaxRank() )
                 break;
 
+#ifdef TIME_MULTIPLY
+            timer.Start( 15 ); // for the entire LOW_RANK update
+            timer.Start( 16 ); // for the LOW_RANK update w/o dense
+#endif
+
             // Form R_U and R_V
             X.Resize( minDimU, r );
             Y.Resize( minDimV, r );
@@ -3001,6 +3152,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 ( Y.Buffer(0,j), F.V.LockedBuffer(0,j),
                   std::min(minDimV,j+1)*sizeof(Scalar) );
 
+#ifdef TIME_MULTIPLY
+            timer.Start( 17 ); // start the Z := R_U R_V^[T/H] timer
+#endif
+
             // Z := R_U R_V^[T/H]
             Z.Resize( minDimU, minDimV );
             const char option = ( Conjugated ? 'C' : 'T' );
@@ -3009,6 +3164,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
               (Scalar)1, X.LockedBuffer(), X.LDim(),
                          Y.LockedBuffer(), Y.LDim(),
               (Scalar)0, Z.Buffer(),       Z.LDim() );
+
+#ifdef TIME_MULTIPLY
+            timer.Stop( 17 ); // stop the Z := R_U R_V^[T/H] timer
+            timer.Start( 18 ); // start the SVD timer
+#endif
 
             const int maxRank = MaxRank();
             singularValues.resize( minDim );
@@ -3021,9 +3181,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             ( 'O', 'S', minDimU, minDimV, Z.Buffer(), Z.LDim(), 
               &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
               &work[0], work.size(), &realWork[0] );
-            const int newRank = std::min(minDim,maxRank);
+
+#ifdef TIME_MULTIPLY
+            timer.Stop( 18 ); // stop the SVD timer
+            timer.Start( 19 ); // start the backtransformation timer
+#endif
 
             // Backtransform U
+            const int newRank = std::min(minDim,maxRank);
             const int m = F.Height();
             hmat_tools::Copy( F.U, X );
             F.U.Resize( m, newRank );
@@ -3076,9 +3241,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
               F.V.Buffer(), F.V.LDim(),  
               &work[0], work.size() );
             tauOffsets[teamLevel] += r;
+
+#ifdef TIME_MULTIPLY
+            timer.Stop( 19 ); // stop the backtransformation timer
+            timer.Stop( 16 ); // stop the LOW_RANK w/o dense timer
+            timer.Stop( 15 ); // stop the LOW_RANK timer
+#endif
         }
         else
         {
+#ifdef TIME_MULTIPLY
+            timer.Start( 15 );  // start the LOW_RANK timer
+            timer.Start( 20 ); // start the LOW_RANK w/ dense timer
+#endif
             const int m = F.Height();
             const int n = F.Width();
             const int minDim = std::min( m, n );
@@ -3160,11 +3335,18 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             _D.Clear();
             _haveDenseUpdate = false;
             _storedDenseUpdate = false;
+#ifdef TIME_MULTIPLY
+            timer.Stop( 20 ); // stop the LOW_RANK update w/ dense timer
+            timer.Stop( 15 ); // stop the LOW_RANK update timer
+#endif
         }
         break;
     }
     case SPLIT_DENSE:
     {
+#ifdef TIME_MULTIPLY
+        timer.Start( 21 ); // Start the SPLIT_DENSE timer
+#endif
         if( _inSourceTeam )
         {
             SplitDense& SD = *_block.data.SD;
@@ -3188,10 +3370,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
             _VMap.Clear();
         }
+#ifdef TIME_MULTIPLY
+        timer.Stop( 21 ); // Stop the SPLIT_DENSE timer
+#endif
         break;
     }
     case DENSE:
     {
+#ifdef TIME_MULTIPLY
+        timer.Start( 22 ); // Start the DENSE timer
+#endif
         Dense<Scalar>& D = *_block.data.D;      
         const int m = D.Height();
         const int n = D.Width();
@@ -3212,6 +3400,9 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 
         _UMap.Clear();
         _VMap.Clear();
+#ifdef TIME_MULTIPLY
+        timer.Stop( 22 );
+#endif
         break;
     }
     default:
