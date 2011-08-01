@@ -1374,30 +1374,30 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyDensePassData
     std::map<int,int> offsets = sendOffsets;
     MultiplyDensePassDataPack( context, sendBuffer, offsets );
 
-    // Start the non-blocking sends
-    MPI_Comm comm = _teams->Team( 0 );
-    const int numSends = sendSizes.size();
-    std::vector<MPI_Request> sendRequests( numSends );
-    int offset = 0;
-    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
-    {
-        const int dest = it->first;
-        mpi::ISend
-        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
-          comm, sendRequests[offset++] );
-    }
-
     // Start the non-blocking recvs
+    MPI_Comm comm = _teams->Team( 0 );
     const int numRecvs = recvSizes.size();
     std::vector<MPI_Request> recvRequests( numRecvs );
     std::vector<Scalar> recvBuffer( totalRecvSize );
-    offset = 0;
+    int offset = 0;
     for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
     {
         const int source = it->first;
         mpi::IRecv
         ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
           comm, recvRequests[offset++] );
+    }
+
+    // Start the non-blocking sends
+    const int numSends = sendSizes.size();
+    std::vector<MPI_Request> sendRequests( numSends );
+    offset = 0;
+    for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
+    {
+        const int dest = it->first;
+        mpi::ISend
+        ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
+          comm, sendRequests[offset++] );
     }
 
     // Unpack as soon as we have received our data

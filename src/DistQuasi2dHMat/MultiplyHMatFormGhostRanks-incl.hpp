@@ -53,8 +53,23 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanks
     std::map<int,int> offsets = sendOffsets;
     A.MultiplyHMatFormGhostRanksPack( B, sendBuffer, offsets );
 
-    // Start the non-blocking sends
+    // Start the non-blocking recvs
     MPI_Comm comm = A._teams->Team( 0 );
+    const int numRecvs = recvSizes.size();
+    std::vector<MPI_Request> recvRequests( numRecvs );
+    std::vector<int> recvBuffer( totalRecvSize );
+    int offset = 0;
+    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
+    {
+        const int source = it->first;
+        mpi::IRecv
+        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
+          comm, recvRequests[offset++] );
+    }
+
+    mpi::Barrier( comm );
+
+    // Start the non-blocking sends
 #ifndef RELEASE
     const int commRank = mpi::CommRank( comm );
     if( commRank == 0 )
@@ -67,26 +82,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFormGhostRanks
 #endif
     const int numSends = sendSizes.size();
     std::vector<MPI_Request> sendRequests( numSends );
-    int offset = 0;
+    offset = 0;
     for( it=sendSizes.begin(); it!=sendSizes.end(); ++it )
     {
         const int dest = it->first;
         mpi::ISend
         ( &sendBuffer[sendOffsets[dest]], sendSizes[dest], dest, 0,
           comm, sendRequests[offset++] );
-    }
-
-    // Start the non-blocking recvs
-    const int numRecvs = recvSizes.size();
-    std::vector<MPI_Request> recvRequests( numRecvs );
-    std::vector<int> recvBuffer( totalRecvSize );
-    offset = 0;
-    for( it=recvSizes.begin(); it!=recvSizes.end(); ++it )
-    {
-        const int source = it->first;
-        mpi::IRecv
-        ( &recvBuffer[recvOffsets[source]], recvSizes[source], source, 0,
-          comm, recvRequests[offset++] );
     }
 
     // Unpack as soon as we have received our data
