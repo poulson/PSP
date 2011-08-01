@@ -1741,6 +1741,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
 #endif
     DistQuasi2dHMat<Scalar,Conjugated>& A = *this;
 
+#ifdef TIME_MULTIPLY
+    Timer timer;    
+    timer.Start( 0 );
+#endif
+
     // Compute send and recv sizes
     std::map<int,int> sendSizes, recvSizes;
     A.MultiplyHMatMainPassDataCountA
@@ -1750,6 +1755,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     A.MultiplyHMatMainPassDataCountC
     ( B, C, sendSizes, recvSizes, 
       startLevel, endLevel, startUpdate, endUpdate, 0 );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 0 );
+    timer.Start( 1 );
+#endif
 
     // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
@@ -1777,6 +1788,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     ( B, C, sendBuffer, offsets, 
       startLevel, endLevel, startUpdate, endUpdate, 0 );
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 1 );
+    timer.Start( 2 );
+#endif
+
     // Start the non-blocking recvs
     MPI_Comm comm = _teams->Team( 0 );
     const int numRecvs = recvSizes.size();
@@ -1791,7 +1808,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
           comm, recvRequests[offset++] );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 2 );
+#endif
+
     mpi::Barrier( comm );
+
+#ifdef TIME_MULTIPLY
+    timer.Start( 3 );
+#endif
 
     // Start the non-blocking sends
     const int numSends = sendSizes.size();
@@ -1805,9 +1831,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
           comm, sendRequests[offset++] );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 3 );
+    timer.Start( 4 );
+#endif
+
     // Unpack as soon as we have received our data
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 4 );
+    timer.Start( 5 );
+#endif
     A.MultiplyHMatMainPassDataUnpackA
     ( recvBuffer, recvOffsets, startLevel, endLevel );
     B.MultiplyHMatMainPassDataUnpackB
@@ -1816,9 +1853,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatMainPassData
     ( B, C, recvBuffer, recvOffsets, 
       startLevel, endLevel, startUpdate, endUpdate, 0 );
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 5 );
+    timer.Start( 6 );
+#endif
+
     // Don't exit until we know that the data was sent
     for( int i=0; i<numSends; ++i )
         mpi::Wait( sendRequests[i] );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 6 );
+
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream os;
+    os << "Multiply-PassData-" << commRank << ".log";
+    std::ofstream file( os.str().c_str(), std::ios::app | std::ios::out );
+    file << "Compute send/recv sizes:  " << timer.GetTime( 0 ) << " seconds.\n"
+         << "Pack send/recv buffers:   " << timer.GetTime( 1 ) << " seconds.\n"
+         << "Start non-blocking recvs: " << timer.GetTime( 2 ) << " seconds.\n"
+         << "Start non-blocking sends: " << timer.GetTime( 3 ) << " seconds.\n"
+         << "Wait for recvs to finish: " << timer.GetTime( 4 ) << " seconds.\n"
+         << "Unpack recv buffer:       " << timer.GetTime( 5 ) << " seconds.\n"
+         << "Wait for sends to finish: " << timer.GetTime( 6 ) << " seconds.\n"
+         << std::endl;
+    file.close();
+#endif
+
 #ifndef RELEASE
     PopCallStack();
 #endif

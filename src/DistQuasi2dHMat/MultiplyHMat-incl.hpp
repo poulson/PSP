@@ -75,16 +75,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
 
 #ifdef TIME_MULTIPLY
     Timer timer; 
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Start( 0 );
 #endif
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 0 );
     timer.Start( 1 );
 #endif
     A.MultiplyHMatFormGhostRanks( B );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 1 );
 #endif
 
@@ -100,30 +103,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
     A.MultiplyHMatMainPrecompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 2 );
     timer.Start( 3 );
 #endif
     A.MultiplyHMatMainSums
     ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 3 );
     timer.Start( 4 );
 #endif
     A.MultiplyHMatMainPassData
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 4 );
     timer.Start( 5 );
 #endif
     A.MultiplyHMatMainBroadcasts
     ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 5 );
     timer.Start( 6 );
 #endif
     A.MultiplyHMatMainPostcompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 6 );
 #endif
 
@@ -133,36 +141,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
     A.MultiplyHMatFHHPrecompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 7 );
     timer.Start( 8 );
 #endif
     A.MultiplyHMatFHHSums
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 8 );
     timer.Start( 9 );
 #endif
     A.MultiplyHMatFHHPassData
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 9 );
     timer.Start( 10 );
 #endif
     A.MultiplyHMatFHHBroadcasts
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 10 );
     timer.Start( 11 );
 #endif
     A.MultiplyHMatFHHPostcompute
     ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 11 );
     timer.Start( 12 );
 #endif
     A.MultiplyHMatFHHFinalize
     ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 12 );
 #endif
 
@@ -171,6 +185,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
 #endif
     C.MultiplyHMatUpdates();
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 13 );
 #endif
 
@@ -228,16 +243,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
 
 #ifdef TIME_MULTIPLY
     Timer timer; 
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Start( 0 );
 #endif
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 0 );
     timer.Start( 1 );
 #endif
     A.MultiplyHMatFormGhostRanks( B );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 1 );
 #endif
 
@@ -256,30 +274,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
         A.MultiplyHMatMainPrecompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 2 );
         timer.Start( 3 );
 #endif
         A.MultiplyHMatMainSums
         ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 3 );
         timer.Start( 4 );
 #endif
         A.MultiplyHMatMainPassData
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 4 );
         timer.Start( 5 );
 #endif
         A.MultiplyHMatMainBroadcasts
         ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 5 );
         timer.Start( 6 );
 #endif
         A.MultiplyHMatMainPostcompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 6 );
 #endif
 
@@ -289,36 +312,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
         A.MultiplyHMatFHHPrecompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 7 );
         timer.Start( 8 );
 #endif
         A.MultiplyHMatFHHSums
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 8 );
         timer.Start( 9 );
 #endif
         A.MultiplyHMatFHHPassData
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 9 );
         timer.Start( 10 );
 #endif
         A.MultiplyHMatFHHBroadcasts
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 10 );
         timer.Start( 11 );
 #endif
         A.MultiplyHMatFHHPostcompute
         ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 11 );
         timer.Start( 12 );
 #endif
         A.MultiplyHMatFHHFinalize
         ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 12 );
 #endif
 
@@ -327,6 +356,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
 #endif
         C.MultiplyHMatUpdates();
 #ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 13 );
 #endif
     }
@@ -385,16 +415,19 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
 
 #ifdef TIME_MULTIPLY
     Timer timer; 
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Start( 0 );
 #endif
     A.FormTargetGhostNodes();
     B.FormSourceGhostNodes();
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 0 );
     timer.Start( 1 );
 #endif
     A.MultiplyHMatFormGhostRanks( B );
 #ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 1 );
 #endif
 
@@ -415,30 +448,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
             A.MultiplyHMatMainPrecompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 2 );
             timer.Start( 3 );
 #endif
             A.MultiplyHMatMainSums
             ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 3 );
             timer.Start( 4 );
 #endif
             A.MultiplyHMatMainPassData
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 4 );
             timer.Start( 5 );
 #endif
             A.MultiplyHMatMainBroadcasts
             ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 5 );
             timer.Start( 6 );
 #endif
             A.MultiplyHMatMainPostcompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 6 );
 #endif
 
@@ -448,36 +486,42 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
             A.MultiplyHMatFHHPrecompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate, 0 );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 7 );
             timer.Start( 8 );
 #endif
             A.MultiplyHMatFHHSums
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 8 );
             timer.Start( 9 );
 #endif
             A.MultiplyHMatFHHPassData
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 9 );
             timer.Start( 10 );
 #endif
             A.MultiplyHMatFHHBroadcasts
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 10 );
             timer.Start( 11 );
 #endif
             A.MultiplyHMatFHHPostcompute
             ( alpha, B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 11 );
             timer.Start( 12 );
 #endif
             A.MultiplyHMatFHHFinalize
             ( B, C, startLevel, endLevel, startUpdate, endUpdate );
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 12 );
 #endif
 
@@ -486,6 +530,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
 #endif
             C.MultiplyHMatUpdates();
 #ifdef TIME_MULTIPLY
+            mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 13 );
 #endif
         }
