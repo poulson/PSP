@@ -28,9 +28,20 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 #endif
     const unsigned numTeamLevels = _teams->NumLevels();
 
+#ifdef TIME_MULTIPLY
+    Timer timer;
+    timer.Start( 0 );
+#endif
+
     // Count the number of QRs we'll need to perform
     std::vector<int> numQRs(numTeamLevels,0);
     MultiplyHMatUpdatesCountQRs( numQRs );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 0 );
+    timer.Start( 1 );
+#endif
 
     // Count the ranks of all of the low-rank updates that we will have to 
     // perform a QR on and also make space for their aggregations.
@@ -47,9 +58,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         MultiplyHMatUpdatesLowRankCountAndResize( Xs, XOffsetsCopy, 0 );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 1 );
+    timer.Start( 2 );
+#endif
+
     // Carry the low-rank updates down from nodes into the low-rank and dense
     // blocks.
     MultiplyHMatUpdatesLowRankImport( 0 );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 2 );
+    timer.Start( 3 );
+#endif
 
     // Allocate space for packed storage of the various components in our
     // distributed QR factorizations.
@@ -92,17 +115,35 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         std::vector<int> tauOffsetsCopy = tauOffsets;
         MultiplyHMatUpdatesLocalQR( tauBuffer, tauOffsetsCopy, qrWork );
 
+#ifdef TIME_MULTIPLY
+        mpi::Barrier( MPI_COMM_WORLD );
+        timer.Stop( 3 );
+        timer.Start( 4 );
+#endif
+
         // Perform the parallel portion of the TSQR algorithm
         MultiplyHMatParallelQR
         ( numQRs, Xs, XOffsets, halfHeights, halfHeightOffsets,
           qrBuffer, qrOffsets, tauBuffer, tauOffsets, qrWork );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 4 );
+    timer.Start( 5 );
+#endif
+
     // Count the number of entries of R and U that we need to exchange.
     // We also need to exchange U, V, and the dense update when performing
     // F += D, where the F is split.
     std::map<int,int> sendSizes, recvSizes;
     MultiplyHMatUpdatesExchangeCount( sendSizes, recvSizes );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 5 );
+    timer.Start( 6 );
+#endif
 
     // Compute the offsets
     int totalSendSize=0, totalRecvSize=0;
@@ -131,6 +172,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
           halfHeights, halfHeightOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 6 );
+    timer.Start( 7 );
+#endif
+
     // Start the non-blocking recvs
     MPI_Comm comm = _teams->Team( 0 );
     const int numRecvs = recvSizes.size();
@@ -145,7 +192,16 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
           comm, recvRequests[offset++] );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 7 );
+#endif
+
     mpi::Barrier( comm );
+
+#ifdef TIME_MULTIPLY
+    timer.Start( 8 );
+#endif
 
     // Start the non-blocking sends
     const int numSends = sendSizes.size();
@@ -159,9 +215,21 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
           comm, sendRequests[offset++] );
     }
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 8 );
+    timer.Start( 9 );
+#endif
+
     // Unpack as soon as we have received our data
     for( int i=0; i<numRecvs; ++i )
         mpi::Wait( recvRequests[i] );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 9 );
+    timer.Start( 10 );
+#endif
 
     Dense<Scalar> X, Y, Z;
     std::vector<Real> singularValues, realWork;
@@ -171,9 +239,40 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
       qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
       X, Y, Z, singularValues, work, realWork );
 
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 10 );
+    timer.Start( 11 );
+#endif
+
     // Don't continue until we know the data was sent
     for( int i=0; i<numSends; ++i )
         mpi::Wait( sendRequests[i] );
+
+#ifdef TIME_MULTIPLY
+    mpi::Barrier( MPI_COMM_WORLD );
+    timer.Stop( 11 );
+
+    const int commRank = mpi::CommRank( MPI_COMM_WORLD );
+    std::ostringstream os;
+    os << "Multiply-Updates-" << commRank << ".log";
+    std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
+    file << "Count QRs:                 " << timer.GetTime( 0  ) << " secs.\n"
+         << "Low-rank count and resize: " << timer.GetTime( 1  ) << " secs.\n"
+         << "Low-rank import:           " << timer.GetTime( 2  ) << " secs.\n"
+         << "Local QRs:                 " << timer.GetTime( 3  ) << " secs.\n"
+         << "Parallel QRs:              " << timer.GetTime( 4  ) << " secs.\n"
+         << "Exchange count:            " << timer.GetTime( 5  ) << " secs.\n"
+         << "Exchange pack:             " << timer.GetTime( 6  ) << " secs.\n"
+         << "Start non-blocking recvs:  " << timer.GetTime( 7  ) << " secs.\n"
+         << "Start non-blocking sends:  " << timer.GetTime( 8  ) << " secs.\n"
+         << "Wait for recvs to finish:  " << timer.GetTime( 9  ) << " secs.\n"
+         << "Exchange finalize:         " << timer.GetTime( 10 ) << " secs.\n"
+         << "Wait for sends to finish:  " << timer.GetTime( 11 ) << " secs.\n"
+         << std::endl;
+    file.close();
+#endif
+
 #ifndef RELEASE
     PopCallStack();
 #endif
