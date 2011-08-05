@@ -43,8 +43,8 @@ void psp::hmat_tools::Update
     {
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
             Scalar* RESTRICT BCol = B.Buffer(0,j);
+            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
             for( int i=j; i<m; ++i )
                 BCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
@@ -53,8 +53,8 @@ void psp::hmat_tools::Update
     {
         for( int j=0; j<n; ++j )
         {
-            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
             Scalar* RESTRICT BCol = B.Buffer(0,j);
+            const Scalar* RESTRICT ACol = A.LockedBuffer(0,j);
             for( int i=0; i<m; ++i )
                 BCol[i] = alpha*ACol[i] + beta*BCol[i];
         }
@@ -96,10 +96,8 @@ void psp::hmat_tools::Update
     // B.V := [B.V A.V]
     B.V.Resize( B.Width(), newRank );
     for( int j=0; j<Ar; ++j )
-    {
         std::memcpy
         ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
-    }
 #ifndef RELEASE
     PopCallStack();
 #endif

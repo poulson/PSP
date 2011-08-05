@@ -51,12 +51,12 @@ void psp::hmat_tools::Compress
 
     // Put (Sigma V^T)^T = V Sigma into F.V
     F.V.Resize( n, r );
+    const int VTLDim = VT.LDim();
     for( int j=0; j<r; ++j )
     {
         const Real sigma = s.Get(j);
         Real* RESTRICT VCol = F.V.Buffer(0,j);
         const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
-        const int VTLDim = VT.LDim();
         for( int i=0; i<n; ++i )
             VCol[i] = sigma*VTRow[i*VTLDim];
     }
@@ -102,12 +102,12 @@ void psp::hmat_tools::Compress
     if( Conjugated )
     {
         // Put (Sigma V^H)^H = V Sigma into F.V
+        const int VHLDim = VH.LDim();
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
             Scalar* RESTRICT VCol = F.V.Buffer(0,j);
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
         }
@@ -115,12 +115,12 @@ void psp::hmat_tools::Compress
     else
     {
         // Put (Sigma V^H)^T = conj(V) Sigma into F.V
+        const int VHLDim = VH.LDim();
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
             Scalar* RESTRICT VCol = F.V.Buffer(0,j);
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*VHRow[i*VHLDim];
         }
@@ -328,7 +328,8 @@ void psp::hmat_tools::Compress
     {
         std::memset( &buffer[0], 0, blockSize*sizeof(Scalar) );
         for( int j=0; j<r; ++j )
-            std::memcpy( &buffer[j*r], A.U.LockedBuffer(0,j), j*sizeof(Real) );
+            std::memcpy
+            ( &buffer[j*r], A.U.LockedBuffer(0,j), j*sizeof(Scalar) );
     }
 
     //------------------------------------------------------------------------//
@@ -367,7 +368,7 @@ void psp::hmat_tools::Compress
     for( int j=0; j<r; ++j )
     {
         std::memcpy
-        ( &buffer[2*blockSize+j*m], A.U.LockedBuffer(0,j), m*sizeof(Real) );
+        ( &buffer[2*blockSize+j*m], A.U.LockedBuffer(0,j), m*sizeof(Scalar) );
     }
     // Logically shrink A.U
     A.U.Resize( m, roundedRank );
@@ -377,8 +378,8 @@ void psp::hmat_tools::Compress
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = realBuffer[j];
-        const Scalar* RESTRICT UCol = &buffer[j*r];
         Scalar* RESTRICT UColScaled = A.U.Buffer(0,j);
+        const Scalar* RESTRICT UCol = &buffer[j*r];
         for( int i=0; i<r; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
@@ -391,7 +392,7 @@ void psp::hmat_tools::Compress
     for( int j=0; j<r; ++j )
     {
         std::memcpy
-        ( &buffer[2*blockSize+j*n], A.V.LockedBuffer(0,j), n*sizeof(Real) );
+        ( &buffer[2*blockSize+j*n], A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
     }
     // Logically shrink A.V
     A.V.Resize( n, roundedRank );
@@ -402,8 +403,8 @@ void psp::hmat_tools::Compress
         // Copy V=(V^H)^H from the SVD of R1 R2^H into the top of A.V
         for( int j=0; j<roundedRank; ++j )
         {
-            const Scalar* RESTRICT VHRow = &buffer[blockSize+j];
             Scalar* RESTRICT VCol = A.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = &buffer[blockSize+j];
             for( int i=0; i<r; ++i )
                 VCol[i] = Conj( VHRow[i*r] );
         }
@@ -413,8 +414,8 @@ void psp::hmat_tools::Compress
         // Copy conj(V)=(V^H)^T from the SVD of R1 R2^T into the top of A.V
         for( int j=0; j<roundedRank; ++j )
         {
-            const Scalar* RESTRICT VHRow = &buffer[blockSize+j];
             Scalar* RESTRICT VColConj = A.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = &buffer[blockSize+j];
             for( int i=0; i<r; ++i )
                 VColConj[i] = VHRow[i*r];
         }

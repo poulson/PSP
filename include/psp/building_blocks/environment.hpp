@@ -141,12 +141,12 @@ struct RealBase<std::complex<Real> >
 template<typename Real>
 class ScalarWrapper
 {
-    const Real& _value;
+    const Real _value;
 public:
-    ScalarWrapper( const Real& alpha ) : _value(alpha) { }
+    ScalarWrapper( const Real alpha ) : _value(alpha) { }
 
     friend std::ostream& operator<<
-    ( std::ostream& out, const ScalarWrapper<Real>& alpha )
+    ( std::ostream& out, const ScalarWrapper<Real> alpha )
     {
         out << alpha._value;
         return out;
@@ -156,12 +156,12 @@ public:
 template<typename Real>
 class ScalarWrapper<std::complex<Real> >
 {
-    const std::complex<Real>& _value;
+    const std::complex<Real> _value;
 public:
-    ScalarWrapper( const std::complex<Real>& alpha ) : _value(alpha) { }
+    ScalarWrapper( const std::complex<Real> alpha ) : _value(alpha) { }
 
     friend std::ostream& operator<<
-    ( std::ostream& os, const ScalarWrapper<std::complex<Real> >& alpha )
+    ( std::ostream& os, const ScalarWrapper<std::complex<Real> > alpha )
     {
         os << std::real(alpha._value) << "+" << std::imag(alpha._value) << "i";
         return os;
@@ -170,12 +170,12 @@ public:
 
 template<typename Real>
 const ScalarWrapper<Real>
-WrapScalar( const Real& alpha )
+WrapScalar( const Real alpha )
 { return ScalarWrapper<Real>( alpha ); }
 
 template<typename Real>
 const ScalarWrapper<std::complex<Real> >
-WrapScalar( const std::complex<Real>& alpha )
+WrapScalar( const std::complex<Real> alpha )
 { return ScalarWrapper<std::complex<Real> >( alpha ); }
 
 // These should typically only be used when not in RELEASE mode

@@ -56,10 +56,8 @@ void psp::hmat_tools::RoundedUpdate
         // Copy A.V into the right half of B.V
         B.V.Resize( n, r );
         for( int j=0; j<Ar; ++j )
-        {
             std::memcpy
             ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Real) );
-        }
 
 #ifndef RELEASE
         PopCallStack();
@@ -151,8 +149,8 @@ void psp::hmat_tools::RoundedUpdate
     for( int j=0; j<roundedRank; ++j )
     {
         const Real sigma = s[j];
-        const Real* RESTRICT UCol = W.LockedBuffer(0,j);
         Real* RESTRICT UColScaled = B.U.Buffer(0,j);
+        const Real* RESTRICT UCol = W.LockedBuffer(0,j);
         for( int i=0; i<minDimU; ++i )
             UColScaled[i] = sigma*UCol[i];
     }
@@ -166,11 +164,11 @@ void psp::hmat_tools::RoundedUpdate
     //  | (VT_Top)^T |, and then hitting it from the left with Q2
     //  |      0     |
     Scale( (Real)0, B.V );
+    const int VTLDim = VT.LDim();
     for( int j=0; j<roundedRank; ++j )
     {
-        const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
-        const int VTLDim = VT.LDim();
         Real* RESTRICT VCol = B.V.Buffer(0,j);
+        const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
         for( int i=0; i<minDimV; ++i )
             VCol[i] = VTRow[i*VTLDim];
     }
@@ -223,10 +221,8 @@ void psp::hmat_tools::RoundedUpdate
         // Copy A.V into the right half of B.V
         B.V.Resize( n, r );
         for( int j=0; j<Ar; ++j )
-        {
             std::memcpy
             ( B.V.Buffer(0,j+Br), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
-        }
 
 #ifndef RELEASE
         PopCallStack();
@@ -254,15 +250,11 @@ void psp::hmat_tools::RoundedUpdate
     // Form V := [A.V B.V]
     Dense<Scalar> V( n, r );
     for( int j=0; j<Ar; ++j )
-    {
         std::memcpy
         ( V.Buffer(0,j), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
-    }
     for( int j=0; j<Br; ++j )
-    {
         std::memcpy
         ( V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Scalar) );
-    }
 
 #if defined(PIVOTED_QR)
     // TODO 
@@ -284,19 +276,15 @@ void psp::hmat_tools::RoundedUpdate
     workU.resize( r*r );
     std::memset( &workU[0], 0, r*r*sizeof(Scalar) );
     for( int j=0; j<r; ++j )
-    {
         std::memcpy
         ( &workU[j*r], U.LockedBuffer(0,j), std::min(m,j+1)*sizeof(Scalar) );
-    }
 
     // Copy R2 (the right factor's R from QR) into a zeroed buffer
     workV.resize( r*r );
     std::memset( &workV[0], 0, r*r*sizeof(Scalar) );
     for( int j=0; j<r; ++j )
-    {
         std::memcpy
         ( &workV[j*r], V.LockedBuffer(0,j), std::min(n,j+1)*sizeof(Scalar) );
-    }
 
     // Form W := R1 R2^[T,H]
     const char option = ( Conjugated ? 'C' : 'T' );
@@ -344,22 +332,22 @@ void psp::hmat_tools::RoundedUpdate
     Scale( (Scalar)0, B.V );
     if( Conjugated )
     {
+        const int VHLDim = VH.LDim();
         for( int j=0; j<roundedRank; ++j )
         {
-            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             Scalar* RESTRICT VCol = B.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
             for( int i=0; i<minDimV; ++i )
                 VCol[i] = Conj( VHRow[i*VHLDim] );
         }
     }
     else
     {
+        const int VHLDim = VH.LDim();
         for( int j=0; j<roundedRank; ++j )
         {
-            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             Scalar* RESTRICT VColConj = B.V.Buffer(0,j);
+            const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
             for( int i=0; i<minDimV; ++i )
                 VColConj[i] = VHRow[i*VHLDim];
         }

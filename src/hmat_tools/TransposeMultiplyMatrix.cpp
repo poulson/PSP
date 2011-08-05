@@ -633,12 +633,12 @@ void psp::hmat_tools::TransposeMultiply
 
     // Put (Sigma V^T)^T = V Sigma into C.V
     C.V.SetType( GENERAL ); C.V.Resize( n, r );
+    const int VTLDim = VT.LDim();
     for( int j=0; j<r; ++j )
     {
         const Real sigma = s.Get(j);
         Real* RESTRICT VCol = C.V.Buffer(0,j);
         const Real* RESTRICT VTRow = VT.LockedBuffer(j,0);
-        const int VTLDim = VT.LDim();
         for( int i=0; i<n; ++i )
             VCol[i] = sigma*VTRow[i*VTLDim];
     }
@@ -688,12 +688,12 @@ void psp::hmat_tools::TransposeMultiply
     if( Conjugated )
     {
         // Put (Sigma V^H)^H = (V^H)^H Sigma into C.V
+        const int VHLDim = VH.LDim();
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
             Scalar* RESTRICT VCol = C.V.Buffer(0,j);
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
         }
@@ -701,12 +701,12 @@ void psp::hmat_tools::TransposeMultiply
     else
     {
         // Put (Sigma V^H)^T = (V^H)^T Sigma into C.V
+        const int VHLDim = VH.LDim();
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
             Scalar* RESTRICT VCol = C.V.Buffer(0,j);
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*VHRow[i*VHLDim];
         }

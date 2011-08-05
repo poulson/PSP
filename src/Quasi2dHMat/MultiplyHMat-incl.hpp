@@ -39,20 +39,20 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Multiply
 
     C._numLevels = A._numLevels;
     C._maxRank = A._maxRank;
-    C._sourceOffset = B._sourceOffset;
     C._targetOffset = A._targetOffset;
+    C._sourceOffset = B._sourceOffset;
     C._symmetric = false;
     C._stronglyAdmissible = ( A._stronglyAdmissible || B._stronglyAdmissible );
 
-    C._xSizeSource = B._xSizeSource;
-    C._ySizeSource = B._ySizeSource;
     C._xSizeTarget = A._xSizeTarget;
     C._ySizeTarget = A._ySizeTarget;
+    C._xSizeSource = B._xSizeSource;
+    C._ySizeSource = B._ySizeSource;
     C._zSize = A._zSize;
-    C._xSource = B._xSource;
-    C._ySource = B._ySource;
     C._xTarget = A._xTarget;
     C._yTarget = A._yTarget;
+    C._xSource = B._xSource;
+    C._ySource = B._ySource;
 
     C._block.Clear();
     if( C.Admissible() )
@@ -120,10 +120,7 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Multiply
     {
         // A product of two matrices will be assumed non-symmetric.
         C._block.type = NODE;
-        C._block.data.N = 
-            new Node
-            ( C._xSizeSource, C._xSizeTarget, C._ySizeSource, C._ySizeTarget,
-              C._zSize );
+        C._block.data.N = C.NewNode();
 
 #ifndef RELEASE
         if( A.IsDense() || B.IsDense() )

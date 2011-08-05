@@ -740,12 +740,12 @@ void psp::hmat_tools::AdjointMultiply
     if( Conjugated )
     {
         // Put (Sigma V^H)^H = (V^H)^H Sigma into C.V
+        const int VHLDim = VH.LDim();
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
             Scalar* RESTRICT VCol = C.V.Buffer(0,j);
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*Conj(VHRow[i*VHLDim]);
         }
@@ -753,12 +753,12 @@ void psp::hmat_tools::AdjointMultiply
     else
     {
         // Put (Sigma V^H)^T = (V^H)^T Sigma into C.V
+        const int VHLDim = VH.LDim();
         for( int j=0; j<r; ++j )
         {
             const Real sigma = s.Get(j);
             Scalar* RESTRICT VCol = C.V.Buffer(0,j);
             const Scalar* RESTRICT VHRow = VH.LockedBuffer(j,0);
-            const int VHLDim = VH.LDim();
             for( int i=0; i<n; ++i )
                 VCol[i] = sigma*VHRow[i*VHLDim];
         }

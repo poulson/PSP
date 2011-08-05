@@ -108,15 +108,13 @@ void psp::hmat_tools::Add
 
     // C.V := [A.V B.V]
     for( int j=0; j<Ar; ++j )
-    {
         std::memcpy
         ( C.V.Buffer(0,j), A.V.LockedBuffer(0,j), n*sizeof(Scalar) );
-    }
+
     for( int j=0; j<Br; ++j )
-    {
         std::memcpy
         ( C.V.Buffer(0,j+Ar), B.V.LockedBuffer(0,j), n*sizeof(Scalar) );
-    }
+
 #ifndef RELEASE
     PopCallStack();
 #endif

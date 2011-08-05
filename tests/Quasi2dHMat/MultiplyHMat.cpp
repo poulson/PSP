@@ -196,7 +196,10 @@ main( int argc, char* argv[] )
         std::cout << "done: " << invertStopTime-invertStartTime 
                   << " seconds." << std::endl;
         if( print )
+        {
             A.Print("A");
+            B.Print("B");
+        }
         if( printStructure )
         {
             A.LatexWriteStructure("A_structure");
@@ -212,6 +215,8 @@ main( int argc, char* argv[] )
         double multStopTime = psp::mpi::WallTime();
         std::cout << "done: " << multStopTime-multStartTime
                   << " seconds." << std::endl;
+        if( print )
+            C.Print("C");
         if( printStructure )
         {
             C.LatexWriteStructure("C_structure");
@@ -234,24 +239,33 @@ main( int argc, char* argv[] )
             X.Resize( m, numRhs );
             psp::SerialGaussianRandomVectors( X );
         }
+        if( print )
+            X.Print("X");
         
         psp::Dense<Scalar> Y, Z;
         // Y := AZ := ABX
         B.Multiply( (Scalar)1, X, Z );
         A.Multiply( (Scalar)1, Z, Y );
+        if( print )
+        {
+            Z.Print("Z := B X");
+            Y.Print("Y := A Z = A B X");
+        }
         // Z := CX
         C.Multiply( (Scalar)1, X, Z );
+        if( print )
+            Z.Print("Z := C X");
 
         if( print )
         {
             std::ofstream YFile( "Y.m" );
             std::ofstream ZFile( "Z.m" );
 
-            YFile << "Y=[\n";
+            YFile << "YMat=[\n";
             Y.Print( YFile, "" );
             YFile << "];\n";
 
-            ZFile << "Z=[\n";
+            ZFile << "ZMat=[\n";
             Z.Print( ZFile, "" );
             ZFile << "];\n";
         }
@@ -291,7 +305,7 @@ main( int argc, char* argv[] )
         if( print )
         {
             std::ofstream EFile( "E.m" );
-            EFile << "E=[\n"; 
+            EFile << "EMat=[\n"; 
             Z.Print( EFile, "" );
             EFile << "];\n";
         }
