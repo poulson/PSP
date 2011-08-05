@@ -34,7 +34,7 @@ namespace psp {
 //
 // U and V will always be assumed to be of general type 
 // (they should be non-square except in pathological cases).
-template<typename Scalar,bool Conjugated>
+template<typename Scalar,bool Conjugated=true>
 struct LowRank
 {
     // If Conjugated == true, then A = U V^H, otherwise, A = U V^T. 

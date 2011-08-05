@@ -30,7 +30,7 @@ namespace psp {
 // A distributed H-matrix class that assumes a quasi2d box domain and requires
 // a power of two number of processes. It does not yet support implicit 
 // symmetry.
-template<typename Scalar,bool Conjugated>
+template<typename Scalar,bool Conjugated=true>
 class DistQuasi2dHMat
 {
 public:

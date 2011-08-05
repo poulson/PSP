@@ -29,7 +29,7 @@ namespace psp {
 // Forward declare friend classes
 template<typename Scalar,bool Conjugated> class DistQuasi2dHMat;
 
-template<typename Scalar,bool Conjugated>
+template<typename Scalar,bool Conjugated=true>
 class Quasi2dHMat : public AbstractHMat<Scalar>
 {
     friend class DistQuasi2dHMat<Scalar,Conjugated>;

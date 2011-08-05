@@ -2500,22 +2500,41 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 #endif
 
         // Perform an SVD on Z, overwriting Z with the left singular vectors
-        // and Y with the adjoint of the right singular vectors. 
+        // and Y with the adjoint of the right singular vectors (as necessary). 
         //
-        // NOTE: Even though we potentially only need either the left or right
-        //       singular vectors, we must be careful to ensure that the signs
-        //       are chosen consistently with our partner process. Though we 
-        //       could adopt an implicit convention, it is likely easier to 
-        //       just compute both for now.
+        // This step could be improved to avoid redundant computation of the
+        // SVDs via coarse grain parallel computation followed by an allgather
+        // of the results.
         const int minDim = std::min( minDimX, minDimY );
         singularValues.resize( minDim );
         work.resize( lapack::SVDWorkSize(minDimX,minDimY) );
         realWork.resize( lapack::SVDRealWorkSize(minDimX,minDimY) );
-        Y.Resize( minDim, minDimY );
-        lapack::SVD
-        ( 'O', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
-          &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
-          &work[0], work.size(), &realWork[0] );
+        if( _inSourceTeam && _inTargetTeam )
+        {
+            Y.Resize( minDim, minDimY );
+            lapack::SVD
+            ( 'O', 'S', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
+              &singularValues[0], 0, 1, Y.Buffer(), Y.LDim(), 
+              &work[0], work.size(), &realWork[0] );
+        }
+        else if( _inTargetTeam )
+        {
+            lapack::SVD
+            ( 'O', 'N', minDimX, minDimY, Z.Buffer(), Z.LDim(), 
+              &singularValues[0], 0, 1, 0, 1, 
+              &work[0], work.size(), &realWork[0] );
+        }
+        else
+        {
+            // The (N,O) and (O,N) options produce compatible singular vectors,
+            // but the (O,N) and (N,S) options do not, so copy Z into Y to
+            // allow for consistent access to the singular vectors.
+            hmat_tools::Copy( Z, Y );
+            lapack::SVD
+            ( 'N', 'O', minDimX, minDimY, Y.Buffer(), Y.LDim(), 
+              &singularValues[0], 0, 1, 0, 1, 
+              &work[0], work.size(), &realWork[0] );
+        }
 
 #ifdef TIME_MULTIPLY
         timer.Stop( 2 ); // Stop the SVD timer
@@ -2643,11 +2662,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
             const int tLast = lastVHalfHeightsStage[1];
             X.Resize( sLast+tLast, newRank );
             hmat_tools::Scale( (Scalar)0, X );
+            const int YLDim = Y.LDim();
             for( int j=0; j<newRank; ++j )
             {
-                const Scalar* YRow = Y.LockedBuffer(j,0);
-                const int YLDim = Y.LDim();
                 Scalar* XCol = X.Buffer(0,j);
+                const Scalar* YRow = Y.LockedBuffer(j,0);
                 if( Conjugated )
                     for( int i=0; i<minDimY; ++i )
                         XCol[i] = Conj(YRow[i*YLDim]);
@@ -2930,11 +2949,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
                 hmat_tools::Scale( (Scalar)0, SF.D );
                 // Copy the first newRank right singular vectors into the 
                 // top of the SF.D buffer
+                const int ZLDim = Z.LDim();
                 for( int j=0; j<newRank; ++j )
                 {
-                    const Scalar* ZRow = Z.LockedBuffer(j,0);
-                    const int ZLDim = Z.LDim();
                     Scalar* VCol = SF.D.Buffer(0,j);
+                    const Scalar* ZRow = Z.LockedBuffer(j,0);
                     if( Conjugated )
                         for( int i=0; i<minDimV; ++i )
                             VCol[i] = Conj(ZRow[i*ZLDim]);
