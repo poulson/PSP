@@ -6,8 +6,7 @@ PSP can usually be configured and built using:
     cd psp 
     mkdir build
     cd build
-    cmake -DCMAKE_CXX_COMPILER=`which mpicxx` 
-      -DCMAKE_C_COMPILER=`which mpicc` ..
+    cmake ..
     make
 
 If something other than the reference BLAS/LAPACK libs are desired for PSP, 
