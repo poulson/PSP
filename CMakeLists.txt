@@ -18,7 +18,7 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.5) # for the new FindMPI module
 project(PSP)
 
 set(PSP_VERSION_MAJOR 0)
@@ -26,55 +26,6 @@ set(PSP_VERSION_MINOR 2)
 
 option(RELEASE "Avoid unnecessary assertions." OFF)
 option(TIME_MULTIPLY "Instrument H-matrix multiply with timers." OFF)
-option(BUILT_PETSC_WITH_X11 "Was petsc-dev built with X11 support?" OFF)
-
-if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
-  message(WARNING "CXX compiler, ${CMAKE_CXX_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CXX or through the '-DCMAKE_CXX_COMPILER' cmake flag. You should probably also clean this build folder first.")
-endif(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
-if(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
-  message(WARNING "C compiler, ${CMAKE_C_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CC or through the '-DCMAKE_C_COMPILER' cmake flag. You should probably also clean this build folder first.")
-endif(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
-
-# We need PETSc's GMRES, so go ahead and use its dependencies, which we must 
-# link anyways.
-#if(NOT PETSC_DIR)    
-#  message(
-#    FATAL_ERROR
-#    "PETSC_DIR must be set to the location of the top-level PETSc folder."
-#  )
-#endif(NOT PETSC_DIR)
-#if(NOT PETSC_ARCH_SUBDIR)
-#  message(
-#    FATAL_ERROR
-#    "PETSC_ARCH_SUBDIR must be set to the architecture-specific PETSc subdirectory."
-#  )
-#endif(NOT PETSC_ARCH_SUBDIR)
-#set(PETSC_INCLUDE_DIR "${PETSC_DIR}/include")
-#set(PETSC_ARCH_INCLUDE_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/include")
-#set(PETSC_LIB_DIR "${PETSC_DIR}/${PETSC_ARCH_SUBDIR}/lib")
-#find_library(PETSC_LIB NAMES petsc HINTS ${PETSC_LIB_DIR})
-#if(NOT PETSC_LIB)
-#  message(
-#    FATAL_ERROR
-#    "Could not find PETSc using PETSC_DIR and PETSC_ARCH_SUBDIR. Please make sure it was built."
-#  )
-#endif(NOT PETSC_LIB)
-
-# X11 library
-#find_library(X11_LIB NAMES X11)
-#if(NOT X11_LIB)
-#  if(BUILT_PETSC_WITH_X11)
-#    message(FATAL_ERROR "Could not find X11 lib.")
-#  else(BUILT_PETSC_WITH_X11)
-#    set(X11_LIB "")
-#  endif(BUILT_PETSC_WITH_X11)
-#endif(NOT X11_LIB)
-
-# Dynamic library
-#find_library(DL_LIB NAMES dl)
-#if(NOT DL_LIB)
-#  message(FATAL_ERROR "Could not find dl library.")
-#endif(NOT DL_LIB)
 
 option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
@@ -82,14 +33,16 @@ mark_as_advanced(AVOID_COMPLEX_MPI)
 
 if(RELEASE)
     set(CXX_FLAGS "-O3" CACHE STRING "CXX flags")
-    set(C_FLAGS "-O3" CACHE STRING "C flags")
 elseif(RELEASE)
     set(CXX_FLAGS "-O0" CACHE STRING "CXX flags")
-    set(C_FLAGS "-O0" CACHE STRING "C flags")
 endif(RELEASE)
 
-set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
-set(CMAKE_C_FLAGS "${C_FLAGS}")
+find_package(MPI)
+if(NOT MPI_CXX_FOUND)
+  message(FATAL_ERROR "MPI C++ compiler was not found and is required")
+endif(NOT MPI_CXX_FOUND)
+include_directories(${MPI_CXX_INCLUDE_PATH})
+set(CMAKE_CXX_FLAGS "${CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
 
 # Query the size of a void pointer in order to determine whether or not this is
 # a 32-bit system
@@ -264,6 +217,21 @@ file(GLOB_RECURSE PSP_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}
      "include/*.h" "include/*.hpp")
 set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
 
+# Copy the headers into the build directory
+foreach(HEADER ${PSP_HEADERS})
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
+    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
+            ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
+  )
+endforeach(HEADER)
+
+# Make sure the PSP headers can be found
+include_directories("${PROJECT_BINARY_DIR}/include")
+
+# Build the PSP source
+add_library(psp STATIC ${PSP_SRC})
+
 # Create the lists of test executables and configure the compile flags
 # for the various build modes
 if(BUILD_TESTS)
@@ -278,32 +246,11 @@ endif(BUILD_TESTS)
 # Create a dummy library in order to be able to force the math libraries
 # to be linked last
 add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
-#set(EXTERNAL_LIBS "${PETSC_LIB}")
-list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
-#list(APPEND EXTERNAL_LIBS "${X11_LIB}")
-#list(APPEND EXTERNAL_LIBS "${DL_LIB}")
+list(APPEND EXTERNAL_LIBS "${MATH_LIBS} ${MPI_CXX_LIBRARIES}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
-# Copy the headers into the build directory
-foreach(HEADER ${PSP_HEADERS})
-  add_custom_command(
-    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
-            ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
-  )
-endforeach(HEADER)
-
-# Make sure the PSP headers can be found
-include_directories("${PROJECT_BINARY_DIR}/include")
-
-# Make sure that the PETSc includes can be found
-#include_directories("${PETSC_INCLUDE_DIR}")
-#include_directories("${PETSC_ARCH_INCLUDE_DIR}")
-
-# Build the PSP source
-add_library(psp STATIC ${PSP_SRC})
-
 # Build the test drivers if necessary
+set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
 if(BUILD_TESTS)
   # Build the building_blocks tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/building_blocks")
@@ -313,7 +260,8 @@ if(BUILD_TESTS)
     target_link_libraries(building_blocks-${TEST} psp cmake-dummy-lib)
     set_target_properties(building_blocks-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
+                          LINK_FLAGS ${MPI_LINK_FLAGS})
   endforeach(TEST)
   # Build the hmat_tools tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmat_tools")
@@ -322,7 +270,8 @@ if(BUILD_TESTS)
     target_link_libraries(hmat-${TEST} psp cmake-dummy-lib)
     set_target_properties(hmat-${TEST} 
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
+                          LINK_FLAGS ${MPI_LINK_FLAGS})
   endforeach(TEST)
   # Build the Quasi2dHMat tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/Quasi2dHMat")
@@ -331,7 +280,8 @@ if(BUILD_TESTS)
     target_link_libraries(quasi2d-${TEST} psp cmake-dummy-lib)
     set_target_properties(quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
+                          LINK_FLAGS ${MPI_LINK_FLAGS})
   endforeach(TEST)
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/DistQuasi2dHMat")
   foreach(TEST ${DIST_QUASI2D_TESTS})
@@ -340,7 +290,8 @@ if(BUILD_TESTS)
     target_link_libraries(dist-quasi2d-${TEST} psp cmake-dummy-lib)
     set_target_properties(dist-quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
+                          LINK_FLAGS ${MPI_LINK_FLAGS})
   endforeach(TEST)
 endif(BUILD_TESTS)
 
