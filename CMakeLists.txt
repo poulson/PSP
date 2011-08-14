@@ -252,8 +252,16 @@ add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS} ${MPI_CXX_LIBRARIES}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
+# Set the MPI link flags
+if(MPI_CXX_LINK_FLAGS AND MPI_C_LINK_FLAGS)
+  set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS} ${MPI_C_LINK_FLAGS}")
+elseif(MPI_CXX_LINK_FLAGS)
+  set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
+elseif(MPI_C_LINK_FLAGS)
+  set(MPI_LINK_FLAGS "${MPI_C_LINK_FLAGS}")
+endif(MPI_CXX_LINK_FLAGS AND MPI_C_LINK_FLAGS)
+
 # Build the test drivers if necessary
-set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
 if(BUILD_TESTS)
   # Build the building_blocks tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/building_blocks")
@@ -263,8 +271,11 @@ if(BUILD_TESTS)
     target_link_libraries(building_blocks-${TEST} psp cmake-dummy-lib)
     set_target_properties(building_blocks-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
-                          LINK_FLAGS ${MPI_LINK_FLAGS})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+    if(MPI_LINK_FLAGS)
+      set_target_properties(building_blocks-${TEST}
+                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
+    endif(MPI_LINK_FLAGS)
     install(TARGETS building_blocks-${TEST} DESTINATION bin/building_blocks)
   endforeach(TEST)
   # Build the hmat_tools tests
@@ -274,8 +285,11 @@ if(BUILD_TESTS)
     target_link_libraries(hmat-${TEST} psp cmake-dummy-lib)
     set_target_properties(hmat-${TEST} 
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
-                          LINK_FLAGS ${MPI_LINK_FLAGS})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+    if(MPI_LINK_FLAGS)
+      set_target_properties(hmat-${TEST}
+                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
+    endif(MPI_LINK_FLAGS)
     install(TARGETS hmat-${TEST} DESTINATION bin/hmat_tools)
   endforeach(TEST)
   # Build the Quasi2dHMat tests
@@ -285,8 +299,11 @@ if(BUILD_TESTS)
     target_link_libraries(quasi2d-${TEST} psp cmake-dummy-lib)
     set_target_properties(quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
-                          LINK_FLAGS ${MPI_LINK_FLAGS})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+    if(MPI_LINK_FLAGS)
+      set_target_properties(quasi2d-${TEST}
+                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
+    endif(MPI_LINK_FLAGS)
     install(TARGETS quasi2d-${TEST} DESTINATION bin/Quasi2dHMat)
   endforeach(TEST)
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/DistQuasi2dHMat")
@@ -296,8 +313,11 @@ if(BUILD_TESTS)
     target_link_libraries(dist-quasi2d-${TEST} psp cmake-dummy-lib)
     set_target_properties(dist-quasi2d-${TEST}
                           PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
-                          LINK_FLAGS ${MPI_LINK_FLAGS})
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+    if(MPI_LINK_FLAGS)
+      set_target_properties(dist-quasi2d-${TEST}
+                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
+    endif(MPI_LINK_FLAGS)
     install(TARGETS dist-quasi2d-${TEST} DESTINATION bin/DistQuasi2dHMat)
   endforeach(TEST)
 endif(BUILD_TESTS)
