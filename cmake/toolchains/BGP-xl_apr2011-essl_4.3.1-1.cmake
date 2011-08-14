@@ -3,7 +3,6 @@ set(CMAKE_SYSTEM_NAME BlueGeneP-static)
 # The serial XL compilers
 set(CMAKE_C_COMPILER       /soft/apps/ibmcmp-apr2011/vacpp/bg/9.0/bin/bgxlc_r)
 set(CMAKE_CXX_COMPILER     /soft/apps/ibmcmp-apr2011/vacpp/bg/9.0/bin/bgxlC_r)
-set(CMAKE_Fortran_COMPILER /soft/apps/ibmcmp-apr2011/xlf/bg/11.1/bin/bgxlf_r)
 
 # The MPI wrappers for the XL C and C++ compilers
 set(MPI_C_COMPILER   /bgsys/drivers/ppcfloor/comm/bin/mpixlc_r)

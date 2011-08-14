@@ -205,10 +205,10 @@ else(HAVE___restrict__)
 endif(HAVE___restrict__)
 
 # Store all of our system-specific definitions
-configure_file( 
-  ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
-  ${CMAKE_BINARY_DIR}/include/psp/config.h 
-)
+configure_file(${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
+               ${CMAKE_BINARY_DIR}/include/psp/config.h)
+install(FILES ${CMAKE_BINARY_DIR}/include/psp/config.h
+        DESTINATION include/psp)
 
 # Grab all of the .c, .cpp, .h, and .hpp PSP files
 file(GLOB_RECURSE PSP_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
@@ -224,6 +224,8 @@ foreach(HEADER ${PSP_HEADERS})
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
             ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
   )
+  get_filename_component(HEADER_PATH ${HEADER} PATH)
+  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${HEADER} DESTINATION ${HEADER_PATH})
 endforeach(HEADER)
 
 # Make sure the PSP headers can be found
@@ -231,6 +233,7 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 
 # Build the PSP source
 add_library(psp STATIC ${PSP_SRC})
+install(TARGETS psp DESTINATION lib)
 
 # Create the lists of test executables and configure the compile flags
 # for the various build modes
@@ -262,6 +265,7 @@ if(BUILD_TESTS)
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
                           LINK_FLAGS ${MPI_LINK_FLAGS})
+    install(TARGETS building_blocks-${TEST} DESTINATION bin/building_blocks)
   endforeach(TEST)
   # Build the hmat_tools tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmat_tools")
@@ -272,6 +276,7 @@ if(BUILD_TESTS)
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
                           LINK_FLAGS ${MPI_LINK_FLAGS})
+    install(TARGETS hmat-${TEST} DESTINATION bin/hmat_tools)
   endforeach(TEST)
   # Build the Quasi2dHMat tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/Quasi2dHMat")
@@ -282,6 +287,7 @@ if(BUILD_TESTS)
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
                           LINK_FLAGS ${MPI_LINK_FLAGS})
+    install(TARGETS quasi2d-${TEST} DESTINATION bin/Quasi2dHMat)
   endforeach(TEST)
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/DistQuasi2dHMat")
   foreach(TEST ${DIST_QUASI2D_TESTS})
@@ -292,6 +298,7 @@ if(BUILD_TESTS)
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR}
                           LINK_FLAGS ${MPI_LINK_FLAGS})
+    install(TARGETS dist-quasi2d-${TEST} DESTINATION bin/DistQuasi2dHMat)
   endforeach(TEST)
 endif(BUILD_TESTS)
 
