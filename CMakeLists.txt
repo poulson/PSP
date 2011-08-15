@@ -252,16 +252,8 @@ add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
 list(APPEND EXTERNAL_LIBS "${MATH_LIBS} ${MPI_CXX_LIBRARIES}")
 target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
-# Set the MPI link flags
-if(MPI_CXX_LINK_FLAGS AND MPI_C_LINK_FLAGS)
-  set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS} ${MPI_C_LINK_FLAGS}")
-elseif(MPI_CXX_LINK_FLAGS)
-  set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
-elseif(MPI_C_LINK_FLAGS)
-  set(MPI_LINK_FLAGS "${MPI_C_LINK_FLAGS}")
-endif(MPI_CXX_LINK_FLAGS AND MPI_C_LINK_FLAGS)
-
 # Build the test drivers if necessary
+set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
 if(BUILD_TESTS)
   # Build the building_blocks tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/building_blocks")
