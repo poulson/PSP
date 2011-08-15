@@ -21,10 +21,10 @@
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompress()
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdates");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompress");
 #endif
     const unsigned numTeamLevels = _teams->NumLevels();
 
@@ -35,7 +35,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 
     // Count the number of QRs we'll need to perform
     std::vector<int> numQRs(numTeamLevels,0);
-    MultiplyHMatUpdatesCountQRs( numQRs );
+    MultiplyHMatCompressCountQRs( numQRs );
 
 #ifdef TIME_MULTIPLY
     mpi::Barrier( MPI_COMM_WORLD );
@@ -55,7 +55,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     std::vector<Dense<Scalar>*> Xs( numTotalQRs );
     {
         std::vector<int> XOffsetsCopy = XOffsets;
-        MultiplyHMatUpdatesLowRankCountAndResize( Xs, XOffsetsCopy, 0 );
+        MultiplyHMatCompressLowRankCountAndResize( Xs, XOffsetsCopy, 0 );
     }
 
 #ifdef TIME_MULTIPLY
@@ -66,7 +66,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 
     // Carry the low-rank updates down from nodes into the low-rank and dense
     // blocks.
-    MultiplyHMatUpdatesLowRankImport( 0 );
+    MultiplyHMatCompressLowRankImport( 0 );
 
 #ifdef TIME_MULTIPLY
     mpi::Barrier( MPI_COMM_WORLD );
@@ -113,7 +113,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         // QR portions of the (distributed) QRs
         std::vector<Scalar> qrWork( lapack::QRWorkSize(maxRank) );
         std::vector<int> tauOffsetsCopy = tauOffsets;
-        MultiplyHMatUpdatesLocalQR( tauBuffer, tauOffsetsCopy, qrWork );
+        MultiplyHMatCompressLocalQR( tauBuffer, tauOffsetsCopy, qrWork );
 
 #ifdef TIME_MULTIPLY
         mpi::Barrier( MPI_COMM_WORLD );
@@ -137,7 +137,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     // We also need to exchange U, V, and the dense update when performing
     // F += D, where the F is split.
     std::map<int,int> sendSizes, recvSizes;
-    MultiplyHMatUpdatesExchangeCount( sendSizes, recvSizes );
+    MultiplyHMatCompressExchangeCount( sendSizes, recvSizes );
 
 #ifdef TIME_MULTIPLY
     mpi::Barrier( MPI_COMM_WORLD );
@@ -167,7 +167,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         std::vector<int> halfHeightOffsetsCopy = halfHeightOffsets;
         std::vector<int> qrOffsetsCopy = qrOffsets;
 
-        MultiplyHMatUpdatesExchangePack
+        MultiplyHMatCompressExchangePack
         ( sendBuffer, sendOffsetsCopy, 
           halfHeights, halfHeightOffsetsCopy, qrBuffer, qrOffsetsCopy );
     }
@@ -236,7 +236,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     std::vector<Scalar> work;
 #ifdef TIME_MULTIPLY
     Timer finTimer;
-    MultiplyHMatUpdatesExchangeFinalize
+    MultiplyHMatCompressExchangeFinalize
     ( recvBuffer, recvOffsets, halfHeights, halfHeightOffsets,
       qrBuffer, qrOffsets, tauBuffer, tauOffsets,
       X, Y, Z, singularValues, work, realWork, finTimer );
@@ -281,7 +281,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
         << std::endl;
     finFile.close();
 #else
-    MultiplyHMatUpdatesExchangeFinalize
+    MultiplyHMatCompressExchangeFinalize
     ( recvBuffer, recvOffsets, halfHeights, halfHeightOffsets,
       qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
       X, Y, Z, singularValues, work, realWork );
@@ -302,7 +302,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
     timer.Stop( 11 );
 
     std::ostringstream os;
-    os << "Multiply-Updates-" << commRank << ".log";
+    os << "MultiplyHMatCompress-" << commRank << ".log";
     std::ofstream file( os.str().c_str(), std::ios::out | std::ios::app );
     file << "Count QRs:                 " << timer.GetTime( 0  ) << " secs.\n"
          << "Low-rank count and resize: " << timer.GetTime( 1  ) << " secs.\n"
@@ -328,10 +328,10 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdates()
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const
+MultiplyHMatCompressCountQRs( std::vector<int>& numQRs ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesCountQRs");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressCountQRs");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -351,7 +351,7 @@ MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesCountQRs( numQRs );
+                node.Child(t,s).MultiplyHMatCompressCountQRs( numQRs );
         break;
     }
     case DIST_LOW_RANK:
@@ -373,11 +373,11 @@ MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const
 template<typename Scalar,bool Conjugated>
 void
 psp::DistQuasi2dHMat<Scalar,Conjugated>::
-MultiplyHMatUpdatesLowRankCountAndResize
+MultiplyHMatCompressLowRankCountAndResize
 ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets, int rank )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLowRankCountAndResize");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressLowRankCountAndResize");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -411,7 +411,7 @@ MultiplyHMatUpdatesLowRankCountAndResize
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesLowRankCountAndResize
+                node.Child(t,s).MultiplyHMatCompressLowRankCountAndResize
                 ( Xs, XOffsets, rank );
         break;
     }
@@ -752,11 +752,11 @@ MultiplyHMatUpdatesLowRankCountAndResize
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressLowRankImport
 ( int rank )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLowRankImport");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressLowRankImport");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -795,7 +795,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                         ULocalSub.LockedView
                         ( ULocal, tOffset, 0, node.targetSizes[t], r );
                         for( int s=0; s<4; ++s )
-                            node.Child(t,s).MultiplyHMatUpdatesImportU
+                            node.Child(t,s).MultiplyHMatCompressImportU
                             ( newRank, ULocalSub );
                     }
                     newRank += r;
@@ -823,7 +823,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                         VLocalSub.LockedView
                         ( VLocal, sOffset, 0, node.sourceSizes[s], r );
                         for( int t=0; t<4; ++t )
-                            node.Child(t,s).MultiplyHMatUpdatesImportV
+                            node.Child(t,s).MultiplyHMatCompressImportV
                             ( newRank, VLocalSub );
                     }
                     newRank += r;
@@ -844,7 +844,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                     const Dense<Scalar>& U = *_UMap.CurrentEntry();
                     for( int t=0; t<4; ++t )
                         for( int s=0; s<4; ++s )
-                            node.Child(t,s).MultiplyHMatUpdatesImportU
+                            node.Child(t,s).MultiplyHMatCompressImportU
                             ( newRank, U );
                     newRank += U.Width();
                     _UMap.EraseCurrentEntry();
@@ -863,7 +863,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                     const Dense<Scalar>& V = *_VMap.CurrentEntry();
                     for( int s=0; s<4; ++s )
                         for( int t=0; t<4; ++t )
-                            node.Child(t,s).MultiplyHMatUpdatesImportV
+                            node.Child(t,s).MultiplyHMatCompressImportV
                             ( newRank, V );
                     newRank += V.Width();
                     _VMap.EraseCurrentEntry();
@@ -874,7 +874,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
         }
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
+                node.Child(t,s).MultiplyHMatCompressLowRankImport( newRank );
         break;
     }
     case SPLIT_NODE:
@@ -896,7 +896,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                     ULocal.LockedView
                     ( U, tOffset, 0, node.targetSizes[t], U.Width() );
                     for( int s=0; s<4; ++s )
-                        node.Child(t,s).MultiplyHMatUpdatesImportU
+                        node.Child(t,s).MultiplyHMatCompressImportU
                         ( newRank, ULocal );
                 }
                 newRank += U.Width();
@@ -918,7 +918,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
                     VLocal.LockedView
                     ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
                     for( int t=0; t<4; ++t )
-                        node.Child(t,s).MultiplyHMatUpdatesImportV
+                        node.Child(t,s).MultiplyHMatCompressImportV
                         ( newRank, VLocal );
                 }
                 newRank += V.Width();
@@ -927,7 +927,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
         }
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesLowRankImport( newRank );
+                node.Child(t,s).MultiplyHMatCompressLowRankImport( newRank );
         break;
     }
     case DIST_LOW_RANK:
@@ -1039,11 +1039,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLowRankImport
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressImportU
 ( int rank, const Dense<Scalar>& U )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesImportU");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressImportU");
 #endif
     if( !_inTargetTeam || Height() == 0 || Width() == 0 )
     {
@@ -1073,14 +1073,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
                 USub.LockedView
                 ( U, tOffset, 0, node.targetSizes[t], U.Width() );
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyHMatUpdatesImportU( rank, USub );
+                    node.Child(t,s).MultiplyHMatCompressImportU( rank, USub );
             }
         }
         else  // teamSize >= 4
         {
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyHMatUpdatesImportU( rank, U );
+                    node.Child(t,s).MultiplyHMatCompressImportU( rank, U );
         }
         break;
     }
@@ -1093,7 +1093,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
         {
             USub.LockedView( U, tOffset, 0, node.targetSizes[t], U.Width() );
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesImportU( rank, USub );
+                node.Child(t,s).MultiplyHMatCompressImportU( rank, USub );
         }
         break;
     }
@@ -1153,11 +1153,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportU
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressImportV
 ( int rank, const Dense<Scalar>& V )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesImportV");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressImportV");
 #endif
     if( !_inSourceTeam || Height() == 0 || Width() == 0 )
     {
@@ -1187,14 +1187,14 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
                 VSub.LockedView
                 ( V, sOffset, 0, node.sourceSizes[s], V.Width() );
                 for( int t=0; t<4; ++t )
-                    node.Child(t,s).MultiplyHMatUpdatesImportV( rank, VSub );
+                    node.Child(t,s).MultiplyHMatCompressImportV( rank, VSub );
             }
         }
         else  // teamSize >= 4
         {
             for( int t=0; t<4; ++t )
                 for( int s=0; s<4; ++s )
-                    node.Child(t,s).MultiplyHMatUpdatesImportV( rank, V );
+                    node.Child(t,s).MultiplyHMatCompressImportV( rank, V );
         }
         break;
     }
@@ -1207,7 +1207,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
         {
             VSub.LockedView( V, sOffset, 0, node.sourceSizes[s], V.Width() );
             for( int t=0; t<4; ++t )
-                node.Child(t,s).MultiplyHMatUpdatesImportV( rank, VSub );
+                node.Child(t,s).MultiplyHMatCompressImportV( rank, VSub );
         }
         break;
     }
@@ -1267,12 +1267,12 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesImportV
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressLocalQR
 ( std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
   std::vector<Scalar>& qrWork )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesLocalQR");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressLocalQR");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -1291,7 +1291,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesLocalQR
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesLocalQR
+                node.Child(t,s).MultiplyHMatCompressLocalQR
                 ( tauBuffer, tauOffsets, qrWork );
         break;
     }
@@ -1938,11 +1938,11 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatParallelQR
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressExchangeCount
 ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeCount");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressExchangeCount");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -1960,7 +1960,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesExchangeCount
+                node.Child(t,s).MultiplyHMatCompressExchangeCount
                 ( sendSizes, recvSizes );
         break;
     }
@@ -2065,13 +2065,13 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeCount
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressExchangePack
 ( std::vector<byte>& sendBuffer, std::map<int,int>& sendOffsets,
   const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangePack");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressExchangePack");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -2089,7 +2089,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesExchangePack
+                node.Child(t,s).MultiplyHMatCompressExchangePack
                 ( sendBuffer, sendOffsets, 
                   halfHeights, halfHeightOffsets, qrBuffer, qrOffsets );
         break;
@@ -2240,7 +2240,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangePack
 
 template<typename Scalar,bool Conjugated>
 void
-psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
+psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatCompressExchangeFinalize
 ( const std::vector<byte>& recvBuffer, std::map<int,int>& recvOffsets,
   const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
   const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
@@ -2254,7 +2254,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
 )
 {
 #ifndef RELEASE
-    PushCallStack("DistQuasi2dHMat::MultiplyHMatUpdatesExchangeFinalize");
+    PushCallStack("DistQuasi2dHMat::MultiplyHMatCompressExchangeFinalize");
 #endif
     if( Height() == 0 || Width() == 0 )
     {
@@ -2273,7 +2273,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatUpdatesExchangeFinalize
         Node& node = *_block.data.N;
         for( int t=0; t<4; ++t )
             for( int s=0; s<4; ++s )
-                node.Child(t,s).MultiplyHMatUpdatesExchangeFinalize
+                node.Child(t,s).MultiplyHMatCompressExchangeFinalize
                 ( recvBuffer, recvOffsets, halfHeights, halfHeightOffsets,
                   qrBuffer, qrOffsets, tauBuffer, tauOffsets, 
                   X, Y, Z, singularValues, work, realWork 

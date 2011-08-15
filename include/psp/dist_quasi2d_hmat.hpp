@@ -1100,23 +1100,23 @@ private:
       int startLevel, int endLevel,
       int startUpdate, int endUpdate, int update ) const;
 
-    void MultiplyHMatUpdates();
-    void MultiplyHMatUpdatesCountQRs( std::vector<int>& numQRs ) const;
-    void MultiplyHMatUpdatesLowRankCountAndResize
+    void MultiplyHMatCompress();
+    void MultiplyHMatCompressCountQRs( std::vector<int>& numQRs ) const;
+    void MultiplyHMatCompressLowRankCountAndResize
     ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets, int rank );
-    void MultiplyHMatUpdatesLowRankImport( int rank );
-    void MultiplyHMatUpdatesImportU( int rank, const Dense<Scalar>& U );
-    void MultiplyHMatUpdatesImportV( int rank, const Dense<Scalar>& V );
-    void MultiplyHMatUpdatesLocalQR
+    void MultiplyHMatCompressLowRankImport( int rank );
+    void MultiplyHMatCompressImportU( int rank, const Dense<Scalar>& U );
+    void MultiplyHMatCompressImportV( int rank, const Dense<Scalar>& V );
+    void MultiplyHMatCompressLocalQR
     ( std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
       std::vector<Scalar>& work );
-    void MultiplyHMatUpdatesExchangeCount
+    void MultiplyHMatCompressExchangeCount
     ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
-    void MultiplyHMatUpdatesExchangePack
+    void MultiplyHMatCompressExchangePack
     ( std::vector<byte>& sendBuffer, std::map<int,int>& sendOffsets,
       const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets );
-    void MultiplyHMatUpdatesExchangeFinalize
+    void MultiplyHMatCompressExchangeFinalize
     ( const std::vector<byte>& recvBuffer, std::map<int,int>& recvOffsets,
       const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
       const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,

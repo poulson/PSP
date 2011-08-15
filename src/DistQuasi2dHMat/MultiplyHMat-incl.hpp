@@ -22,7 +22,7 @@
 #include "./MultiplyHMatFormGhostRanks-incl.hpp"
 #include "./MultiplyHMatMain-incl.hpp"
 #include "./MultiplyHMatFHH-incl.hpp"
-#include "./MultiplyHMatUpdates-incl.hpp"
+#include "./MultiplyHMatCompress-incl.hpp"
 
 // C := alpha A B
 template<typename Scalar,bool Conjugated>
@@ -183,7 +183,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
 #ifdef TIME_MULTIPLY
     timer.Start( 13 );
 #endif
-    C.MultiplyHMatUpdates();
+    C.MultiplyHMatCompress();
 #ifdef TIME_MULTIPLY
     mpi::Barrier( MPI_COMM_WORLD );
     timer.Stop( 13 );
@@ -208,7 +208,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatFullAccumulate
          << "FHH broadcasts:   " << timer.GetTime( 10 ) << " seconds.\n"
          << "FHH postcompute:  " << timer.GetTime( 11 ) << " seconds.\n"
          << "FHH finalize:     " << timer.GetTime( 12 ) << " seconds.\n"
-         << "Updates:          " << timer.GetTime( 13 ) << " seconds.\n"
+         << "Compress:         " << timer.GetTime( 13 ) << " seconds.\n"
          << std::endl;
     file.close();
 #endif
@@ -354,7 +354,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
 #ifdef TIME_MULTIPLY
         timer.Start( 13 );
 #endif
-        C.MultiplyHMatUpdates();
+        C.MultiplyHMatCompress();
 #ifdef TIME_MULTIPLY
         mpi::Barrier( MPI_COMM_WORLD );
         timer.Stop( 13 );
@@ -380,7 +380,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleLevelAccumulate
          << "FHH broadcasts:   " << timer.GetTime( 10 ) << " seconds.\n"
          << "FHH postcompute:  " << timer.GetTime( 11 ) << " seconds.\n"
          << "FHH finalize:     " << timer.GetTime( 12 ) << " seconds.\n"
-         << "Updates:          " << timer.GetTime( 13 ) << " seconds.\n"
+         << "Compress:         " << timer.GetTime( 13 ) << " seconds.\n"
          << std::endl;
     file.close();
 #endif
@@ -528,7 +528,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
 #ifdef TIME_MULTIPLY
             timer.Start( 13 );
 #endif
-            C.MultiplyHMatUpdates();
+            C.MultiplyHMatCompress();
 #ifdef TIME_MULTIPLY
             mpi::Barrier( MPI_COMM_WORLD );
             timer.Stop( 13 );
@@ -555,7 +555,7 @@ psp::DistQuasi2dHMat<Scalar,Conjugated>::MultiplyHMatSingleUpdateAccumulate
          << "FHH broadcasts:   " << timer.GetTime( 10 ) << " seconds.\n"
          << "FHH postcompute:  " << timer.GetTime( 11 ) << " seconds.\n"
          << "FHH finalize:     " << timer.GetTime( 12 ) << " seconds.\n"
-         << "Updates:          " << timer.GetTime( 13 ) << " seconds.\n"
+         << "Compress:          " << timer.GetTime( 13 ) << " seconds.\n"
          << std::endl;
     file.close();
 #endif
