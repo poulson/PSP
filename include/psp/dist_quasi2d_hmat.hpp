@@ -952,7 +952,7 @@ private:
     void MultiplyHMatMainPostcomputeCCleanup // To be called from C
     ( int startLevel, int endLevel ); 
 
-    // TODO: Think of how to switch the lockstep approach
+    // TODO: Think of how to switch to the lockstep approach
     void MultiplyHMatParallelQR
     ( const std::vector<int>& numQRs,
       const std::vector<Dense<Scalar>*>& Xs,      
@@ -1101,33 +1101,11 @@ private:
       int startUpdate, int endUpdate, int update ) const;
 
     void MultiplyHMatCompress();
-    void MultiplyHMatCompressCountQRs( std::vector<int>& numQRs ) const;
-    void MultiplyHMatCompressLowRankCountAndResize
-    ( std::vector<Dense<Scalar>*>& Xs, std::vector<int>& XOffsets, int rank );
-    void MultiplyHMatCompressLowRankImport( int rank );
-    void MultiplyHMatCompressImportU( int rank, const Dense<Scalar>& U );
-    void MultiplyHMatCompressImportV( int rank, const Dense<Scalar>& V );
-    void MultiplyHMatCompressLocalQR
-    ( std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-      std::vector<Scalar>& work );
-    void MultiplyHMatCompressExchangeCount
-    ( std::map<int,int>& sendSizes, std::map<int,int>& recvSizes );
-    void MultiplyHMatCompressExchangePack
-    ( std::vector<byte>& sendBuffer, std::map<int,int>& sendOffsets,
-      const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
-      const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets );
-    void MultiplyHMatCompressExchangeFinalize
-    ( const std::vector<byte>& recvBuffer, std::map<int,int>& recvOffsets,
-      const std::vector<int>& halfHeights, std::vector<int>& halfHeightOffsets,
-      const std::vector<Scalar>& qrBuffer, std::vector<int>& qrOffsets,
-      const std::vector<Scalar>& tauBuffer, std::vector<int>& tauOffsets,
-      Dense<Scalar>& X, Dense<Scalar>& Y, Dense<Scalar>& Z,
-      std::vector<Real>& singularValues,
-      std::vector<Scalar>& work, std::vector<Real>& realWork
-#ifdef TIME_MULTIPLY  // Yes, this is ugly, but it is sufficient for now
-      , Timer& timer
-#endif
-    );
+    void MultiplyHMatCompressRandomSetup( int rank );
+    void MultiplyHMatCompressRandomPrecompute( int rank );
+    void MultiplyHMatCompressRandomPrecomputeImport
+    ( int rank, const Dense<Scalar>& V );
+    // TODO: The rest of the Compress routines
 
     /*
      * Private data

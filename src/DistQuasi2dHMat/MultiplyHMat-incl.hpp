@@ -20,6 +20,8 @@
 */
 
 #include "./MultiplyHMatFormGhostRanks-incl.hpp"
+#include "./MultiplyHMatParallelQR-incl.hpp"
+
 #include "./MultiplyHMatMain-incl.hpp"
 #include "./MultiplyHMatFHH-incl.hpp"
 #include "./MultiplyHMatCompress-incl.hpp"
