@@ -169,7 +169,7 @@ public:
 };
 
 template<typename Real>
-const ScalarWrapper<Real>
+inline const ScalarWrapper<Real>
 WrapScalar( const Real alpha )
 { return ScalarWrapper<Real>( alpha ); }
 
