@@ -132,6 +132,7 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Quasi2dHMat
   _xSource(0), _xTarget(0),
   _ySource(0), _yTarget(0)
 { }
+
 template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMat<Scalar,Conjugated>::Quasi2dHMat
 ( const LowRank<Scalar,Conjugated>& F,
@@ -202,6 +203,7 @@ psp::Quasi2dHMat<Scalar,Conjugated>::Quasi2dHMat
   _xSource(xSource), _xTarget(xTarget),
   _ySource(ySource), _yTarget(yTarget)
 { }
+
 template<typename Scalar,bool Conjugated>
 psp::Quasi2dHMat<Scalar,Conjugated>::Quasi2dHMat
 ( const LowRank<Scalar,Conjugated>& F,

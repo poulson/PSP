@@ -78,6 +78,7 @@ main( int argc, char* argv[] )
         Quasi2d H
         ( numLevels, maxRank, symmetric, 
           stronglyAdmissible, xSize, ySize, zSize );
+        throw std::logic_error("Constructor needs to be fixed...");
         H.SetToRandom();
         psp::mpi::Barrier( MPI_COMM_WORLD );
         double constructStopTime = psp::mpi::WallTime();
