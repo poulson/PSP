@@ -18,10 +18,14 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_HPP
-#define PSP_HPP 1
+#ifndef PSP_H
+#define PSP_H 1
 
-#include "psp/building_blocks/environment.hpp"
-#include "psp/dist_quasi2d_hmat.hpp"
+#include "mpi.h"
 
-#endif // PSP_HPP
+#include "psp/config.h"
+
+#include "psp/finite_diff_control.hpp"
+#include "psp/finite_diff_sweeping_pc.hpp"
+
+#endif // PSP_H

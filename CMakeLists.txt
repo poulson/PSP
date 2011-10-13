@@ -18,31 +18,163 @@
 #  You should have received a copy of the GNU General Public License
 #  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-cmake_minimum_required(VERSION 2.8.5) # for the new FindMPI module
+cmake_minimum_required(VERSION 2.8)
 project(PSP)
 
 set(PSP_VERSION_MAJOR 0)
-set(PSP_VERSION_MINOR 2)
+set(PSP_VERSION_MINOR 1)
 
-option(RELEASE "Avoid unnecessary assertions." OFF)
-option(TIME_MULTIPLY "Instrument H-matrix multiply with timers." OFF)
+option(RELEASE "Avoid unnecessary assertions." ON)
+option(VIEW_MATRICES "Print/draw the preconditioner matrices." OFF)
+option(BUILT_PETSC_WITH_X11 "Was petsc-dev built with X11 support?" OFF)
+
+if(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
+  message(WARNING "CXX compiler, ${CMAKE_CXX_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CXX or through the '-DCMAKE_CXX_COMPILER' cmake flag. You should probably also clean this build folder first.")
+endif(NOT (CMAKE_CXX_COMPILER MATCHES "mpi"))
+if(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
+  message(WARNING "C compiler, ${CMAKE_C_COMPILER} does not appear to be an MPI compiler. Please manually set it via the environment variable CC or through the '-DCMAKE_C_COMPILER' cmake flag. You should probably also clean this build folder first.")
+endif(NOT (CMAKE_C_COMPILER MATCHES "mpi"))
+
+# We need PETSc's GMRES, so go ahead and use its dependencies, which we must 
+# link anyways.
+if(NOT PETSC_DIR)    
+  message(
+    FATAL_ERROR
+    "PETSC_DIR must be set to the location of the top-level PETSc folder."
+  )
+endif(NOT PETSC_DIR)
+if(NOT PETSC_ARCH_DIR)
+  message(
+    FATAL_ERROR
+    "PETSC_ARCH_DIR must be set to the architecture-specific PETSc directory."
+  )
+endif(NOT PETSC_ARCH_DIR)
+set(PETSC_INCLUDE_DIR "${PETSC_DIR}/include")
+set(PETSC_ARCH_INCLUDE_DIR "${PETSC_ARCH_DIR}/include")
+set(PETSC_LIB_DIR "${PETSC_ARCH_DIR}/lib")
+find_library(PETSC_LIB NAMES petsc HINTS ${PETSC_LIB_DIR})
+if(NOT PETSC_LIB)
+  message(
+    FATAL_ERROR
+    "Could not find PETSc using PETSC_ARCH_DIR. Please make sure it was built."
+  )
+endif(NOT PETSC_LIB)
+
+# Metis + ParMetis
+find_library(METIS_LIB NAMES metis HINTS ${PETSC_LIB_DIR})
+if(NOT METIS_LIB)
+  message(
+    FATAL_ERROR
+    "Could not find Metis library in PETSC_ARCH_DIR. Make sure PETSc built it."
+  )
+endif(NOT METIS_LIB)
+find_library(PARMETIS_LIB NAMES parmetis HINTS ${PETSC_LIB_DIR})
+if(NOT PARMETIS_LIB)
+  message(
+    FATAL_ERROR
+    "Could not find ParMetis lib in PETSC_ARCH_DIR. Make sure PETSc built it."
+  )
+endif(NOT PARMETIS_LIB)
+
+# MUMPS
+find_library(CMUMPS_LIB NAMES cmumps HINTS ${PETSC_LIB_DIR})
+find_library(DMUMPS_LIB NAMES dmumps HINTS ${PETSC_LIB_DIR})
+find_library(SMUMPS_LIB NAMES smumps HINTS ${PETSC_LIB_DIR})
+find_library(ZMUMPS_LIB NAMES zmumps HINTS ${PETSC_LIB_DIR})
+find_library(MUMPS_COMMON_LIB NAMES mumps_common HINTS ${PETSC_LIB_DIR})
+if(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
+   OR NOT MUMPS_COMMON_LIB)
+  message(
+    FATAL_ERROR "Could not find MUMPS libraries in PETSC_ARCH_DIR. Make sure they exist."
+  )
+endif(NOT CMUMPS_LIB OR NOT DMUMPS_LIB OR NOT SMUMPS_LIB OR NOT ZMUMPS_LIB 
+      OR NOT MUMPS_COMMON_LIB)
+set(MUMPS_LIBS 
+  "${CMUMPS_LIB};${DMUMPS_LIB};${SMUMPS_LIB};${ZMUMPS_LIB};${MUMPS_COMMON_LIB}")
+
+# SuperLU
+find_library(SUPERLU_DIST_LIB NAMES superlu_dist_2.5 HINTS ${PETSC_LIB_DIR})
+if(NOT SUPERLU_DIST_LIB)
+  set(SUPERLU_DIST_LIB "")
+endif(NOT SUPERLU_DIST_LIB)
+
+# Scotch
+find_library(PTESMUMPS_LIB NAMES ptesmumps HINTS ${PETSC_LIB_DIR})
+find_library(PTSCOTCHPARMETIS_LIB NAMES ptscotchparmetis HINTS ${PETSC_LIB_DIR})
+find_library(PTSCOTCH_LIB NAMES ptscotch HINTS ${PETSC_LIB_DIR})
+find_library(PTSCOTCHERR_LIB NAMES ptscotcherr HINTS ${PETSC_LIB_DIR})
+find_library(PTSCOTCHERREXIT_LIB NAMES ptscotcherrexit HINTS ${PETSC_LIB_DIR})
+if(NOT PTESMUMPS_LIB)
+  message(FATAL_ERROR "Could not find ptesmumps lib for PT-SCOTCH")
+endif(NOT PTESMUMPS_LIB)
+if(NOT PTSCOTCHPARMETIS_LIB)
+  message(FATAL_ERROR "Could not find ptscotchparmetis lib for PT-SCOTCH")
+endif(NOT PTSCOTCHPARMETIS_LIB)
+if(NOT PTSCOTCH_LIB)
+  message(FATAL_ERROR "Could not find ptscotch lib for PT-SCOTCH")
+endif(NOT PTSCOTCH_LIB)
+if(NOT PTSCOTCHERR_LIB)
+  message(FATAL_ERROR "Could not find ptscotcherr lib for PT-SCOTCH")
+endif(NOT PTSCOTCHERR_LIB)
+if(NOT PTSCOTCHERREXIT_LIB)
+  message(FATAL_ERROR "Could not find ptscotcherrexit lib for PT-SCOTCH")
+endif(NOT PTSCOTCHERREXIT_LIB)
+set(SCOTCH_LIBS "")
+list(APPEND SCOTCH_LIBS "${PTESMUMPS_LIB}")
+list(APPEND SCOTCH_LIBS "${PTSCOTCHPARMETIS_LIB}")
+list(APPEND SCOTCH_LIBS "${PTSCOTCH_LIB}")
+list(APPEND SCOTCH_LIBS "${PTSCOTCHERR_LIB}")
+list(APPEND SCOTCH_LIBS "${PTSCOTCHERREXIT_LIB}")
+
+# PORD (linked but not used)
+find_library(PORD_LIB NAMES pord HINTS ${PETSC_LIB_DIR})
+if(NOT PORD_LIB)
+  message(WARNING "Could not find PORD using PETSC_ARCH_DIR.")
+endif(NOT PORD_LIB)
+
+# ScaLAPACK
+find_library(SCALAPACK_LIB NAMES scalapack HINTS ${PETSC_LIB_DIR})
+if(NOT SCALAPACK_LIB)
+  message(
+    FATAL_ERROR
+    "Could not find ScaLAPACK using PETSC_ARCH_DIR. Make sure PETSc built it."
+  )
+endif(NOT SCALAPACK_LIB)
+
+# BLACS
+find_library(BLACS_LIB NAMES blacs HINTS ${PETSC_LIB_DIR})
+if(NOT BLACS_LIB)
+  message(
+    FATAL_ERROR
+    "Could not find BLACS using PETSC_ARCH_DIR. Make sure PETSc build it."
+  )
+endif(NOT BLACS_LIB)
+
+# X11 library
+find_library(X11_LIB NAMES X11)
+if(NOT X11_LIB)
+  if(BUILT_PETSC_WITH_X11)
+    message(FATAL_ERROR "Could not find X11 lib.")
+  else(BUILT_PETSC_WITH_X11)
+    set(X11_LIB "")
+  endif(BUILT_PETSC_WITH_X11)
+endif(NOT X11_LIB)
+
+# Dynamic library
+find_library(DL_LIB NAMES dl)
+if(NOT DL_LIB)
+  message(FATAL_ERROR "Could not find dl library.")
+endif(NOT DL_LIB)
 
 option(BUILD_TESTS "Build the test drivers" ON)
 option(AVOID_COMPLEX_MPI "Avoid complex MPI routines for robustness" ON)
 mark_as_advanced(AVOID_COMPLEX_MPI)
 
-if(RELEASE)
-    set(CXX_FLAGS "-O3" CACHE STRING "CXX flags")
-elseif(RELEASE)
-    set(CXX_FLAGS "-O0" CACHE STRING "CXX flags")
-endif(RELEASE)
+set(CXX_FLAGS "-O3" CACHE STRING "CXX flags")
+set(C_FLAGS "-O3" CACHE STRING "C flags")
 
-find_package(MPI)
-if(NOT MPI_CXX_FOUND)
-  message(FATAL_ERROR "MPI C++ compiler was not found and is required")
-endif(NOT MPI_CXX_FOUND)
-include_directories(${MPI_CXX_INCLUDE_PATH})
-set(CMAKE_CXX_FLAGS "${CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
+set(CMAKE_CXX_FLAGS "${CXX_FLAGS}")
+set(CMAKE_C_FLAGS "${C_FLAGS}")
 
 # Query the size of a void pointer in order to determine whether or not this is
 # a 32-bit system
@@ -144,78 +276,40 @@ if(NEED_MATH)
   list(APPEND MATH_LIBS m)
 endif(NEED_MATH)
 
-# Attempt to detect the BLAS/LAPACK underscore conventions. 
-# We currently only handle whether or not there is an underscore appended.
-include(CheckFunctionExists)
-set(CMAKE_REQUIRED_LIBRARIES ${MATH_LIBS})
-check_function_exists(daxpy HAVE_DAXPY)
-if(HAVE_DAXPY)
-  set(BLAS_POST FALSE)
-else(HAVE_DAXPY)
-  check_function_exists(daxpy_ HAVE_DAXPY_POST)
-  if(HAVE_DAXPY_POST)
-    set(BLAS_POST TRUE)
-  else(HAVE_DAXPY_POST)
-    message(FATAL_ERROR "Could not determine BLAS format.")
-  endif(HAVE_DAXPY_POST)
-endif(HAVE_DAXPY)
-check_function_exists(dpotrf HAVE_DPOTRF)
-if(HAVE_DPOTRF)
-  set(LAPACK_POST FALSE)
-else(HAVE_DPOTRF)
-  check_function_exists(dpotrf_ HAVE_DPOTRF_POST)
-  if(HAVE_DPOTRF_POST)
-    set(LAPACK_POST TRUE)
-  else(HAVE_DPOTRF_POST)
-    message(FATAL_ERROR "Could not determine LAPACK format.")
-  endif(HAVE_DPOTRF_POST)
-endif(HAVE_DPOTRF)
-
-# Look for restrict support
-include(CheckCXXSourceCompiles)
-set(RESTRICT_CODE
-    "int main(void)
-     {
-         int* RESTRICT a;
-         return 0;
-     }
-    ")
-set(CMAKE_REQUIRED_DEFINITIONS "-DRESTRICT=__restrict__")
-check_cxx_source_compiles("${RESTRICT_CODE}" HAVE___restrict__)
-if(HAVE___restrict__)
-  set(RESTRICT "__restrict__")
-  message(STATUS "Using __restrict__ keyword.")
-else(HAVE___restrict__)
-  set(CMAKE_REQUIRED_DEFINITIONS "-DRESTRICT=__restrict")
-  check_cxx_source_compiles("${RESTRICT_CODE}" HAVE___restrict)
-  if(HAVE___restrict)
-    set(RESTRICT "__restrict")
-    message(STATUS "Using __restrict keyword.")
-  else(HAVE___restrict)
-    set(CMAKE_REQUIRED_DEFINITIONS "-DRESTRICT=restrict")
-    check_cxx_source_compiles("${RESTRICT_CODE}" HAVE_restrict)
-    if(HAVE_restrict)
-      set(RESTRICT "restrict")
-      message(STATUS "Using restrict keyword.")
-    else(HAVE_restrict)
-      set(RESTRICT "")
-      message(STATUS "Could not find a restrict keyword.")
-    endif(HAVE_restrict)
-  endif(HAVE___restrict)
-endif(HAVE___restrict__)
-
 # Store all of our system-specific definitions
-configure_file(${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
-               ${CMAKE_BINARY_DIR}/include/psp/config.h)
-install(FILES ${CMAKE_BINARY_DIR}/include/psp/config.h
-        DESTINATION include/psp)
+configure_file( 
+  ${CMAKE_SOURCE_DIR}/include/psp/config.h.cmake
+  ${CMAKE_BINARY_DIR}/include/psp/config.h 
+)
 
 # Grab all of the .c, .cpp, .h, and .hpp PSP files
 file(GLOB_RECURSE PSP_CPP RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
-     "src/*.c" "src/*.cpp" "src/*-incl.hpp")
+     "src/*.c" "src/*.cpp")
 file(GLOB_RECURSE PSP_HEADERS RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
      "include/*.h" "include/*.hpp")
 set(PSP_SRC "${PSP_CPP};${PSP_HEADERS}")
+
+# Create the lists of test executables and configure the compile flags
+# for the various build modes
+if(BUILD_TESTS)
+  set(TEST_DIR ${PROJECT_SOURCE_DIR}/test)
+  set(TESTS BasicTest)
+endif(BUILD_TESTS)
+
+# Create a dummy library in order to be able to force the math libraries
+# to be linked last
+add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
+set(EXTERNAL_LIBS "${PETSC_LIB}")
+list(APPEND EXTERNAL_LIBS "${MUMPS_LIBS}")
+list(APPEND EXTERNAL_LIBS "${SUPERLU_DIST_LIB}")
+list(APPEND EXTERNAL_LIBS "${SCOTCH_LIBS}")
+list(APPEND EXTERNAL_LIBS "${PARMETIS_LIB};${METIS_LIB}")
+list(APPEND EXTERNAL_LIBS "${PORD_LIB}")
+list(APPEND EXTERNAL_LIBS "${SCALAPACK_LIB};${BLACS_LIB}")
+list(APPEND EXTERNAL_LIBS "${MATH_LIBS}")
+list(APPEND EXTERNAL_LIBS "${X11_LIB}")
+list(APPEND EXTERNAL_LIBS "${DL_LIB}")
+target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
 # Copy the headers into the build directory
 foreach(HEADER ${PSP_HEADERS})
@@ -224,93 +318,28 @@ foreach(HEADER ${PSP_HEADERS})
     COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_SOURCE_DIR}/${HEADER}
             ${CMAKE_CURRENT_BINARY_DIR}/${HEADER}
   )
-  get_filename_component(HEADER_PATH ${HEADER} PATH)
-  install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${HEADER} DESTINATION ${HEADER_PATH})
 endforeach(HEADER)
 
 # Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
 
+# Make sure that the PETSc includes can be found
+include_directories("${PETSC_INCLUDE_DIR}")
+include_directories("${PETSC_ARCH_INCLUDE_DIR}")
+
 # Build the PSP source
 add_library(psp STATIC ${PSP_SRC})
-install(TARGETS psp DESTINATION lib)
-
-# Create the lists of test executables and configure the compile flags
-# for the various build modes
-if(BUILD_TESTS)
-  set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(BUILDING_BLOCKS_TESTS MemoryMap ParallelLcg Timer)
-  set(HMAT_TOOLS_TESTS MatrixAdd Compress ConvertSubmatrix PackedQR)
-  set(QUASI2D_TESTS Invert LowRankConstructor MultiplyHMat Pack)
-  set(DIST_QUASI2D_TESTS Ghost ImportSparse MultiplyHMat Pack 
-                         RandomMultiplyHMat RandomMultiplyVectors)
-endif(BUILD_TESTS)
-
-# Create a dummy library in order to be able to force the math libraries
-# to be linked last
-add_library(cmake-dummy-lib STATIC cmake/CMakeDummyFunction.cpp)
-list(APPEND EXTERNAL_LIBS "${MATH_LIBS} ${MPI_CXX_LIBRARIES}")
-target_link_libraries(cmake-dummy-lib ${EXTERNAL_LIBS})
 
 # Build the test drivers if necessary
-set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
 if(BUILD_TESTS)
-  # Build the building_blocks tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/building_blocks")
-  foreach(TEST ${BUILDING_BLOCKS_TESTS}) 
-    add_executable(building_blocks-${TEST} 
-                   ${TEST_DIR}/building_blocks/${TEST}.cpp)
-    target_link_libraries(building_blocks-${TEST} psp cmake-dummy-lib)
-    set_target_properties(building_blocks-${TEST}
+ # Build the core tests
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/")
+  foreach(TEST ${TESTS})
+    add_executable(${TEST} ${TEST_DIR}/${TEST}.cpp)
+    target_link_libraries(${TEST} psp cmake-dummy-lib)
+    set_target_properties(${TEST} 
                           PROPERTIES OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-    if(MPI_LINK_FLAGS)
-      set_target_properties(building_blocks-${TEST}
-                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif(MPI_LINK_FLAGS)
-    install(TARGETS building_blocks-${TEST} DESTINATION bin/building_blocks)
-  endforeach(TEST)
-  # Build the hmat_tools tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/hmat_tools")
-  foreach(TEST ${HMAT_TOOLS_TESTS})
-    add_executable(hmat-${TEST} ${TEST_DIR}/hmat_tools/${TEST}.cpp)
-    target_link_libraries(hmat-${TEST} psp cmake-dummy-lib)
-    set_target_properties(hmat-${TEST} 
-                          PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-    if(MPI_LINK_FLAGS)
-      set_target_properties(hmat-${TEST}
-                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif(MPI_LINK_FLAGS)
-    install(TARGETS hmat-${TEST} DESTINATION bin/hmat_tools)
-  endforeach(TEST)
-  # Build the Quasi2dHMat tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/Quasi2dHMat")
-  foreach(TEST ${QUASI2D_TESTS})
-    add_executable(quasi2d-${TEST} ${TEST_DIR}/Quasi2dHMat/${TEST}.cpp)
-    target_link_libraries(quasi2d-${TEST} psp cmake-dummy-lib)
-    set_target_properties(quasi2d-${TEST}
-                          PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-    if(MPI_LINK_FLAGS)
-      set_target_properties(quasi2d-${TEST}
-                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif(MPI_LINK_FLAGS)
-    install(TARGETS quasi2d-${TEST} DESTINATION bin/Quasi2dHMat)
-  endforeach(TEST)
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/DistQuasi2dHMat")
-  foreach(TEST ${DIST_QUASI2D_TESTS})
-    add_executable(dist-quasi2d-${TEST} 
-                   ${TEST_DIR}/DistQuasi2dHMat/${TEST}.cpp)
-    target_link_libraries(dist-quasi2d-${TEST} psp cmake-dummy-lib)
-    set_target_properties(dist-quasi2d-${TEST}
-                          PROPERTIES OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-    if(MPI_LINK_FLAGS)
-      set_target_properties(dist-quasi2d-${TEST}
-                            PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif(MPI_LINK_FLAGS)
-    install(TARGETS dist-quasi2d-${TEST} DESTINATION bin/DistQuasi2dHMat)
   endforeach(TEST)
 endif(BUILD_TESTS)
 
