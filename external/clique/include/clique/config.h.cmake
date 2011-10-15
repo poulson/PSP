@@ -1,7 +1,7 @@
 /*
-   Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
-   of a sweeping preconditioner for 3d Helmholtz equations.
+   Clique: a scalable implementation of the multifrontal algorithm
 
+   Copyright (C) 2010-2011 Jack Poulson <jack.poulson@gmail.com>
    Copyright (C) 2011 Jack Poulson, Lexing Ying, and 
    The University of Texas at Austin
  
@@ -18,10 +18,10 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_CONFIG_HPP
-#define PSP_CONFIG_HPP 1
+#ifndef CLIQUE_CONFIG_HPP
+#define CLIQUE_CONFIG_HPP 1
 
-#define PSP_VERSION_MAJOR @PSP_VERSION_MAJOR@
-#define PSP_VERSION_MINOR @PSP_VERSION_MINOR@
+#define Clique_VERSION_MAJOR @Clique_VERSION_MAJOR@
+#define Clique_VERSION_MINOR @Clique_VERSION_MINOR@
 
-#endif /* PSP_CONFIG_HPP */
+#endif /* CLIQUE_CONFIG_HPP */
