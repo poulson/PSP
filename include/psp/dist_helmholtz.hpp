@@ -29,15 +29,15 @@ template<typename F>
 class DistHelmholtz
 {
 private:
-    typedef elemental::RealBase<F>::type R;
+    typedef typename elemental::RealBase<F>::type R;
 
     elemental::mpi::Comm comm_;
-    const FiniteDiffControl control_;
+    const FiniteDiffControl<F> control_;
 
     // Useful constants
     const R hx_, hy_, hz_; // grid spacings
     const R bx_, by_, bz_; // (PML width)/(grid spacings)
-    const int bzPadded_;   // ceil(bz)
+    const int bzCeil_;     // ceil(bz)
 
     // Sparse matrix storage
     int localHeight_;
@@ -52,6 +52,8 @@ private:
     // Information for communication needed by application of A_{i+1,i} blocks.
     // This will be needed for more general stencils than SEVEN_POINT.
 
+    bool initialized_;
+
     // Sparse-direct symbolic factorizations of PML-padded panels.
     // Since most of the inner panels are structurally equivalent, we can get
     // away with only a few symbolic factorizations.
@@ -60,6 +62,11 @@ private:
 
     // Sparse-direct numeric factorizations of PML-padded panels
     std::vector<clique::numeric::SymmFrontTree<F>*> numericFacts_;
+
+    // Helper routines
+    void RecursiveReordering
+    ( int xOffset, int xSize, int yOffset, int ySize, int cutoff,
+      int* reordering ) const;
 
 public:
     DistHelmholtz
@@ -90,7 +97,7 @@ public:
 //----------------------------------------------------------------------------//
 
 template<typename F>
-inline void
+inline 
 DistHelmholtz<F>::~DistHelmholtz() 
 {
     const int numPanels = numericFacts_.size();

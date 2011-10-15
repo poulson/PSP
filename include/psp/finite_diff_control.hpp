@@ -21,6 +21,8 @@
 #ifndef PSP_FINITE_DIFF_CONTROL_HPP
 #define PSP_FINITE_DIFF_CONTROL_HPP 1
 
+#include "elemental.hpp"
+
 namespace psp {
 
 enum BoundaryCondition { PML, DIRICHLET };
@@ -46,7 +48,7 @@ enum Stencil { SEVEN_POINT }; // TWENTY_SEVEN_POINT not yet supported
 template<typename F>
 struct FiniteDiffControl
 {
-    typedef elemental::RealBase<F>::type R;
+    typedef typename elemental::RealBase<F>::type R;
 
     Stencil stencil; // only 7-point supported so far
     int nx, ny, nz;  // number of grid points in each direction

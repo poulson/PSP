@@ -23,5 +23,6 @@
 
 #include "psp/config.h"
 #include "psp/finite_diff_control.hpp"
+#include "psp/dist_helmholtz.hpp"
 
 #endif // PSP_HPP
