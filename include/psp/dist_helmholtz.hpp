@@ -45,8 +45,8 @@ private:
 
     // Sparse matrix communication information
     int allToAllSize_;
-    std::vector<int> localSendIndices_; // length is p*allToAllSize_
-    std::vector<int> localRecvIndices_; // length is p*allToAllSize_
+    std::vector<int> actualSendSizes_, actualRecvSizes_; // length p
+    std::vector<int> sendIndices_, recvIndices_; // length p*allToAllSize_
 
     // TODO: 
     // Information for communication needed by application of A_{i+1,i} blocks.
@@ -67,9 +67,14 @@ private:
     static void RecursiveReordering
     ( int nx, int xOffset, int xSize, int yOffset, int ySize, 
       int cutoff, int depthTilSerial, int* reordering );
-    static void AddLocalHeight
+    static void CountLocalHeight
     ( int xSize, int ySize, int zSize, int cutoff, 
       unsigned commRank, unsigned log2CommSize, int& localHeight );
+    static void CountLocalSupernodes
+    ( int xSize, int ySize, int cutoff, 
+      unsigned commRank, unsigned log2CommSize, int& numLocal );
+    static void ConvertCoordsToProcess
+    ( int x, int y, int xSize, int ySize, unsigned log2CommSize, int& process );
 
 public:
     DistHelmholtz

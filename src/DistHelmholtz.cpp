@@ -58,16 +58,19 @@ psp::DistHelmholtz<F>::DistHelmholtz
         ("The domain is very shallow. Please run a sparse-direct factorization "
          "instead.");
 
+
+    const int cutoff = 100;
     // Create the 2d reordering structure
+    /*
     const int planeSize = nx*ny;
     std::vector<int> reordering( planeSize );
-    const int cutoff = 100;
     RecursiveReordering( nx, 0, nx, 0, ny, cutoff, 0, &reordering[0] );
 
     // Construct the inverse map
     std::vector<int> inverseReordering( planeSize );
     for( int i=0; i<planeSize; ++i )
         inverseReordering[reordering[i]] = i;
+    */
 
     // Compute the depths of each interior panel class and the number of 
     // full inner panels.
@@ -87,20 +90,54 @@ psp::DistHelmholtz<F>::DistHelmholtz
 
     // Compute the number of rows we own of the sparse distributed matrix
     int localHeight = 0;
-    AddLocalHeight
+    CountLocalHeight
     ( nx, ny, planesPerPanel, cutoff, commRank, log2CommSize, localHeight );
     localHeight *= numFullInnerPanels;
-    AddLocalHeight
+    CountLocalHeight
     ( nx, ny, topDepth, cutoff, commRank, log2CommSize, localHeight );
     if( haveLeftover )
-        AddLocalHeight
+        CountLocalHeight
         ( nx, ny, leftoverInnerDepth, cutoff, commRank, log2CommSize,
           localHeight );
-    AddLocalHeight
+    CountLocalHeight
     ( nx, ny, bottomOrigDepth, cutoff, commRank, log2CommSize, localHeight );
     localHeight_ = localHeight;
 
-    // TODO: Fill the original structures of the panels
+    // Compute the indices of the RHS that each process will need to send/recv 
+    // from every other process in order to perform its portion of a mat-vec
+    //
+    // TODO
+
+    // Count the number of local supernodes
+    int numLocalSupernodes=0;
+    CountLocalSupernodes
+    ( nx, ny, cutoff, commRank, log2CommSize, numLocalSupernodes );
+
+    // Create space for the original structures of the panel classes
+    clique::symbolic::SymmOrig 
+        mainSymbolicOrig, misfitSymbolicOrig, lastSymbolicOrig;
+    mainSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    mainSymbolicOrig.dist.supernodes.resize( log2CommSize );
+    misfitSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    misfitSymbolicOrig.dist.supernodes.resize( log2CommSize );
+    lastSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    lastSymbolicOrig.dist.supernodes.resize( log2CommSize );
+
+    // Fill the original structures
+    //
+    // In order to minimize the number of symbolic factorizations that have to 
+    // be performed, and to simplify distribution issues, the leading PML region
+    // on each panel will always be ordered _LAST_ within that panel.
+    //
+    // TODO
+
+    // Perform the parallel symbolic factorizations
+    clique::symbolic::SymmetricFactorization
+    ( mainSymbolicOrig, mainSymbolicFact_, true );
+    clique::symbolic::SymmetricFactorization
+    ( misfitSymbolicOrig, misfitSymbolicFact_, true );
+    clique::symbolic::SymmetricFactorization
+    ( lastSymbolicOrig, lastSymbolicFact_, true );
 }
 
 template<typename F>
@@ -154,7 +191,7 @@ psp::DistHelmholtz<F>::RecursiveReordering
 
 template<typename F>
 void
-psp::DistHelmholtz<F>::AddLocalHeight
+psp::DistHelmholtz<F>::CountLocalHeight
 ( int xSize, int ySize, int zSize, int cutoff, 
   unsigned commRank, unsigned log2CommSize, int& localHeight ) 
 {
@@ -179,23 +216,23 @@ psp::DistHelmholtz<F>::AddLocalHeight
         if( log2CommSize == 0 )
         {
             // Add the left side
-            AddLocalHeight
+            CountLocalHeight
             ( xLeftSize, ySize, zSize, cutoff, 0, 0, localHeight );
             // Add the right side
-            AddLocalHeight
+            CountLocalHeight
             ( xSize-(xLeftSize+1), ySize, zSize, cutoff, 0, 0, localHeight );
         }
         else if( commRank & 1 )
         {
             // Add the right side
-            AddLocalHeight
+            CountLocalHeight
             ( xSize-(xLeftSize+1), ySize, zSize, cutoff,
               commRank/2, log2CommSize-1, localHeight );
         }
         else // log2CommSize != 0 && commRank & 1 == 0
         {
             // Add the left side
-            AddLocalHeight
+            CountLocalHeight
             ( xLeftSize, ySize, zSize, cutoff,
               commRank/2, log2CommSize-1, localHeight );
         }
@@ -216,25 +253,170 @@ psp::DistHelmholtz<F>::AddLocalHeight
         if( log2CommSize == 0 )
         {
             // Add the left side
-            AddLocalHeight
+            CountLocalHeight
             ( xSize, yLeftSize, zSize, cutoff, 0, 0, localHeight );
             // Add the right side
-            AddLocalHeight
+            CountLocalHeight
             ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 0, 0, localHeight );
         }
         else if( commRank & 1 )
         {
             // Add the right side
-            AddLocalHeight
+            CountLocalHeight
             ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 
               commRank/2, log2CommSize-1, localHeight );
         }
         else // log2CommSize != 0 && commRank & 1 == 0
         {
             // Add the left side
-            AddLocalHeight
+            CountLocalHeight
             ( xSize, yLeftSize, zSize, cutoff,
               commRank/2, log2CommSize-1, localHeight );
+        }
+    }
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::CountLocalSupernodes
+( int xSize, int ySize, int cutoff, unsigned commRank, unsigned log2CommSize, 
+  int& numLocal ) 
+{
+    if( log2CommSize == 0 && xSize*ySize <= cutoff )
+    {
+        ++numLocal;
+    }
+    else if( xSize >= ySize )
+    {
+        //
+        // Cut the x dimension
+        //
+
+        // Add our local portion of the partition
+        if( log2CommSize == 0 )
+            ++numLocal;
+
+        // Add the left and/or right sides
+        const int xLeftSize = (xSize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            CountLocalSupernodes
+            ( xLeftSize, ySize, cutoff, 0, 0, numLocal );
+            // Add the right side
+            CountLocalSupernodes
+            ( xSize-(xLeftSize+1), ySize, cutoff, 0, 0, numLocal );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            CountLocalSupernodes
+            ( xSize-(xLeftSize+1), ySize, cutoff, commRank/2, log2CommSize-1, 
+              numLocal );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            CountLocalSupernodes
+            ( xLeftSize, ySize, cutoff, commRank/2, log2CommSize-1, numLocal );
+        }
+    }
+    else
+    {
+        //
+        // Cut the y dimension 
+        //
+
+        // Add our local portion of the partition
+        if( log2CommSize == 0 )
+            ++numLocal;
+
+        // Add the left and/or right sides
+        const int yLeftSize = (ySize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            CountLocalSupernodes
+            ( xSize, yLeftSize, cutoff, 0, 0, numLocal );
+            // Add the right side
+            CountLocalSupernodes
+            ( xSize, ySize-(yLeftSize+1), cutoff, 0, 0, numLocal );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            CountLocalSupernodes
+            ( xSize, ySize-(yLeftSize+1), cutoff, commRank/2, log2CommSize-1, 
+              numLocal );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            CountLocalSupernodes
+            ( xSize, yLeftSize, cutoff, commRank/2, log2CommSize-1, numLocal );
+        }
+    }
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::ConvertCoordsToProcess
+( int x, int y, int xSize, int ySize, unsigned depthToSerial, int& process )
+{
+    if( depthToSerial == 0 )
+        return;
+
+    process <<= 1;
+    if( xSize >= ySize )
+    {
+        //
+        // Cut the x dimension
+        //
+
+        const int xLeftSize = (xSize-1) / 2;
+        if( x == xLeftSize )
+        {
+            // HERE: Need to take z into account
+        }
+        else if( x > xLeftSize )
+        { 
+            // Continue down the right side
+            process |= 1;
+            ConvertCoordsToProcess
+            ( x-(xLeftSize+1), y, xSize-(xLeftSize+1), ySize, depthToSerial-1,
+              process );
+        }
+        else // x < leftSize
+        {
+            // Continue down the left side
+            ConvertCoordsToProcess
+            ( x, y, xLeftSize, ySize, depthToSerial-1, process );
+        }
+    }
+    else
+    {
+        //
+        // Cut the y dimension 
+        //
+
+        const int yLeftSize = (ySize-1) / 2;
+        if( y == yLeftSize )
+        {
+            // HERE: Need to take z into account
+        }
+        else if( y > yLeftSize )
+        { 
+            // Continue down the right side
+            process |= 1;
+            ConvertCoordsToProcess
+            ( x, y-(yLeftSize+1), xSize, ySize-(yLeftSize+1), depthToSerial-1,
+              process );
+        }
+        else // x < leftSize
+        {
+            // Continue down the left side
+            ConvertCoordsToProcess
+            ( x, y, xSize, yLeftSize, depthToSerial-1, process );
         }
     }
 }
