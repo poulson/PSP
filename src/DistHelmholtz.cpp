@@ -40,6 +40,15 @@ psp::DistHelmholtz<F>::DistHelmholtz
     const int planesPerPanel = control.planesPerPanel;
     const int bzCeil = bzCeil_;
 
+    // Pull out some information about our communicator
+    const int commRank = elemental::mpi::CommRank( comm );
+    const int commSize = elemental::mpi::CommSize( comm );
+    unsigned temp = commSize;
+    unsigned log2CommSize = 0;
+    while( temp >>= 1 )
+        ++log2CommSize;
+
+    // Decide if the domain is sufficiently deep to warrant sweeping
     const bool bottomHasPML = (control.bottomBC == PML);
     const int topDepth = bzCeil+planesPerPanel;
     const int bottomOrigDepth = 
@@ -53,21 +62,16 @@ psp::DistHelmholtz<F>::DistHelmholtz
     const int planeSize = nx*ny;
     std::vector<int> reordering( planeSize );
     const int cutoff = 100;
-    RecursiveReordering( 0, nx, 0, ny, cutoff, &reordering[0] );
+    RecursiveReordering( nx, 0, nx, 0, ny, cutoff, 0, &reordering[0] );
 
     // Construct the inverse map
     std::vector<int> inverseReordering( planeSize );
     for( int i=0; i<planeSize; ++i )
         inverseReordering[reordering[i]] = i;
 
-    // Compute the depths of each interior panel class
-    const int innerDepth = nz-(topDepth+bottomOrigDepth);
-    const int leftoverInnerDepth = innerDepth % planesPerPanel;
-
-    // Compute the number of full-sized interior artificially padded panels
-    const int numFullInnerPanels = innerDepth / planesPerPanel;
-    
-    // Count the total number of panels:
+    // Compute the depths of each interior panel class and the number of 
+    // full inner panels.
+    //
     //    -----------
     //   | Top       |
     //   | Inner     |
@@ -75,10 +79,26 @@ psp::DistHelmholtz<F>::DistHelmholtz
     //   | Leftover? |
     //   | Bottom    |
     //    -----------
+    const int innerDepth = nz-(topDepth+bottomOrigDepth);
+    const int leftoverInnerDepth = innerDepth % planesPerPanel;
     const bool haveLeftover = ( leftoverInnerDepth != 0 );
-    const int numTotalPanels = 2 + numFullInnerPanels + haveLeftover;
+    const int numFullInnerPanels = innerDepth / planesPerPanel;
+    const int numTotalPanels = 1 + numFullInnerPanels + haveLeftover + 1;
 
-    // TODO: Compute our local height of the distributed sparse matrix
+    // Compute the number of rows we own of the sparse distributed matrix
+    int localHeight = 0;
+    AddLocalHeight
+    ( nx, ny, planesPerPanel, cutoff, commRank, log2CommSize, localHeight );
+    localHeight *= numFullInnerPanels;
+    AddLocalHeight
+    ( nx, ny, topDepth, cutoff, commRank, log2CommSize, localHeight );
+    if( haveLeftover )
+        AddLocalHeight
+        ( nx, ny, leftoverInnerDepth, cutoff, commRank, log2CommSize,
+          localHeight );
+    AddLocalHeight
+    ( nx, ny, bottomOrigDepth, cutoff, commRank, log2CommSize, localHeight );
+    localHeight_ = localHeight;
 
     // TODO: Fill the original structures of the panels
 }
@@ -86,15 +106,15 @@ psp::DistHelmholtz<F>::DistHelmholtz
 template<typename F>
 void 
 psp::DistHelmholtz<F>::RecursiveReordering
-( int xOffset, int xSize, int yOffset, int ySize, int cutoff,
-  int* reordering ) const
+( int nx, int xOffset, int xSize, int yOffset, int ySize,
+  int cutoff, int depthTilSerial, int* reordering ) 
 {
-    if( xSize*ySize <= cutoff )
+    if( depthTilSerial == 0 && xSize*ySize <= cutoff )
     {
         // Write the leaf
         for( int x=xOffset; x<xOffset+xSize; ++x )
             for( int y=yOffset; y<yOffset+ySize; ++y )
-                reordering[(x-xOffset)*ySize+(y-yOffset)] = x+y*control_.nx;
+                reordering[(x-xOffset)*ySize+(y-yOffset)] = x+y*nx;
     }
     else if( xSize >= ySize )
     {
@@ -103,14 +123,15 @@ psp::DistHelmholtz<F>::RecursiveReordering
         const int separatorSize = ySize;
         int* separatorSection = &reordering[xSize*ySize-separatorSize];
         for( int y=yOffset; y<yOffset+ySize; ++y )
-            separatorSection[y-yOffset] = (xOffset+xLeftSize)+y*control_.nx;
+            separatorSection[y-yOffset] = (xOffset+xLeftSize)+y*nx;
         // Recurse on the left side of the x cut
         RecursiveReordering
-        ( xOffset, xLeftSize, yOffset, ySize, cutoff, reordering );
+        ( nx, xOffset, xLeftSize, yOffset, ySize, 
+          cutoff, std::max(depthTilSerial-1,0), reordering );
         // Recurse on the right side of the x cut
         RecursiveReordering
-        ( xOffset+(xLeftSize+1), xSize-(xLeftSize+1), yOffset, ySize,
-          cutoff, &reordering[xLeftSize*ySize] );
+        ( nx, xOffset+(xLeftSize+1), xSize-(xLeftSize+1), yOffset, ySize,
+          cutoff, std::max(depthTilSerial-1,0), &reordering[xLeftSize*ySize] );
     }
     else
     {
@@ -119,14 +140,102 @@ psp::DistHelmholtz<F>::RecursiveReordering
         const int separatorSize = xSize;
         int* separatorSection = &reordering[xSize*ySize-separatorSize];
         for( int x=xOffset; x<xOffset+xSize; ++x )
-            separatorSection[x-xOffset] = x+(yOffset+yLeftSize)*control_.nx;
+            separatorSection[x-xOffset] = x+(yOffset+yLeftSize)*nx;
         // Recurse on the left side of the y cut
         RecursiveReordering
-        ( xOffset, xSize, yOffset, yLeftSize, cutoff, reordering );
+        ( nx, xOffset, xSize, yOffset, yLeftSize, 
+          cutoff, std::max(depthTilSerial-1,0), reordering );
         // Recurse on the right side of the y cut
         RecursiveReordering
-        ( xOffset, xSize, yOffset+(yLeftSize+1), ySize-(yLeftSize+1),
-          cutoff, &reordering[xSize*yLeftSize] );
+        ( nx, xOffset, xSize, yOffset+(yLeftSize+1), ySize-(yLeftSize+1),
+          cutoff, std::max(depthTilSerial-1,0), &reordering[xSize*yLeftSize] );
+    }
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::AddLocalHeight
+( int xSize, int ySize, int zSize, int cutoff, 
+  unsigned commRank, unsigned log2CommSize, int& localHeight ) 
+{
+    if( log2CommSize == 0 && xSize*ySize <= cutoff )
+    {
+        // Add the leaf
+        localHeight += xSize*ySize;
+    }
+    else if( xSize >= ySize )
+    {
+        //
+        // Cut the x dimension
+        //
+
+        // Add our local portion of the partition
+        const int commSize = 1u<<log2CommSize;
+        localHeight += 
+            elemental::LocalLength( ySize*zSize, commRank, commSize );
+
+        // Add the left and/or right sides
+        const int xLeftSize = (xSize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            AddLocalHeight
+            ( xLeftSize, ySize, zSize, cutoff, 0, 0, localHeight );
+            // Add the right side
+            AddLocalHeight
+            ( xSize-(xLeftSize+1), ySize, zSize, cutoff, 0, 0, localHeight );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            AddLocalHeight
+            ( xSize-(xLeftSize+1), ySize, zSize, cutoff,
+              commRank/2, log2CommSize-1, localHeight );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            AddLocalHeight
+            ( xLeftSize, ySize, zSize, cutoff,
+              commRank/2, log2CommSize-1, localHeight );
+        }
+    }
+    else
+    {
+        //
+        // Cut the y dimension 
+        //
+
+        // Add our local portion of the partition
+        const int commSize = 1u<<log2CommSize;
+        localHeight +=
+            elemental::LocalLength( xSize*zSize, commRank, commSize );
+
+        // Add the left and/or right sides
+        const int yLeftSize = (ySize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            AddLocalHeight
+            ( xSize, yLeftSize, zSize, cutoff, 0, 0, localHeight );
+            // Add the right side
+            AddLocalHeight
+            ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 0, 0, localHeight );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            AddLocalHeight
+            ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 
+              commRank/2, log2CommSize-1, localHeight );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            AddLocalHeight
+            ( xSize, yLeftSize, zSize, cutoff,
+              commRank/2, log2CommSize-1, localHeight );
+        }
     }
 }
 

@@ -64,9 +64,12 @@ private:
     std::vector<clique::numeric::SymmFrontTree<F>*> numericFacts_;
 
     // Helper routines
-    void RecursiveReordering
-    ( int xOffset, int xSize, int yOffset, int ySize, int cutoff,
-      int* reordering ) const;
+    static void RecursiveReordering
+    ( int nx, int xOffset, int xSize, int yOffset, int ySize, 
+      int cutoff, int depthTilSerial, int* reordering );
+    static void AddLocalHeight
+    ( int xSize, int ySize, int zSize, int cutoff, 
+      unsigned commRank, unsigned log2CommSize, int& localHeight );
 
 public:
     DistHelmholtz
