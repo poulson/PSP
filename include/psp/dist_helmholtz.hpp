@@ -117,8 +117,8 @@ private:
       unsigned commRank, unsigned log2CommSize, int& numLocal );
 
     static int LocalZ
-    ( int z, int topDepth, int innerDepth, int bottomOrigDepth,
-      int bzPadded, int planesPerPanel );
+    ( int z, int topDepth, int innerDepth, int bottomOrigDepth, 
+      int planesPerPanel );
     static int LocalPanelOffset
     ( int z, 
       int topDepth, int innerDepth, int planesPerPanel, int bottomOrigDepth,
@@ -143,6 +143,33 @@ private:
     static void OwningProcessRecursion
     ( int x, int y, int zLocal, int xSize, int ySize, unsigned log2CommSize,
       int& process );
+
+    static int ReorderedIndex
+    ( int x, int y, int z, int nx, int ny, int nz, 
+      int log2CommSize, int cutoff );
+    static int ReorderedIndexRecursion
+    ( int x, int y, int z, int nx, int ny, int nz,
+      int log2CommSize, int cutoff, int offset );
+
+    static void FillOrigPanelStruct
+    ( int nx, int ny, int nz, int cutoff, 
+      clique::mpi::Comm comm, unsigned log2CommSize, 
+      clique::symbolic::SymmOrig& S );
+    static void FillDistOrigPanelStruct
+    ( int nx, int ny, int nz, int& nxSub, int& nySub, 
+      int& xOffset, int& yOffset, int cutoff, clique::mpi::Comm comm, 
+      unsigned log2CommSize, clique::symbolic::SymmOrig& S );
+    static void FillLocalOrigPanelStruct
+    ( int nx, int ny, int nz, int& nxSub, int& nySub, 
+      int& xOffset, int& yOffset, int cutoff, unsigned log2CommSize,
+      clique::symbolic::SymmOrig& S );
+   
+    // For use in FillLocalOrigPanelStruct
+    struct Box
+    {
+        int parentIndex, nx, ny, xOffset, yOffset;
+        bool leftChild;
+    };
 };
 
 //----------------------------------------------------------------------------//
