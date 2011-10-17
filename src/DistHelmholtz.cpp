@@ -58,7 +58,6 @@ psp::DistHelmholtz<F>::DistHelmholtz
         ("The domain is very shallow. Please run a sparse-direct factorization "
          "instead.");
 
-
     const int cutoff = 100;
     // Create the 2d reordering structure
     /*
@@ -89,55 +88,84 @@ psp::DistHelmholtz<F>::DistHelmholtz
     const int numTotalPanels = 1 + numFullInnerPanels + haveLeftover + 1;
 
     // Compute the number of rows we own of the sparse distributed matrix
-    int localHeight = 0;
-    CountLocalHeight
-    ( nx, ny, planesPerPanel, cutoff, commRank, log2CommSize, localHeight );
-    localHeight *= numFullInnerPanels;
-    CountLocalHeight
-    ( nx, ny, topDepth, cutoff, commRank, log2CommSize, localHeight );
+    const int localTopHeight = 
+        LocalPanelHeight( nx, ny, topDepth, cutoff, commRank, log2CommSize );
+    const int localFullInnerHeight = 
+        LocalPanelHeight
+        ( nx, ny, planesPerPanel, cutoff, commRank, log2CommSize );
+    const int localLeftoverInnerHeight = 
+        LocalPanelHeight
+        ( nx, ny, leftoverInnerDepth, cutoff, commRank, log2CommSize );
+    const int localBottomHeight = 
+        LocalPanelHeight
+        ( nx, ny, bottomOrigDepth, cutoff, commRank, log2CommSize );
+    localHeight_ = localTopHeight + numFullInnerPanels*localFullInnerHeight + 
+                   localLeftoverInnerHeight + localBottomHeight;
+
+    // Compute the natural indices of our local indices and fill in the offsets
+    // for the store of each local rows indices.
+    localToNaturalMap_.resize( localHeight_ );
+    localRowOffsets_.resize( localHeight_+1 );
+    localRowOffsets_[0] = 0;
+    int localOffset=0, zOffset=0;
+    MapLocalPanelIndices
+    ( nx, ny, nz, topDepth, zOffset, cutoff, commRank, log2CommSize, 
+      localToNaturalMap_, localRowOffsets_, localOffset );
+    for( int i=0; i<numFullInnerPanels; ++i )
+        MapLocalPanelIndices
+        ( nx, ny, nz, planesPerPanel, zOffset, cutoff, commRank, log2CommSize,
+          localToNaturalMap_, localRowOffsets_, localOffset );
     if( haveLeftover )
-        CountLocalHeight
-        ( nx, ny, leftoverInnerDepth, cutoff, commRank, log2CommSize,
-          localHeight );
-    CountLocalHeight
-    ( nx, ny, bottomOrigDepth, cutoff, commRank, log2CommSize, localHeight );
-    localHeight_ = localHeight;
+        MapLocalPanelIndices
+        ( nx, ny, nz, leftoverInnerDepth, zOffset, cutoff, 
+          commRank, log2CommSize, localToNaturalMap_, localRowOffsets_, 
+          localOffset );
+    MapLocalPanelIndices
+    ( nx, ny, nz, bottomOrigDepth, zOffset, cutoff, commRank, log2CommSize,
+      localToNaturalMap_, localRowOffsets_, localOffset );
 
     // Compute the indices of the RHS that each process will need to send/recv 
     // from every other process in order to perform its portion of a mat-vec
     //
+    //localEntries_.resize( localRowOffsets_.back() );
     // TODO
 
-    // Count the number of local supernodes
-    int numLocalSupernodes=0;
-    CountLocalSupernodes
-    ( nx, ny, cutoff, commRank, log2CommSize, numLocalSupernodes );
+    // Count the number of local supernodes in each panel
+    const int numLocalSupernodes = 
+        NumLocalSupernodes( nx, ny, cutoff, commRank, log2CommSize );
 
     // Create space for the original structures of the panel classes
     clique::symbolic::SymmOrig 
-        mainSymbolicOrig, misfitSymbolicOrig, lastSymbolicOrig;
-    mainSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    mainSymbolicOrig.dist.supernodes.resize( log2CommSize );
-    misfitSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    misfitSymbolicOrig.dist.supernodes.resize( log2CommSize );
-    lastSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    lastSymbolicOrig.dist.supernodes.resize( log2CommSize );
+        topSymbolicOrig, 
+        fullInnerSymbolicOrig, 
+        leftoverInnerSymbolicOrig, 
+        bottomSymbolicOrig;
+    topSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    topSymbolicOrig.dist.supernodes.resize( log2CommSize );
+    fullInnerSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    fullInnerSymbolicOrig.dist.supernodes.resize( log2CommSize );
+    leftoverInnerSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    leftoverInnerSymbolicOrig.dist.supernodes.resize( log2CommSize );
+    bottomSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
+    bottomSymbolicOrig.dist.supernodes.resize( log2CommSize );
 
     // Fill the original structures
     //
     // In order to minimize the number of symbolic factorizations that have to 
     // be performed, and to simplify distribution issues, the leading PML region
-    // on each panel will always be ordered _LAST_ within that panel.
+    // on each inner panel will always be ordered _LAST_ within that panel.
     //
     // TODO
 
     // Perform the parallel symbolic factorizations
     clique::symbolic::SymmetricFactorization
-    ( mainSymbolicOrig, mainSymbolicFact_, true );
+    ( topSymbolicOrig, topSymbolicFact_, true );
     clique::symbolic::SymmetricFactorization
-    ( misfitSymbolicOrig, misfitSymbolicFact_, true );
+    ( fullInnerSymbolicOrig, fullInnerSymbolicFact_, true );
     clique::symbolic::SymmetricFactorization
-    ( lastSymbolicOrig, lastSymbolicFact_, true );
+    ( leftoverInnerSymbolicOrig, leftoverInnerSymbolicFact_, true );
+    clique::symbolic::SymmetricFactorization
+    ( bottomSymbolicOrig, bottomSymbolicFact_, true );
 }
 
 template<typename F>
@@ -190,8 +218,20 @@ psp::DistHelmholtz<F>::RecursiveReordering
 }
 
 template<typename F>
+int
+psp::DistHelmholtz<F>::LocalPanelHeight
+( int xSize, int ySize, int zSize, int cutoff, 
+  unsigned commRank, unsigned log2CommSize ) 
+{
+    int localHeight = 0;
+    LocalPanelHeightRecursion
+    ( xSize, ySize, zSize, cutoff, commRank, log2CommSize, localHeight );
+    return localHeight;
+}
+
+template<typename F>
 void
-psp::DistHelmholtz<F>::CountLocalHeight
+psp::DistHelmholtz<F>::LocalPanelHeightRecursion
 ( int xSize, int ySize, int zSize, int cutoff, 
   unsigned commRank, unsigned log2CommSize, int& localHeight ) 
 {
@@ -216,23 +256,23 @@ psp::DistHelmholtz<F>::CountLocalHeight
         if( log2CommSize == 0 )
         {
             // Add the left side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xLeftSize, ySize, zSize, cutoff, 0, 0, localHeight );
             // Add the right side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xSize-(xLeftSize+1), ySize, zSize, cutoff, 0, 0, localHeight );
         }
         else if( commRank & 1 )
         {
             // Add the right side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xSize-(xLeftSize+1), ySize, zSize, cutoff,
               commRank/2, log2CommSize-1, localHeight );
         }
         else // log2CommSize != 0 && commRank & 1 == 0
         {
             // Add the left side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xLeftSize, ySize, zSize, cutoff,
               commRank/2, log2CommSize-1, localHeight );
         }
@@ -253,23 +293,23 @@ psp::DistHelmholtz<F>::CountLocalHeight
         if( log2CommSize == 0 )
         {
             // Add the left side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xSize, yLeftSize, zSize, cutoff, 0, 0, localHeight );
             // Add the right side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 0, 0, localHeight );
         }
         else if( commRank & 1 )
         {
             // Add the right side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 
               commRank/2, log2CommSize-1, localHeight );
         }
         else // log2CommSize != 0 && commRank & 1 == 0
         {
             // Add the left side
-            CountLocalHeight
+            LocalPanelHeightRecursion
             ( xSize, yLeftSize, zSize, cutoff,
               commRank/2, log2CommSize-1, localHeight );
         }
@@ -277,8 +317,19 @@ psp::DistHelmholtz<F>::CountLocalHeight
 }
 
 template<typename F>
+int
+psp::DistHelmholtz<F>::NumLocalSupernodes
+( int xSize, int ySize, int cutoff, unsigned commRank, unsigned log2CommSize )
+{
+    int numLocalSupernodes = 0;
+    NumLocalSupernodesRecursion
+    ( xSize, ySize, cutoff, commRank, log2CommSize, numLocalSupernodes );
+    return numLocalSupernodes;
+}
+
+template<typename F>
 void
-psp::DistHelmholtz<F>::CountLocalSupernodes
+psp::DistHelmholtz<F>::NumLocalSupernodesRecursion
 ( int xSize, int ySize, int cutoff, unsigned commRank, unsigned log2CommSize, 
   int& numLocal ) 
 {
@@ -301,23 +352,23 @@ psp::DistHelmholtz<F>::CountLocalSupernodes
         if( log2CommSize == 0 )
         {
             // Add the left side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xLeftSize, ySize, cutoff, 0, 0, numLocal );
             // Add the right side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xSize-(xLeftSize+1), ySize, cutoff, 0, 0, numLocal );
         }
         else if( commRank & 1 )
         {
             // Add the right side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xSize-(xLeftSize+1), ySize, cutoff, commRank/2, log2CommSize-1, 
               numLocal );
         }
         else // log2CommSize != 0 && commRank & 1 == 0
         {
             // Add the left side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xLeftSize, ySize, cutoff, commRank/2, log2CommSize-1, numLocal );
         }
     }
@@ -336,31 +387,284 @@ psp::DistHelmholtz<F>::CountLocalSupernodes
         if( log2CommSize == 0 )
         {
             // Add the left side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xSize, yLeftSize, cutoff, 0, 0, numLocal );
             // Add the right side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xSize, ySize-(yLeftSize+1), cutoff, 0, 0, numLocal );
         }
         else if( commRank & 1 )
         {
             // Add the right side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xSize, ySize-(yLeftSize+1), cutoff, commRank/2, log2CommSize-1, 
               numLocal );
         }
         else // log2CommSize != 0 && commRank & 1 == 0
         {
             // Add the left side
-            CountLocalSupernodes
+            NumLocalSupernodesRecursion
             ( xSize, yLeftSize, cutoff, commRank/2, log2CommSize-1, numLocal );
         }
     }
 }
 
 template<typename F>
+int 
+psp::DistHelmholtz<F>::LocalZ
+( int z, int topDepth, int innerDepth, int bottomOrigDepth, 
+  int bzPadded, int planesPerPanel )
+{
+    if( z < topDepth )
+    {
+        return z;
+    }
+    else if( z < topDepth + innerDepth )
+    {
+        return (z-topDepth) % planesPerPanel;
+    }
+    else // z in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
+    {
+#ifndef RELEASE
+        if( z < topDepth+innerDepth || 
+            z >= topDepth+innerDepth+bottomOrigDepth )
+            throw std::logic_error("z is out of bounds");
+#endif
+        return z - (topDepth+innerDepth);
+    }
+}
+
+template<typename F>
+int 
+psp::DistHelmholtz<F>::LocalPanelOffset
+( int z,       
+  int topDepth, int innerDepth, int planesPerPanel, int bottomOrigDepth,
+  int numFullInnerPanels,
+  int localTopHeight, int localInnerHeight, int localLeftoverHeight,
+  int localBottomHeight )
+{
+    if( z < topDepth )
+    {
+        return 0;
+    }
+    else if( z < topDepth + innerDepth )
+    {
+        return localTopHeight + ((z-topDepth)/planesPerPanel)*localInnerHeight;
+    }
+    else
+    {
+        return localTopHeight + numFullInnerPanels*localInnerHeight + 
+               localLeftoverHeight;
+    }
+}
+
+template<typename F>
 void
-psp::DistHelmholtz<F>::ConvertCoordsToProcess
+psp::DistHelmholtz<F>::MapLocalPanelIndices
+( int nx, int ny, int nz, int zSize, int& zOffset, int cutoff, 
+  unsigned commRank, unsigned log2CommSize,
+  std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
+  int& localOffset )
+{
+    MapLocalPanelIndicesRecursion
+    ( nx, ny, nz, nx, ny, zSize, 0, 0, zOffset, cutoff, commRank, log2CommSize, 
+      localToNaturalMap, localRowOffsets, localOffset );
+    zOffset += zSize;
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
+( int nx, int ny, int nz, int xSize, int ySize, int zSize, 
+  int xOffset, int yOffset, int zOffset, int cutoff, 
+  unsigned commRank, unsigned log2CommSize,
+  std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
+  int& localOffset )
+{
+    if( log2CommSize == 0 && xSize*ySize <= cutoff )
+    {
+        // Add the leaf
+        for( int zDelta=0; zDelta<zSize; ++zDelta )
+        {
+            const int z = zOffset + zDelta;
+            for( int yDelta=0; yDelta<ySize; ++yDelta )
+            {
+                const int y = yOffset + yDelta;
+                for( int xDelta=0; xDelta<xSize; ++xDelta )
+                {
+                    const int x = xOffset + xDelta;
+
+                    // Map this local entry to the global natural index
+                    localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
+
+                    // Compute the number of connections from this row
+                    int numForwardConnections = 1; // always count diagonal
+                    if( x < nx ) 
+                        ++numForwardConnections;
+                    if( y < ny )
+                        ++numForwardConnections;
+                    if( z < nz )
+                        ++numForwardConnections;
+                    localRowOffsets[localOffset+1] = 
+                        localRowOffsets[localOffset] + numForwardConnections;
+
+                    ++localOffset;
+                }
+            }
+        }
+    }
+    else if( xSize >= ySize )
+    {
+        //
+        // Cut the y dimension
+        //
+
+        // Add the left and/or right sides
+        const int commSize = 1u<<log2CommSize;
+        const int yLeftSize = (ySize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
+              cutoff, commRank/2, log2CommSize-1, 
+              localToNaturalMap, localRowOffsets, localOffset );
+            // Add the right side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, 
+              xOffset, yOffset+(yLeftSize+1), zOffset, cutoff, 
+              commRank/2, log2CommSize-1, localToNaturalMap, localRowOffsets,
+              localOffset );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize,
+              xOffset, yOffset+(yLeftSize+1), zOffset, cutoff,
+              0, 0, localToNaturalMap, localRowOffsets, localOffset );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
+              cutoff, 0, 0, localToNaturalMap, localRowOffsets, localOffset );
+        }
+        
+        // Add our local portion of the partition
+        const int localHeight = 
+            elemental::LocalLength( xSize*zSize, commRank, commSize );
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        {
+            const int i = commRank + iLocal*commSize;
+            const int xDelta = i % xSize;
+            const int zDelta = i / xSize;
+            const int x = xOffset + xDelta;
+            const int y = yOffset + yLeftSize;
+            const int z = zOffset + zDelta;
+
+            // Map this local entry to the global natrual index
+            localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
+
+            // Compute the number of connections from this row
+            int numForwardConnections = 1; // always count diagonal
+            if( x < nx )
+                ++numForwardConnections;
+            if( y < ny )
+                ++numForwardConnections;
+            if( z < nz )
+                ++numForwardConnections;
+            localRowOffsets[localOffset+1] = 
+                localRowOffsets[localOffset] + numForwardConnections;
+
+            ++localOffset;
+        }
+    }
+    else
+    {
+        //
+        // Cut the x dimension
+        //
+
+        // Add the left and/or right sides
+        const int commSize = 1u<<log2CommSize;
+        const int xLeftSize = (xSize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xLeftSize, xSize, zSize, xOffset, yOffset, zOffset,
+              cutoff, commRank/2, log2CommSize-1, 
+              localToNaturalMap, localRowOffsets, localOffset );
+            // Add the right side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, 
+              xOffset+(xLeftSize+1), yOffset, zOffset, cutoff, 
+              commRank/2, log2CommSize-1, localToNaturalMap, localRowOffsets,
+              localOffset );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize,
+              xOffset+(xLeftSize+1), yOffset, zOffset, cutoff,
+              0, 0, localToNaturalMap, localRowOffsets, localOffset );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            MapLocalPanelIndicesRecursion
+            ( nx, ny, nz, xLeftSize, ySize, zSize, xOffset, yOffset, zOffset,
+              cutoff, 0, 0, localToNaturalMap, localRowOffsets, localOffset );
+        }
+        
+        // Add our local portion of the partition
+        const int localHeight = 
+            elemental::LocalLength( ySize*zSize, commRank, commSize );
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        {
+            const int i = commRank + iLocal*commSize;
+            const int yDelta = i % ySize;
+            const int zDelta = i / ySize;
+            const int x = xOffset + xLeftSize;
+            const int y = yOffset + yDelta;
+            const int z = zOffset + zDelta;
+
+            // Map this local entry to the global natrual index
+            localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
+
+            // Compute the number of connections from this row
+            int numForwardConnections = 1; // always count diagonal
+            if( x < nx )
+                ++numForwardConnections;
+            if( y < ny )
+                ++numForwardConnections;
+            if( z < nz )
+                ++numForwardConnections;
+            localRowOffsets[localOffset+1] = 
+                localRowOffsets[localOffset] + numForwardConnections;
+
+            ++localOffset;
+        }
+    }
+}
+
+template<typename F>
+int
+psp::DistHelmholtz<F>::OwningProcess
+( int x, int y, int zLocal, int xSize, int ySize, unsigned depthToSerial )
+{
+    int process = 0;
+    OwningProcessRecursion
+    ( x, y, zLocal, xSize, ySize, depthToSerial, process );
+    return process;
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::OwningProcessRecursion
 ( int x, int y, int zLocal, int xSize, int ySize, unsigned depthToSerial, 
   int& process )
 {
@@ -384,7 +688,7 @@ psp::DistHelmholtz<F>::ConvertCoordsToProcess
             // Continue down the right side
             process <<= 1;
             process |= 1;
-            ConvertCoordsToProcess
+            OwningProcessRecursion
             ( x-(xLeftSize+1), y, zLocal, xSize-(xLeftSize+1), ySize, 
               depthToSerial-1, process );
         }
@@ -392,7 +696,7 @@ psp::DistHelmholtz<F>::ConvertCoordsToProcess
         {
             // Continue down the left side
             process <<= 1;
-            ConvertCoordsToProcess
+            OwningProcessRecursion
             ( x, y, zLocal, xLeftSize, ySize, depthToSerial-1, process );
         }
     }
@@ -413,7 +717,7 @@ psp::DistHelmholtz<F>::ConvertCoordsToProcess
             // Continue down the right side
             process <<= 1;
             process |= 1;
-            ConvertCoordsToProcess
+            OwningProcessRecursion
             ( x, y-(yLeftSize+1), zLocal, xSize, ySize-(yLeftSize+1), 
               depthToSerial-1, process );
         }
@@ -421,7 +725,7 @@ psp::DistHelmholtz<F>::ConvertCoordsToProcess
         {
             // Continue down the left side
             process <<= 1;
-            ConvertCoordsToProcess
+            OwningProcessRecursion
             ( x, y, zLocal, xSize, yLeftSize, depthToSerial-1, process );
         }
     }
