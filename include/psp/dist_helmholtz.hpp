@@ -74,7 +74,8 @@ private:
     ( int xSize, int ySize, int cutoff, 
       unsigned commRank, unsigned log2CommSize, int& numLocal );
     static void ConvertCoordsToProcess
-    ( int x, int y, int xSize, int ySize, unsigned log2CommSize, int& process );
+    ( int x, int y, int zLocal, int xSize, int ySize, unsigned log2CommSize, 
+      int& process );
 
 public:
     DistHelmholtz

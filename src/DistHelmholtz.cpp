@@ -361,12 +361,12 @@ psp::DistHelmholtz<F>::CountLocalSupernodes
 template<typename F>
 void
 psp::DistHelmholtz<F>::ConvertCoordsToProcess
-( int x, int y, int xSize, int ySize, unsigned depthToSerial, int& process )
+( int x, int y, int zLocal, int xSize, int ySize, unsigned depthToSerial, 
+  int& process )
 {
     if( depthToSerial == 0 )
         return;
 
-    process <<= 1;
     if( xSize >= ySize )
     {
         //
@@ -376,21 +376,24 @@ psp::DistHelmholtz<F>::ConvertCoordsToProcess
         const int xLeftSize = (xSize-1) / 2;
         if( x == xLeftSize )
         {
-            // HERE: Need to take z into account
+            process <<= depthToSerial;
+            process |= (y+zLocal*ySize) % (1u<<depthToSerial);
         }
         else if( x > xLeftSize )
         { 
             // Continue down the right side
+            process <<= 1;
             process |= 1;
             ConvertCoordsToProcess
-            ( x-(xLeftSize+1), y, xSize-(xLeftSize+1), ySize, depthToSerial-1,
-              process );
+            ( x-(xLeftSize+1), y, zLocal, xSize-(xLeftSize+1), ySize, 
+              depthToSerial-1, process );
         }
         else // x < leftSize
         {
             // Continue down the left side
+            process <<= 1;
             ConvertCoordsToProcess
-            ( x, y, xLeftSize, ySize, depthToSerial-1, process );
+            ( x, y, zLocal, xLeftSize, ySize, depthToSerial-1, process );
         }
     }
     else
@@ -402,21 +405,24 @@ psp::DistHelmholtz<F>::ConvertCoordsToProcess
         const int yLeftSize = (ySize-1) / 2;
         if( y == yLeftSize )
         {
-            // HERE: Need to take z into account
+            process <<= depthToSerial;
+            process |= (x+zLocal*xSize) % (1u<<depthToSerial);
         }
         else if( y > yLeftSize )
         { 
             // Continue down the right side
+            process <<= 1;
             process |= 1;
             ConvertCoordsToProcess
-            ( x, y-(yLeftSize+1), xSize, ySize-(yLeftSize+1), depthToSerial-1,
-              process );
+            ( x, y-(yLeftSize+1), zLocal, xSize, ySize-(yLeftSize+1), 
+              depthToSerial-1, process );
         }
         else // x < leftSize
         {
             // Continue down the left side
+            process <<= 1;
             ConvertCoordsToProcess
-            ( x, y, xSize, yLeftSize, depthToSerial-1, process );
+            ( x, y, zLocal, xSize, yLeftSize, depthToSerial-1, process );
         }
     }
 }

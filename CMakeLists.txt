@@ -76,27 +76,6 @@ add_dependencies(psp prepare_psp_headers)
 # Make sure the PSP headers can be found
 include_directories("${PROJECT_BINARY_DIR}/include")
 
-# Build the test drivers if necessary
-if(BUILD_TESTS)
-  set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(TESTS FileSpeed PanelLDL)
-
-  # Build the tests
-  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/tests")
-  foreach(TEST ${TESTS})
-    add_executable(tests-${TEST} ${TEST_DIR}/${TEST}.cpp)
-    target_link_libraries(tests-${TEST} psp cmake-dummy-lib)
-    set_target_properties(tests-${TEST} PROPERTIES
-                          OUTPUT_NAME ${TEST}
-                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-    if(MPI_LINK_FLAGS)
-      set_target_properties(tests-${TEST} PROPERTIES
-                            LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif(MPI_LINK_FLAGS)
-    install(TARGETS tests-${TEST} DESTINATION bin/tests)
-  endforeach(TEST)
-endif(BUILD_TESTS)
-
 # Simplify the inclusion of PSP as a subproject in another build system
 #
 #set(MPI_C_COMPILER ${MPI_C_COMPILER} PARENT_SCOPE)
