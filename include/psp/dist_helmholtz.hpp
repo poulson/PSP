@@ -71,7 +71,7 @@ private:
     // Sparse matrix communication information
     int allToAllSize_;
     std::vector<int> actualSendSizes_, actualRecvSizes_; // length p
-    std::vector<int> sendIndices_, recvIndices_; // length p*allToAllSize_
+    std::vector<int> sendIndices_; // length p*allToAllSize_
 
     // TODO: 
     // Information for communication needed by application of A_{i+1,i} blocks.
@@ -137,6 +137,16 @@ private:
       unsigned commRank, unsigned log2CommSize,
       std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
       int& localOffset );
+
+    static void MapLocalConnectionIndices
+    ( int nx, int ny, int nz, int zSize, int& zOffset, int cutoff, 
+      unsigned commRank, unsigned log2CommSize, 
+      std::vector<int>& localConnections, int& localOffset );
+    static void MapLocalConnectionIndicesRecursion
+    ( int nx, int ny, int nz, int xSize, int ySize, int zSize,
+      int xOffset, int yOffset, int zOffset, int cutoff,
+      unsigned commRank, unsigned log2CommSize,
+      std::vector<int>& localConnections, int& localOffset );
 
     static int OwningProcess
     ( int x, int y, int zLocal, int xSize, int ySize, unsigned log2CommSize );

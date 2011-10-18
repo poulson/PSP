@@ -111,11 +111,117 @@ psp::DistHelmholtz<F>::DistHelmholtz
     ( nx, ny, nz, bottomOrigDepth, zOffset, cutoff, commRank, log2CommSize,
       localToNaturalMap_, localRowOffsets_, localOffset );
 
-    // Compute the indices of the RHS that each process will need to send/recv 
-    // from every other process in order to perform its portion of a mat-vec
-    //
-    //localEntries_.resize( localRowOffsets_.back() );
-    // TODO
+    // Fill in the natural connection indices
+    std::vector<int> localConnections( localRowOffsets_.back() );
+    localOffset = 0;
+    zOffset = 0;
+    MapLocalConnectionIndices
+    ( nx, ny, nz, topDepth, zOffset, cutoff, commRank, log2CommSize, 
+      localConnections, localOffset );
+    for( int i=0; i<numFullInnerPanels; ++i )
+        MapLocalConnectionIndices
+        ( nx, ny, nz, planesPerPanel, zOffset, cutoff, commRank, log2CommSize,
+          localConnections, localOffset );
+    if( haveLeftover )
+        MapLocalConnectionIndices
+        ( nx, ny, nz, leftoverInnerDepth, zOffset, cutoff, 
+          commRank, log2CommSize, localConnections, localOffset );
+    MapLocalConnectionIndices
+    ( nx, ny, nz, bottomOrigDepth, zOffset, cutoff, commRank, log2CommSize,
+      localConnections, localOffset );
+#ifndef RELEASE
+    const int numLocalConnections = localConnections.size();
+    if( numLocalConnections != localOffset )
+        throw std::logic_error("Invalid connection count");
+#endif
+
+    // Count the number of indices that we will need to recv from each process.
+    actualRecvSizes_.resize( commSize, 0 );
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalRow = localToNaturalMap_[iLocal];
+        const int rowOffset = localRowOffsets_[iLocal];
+        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
+        // skip the diagonal value...
+        for( int k=1; k<rowSize; ++k )
+        {
+            const int naturalCol = localConnections[rowOffset+k];
+            const int x = naturalCol % nx;
+            const int y = (naturalCol/nx) % ny;
+            const int z = naturalCol/(nx*ny);
+            const int zLocal = 
+                LocalZ
+                ( z, topDepth, innerDepth, bottomOrigDepth, planesPerPanel );
+            const int process = 
+                OwningProcess( x, y, zLocal, nx, ny, log2CommSize );
+            ++actualRecvSizes_[process];
+        }
+    }
+    const int maxRecvSize = 
+        *std::max_element( actualRecvSizes_.begin(), actualRecvSizes_.end() );
+    std::vector<int> synchMessageSends( 2*commSize );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        synchMessageSends[2*proc+0] = actualRecvSizes_[proc];
+        synchMessageSends[2*proc+1] = maxRecvSize;
+    }
+    std::vector<int> synchMessageRecvs( 2*commSize );
+    clique::mpi::AllToAll
+    ( &synchMessageSends[0], 2, &synchMessageRecvs[0], 2, comm );
+    synchMessageSends.clear();
+    actualSendSizes_.resize( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        actualSendSizes_[proc] = synchMessageRecvs[2*proc];
+    allToAllSize_ = 0;
+    for( int proc=0; proc<commSize; ++proc )
+        allToAllSize_ = std::max(allToAllSize_,synchMessageRecvs[2*proc+1]);
+    synchMessageRecvs.clear();
+
+    // Pack and send the natural indices
+    std::vector<int> packOffsets( commSize );
+    std::vector<int> naturalIndexSends( commSize*allToAllSize_ );
+    for( int proc=0; proc<commSize; ++proc )
+        packOffsets[proc] = proc*allToAllSize_;
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalRow = localToNaturalMap_[iLocal];
+        const int rowOffset = localRowOffsets_[iLocal];
+        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
+        // skip the diagonal value...
+        for( int k=1; k<rowSize; ++k )
+        {
+            const int naturalCol = localConnections[rowOffset+k];
+            const int x = naturalCol % nx;
+            const int y = (naturalCol/nx) % ny;
+            const int z = naturalCol/(nx*ny);
+            const int zLocal = 
+                LocalZ
+                ( z, topDepth, innerDepth, bottomOrigDepth, planesPerPanel );
+            const int process = 
+                OwningProcess( x, y, zLocal, nx, ny, log2CommSize );
+
+            naturalIndexSends[packOffsets[process]++] = naturalCol;
+        }
+    }
+    sendIndices_.resize( commSize*allToAllSize_ );
+    clique::mpi::AllToAll
+    ( &naturalIndexSends[0], allToAllSize_, 
+      &sendIndices_[0],      allToAllSize_, comm );
+    naturalIndexSends.clear();
+
+    // Invert the local to natural map
+    std::map<int,int> naturalToLocalMap;
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+        naturalToLocalMap[localToNaturalMap_[iLocal]] = iLocal;
+
+    // Convert the recv indices in place
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        const int actualSendSize = actualSendSizes_[proc];
+        int* thisSend = &sendIndices_[proc*allToAllSize_];
+        for( int i=0; i<actualSendSize; ++i )
+            thisSend[i] = naturalToLocalMap[thisSend[i]];
+    }
 
     // Count the number of local supernodes in each panel
     const int numLocalSupernodes = 
@@ -495,15 +601,21 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
                     localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
 
                     // Compute the number of connections from this row
-                    int numForwardConnections = 1; // always count diagonal
+                    int numConnections = 1; // always count diagonal
+                    if( x > 0 )
+                        ++numConnections;
                     if( x < nx ) 
-                        ++numForwardConnections;
+                        ++numConnections;
+                    if( y > 0 )
+                        ++numConnections;
                     if( y < ny )
-                        ++numForwardConnections;
+                        ++numConnections;
+                    if( z > 0 )
+                        ++numConnections;
                     if( z < nz )
-                        ++numForwardConnections;
+                        ++numConnections;
                     localRowOffsets[localOffset+1] = 
-                        localRowOffsets[localOffset] + numForwardConnections;
+                        localRowOffsets[localOffset] + numConnections;
 
                     ++localOffset;
                 }
@@ -565,15 +677,21 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
             localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
 
             // Compute the number of connections from this row
-            int numForwardConnections = 1; // always count diagonal
+            int numConnections = 1; // always count diagonal
+            if( x > 0 )
+                ++numConnections;
             if( x < nx )
-                ++numForwardConnections;
+                ++numConnections;
+            if( y > 0 )
+                ++numConnections;
             if( y < ny )
-                ++numForwardConnections;
+                ++numConnections;
+            if( z > 0 )
+                ++numConnections;
             if( z < nz )
-                ++numForwardConnections;
+                ++numConnections;
             localRowOffsets[localOffset+1] = 
-                localRowOffsets[localOffset] + numForwardConnections;
+                localRowOffsets[localOffset] + numConnections;
 
             ++localOffset;
         }
@@ -633,17 +751,206 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
             localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
 
             // Compute the number of connections from this row
-            int numForwardConnections = 1; // always count diagonal
+            int numConnections = 1; // always count diagonal
+            if( x > 0 )
+                ++numConnections;
             if( x < nx )
-                ++numForwardConnections;
+                ++numConnections;
+            if( y > 0 )
+                ++numConnections;
             if( y < ny )
-                ++numForwardConnections;
+                ++numConnections;
+            if( z > 0 )
+                ++numConnections;
             if( z < nz )
-                ++numForwardConnections;
+                ++numConnections;
             localRowOffsets[localOffset+1] = 
-                localRowOffsets[localOffset] + numForwardConnections;
+                localRowOffsets[localOffset] + numConnections;
 
             ++localOffset;
+        }
+    }
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::MapLocalConnectionIndices
+( int nx, int ny, int nz, int zSize, int& zOffset, int cutoff, 
+  unsigned commRank, unsigned log2CommSize,
+  std::vector<int>& localConnections, int& localOffset )
+{
+    MapLocalConnectionIndicesRecursion
+    ( nx, ny, nz, nx, ny, zSize, 0, 0, zOffset, cutoff, commRank, log2CommSize, 
+      localConnections, localOffset );
+    zOffset += zSize;
+}
+
+template<typename F>
+void
+psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
+( int nx, int ny, int nz, int xSize, int ySize, int zSize, 
+  int xOffset, int yOffset, int zOffset, int cutoff, 
+  unsigned commRank, unsigned log2CommSize,
+  std::vector<int>& localConnections, int& localOffset )
+{
+    if( log2CommSize == 0 && xSize*ySize <= cutoff )
+    {
+        // Add the leaf
+        for( int zDelta=0; zDelta<zSize; ++zDelta )
+        {
+            const int z = zOffset + zDelta;
+            for( int yDelta=0; yDelta<ySize; ++yDelta )
+            {
+                const int y = yOffset + yDelta;
+                for( int xDelta=0; xDelta<xSize; ++xDelta )
+                {
+                    const int x = xOffset + xDelta;
+
+                    localConnections[localOffset++] = x + y*nx + z*nx*ny;
+                    if( x > 0 )
+                        localConnections[localOffset++] = (x-1)+y*nx+z*nx*ny;
+                    if( x < nx ) 
+                        localConnections[localOffset++] = (x+1)+y*nx+z*nx*ny;
+                    if( y > 0 )
+                        localConnections[localOffset++] = x+(y-1)*nx+z*nx*ny;
+                    if( y < ny )
+                        localConnections[localOffset++] = x+(y+1)*nx+z*nx*ny;
+                    if( z > 0 )
+                        localConnections[localOffset++] = x+y*nx+(z-1)*nx*ny;
+                    if( z < nz )
+                        localConnections[localOffset++] = x+y*nx+(z+1)*nx*ny;
+                }
+            }
+        }
+    }
+    else if( xSize >= ySize )
+    {
+        //
+        // Cut the y dimension
+        //
+
+        // Add the left and/or right sides
+        const int commSize = 1u<<log2CommSize;
+        const int yLeftSize = (ySize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
+              cutoff, commRank/2, log2CommSize-1, localConnections, 
+              localOffset );
+            // Add the right side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, 
+              xOffset, yOffset+(yLeftSize+1), zOffset, cutoff, 
+              commRank/2, log2CommSize-1, localConnections, localOffset );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize,
+              xOffset, yOffset+(yLeftSize+1), zOffset, cutoff,
+              0, 0, localConnections, localOffset );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
+              cutoff, 0, 0, localConnections, localOffset );
+        }
+        
+        // Add our local portion of the partition
+        const int localHeight = 
+            elemental::LocalLength( xSize*zSize, commRank, commSize );
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        {
+            const int i = commRank + iLocal*commSize;
+            const int xDelta = i % xSize;
+            const int zDelta = i / xSize;
+            const int x = xOffset + xDelta;
+            const int y = yOffset + yLeftSize;
+            const int z = zOffset + zDelta;
+
+            localConnections[localOffset++] = x + y*nx + z*nx*ny;
+            if( x > 0 )
+                localConnections[localOffset++] = (x-1) + y*nx + z*nx*ny;
+            if( x < nx )
+                localConnections[localOffset++] = (x+1) + y*nx + z*nx*ny;
+            if( y > 0 )
+                localConnections[localOffset++] = x + (y-1)*nx + z*nx*ny;
+            if( y < ny )
+                localConnections[localOffset++] = x + (y+1)*nx + z*nx*ny;
+            if( z > 0 )
+                localConnections[localOffset++] = x + y*nx + (z-1)*nx*ny;
+            if( z < nz )
+                localConnections[localOffset++] = x + y*nx + (z+1)*nx*ny;
+        }
+    }
+    else
+    {
+        //
+        // Cut the x dimension
+        //
+
+        // Add the left and/or right sides
+        const int commSize = 1u<<log2CommSize;
+        const int xLeftSize = (xSize-1) / 2;
+        if( log2CommSize == 0 )
+        {
+            // Add the left side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xLeftSize, xSize, zSize, xOffset, yOffset, zOffset,
+              cutoff, commRank/2, log2CommSize-1, 
+              localConnections, localOffset );
+            // Add the right side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, 
+              xOffset+(xLeftSize+1), yOffset, zOffset, cutoff, 
+              commRank/2, log2CommSize-1, localConnections, localOffset );
+        }
+        else if( commRank & 1 )
+        {
+            // Add the right side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize,
+              xOffset+(xLeftSize+1), yOffset, zOffset, cutoff,
+              0, 0, localConnections, localOffset );
+        }
+        else // log2CommSize != 0 && commRank & 1 == 0
+        {
+            // Add the left side
+            MapLocalConnectionIndicesRecursion
+            ( nx, ny, nz, xLeftSize, ySize, zSize, xOffset, yOffset, zOffset,
+              cutoff, 0, 0, localConnections, localOffset );
+        }
+        
+        // Add our local portion of the partition
+        const int localHeight = 
+            elemental::LocalLength( ySize*zSize, commRank, commSize );
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        {
+            const int i = commRank + iLocal*commSize;
+            const int yDelta = i % ySize;
+            const int zDelta = i / ySize;
+            const int x = xOffset + xLeftSize;
+            const int y = yOffset + yDelta;
+            const int z = zOffset + zDelta;
+
+            localConnections[localOffset++] = x+y*nx+z*nx*ny;
+            if( x > 0 )
+                localConnections[localOffset++] = (x-1) + y*nx + z*nx*ny;
+            if( x < nx )
+                localConnections[localOffset++] = (x+1) + y*nx + z*nx*ny;
+            if( y > 0 )
+                localConnections[localOffset++] = x + (y-1)*nx + z*nx*ny;
+            if( y < ny )
+                localConnections[localOffset++] = x + (y+1)*nx + z*nx*ny;
+            if( z > 0 )
+                localConnections[localOffset++] = x + y*nx + (z-1)*nx*ny;
+            if( z < nz )
+                localConnections[localOffset++] = x + y*nx + (z+1)*nx*ny;
         }
     }
 }
