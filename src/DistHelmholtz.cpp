@@ -20,6 +20,10 @@
 */
 #include "psp.hpp"
 
+#include "./DistHelmholtz/InitializeFinalize-incl.hpp"
+#include "./DistHelmholtz/Multiply-incl.hpp"
+#include "./DistHelmholtz/Precondition-incl.hpp"
+
 template<typename F>
 psp::DistHelmholtz<F>::DistHelmholtz
 ( const FiniteDiffControl<F>& control, elemental::mpi::Comm comm )
