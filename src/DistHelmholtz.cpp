@@ -37,9 +37,9 @@ psp::DistHelmholtz<F>::DistHelmholtz
     const int nx = control.nx;
     const int ny = control.ny;
     const int nz = control.nz;
+    const int cutoff = control.cutoff;
     const int planesPerPanel = control.planesPerPanel;
     const int bzCeil = bzCeil_;
-    const int cutoff = 10; // note that this is for a z-depth of 1!!!
 
     // Pull out some information about our communicator
     const int commRank = elemental::mpi::CommRank( comm );
@@ -51,10 +51,10 @@ psp::DistHelmholtz<F>::DistHelmholtz
 
     // Decide if the domain is sufficiently deep to warrant sweeping
     const bool bottomHasPML = (control.bottomBC == PML);
-    const int topDepth = bzCeil+planesPerPanel;
-    const int bottomOrigDepth = 
+    topDepth_ = bzCeil+planesPerPanel;
+    bottomOrigDepth_ = 
         (bottomHasPML ? bzCeil+planesPerPanel : planesPerPanel );
-    if( nz <= topDepth+bottomOrigDepth )
+    if( nz <= topDepth_+bottomOrigDepth_ )
         throw std::logic_error
         ("The domain is very shallow. Please run a sparse-direct factorization "
          "instead.");
@@ -69,25 +69,22 @@ psp::DistHelmholtz<F>::DistHelmholtz
     //   | Leftover? |
     //   | Bottom    |
     //    -----------
-    const int innerDepth = nz-(topDepth+bottomOrigDepth);
-    const int leftoverInnerDepth = innerDepth % planesPerPanel;
-    const bool haveLeftover = ( leftoverInnerDepth != 0 );
-    const int numFullInnerPanels = innerDepth / planesPerPanel;
+    innerDepth_ = nz-(topDepth_+bottomOrigDepth_);
+    leftoverInnerDepth_ = innerDepth_ % planesPerPanel;
+    haveLeftover_ = ( leftoverInnerDepth_ != 0 );
+    numFullInnerPanels_ = innerDepth_ / planesPerPanel;
 
     // Compute the number of rows we own of the sparse distributed matrix
-    const int localTopHeight = 
-        LocalPanelHeight( nx, ny, topDepth, cutoff, commRank, log2CommSize );
-    const int localFullInnerHeight = 
-        LocalPanelHeight
-        ( nx, ny, planesPerPanel, cutoff, commRank, log2CommSize );
-    const int localLeftoverInnerHeight = 
-        LocalPanelHeight
-        ( nx, ny, leftoverInnerDepth, cutoff, commRank, log2CommSize );
-    const int localBottomHeight = 
-        LocalPanelHeight
-        ( nx, ny, bottomOrigDepth, cutoff, commRank, log2CommSize );
-    localHeight_ = localTopHeight + numFullInnerPanels*localFullInnerHeight + 
-                   localLeftoverInnerHeight + localBottomHeight;
+    localTopHeight_ = 
+        LocalPanelHeight( topDepth_, commRank, log2CommSize );
+    localFullInnerHeight_ = 
+        LocalPanelHeight( planesPerPanel, commRank, log2CommSize );
+    localLeftoverInnerHeight_ = 
+        LocalPanelHeight( leftoverInnerDepth_, commRank, log2CommSize );
+    localBottomHeight_ = 
+        LocalPanelHeight( bottomOrigDepth_, commRank, log2CommSize );
+    localHeight_ = localTopHeight_ + numFullInnerPanels_*localFullInnerHeight_ +
+                   localLeftoverInnerHeight_ + localBottomHeight_;
 
     // Compute the natural indices of our local indices and fill in the offsets
     // for the store of each local rows indices.
@@ -96,39 +93,34 @@ psp::DistHelmholtz<F>::DistHelmholtz
     localRowOffsets_[0] = 0;
     int localOffset=0, zOffset=0;
     MapLocalPanelIndices
-    ( nx, ny, nz, topDepth, zOffset, cutoff, commRank, log2CommSize, 
-      localToNaturalMap_, localRowOffsets_, localOffset );
-    for( int i=0; i<numFullInnerPanels; ++i )
+    ( topDepth_, zOffset, commRank, log2CommSize, localOffset );
+    for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalPanelIndices
-        ( nx, ny, nz, planesPerPanel, zOffset, cutoff, commRank, log2CommSize,
-          localToNaturalMap_, localRowOffsets_, localOffset );
-    if( haveLeftover )
+        ( planesPerPanel, zOffset, commRank, log2CommSize, localOffset );
+    if( haveLeftover_ )
         MapLocalPanelIndices
-        ( nx, ny, nz, leftoverInnerDepth, zOffset, cutoff, 
-          commRank, log2CommSize, localToNaturalMap_, localRowOffsets_, 
-          localOffset );
+        ( leftoverInnerDepth_, zOffset, commRank, log2CommSize, localOffset );
     MapLocalPanelIndices
-    ( nx, ny, nz, bottomOrigDepth, zOffset, cutoff, commRank, log2CommSize,
-      localToNaturalMap_, localRowOffsets_, localOffset );
+    ( bottomOrigDepth_, zOffset, commRank, log2CommSize, localOffset );
 
     // Fill in the natural connection indices
     std::vector<int> localConnections( localRowOffsets_.back() );
     localOffset = 0;
     zOffset = 0;
     MapLocalConnectionIndices
-    ( nx, ny, nz, topDepth, zOffset, cutoff, commRank, log2CommSize, 
-      localConnections, localOffset );
-    for( int i=0; i<numFullInnerPanels; ++i )
+    ( topDepth_, zOffset, commRank, log2CommSize, localConnections, 
+      localOffset );
+    for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalConnectionIndices
-        ( nx, ny, nz, planesPerPanel, zOffset, cutoff, commRank, log2CommSize,
+        ( planesPerPanel, zOffset, commRank, log2CommSize, localConnections,
+          localOffset );
+    if( haveLeftover_ )
+        MapLocalConnectionIndices
+        ( leftoverInnerDepth_, zOffset, commRank, log2CommSize,
           localConnections, localOffset );
-    if( haveLeftover )
-        MapLocalConnectionIndices
-        ( nx, ny, nz, leftoverInnerDepth, zOffset, cutoff, 
-          commRank, log2CommSize, localConnections, localOffset );
     MapLocalConnectionIndices
-    ( nx, ny, nz, bottomOrigDepth, zOffset, cutoff, commRank, log2CommSize,
-      localConnections, localOffset );
+    ( bottomOrigDepth_, zOffset, commRank, log2CommSize, localConnections,
+      localOffset );
 #ifndef RELEASE
     const int numLocalConnections = localConnections.size();
     if( numLocalConnections != localOffset )
@@ -149,11 +141,8 @@ psp::DistHelmholtz<F>::DistHelmholtz
             const int x = naturalCol % nx;
             const int y = (naturalCol/nx) % ny;
             const int z = naturalCol/(nx*ny);
-            const int zLocal = 
-                LocalZ
-                ( z, topDepth, innerDepth, bottomOrigDepth, planesPerPanel );
-            const int process = 
-                OwningProcess( x, y, zLocal, nx, ny, log2CommSize );
+            const int zLocal = LocalZ( z );
+            const int process = OwningProcess( x, y, zLocal, log2CommSize );
             ++actualRecvSizes_[process];
         }
     }
@@ -194,11 +183,8 @@ psp::DistHelmholtz<F>::DistHelmholtz
             const int x = naturalCol % nx;
             const int y = (naturalCol/nx) % ny;
             const int z = naturalCol/(nx*ny);
-            const int zLocal = 
-                LocalZ
-                ( z, topDepth, innerDepth, bottomOrigDepth, planesPerPanel );
-            const int process = 
-                OwningProcess( x, y, zLocal, nx, ny, log2CommSize );
+            const int zLocal = LocalZ( z );
+            const int process = OwningProcess( x, y, zLocal, log2CommSize );
 
             naturalIndexSends[packOffsets[process]++] = naturalCol;
         }
@@ -224,8 +210,7 @@ psp::DistHelmholtz<F>::DistHelmholtz
     }
 
     // Count the number of local supernodes in each panel
-    const int numLocalSupernodes = 
-        NumLocalSupernodes( nx, ny, cutoff, commRank, log2CommSize );
+    const int numLocalSupernodes = NumLocalSupernodes( commRank, log2CommSize );
 
     // Create space for the original structures of the panel classes
     clique::symbolic::SymmOrig 
@@ -247,25 +232,21 @@ psp::DistHelmholtz<F>::DistHelmholtz
     // In order to minimize the number of symbolic factorizations that have to 
     // be performed, and to simplify distribution issues, the leading PML region
     // on each inner panel will always be ordered _LAST_ within that panel.
+    FillOrigPanelStruct( topDepth_, log2CommSize, topSymbolicOrig );
     FillOrigPanelStruct
-    ( nx, ny, topDepth, cutoff, comm, log2CommSize, topSymbolicOrig );
-    FillOrigPanelStruct
-    ( nx, ny, planesPerPanel+bzCeil, cutoff, comm, log2CommSize, 
-      fullInnerSymbolicOrig );
-    if( haveLeftover )
+    ( planesPerPanel+bzCeil, log2CommSize, fullInnerSymbolicOrig );
+    if( haveLeftover_ )
         FillOrigPanelStruct
-        ( nx, ny, leftoverInnerDepth+bzCeil, cutoff, comm, log2CommSize,
-          leftoverInnerSymbolicOrig );
+        ( leftoverInnerDepth_+bzCeil, log2CommSize, leftoverInnerSymbolicOrig );
     FillOrigPanelStruct
-    ( nx, ny, bottomOrigDepth+bzCeil, cutoff, comm, log2CommSize,
-      bottomSymbolicOrig );
+    ( bottomOrigDepth_+bzCeil, log2CommSize, bottomSymbolicOrig );
 
     // Perform the parallel symbolic factorizations
     clique::symbolic::SymmetricFactorization
     ( topSymbolicOrig, topSymbolicFact_, true );
     clique::symbolic::SymmetricFactorization
     ( fullInnerSymbolicOrig, fullInnerSymbolicFact_, true );
-    if( haveLeftover )
+    if( haveLeftover_ )
         clique::symbolic::SymmetricFactorization
         ( leftoverInnerSymbolicOrig, leftoverInnerSymbolicFact_, true );
     clique::symbolic::SymmetricFactorization
@@ -324,12 +305,12 @@ psp::DistHelmholtz<F>::RecursiveReordering
 template<typename F>
 int
 psp::DistHelmholtz<F>::LocalPanelHeight
-( int xSize, int ySize, int zSize, int cutoff, 
-  unsigned commRank, unsigned log2CommSize ) 
+( int zSize, unsigned commRank, unsigned log2CommSize ) const
 {
     int localHeight = 0;
     LocalPanelHeightRecursion
-    ( xSize, ySize, zSize, cutoff, commRank, log2CommSize, localHeight );
+    ( control_.nx, control_.ny, zSize, control_.cutoff, 
+      commRank, log2CommSize, localHeight );
     return localHeight;
 }
 
@@ -423,11 +404,12 @@ psp::DistHelmholtz<F>::LocalPanelHeightRecursion
 template<typename F>
 int
 psp::DistHelmholtz<F>::NumLocalSupernodes
-( int xSize, int ySize, int cutoff, unsigned commRank, unsigned log2CommSize )
+( unsigned commRank, unsigned log2CommSize ) const
 {
     int numLocalSupernodes = 0;
     NumLocalSupernodesRecursion
-    ( xSize, ySize, cutoff, commRank, log2CommSize, numLocalSupernodes );
+    ( control_.nx, control_.ny, control_.cutoff, commRank, log2CommSize, 
+      numLocalSupernodes );
     return numLocalSupernodes;
 }
 
@@ -515,63 +497,57 @@ psp::DistHelmholtz<F>::NumLocalSupernodesRecursion
 
 template<typename F>
 int 
-psp::DistHelmholtz<F>::LocalZ
-( int z, int topDepth, int innerDepth, int bottomOrigDepth, int planesPerPanel )
+psp::DistHelmholtz<F>::LocalZ( int z ) const
 {
-    if( z < topDepth )
+    if( z < topDepth_ )
     {
         return z;
     }
-    else if( z < topDepth + innerDepth )
+    else if( z < topDepth_ + innerDepth_ )
     {
-        return (z-topDepth) % planesPerPanel;
+        return (z-topDepth_) % control_.planesPerPanel;
     }
     else // z in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
     {
 #ifndef RELEASE
-        if( z < topDepth+innerDepth || 
-            z >= topDepth+innerDepth+bottomOrigDepth )
+        if( z < topDepth_+innerDepth_ || 
+            z >= topDepth_+innerDepth_+bottomOrigDepth_ )
             throw std::logic_error("z is out of bounds");
 #endif
-        return z - (topDepth+innerDepth);
+        return z - (topDepth_+innerDepth_);
     }
 }
 
 template<typename F>
 int 
-psp::DistHelmholtz<F>::LocalPanelOffset
-( int z,       
-  int topDepth, int innerDepth, int planesPerPanel, int bottomOrigDepth,
-  int numFullInnerPanels,
-  int localTopHeight, int localInnerHeight, int localLeftoverHeight,
-  int localBottomHeight )
+psp::DistHelmholtz<F>::LocalPanelOffset( int z ) const
 {
-    if( z < topDepth )
+    if( z < topDepth_ )
     {
         return 0;
     }
-    else if( z < topDepth + innerDepth )
+    else if( z < topDepth_ + innerDepth_ )
     {
-        return localTopHeight + ((z-topDepth)/planesPerPanel)*localInnerHeight;
+        return localTopHeight_ + 
+               ((z-topDepth_)/control_.planesPerPanel)*localFullInnerHeight_;
     }
     else
     {
-        return localTopHeight + numFullInnerPanels*localInnerHeight + 
-               localLeftoverHeight;
+        return localTopHeight_ + numFullInnerPanels_*localFullInnerHeight_ + 
+               localLeftoverInnerHeight_;
     }
 }
 
 template<typename F>
 void
 psp::DistHelmholtz<F>::MapLocalPanelIndices
-( int nx, int ny, int nz, int zSize, int& zOffset, int cutoff, 
-  unsigned commRank, unsigned log2CommSize,
-  std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
-  int& localOffset )
+( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize,
+  int& localOffset ) 
 {
     MapLocalPanelIndicesRecursion
-    ( nx, ny, nz, nx, ny, zSize, 0, 0, zOffset, cutoff, commRank, log2CommSize, 
-      localToNaturalMap, localRowOffsets, localOffset );
+    ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, zSize, 
+      0, 0, zOffset, control_.cutoff, commRank, log2CommSize, 
+      localToNaturalMap_, localRowOffsets_, localOffset );
     zOffset += zSize;
 }
 
@@ -775,12 +751,12 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
 template<typename F>
 void
 psp::DistHelmholtz<F>::MapLocalConnectionIndices
-( int nx, int ny, int nz, int zSize, int& zOffset, int cutoff, 
-  unsigned commRank, unsigned log2CommSize,
-  std::vector<int>& localConnections, int& localOffset )
+( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize,
+  std::vector<int>& localConnections, int& localOffset ) const
 {
     MapLocalConnectionIndicesRecursion
-    ( nx, ny, nz, nx, ny, zSize, 0, 0, zOffset, cutoff, commRank, log2CommSize, 
+    ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, zSize, 
+      0, 0, zOffset, control_.cutoff, commRank, log2CommSize, 
       localConnections, localOffset );
     zOffset += zSize;
 }
@@ -958,11 +934,11 @@ psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
 template<typename F>
 int
 psp::DistHelmholtz<F>::OwningProcess
-( int x, int y, int zLocal, int xSize, int ySize, unsigned depthToSerial )
+( int x, int y, int zLocal, unsigned log2CommSize ) const
 {
     int process = 0;
     OwningProcessRecursion
-    ( x, y, zLocal, xSize, ySize, depthToSerial, process );
+    ( x, y, zLocal, control_.nx, control_.ny, log2CommSize, process );
     return process;
 }
 
@@ -1038,10 +1014,12 @@ psp::DistHelmholtz<F>::OwningProcessRecursion
 template<typename F>
 int
 psp::DistHelmholtz<F>::ReorderedIndex
-( int x, int y, int z, int nx, int ny, int nz, int log2CommSize, int cutoff )
+( int x, int y, int z, int zSize, int log2CommSize ) const
 {
     int index = 
-        ReorderedIndexRecursion( x, y, z, nx, ny, nz, log2CommSize, cutoff, 0 );
+        ReorderedIndexRecursion
+        ( x, y, z, control_.nx, control_.ny, zSize, log2CommSize, 
+          control_.cutoff, 0 );
     return index;
 }
 
@@ -1102,26 +1080,26 @@ psp::DistHelmholtz<F>::ReorderedIndexRecursion
 template<typename F>
 void
 psp::DistHelmholtz<F>::FillOrigPanelStruct
-( int nx, int ny, int nz, int cutoff, clique::mpi::Comm comm, 
-  unsigned log2CommSize, clique::symbolic::SymmOrig& S )
+( int zSize, unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const
 {
-    int nxSub=nx, nySub=ny, xOffset=0, yOffset=0;    
+    int nxSub=control_.nx, nySub=control_.ny, xOffset=0, yOffset=0;    
     FillDistOrigPanelStruct
-    ( nx, ny, nz, nxSub, nySub, xOffset, yOffset, cutoff, comm, log2CommSize, 
-      S );
+    ( zSize, nxSub, nySub, xOffset, yOffset, log2CommSize, S );
     FillLocalOrigPanelStruct
-    ( nx, ny, nz, nxSub, nySub, xOffset, yOffset, cutoff, log2CommSize, S );
+    ( zSize, nxSub, nySub, xOffset, yOffset, log2CommSize, S );
 }
 
 template<typename F>
 void
 psp::DistHelmholtz<F>::FillDistOrigPanelStruct
-( int nx, int ny, int nz, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-  int cutoff, clique::mpi::Comm comm, unsigned log2CommSize, 
-  clique::symbolic::SymmOrig& S )
+( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
+  unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const
 {
-    const unsigned commRank = clique::mpi::CommRank( comm );
-    S.dist.comm = comm;
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int cutoff = control_.cutoff;
+    const unsigned commRank = clique::mpi::CommRank( comm_ );
+    S.dist.comm = comm_;
     // Fill the distributed nodes
     for( int s=log2CommSize; s>0; --s )
     {
@@ -1132,11 +1110,10 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
         {
             // Form the structure of a partition of the X dimension
             const int middle = (nxSub-1)/2;
-            sn.size = nySub*nz;
+            sn.size = nySub*zSize;
             sn.offset = 
                 ReorderedIndex
-                ( xOffset+middle, yOffset, 0, nx, ny, nz, 
-                  log2CommSize, cutoff );
+                ( xOffset+middle, yOffset, 0, zSize, log2CommSize );
 
             // Allocate space for the lower structure
             int numJoins = 0;
@@ -1144,24 +1121,22 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
                 ++numJoins;
             if( yOffset+nySub < ny )
                 ++numJoins;
-            sn.lowerStruct.resize( numJoins*nz );
+            sn.lowerStruct.resize( numJoins*zSize );
 
             // Fill the (unsorted) lower structure
             int joinOffset = 0;
             if( yOffset-1 >= 0 )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     sn.lowerStruct[i] = ReorderedIndex
-                    ( xOffset+middle, yOffset-1, i, nx, ny, nz,
-                      log2CommSize, cutoff );
-                joinOffset += nz;
+                    ( xOffset+middle, yOffset-1, i, zSize, log2CommSize );
+                joinOffset += zSize;
             }
             if( yOffset+nySub < ny )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     sn.lowerStruct[joinOffset+i] = ReorderedIndex
-                    ( xOffset+middle, yOffset+nySub, i, nx, ny, nz,
-                      log2CommSize, cutoff );
+                    ( xOffset+middle, yOffset+nySub, i, zSize, log2CommSize );
             }
 
             // Sort the lower structure
@@ -1183,11 +1158,10 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
         {
             // Form the structure of a partition of the Y dimension
             const int middle = (nySub-1)/2;
-            sn.size = nxSub*nz;
+            sn.size = nxSub*zSize;
             sn.offset =
                 ReorderedIndex
-                ( xOffset, yOffset+middle, 0, nx, ny, nz,
-                  log2CommSize, cutoff );
+                ( xOffset, yOffset+middle, 0, zSize, log2CommSize );
 
             // Allocate space for the lower structure
             int numJoins = 0;
@@ -1195,24 +1169,22 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
                 ++numJoins;
             if( xOffset+nxSub < nx )
                 ++numJoins;
-            sn.lowerStruct.resize( numJoins*nz );
+            sn.lowerStruct.resize( numJoins*zSize );
 
             // Fill the (unsorted) lower structure
             int joinOffset = 0;
             if( xOffset-1 >= 0 )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     sn.lowerStruct[i] = ReorderedIndex
-                    ( xOffset-1, yOffset+middle, i, nx, ny, nz,
-                      log2CommSize, cutoff );
-                joinOffset += nz;
+                    ( xOffset-1, yOffset+middle, i, zSize, log2CommSize );
+                joinOffset += zSize;
             }
             if( xOffset+nxSub < nx )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     sn.lowerStruct[joinOffset+i] = ReorderedIndex
-                    ( xOffset+nxSub, yOffset+middle, i, nx, ny, nz,
-                      log2CommSize, cutoff );
+                    ( xOffset+nxSub, yOffset+middle, i, zSize, log2CommSize );
             }
 
             // Sort the lower structure
@@ -1236,57 +1208,52 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
     clique::symbolic::DistSymmOrigSupernode& sn = S.dist.supernodes[0];
     if( nxSub*nySub <= cutoff )
     {
-        sn.size = nxSub*nySub*nz;
-        sn.offset = ReorderedIndex
-            ( xOffset, yOffset, 0, nx, ny, nz, log2CommSize, cutoff );
+        sn.size = nxSub*nySub*zSize;
+        sn.offset = ReorderedIndex( xOffset, yOffset, 0, zSize, log2CommSize );
 
         // Count, allocate, and fill the lower struct
         int joinSize = 0;
         if( xOffset-1 >= 0 )
-            joinSize += nySub*nz;
+            joinSize += nySub*zSize;
         if( xOffset+nxSub < nx )
-            joinSize += nySub*nz;
+            joinSize += nySub*zSize;
         if( yOffset-1 >= 0 )
-            joinSize += nxSub*nz;
+            joinSize += nxSub*zSize;
         if( yOffset+nySub < ny )
-            joinSize += nxSub*nz;
+            joinSize += nxSub*zSize;
         sn.lowerStruct.resize( joinSize );
 
         int joinOffset = 0;
         if( xOffset-1 >= 0 )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 for( int j=0; j<nySub; ++j )
                     sn.lowerStruct[i*nySub+j] = ReorderedIndex
-                    ( xOffset-1, yOffset+j, i,
-                      nx, ny, nz, log2CommSize, cutoff );
-            joinOffset += nySub*nz;
+                    ( xOffset-1, yOffset+j, i, zSize, log2CommSize );
+            joinOffset += nySub*zSize;
         }
         if( xOffset+nxSub < nx )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 for( int j=0; j<nySub; ++j )
                     sn.lowerStruct[joinOffset+i*nySub+j] = ReorderedIndex
-                    ( xOffset+nxSub, yOffset+j, i,
-                      nx, ny, nz, log2CommSize, cutoff );
-            joinOffset += nySub*nz;
+                    ( xOffset+nxSub, yOffset+j, i, zSize, log2CommSize );
+            joinOffset += nySub*zSize;
         }
         if( yOffset-1 >= 0 )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 for( int j=0; j<nxSub; ++j )
                     sn.lowerStruct[joinOffset+i*nxSub+j] = ReorderedIndex
-                    ( xOffset+j, yOffset-1, i,
-                      nx, ny, nz, log2CommSize, cutoff );
-            joinOffset += nxSub*nz;
+                    ( xOffset+j, yOffset-1, i, zSize, log2CommSize );
+            joinOffset += nxSub*zSize;
         }
         if( yOffset+nySub < ny )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 for( int j=0; j<nxSub; ++j )
                     sn.lowerStruct[joinOffset+i*nxSub+j] = ReorderedIndex
-                    ( xOffset+j, yOffset+nySub, i,
-                      nx, ny, nz, log2CommSize, cutoff );
+                    ( xOffset+j, yOffset+nySub, i, zSize, log2CommSize );
         }
 
         // Sort the lower structure
@@ -1296,10 +1263,9 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
     {
         // Form the structure of a partition of the X dimension
         const int middle = (nxSub-1)/2;
-        sn.size = nySub*nz;
+        sn.size = nySub*zSize;
         sn.offset =
-            ReorderedIndex
-            ( xOffset+middle, yOffset, 0, nx, ny, nz, log2CommSize, cutoff );
+            ReorderedIndex( xOffset+middle, yOffset, 0, zSize, log2CommSize );
 
         // Allocate space for the lower structure
         int numJoins = 0;
@@ -1307,24 +1273,22 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
             ++numJoins;
         if( yOffset+nySub < ny )
             ++numJoins;
-        sn.lowerStruct.resize( numJoins*nz );
+        sn.lowerStruct.resize( numJoins*zSize );
 
         // Fill the (unsorted) lower structure
         int joinOffset = 0;
         if( yOffset-1 >= 0 )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 sn.lowerStruct[i] = ReorderedIndex
-                ( xOffset+middle, yOffset-1, i, nx, ny, nz,
-                  log2CommSize, cutoff );
-            joinOffset += nz;
+                ( xOffset+middle, yOffset-1, i, zSize, log2CommSize );
+            joinOffset += zSize;
         }
         if( yOffset+nySub < ny )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 sn.lowerStruct[joinOffset+i] = ReorderedIndex
-                ( xOffset+middle, yOffset+nySub, i, nx, ny, nz,
-                  log2CommSize, cutoff );
+                ( xOffset+middle, yOffset+nySub, i, zSize, log2CommSize );
         }
 
         // Sort the lower structure
@@ -1334,10 +1298,9 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
     {
         // Form the structure of a partition of the Y dimension
         const int middle = (nySub-1)/2;
-        sn.size = nxSub*nz;
+        sn.size = nxSub*zSize;
         sn.offset =
-            ReorderedIndex
-            ( xOffset, yOffset+middle, 0, nx, ny, nz, log2CommSize, cutoff );
+            ReorderedIndex( xOffset, yOffset+middle, 0, zSize, log2CommSize );
 
         // Allocate space for the lower structure
         int numJoins = 0;
@@ -1345,24 +1308,22 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
             ++numJoins;
         if( xOffset+nxSub < nx )
             ++numJoins;
-        sn.lowerStruct.resize( numJoins*nz );
+        sn.lowerStruct.resize( numJoins*zSize );
 
         // Fill the (unsorted) lower structure
         int joinOffset = 0;
         if( xOffset-1 >= 0 )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 sn.lowerStruct[i] = ReorderedIndex
-                ( xOffset-1, yOffset+middle, i, nx, ny, nz,
-                  log2CommSize, cutoff );
-            joinOffset += nz;
+                ( xOffset-1, yOffset+middle, i, zSize, log2CommSize );
+            joinOffset += zSize;
         }
         if( xOffset+nxSub < nx )
         {
-            for( int i=0; i<nz; ++i )
+            for( int i=0; i<zSize; ++i )
                 sn.lowerStruct[joinOffset+i] = ReorderedIndex
-                ( xOffset+nxSub, yOffset+middle, i, nx, ny, nz,
-                  log2CommSize, cutoff );
+                ( xOffset+nxSub, yOffset+middle, i, zSize, log2CommSize );
         }
 
         // Sort the lower structure
@@ -1373,10 +1334,13 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
 template<typename F>
 void
 psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
-( int nx, int ny, int nz, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-  int cutoff, unsigned log2CommSize, clique::symbolic::SymmOrig& S )
+( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
+  unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const
 {
     const int numLocalSupernodes = S.local.supernodes.size();
+    const int cutoff = control_.cutoff;
+    const int nx = control_.nx;
+    const int ny = control_.ny;
 
     // Initialize with the local root's box
     std::stack<Box> boxStack;
@@ -1407,63 +1371,61 @@ psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
                 S.local.supernodes[sn.parent].children[1] = s;
         }
 
-        if( box.nx*box.ny*nz <= cutoff )
+        if( box.nx*box.ny*zSize <= cutoff )
         {
-            sn.size = box.nx*box.ny*nz;
+            sn.size = box.nx*box.ny*zSize;
             sn.offset = ReorderedIndex
-                ( box.xOffset, box.yOffset, 0, nx, ny, nz,
-                  log2CommSize, cutoff );
+                ( box.xOffset, box.yOffset, 0, zSize, log2CommSize );
             sn.children.clear();
 
             // Count, allocate, and fill the lower struct
             int joinSize = 0;
             if( box.xOffset-1 >= 0 )
-                joinSize += box.ny*nz;
+                joinSize += box.ny*zSize;
             if( box.xOffset+box.nx < nx )
-                joinSize += box.ny*nz;
+                joinSize += box.ny*zSize;
             if( box.yOffset-1 >= 0 )
-                joinSize += box.nx*nz;
+                joinSize += box.nx*zSize;
             if( box.yOffset+box.ny < ny )
-                joinSize += box.nx*nz;
+                joinSize += box.nx*zSize;
             sn.lowerStruct.resize( joinSize );
 
             int joinOffset = 0;
             if( box.xOffset-1 >= 0 )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     for( int j=0; j<box.ny; ++j )
                         sn.lowerStruct[i*box.ny+j] = ReorderedIndex
-                        ( box.xOffset-1, box.yOffset+j, i,
-                          nx, ny, nz, log2CommSize, cutoff );
-                joinOffset += box.ny*nz;
+                        ( box.xOffset-1, box.yOffset+j, i, zSize, 
+                          log2CommSize );
+                joinOffset += box.ny*zSize;
             }
             if( box.xOffset+box.nx < nx )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     for( int j=0; j<box.ny; ++j )
                         sn.lowerStruct[joinOffset+i*box.ny+j] = ReorderedIndex
-                        ( box.xOffset+box.nx, box.yOffset+j, i,
-                          nx, ny, nz, log2CommSize, cutoff );
-                joinOffset += box.ny*nz;
+                        ( box.xOffset+box.nx, box.yOffset+j, i, zSize, 
+                          log2CommSize );
+                joinOffset += box.ny*zSize;
             }
             if( box.yOffset-1 >= 0 )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     for( int j=0; j<box.nx; ++j )
                         sn.lowerStruct[joinOffset+i*box.nx+j] = ReorderedIndex
-                        ( box.xOffset+j, box.yOffset-1, i,
-                          nx, ny, nz, log2CommSize, cutoff );
-                joinOffset += box.nx*nz;
+                        ( box.xOffset+j, box.yOffset-1, i, zSize, 
+                          log2CommSize );
+                joinOffset += box.nx*zSize;
             }
             if( box.yOffset+box.ny < ny )
             {
-                for( int i=0; i<nz; ++i )
+                for( int i=0; i<zSize; ++i )
                     for( int j=0; j<box.nx; ++j )
                         sn.lowerStruct[joinOffset+i*box.nx+j] = ReorderedIndex
-                        ( box.xOffset+j, box.yOffset+box.ny, i,
-                          nx, ny, nz, log2CommSize, cutoff );
+                        ( box.xOffset+j, box.yOffset+box.ny, i, zSize,
+                          log2CommSize );
             }
-
 
             // Sort the lower structure
             std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
@@ -1475,10 +1437,9 @@ psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
             {
                 // Partition the X dimension (this is the separator)
                 const int middle = (box.nx-1)/2;
-                sn.size = box.ny*nz;
+                sn.size = box.ny*zSize;
                 sn.offset = ReorderedIndex
-                    ( box.xOffset+middle, box.yOffset, 0, nx, ny, nz,
-                      log2CommSize, cutoff );
+                    ( box.xOffset+middle, box.yOffset, 0, zSize, log2CommSize );
 
                 // Count, allocate, and fill the lower struct
                 int numJoins = 0;
@@ -1486,23 +1447,23 @@ psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
                     ++numJoins;
                 if( box.yOffset+box.ny < ny )
                     ++numJoins;
-                sn.lowerStruct.resize( numJoins*nz );
+                sn.lowerStruct.resize( numJoins*zSize );
 
                 int joinOffset = 0;
                 if( box.yOffset-1 >= 0 )
                 {
-                    for( int i=0; i<nz; ++i )
+                    for( int i=0; i<zSize; ++i )
                         sn.lowerStruct[i] = ReorderedIndex
-                        ( box.xOffset+middle, box.yOffset-1, i, nx, ny, nz,
-                          log2CommSize, cutoff );
-                    joinOffset += nz;
+                        ( box.xOffset+middle, box.yOffset-1, i, zSize, 
+                          log2CommSize );
+                    joinOffset += zSize;
                 }
                 if( box.yOffset+box.ny < ny )
                 {
-                    for( int i=0; i<nz; ++i )
+                    for( int i=0; i<zSize; ++i )
                         sn.lowerStruct[joinOffset+i] = ReorderedIndex
-                        ( box.xOffset+middle, box.yOffset+box.ny, i, nx, ny, nz,
-                          log2CommSize, cutoff );
+                        ( box.xOffset+middle, box.yOffset+box.ny, i, zSize,
+                          log2CommSize );
                 }
 
                 // Sort the lower structure
@@ -1532,11 +1493,9 @@ psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
             {
                 // Partition the Y dimension (this is the separator)
                 const int middle = (box.ny-1)/2;
-                sn.size = box.nx*nz;
+                sn.size = box.nx*zSize;
                 sn.offset = ReorderedIndex
-                    ( box.xOffset, box.yOffset+middle, 0, nx, ny, nz,
-                      log2CommSize, cutoff );
-
+                    ( box.xOffset, box.yOffset+middle, 0, zSize, log2CommSize );
 
                 // Count, allocate, and fill the lower struct
                 int numJoins = 0;
@@ -1544,23 +1503,23 @@ psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
                     ++numJoins;
                 if( box.xOffset+box.nx < nx )
                     ++numJoins;
-                sn.lowerStruct.resize( numJoins*nz );
+                sn.lowerStruct.resize( numJoins*zSize );
 
                 int joinOffset = 0;
                 if( box.xOffset-1 >= 0 )
                 {
-                    for( int i=0; i<nz; ++i )
+                    for( int i=0; i<zSize; ++i )
                         sn.lowerStruct[i] = ReorderedIndex
-                        ( box.xOffset-1, box.yOffset+middle, i, nx, ny, nz,
-                          log2CommSize, cutoff );
-                    joinOffset += nz;
+                        ( box.xOffset-1, box.yOffset+middle, i, zSize,
+                          log2CommSize );
+                    joinOffset += zSize;
                 }
                 if( box.xOffset+box.nx < nx )
                 {
-                    for( int i=0; i<nz; ++i )
+                    for( int i=0; i<zSize; ++i )
                         sn.lowerStruct[joinOffset+i] = ReorderedIndex
-                        ( box.xOffset+box.nx, box.yOffset+middle, i, nx, ny, nz,
-                          log2CommSize, cutoff );
+                        ( box.xOffset+box.nx, box.yOffset+middle, i, zSize,
+                          log2CommSize );
                 }
 
                 // Sort the lower structure
