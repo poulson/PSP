@@ -19,10 +19,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::Multiply
-( F alpha, const F* localX, F beta, F* localY ) const
+psp::DistHelmholtz<R>::Multiply
+( C alpha, const C* localX, C beta, C* localY ) const
 {
     // HERE
 }

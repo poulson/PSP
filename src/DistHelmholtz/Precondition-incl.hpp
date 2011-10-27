@@ -19,9 +19,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::Precondition( F* localY ) const
+psp::DistHelmholtz<R>::Precondition( C* localY ) const
 {
     // HERE
 }

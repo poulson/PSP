@@ -25,26 +25,28 @@
 
 namespace psp {
 
-template<typename F>
+template<typename R>
 class DistHelmholtz
 {
 public:
+    typedef std::complex<R> C;
+
     DistHelmholtz
-    ( const FiniteDiffControl<F>& control, elemental::mpi::Comm comm );
+    ( const FiniteDiffControl<R>& control, elemental::mpi::Comm comm );
 
     ~DistHelmholtz();
 
     // Build the sparse matrix and the preconditioner
-    void Initialize( const F* localSlowness );
+    void Initialize( const R* localSlowness );
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
 
     // Y := alpha A X + beta Y
-    void Multiply( F alpha, const F* localX, F beta, F* localY ) const;
+    void Multiply( C alpha, const C* localX, C beta, C* localY ) const;
 
     // Y := approximateInv(A) Y
-    void Precondition( F* localY ) const;
+    void Precondition( C* localY ) const;
 
     // Return the number of rows of the sparse matrix that our process stores.
     int LocalSize() const;
@@ -52,10 +54,8 @@ public:
     //void WriteParallelVtkFile( const F* vLocal, const char* basename ) const;
 
 private:
-    typedef typename elemental::RealBase<F>::type R;
-
     elemental::mpi::Comm comm_;
-    const FiniteDiffControl<F> control_;
+    const FiniteDiffControl<R> control_;
 
     // Useful constants
     const R hx_, hy_, hz_; // grid spacings
@@ -73,7 +73,7 @@ private:
     int localHeight_;
     std::vector<int> localToNaturalMap_;
     std::vector<int> localRowOffsets_;
-    std::vector<F> localEntries_;
+    std::vector<C> localEntries_;
 
     // Sparse matrix communication information
     int allToAllSize_;
@@ -96,14 +96,18 @@ private:
         bottomSymbolicFact_;
 
     // Sparse-direct numeric factorizations of PML-padded panels
-    clique::numeric::SymmFrontTree<F> topFact_;
-    std::vector<clique::numeric::SymmFrontTree<F>*> fullInnerFacts_;
-    clique::numeric::SymmFrontTree<F> leftoverInnerFact_;
-    clique::numeric::SymmFrontTree<F> bottomFact_;
+    clique::numeric::SymmFrontTree<C> topFact_;
+    std::vector<clique::numeric::SymmFrontTree<C>*> fullInnerFacts_;
+    clique::numeric::SymmFrontTree<C> leftoverInnerFact_;
+    clique::numeric::SymmFrontTree<C> bottomFact_;
 
     //
     // Helper routines
     //
+
+    C s1Inv( int x ) const;
+    C s2Inv( int y ) const;
+    C s3Inv( int z ) const;
 
     static void RecursiveReordering
     ( int nx, int xOffset, int xSize, int yOffset, int ySize, 
@@ -174,14 +178,14 @@ private:
 // Implementation begins here                                                 //
 //----------------------------------------------------------------------------//
 
-template<typename F>
+template<typename R>
 inline 
-DistHelmholtz<F>::~DistHelmholtz() 
+DistHelmholtz<R>::~DistHelmholtz() 
 { }
 
-template<typename F>
+template<typename R>
 inline int
-DistHelmholtz<F>::LocalSize() const
+DistHelmholtz<R>::LocalSize() const
 { return localHeight_; }
 
 } // namespace psp

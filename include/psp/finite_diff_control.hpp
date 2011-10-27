@@ -45,10 +45,10 @@ enum Stencil { SEVEN_POINT }; // TWENTY_SEVEN_POINT not yet supported
 //
 // PML must be enforced at least on the top face, and the remaining faces 
 // may be set as either PML or a zero Dirichlet boundary condition.
-template<typename F>
+template<typename R>
 struct FiniteDiffControl
 {
-    typedef typename elemental::RealBase<F>::type R;
+    typedef typename std::complex<R> C;
 
     Stencil stencil; // only 7-point supported so far
     int nx, ny, nz;  // number of grid points in each direction

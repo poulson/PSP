@@ -24,9 +24,9 @@
 #include "./DistHelmholtz/Multiply-incl.hpp"
 #include "./DistHelmholtz/Precondition-incl.hpp"
 
-template<typename F>
-psp::DistHelmholtz<F>::DistHelmholtz
-( const FiniteDiffControl<F>& control, elemental::mpi::Comm comm )
+template<typename R>
+psp::DistHelmholtz<R>::DistHelmholtz
+( const FiniteDiffControl<R>& control, elemental::mpi::Comm comm )
 : comm_(comm), control_(control),
   hx_(control.wx/(control.nx+1)),
   hy_(control.wy/(control.ny+1)),
@@ -257,9 +257,9 @@ psp::DistHelmholtz<F>::DistHelmholtz
     ( bottomSymbolicOrig, bottomSymbolicFact_, true );
 }
 
-template<typename F>
+template<typename R>
 void 
-psp::DistHelmholtz<F>::RecursiveReordering
+psp::DistHelmholtz<R>::RecursiveReordering
 ( int nx, int xOffset, int xSize, int yOffset, int ySize,
   int cutoff, int depthTilSerial, int* reordering ) 
 {
@@ -306,9 +306,9 @@ psp::DistHelmholtz<F>::RecursiveReordering
     }
 }
 
-template<typename F>
+template<typename R>
 int
-psp::DistHelmholtz<F>::LocalPanelHeight
+psp::DistHelmholtz<R>::LocalPanelHeight
 ( int zSize, unsigned commRank, unsigned log2CommSize ) const
 {
     int localHeight = 0;
@@ -318,9 +318,9 @@ psp::DistHelmholtz<F>::LocalPanelHeight
     return localHeight;
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::LocalPanelHeightRecursion
+psp::DistHelmholtz<R>::LocalPanelHeightRecursion
 ( int xSize, int ySize, int zSize, int cutoff, 
   unsigned commRank, unsigned log2CommSize, int& localHeight ) 
 {
@@ -405,9 +405,9 @@ psp::DistHelmholtz<F>::LocalPanelHeightRecursion
     }
 }
 
-template<typename F>
+template<typename R>
 int
-psp::DistHelmholtz<F>::NumLocalSupernodes
+psp::DistHelmholtz<R>::NumLocalSupernodes
 ( unsigned commRank, unsigned log2CommSize ) const
 {
     int numLocalSupernodes = 0;
@@ -417,9 +417,9 @@ psp::DistHelmholtz<F>::NumLocalSupernodes
     return numLocalSupernodes;
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::NumLocalSupernodesRecursion
+psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
 ( int xSize, int ySize, int cutoff, unsigned commRank, unsigned log2CommSize, 
   int& numLocal ) 
 {
@@ -499,9 +499,9 @@ psp::DistHelmholtz<F>::NumLocalSupernodesRecursion
     }
 }
 
-template<typename F>
+template<typename R>
 int 
-psp::DistHelmholtz<F>::LocalZ( int z ) const
+psp::DistHelmholtz<R>::LocalZ( int z ) const
 {
     if( z < topDepth_ )
     {
@@ -522,9 +522,9 @@ psp::DistHelmholtz<F>::LocalZ( int z ) const
     }
 }
 
-template<typename F>
+template<typename R>
 int 
-psp::DistHelmholtz<F>::LocalPanelOffset( int z ) const
+psp::DistHelmholtz<R>::LocalPanelOffset( int z ) const
 {
     if( z < topDepth_ )
     {
@@ -542,9 +542,9 @@ psp::DistHelmholtz<F>::LocalPanelOffset( int z ) const
     }
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::MapLocalPanelIndices
+psp::DistHelmholtz<R>::MapLocalPanelIndices
 ( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize,
   int& localOffset ) 
 {
@@ -555,9 +555,9 @@ psp::DistHelmholtz<F>::MapLocalPanelIndices
     zOffset += zSize;
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
+psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int zSize, 
   int xOffset, int yOffset, int zOffset, int cutoff, 
   unsigned commRank, unsigned log2CommSize,
@@ -752,9 +752,9 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
     }
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::MapLocalConnectionIndices
+psp::DistHelmholtz<R>::MapLocalConnectionIndices
 ( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize,
   std::vector<int>& localConnections, int& localOffset ) const
 {
@@ -765,9 +765,9 @@ psp::DistHelmholtz<F>::MapLocalConnectionIndices
     zOffset += zSize;
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
+psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int zSize, 
   int xOffset, int yOffset, int zOffset, int cutoff, 
   unsigned commRank, unsigned log2CommSize,
@@ -935,9 +935,9 @@ psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
     }
 }
 
-template<typename F>
+template<typename R>
 int
-psp::DistHelmholtz<F>::OwningProcess
+psp::DistHelmholtz<R>::OwningProcess
 ( int x, int y, int zLocal, unsigned log2CommSize ) const
 {
     int process = 0;
@@ -946,9 +946,9 @@ psp::DistHelmholtz<F>::OwningProcess
     return process;
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::OwningProcessRecursion
+psp::DistHelmholtz<R>::OwningProcessRecursion
 ( int x, int y, int zLocal, int xSize, int ySize, unsigned depthToSerial, 
   int& process )
 {
@@ -1015,9 +1015,9 @@ psp::DistHelmholtz<F>::OwningProcessRecursion
     }
 }
 
-template<typename F>
+template<typename R>
 int
-psp::DistHelmholtz<F>::ReorderedIndex
+psp::DistHelmholtz<R>::ReorderedIndex
 ( int x, int y, int z, int zSize, int log2CommSize ) const
 {
     int index = 
@@ -1027,9 +1027,9 @@ psp::DistHelmholtz<F>::ReorderedIndex
     return index;
 }
 
-template<typename F>
+template<typename R>
 int
-psp::DistHelmholtz<F>::ReorderedIndexRecursion
+psp::DistHelmholtz<R>::ReorderedIndexRecursion
 ( int x, int y, int z, int nx, int ny, int nz,
   int log2CommSize, int cutoff, int offset )
 {
@@ -1081,9 +1081,9 @@ psp::DistHelmholtz<F>::ReorderedIndexRecursion
     }
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::FillOrigPanelStruct
+psp::DistHelmholtz<R>::FillOrigPanelStruct
 ( int zSize, unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const
 {
     int nxSub=control_.nx, nySub=control_.ny, xOffset=0, yOffset=0;    
@@ -1093,9 +1093,9 @@ psp::DistHelmholtz<F>::FillOrigPanelStruct
     ( zSize, nxSub, nySub, xOffset, yOffset, log2CommSize, S );
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::FillDistOrigPanelStruct
+psp::DistHelmholtz<R>::FillDistOrigPanelStruct
 ( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
   unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const
 {
@@ -1335,9 +1335,9 @@ psp::DistHelmholtz<F>::FillDistOrigPanelStruct
     }
 }
 
-template<typename F>
+template<typename R>
 void
-psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
+psp::DistHelmholtz<R>::FillLocalOrigPanelStruct
 ( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
   unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const
 {
@@ -1555,5 +1555,3 @@ psp::DistHelmholtz<F>::FillLocalOrigPanelStruct
 
 template class psp::DistHelmholtz<float>;
 template class psp::DistHelmholtz<double>;
-template class psp::DistHelmholtz<std::complex<float> >;
-template class psp::DistHelmholtz<std::complex<double> >;
