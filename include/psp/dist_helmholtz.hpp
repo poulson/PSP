@@ -177,12 +177,7 @@ private:
 template<typename F>
 inline 
 DistHelmholtz<F>::~DistHelmholtz() 
-{
-    const int numFullInnerPanels = fullInnerFacts_.size();
-    for( int i=0; i<numFullInnerPanels; ++i )
-        delete fullInnerFacts_[i];
-    fullInnerFacts_.clear();
-}
+{ }
 
 template<typename F>
 inline int

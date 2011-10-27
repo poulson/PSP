@@ -584,15 +584,15 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
                     int numConnections = 1; // always count diagonal
                     if( x > 0 )
                         ++numConnections;
-                    if( x < nx ) 
+                    if( x+1 < nx ) 
                         ++numConnections;
                     if( y > 0 )
                         ++numConnections;
-                    if( y < ny )
+                    if( y+1 < ny )
                         ++numConnections;
                     if( z > 0 )
                         ++numConnections;
-                    if( z < nz )
+                    if( z+1 < nz )
                         ++numConnections;
                     localRowOffsets[localOffset+1] = 
                         localRowOffsets[localOffset] + numConnections;
@@ -660,15 +660,15 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
             int numConnections = 1; // always count diagonal
             if( x > 0 )
                 ++numConnections;
-            if( x < nx )
+            if( x+1 < nx )
                 ++numConnections;
             if( y > 0 )
                 ++numConnections;
-            if( y < ny )
+            if( y+1 < ny )
                 ++numConnections;
             if( z > 0 )
                 ++numConnections;
-            if( z < nz )
+            if( z+1 < nz )
                 ++numConnections;
             localRowOffsets[localOffset+1] = 
                 localRowOffsets[localOffset] + numConnections;
@@ -734,15 +734,15 @@ psp::DistHelmholtz<F>::MapLocalPanelIndicesRecursion
             int numConnections = 1; // always count diagonal
             if( x > 0 )
                 ++numConnections;
-            if( x < nx )
+            if( x+1 < nx )
                 ++numConnections;
             if( y > 0 )
                 ++numConnections;
-            if( y < ny )
+            if( y+1 < ny )
                 ++numConnections;
             if( z > 0 )
                 ++numConnections;
-            if( z < nz )
+            if( z+1 < nz )
                 ++numConnections;
             localRowOffsets[localOffset+1] = 
                 localRowOffsets[localOffset] + numConnections;
@@ -789,15 +789,15 @@ psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
                     localConnections[localOffset++] = x + y*nx + z*nx*ny;
                     if( x > 0 )
                         localConnections[localOffset++] = (x-1)+y*nx+z*nx*ny;
-                    if( x < nx ) 
+                    if( x+1 < nx ) 
                         localConnections[localOffset++] = (x+1)+y*nx+z*nx*ny;
                     if( y > 0 )
                         localConnections[localOffset++] = x+(y-1)*nx+z*nx*ny;
-                    if( y < ny )
+                    if( y+1 < ny )
                         localConnections[localOffset++] = x+(y+1)*nx+z*nx*ny;
                     if( z > 0 )
                         localConnections[localOffset++] = x+y*nx+(z-1)*nx*ny;
-                    if( z < nz )
+                    if( z+1 < nz )
                         localConnections[localOffset++] = x+y*nx+(z+1)*nx*ny;
                 }
             }
@@ -856,15 +856,15 @@ psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
             localConnections[localOffset++] = x + y*nx + z*nx*ny;
             if( x > 0 )
                 localConnections[localOffset++] = (x-1) + y*nx + z*nx*ny;
-            if( x < nx )
+            if( x+1 < nx )
                 localConnections[localOffset++] = (x+1) + y*nx + z*nx*ny;
             if( y > 0 )
                 localConnections[localOffset++] = x + (y-1)*nx + z*nx*ny;
-            if( y < ny )
+            if( y+1 < ny )
                 localConnections[localOffset++] = x + (y+1)*nx + z*nx*ny;
             if( z > 0 )
                 localConnections[localOffset++] = x + y*nx + (z-1)*nx*ny;
-            if( z < nz )
+            if( z+1 < nz )
                 localConnections[localOffset++] = x + y*nx + (z+1)*nx*ny;
         }
     }
@@ -921,15 +921,15 @@ psp::DistHelmholtz<F>::MapLocalConnectionIndicesRecursion
             localConnections[localOffset++] = x+y*nx+z*nx*ny;
             if( x > 0 )
                 localConnections[localOffset++] = (x-1) + y*nx + z*nx*ny;
-            if( x < nx )
+            if( x+1 < nx )
                 localConnections[localOffset++] = (x+1) + y*nx + z*nx*ny;
             if( y > 0 )
                 localConnections[localOffset++] = x + (y-1)*nx + z*nx*ny;
-            if( y < ny )
+            if( y+1 < ny )
                 localConnections[localOffset++] = x + (y+1)*nx + z*nx*ny;
             if( z > 0 )
                 localConnections[localOffset++] = x + y*nx + (z-1)*nx*ny;
-            if( z < nz )
+            if( z+1 < nz )
                 localConnections[localOffset++] = x + y*nx + (z+1)*nx*ny;
         }
     }
