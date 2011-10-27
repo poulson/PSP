@@ -38,58 +38,28 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
         const int y = (naturalIndex/nx) % ny;
         const int z = naturalIndex/(nx*ny);
 
-        // NOTE: Here we are exploiting the fact that the structure is 
-        //       consistent (i.e., a 7-point stencil).
-        int offset = localRowOffsets_[iLocal];
-        if( x > 0 )
-        {
-            // Fill left connection 
-            // localEntries_[offset++] = ...
-        }
-        if( x+1 < nx )
-        {
-            // Fill right connection
-            // localEntries_[offset++] = ...
-        }
-        if( y > 0 )
-        {
-            // Fill bottom connection
-            // localEntries_[offset++] = ...
-        }
-        if( y+1 < ny )
-        {
-            // Fill top connection
-            // localEntries_[offset++] = ...
-        }
-        if( z > 0 )
-        {
-            // Fill front connection
-            // localEntries_[offset++] = ...
-        }
-        if( z+1 < nz )
-        {
-            // Fill back connection
-            // localEntries_[offset++] = ...
-        }
+        const R alpha = localSlowness[iLocal];
+        const int rowOffset = localRowOffsets_[iLocal];
+        FormRow( 0, x, y, z, 0, nz, rowOffset, alpha );
     }
 
     // Initialize the front panel
-    // TODO
+    // TODO: Traverse symbolic local tree in order to initialize fronts
 
     // Initialize the full inner panels
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
-        // TODO
+        // TODO: Traverse symbolic local tree in order to initialize fronts
     }
 
     if( haveLeftover_ )
     {
         // Initialize the leftover panel
-        // TODO
+        // TODO: Traverse symbolic local tree in order to initialize fronts
     }
 
     // Initialize the back panel
-    // TODO
+    // TODO: Traverse symbolic local tree in order to initialize fronts
 }
 
 template<typename R>
@@ -183,4 +153,93 @@ psp::DistHelmholtz<R>::s3Inv( int z ) const
         return 1;
 }
 
-// HERE
+template<typename R>
+std::complex<R>
+psp::DistHelmholtz<R>::s3InvArtificial( int z, int zOffset, R sizeOfPML ) const
+{
+    if( z+1 < zOffset+sizeOfPML )
+    {
+        const R delta = zOffset + sizeOfPML - (z+1);
+        const R realPart = 1;
+        const R imagPart = 
+            control_.Cz*delta*delta/
+            (sizeOfPML*sizeOfPML*sizeOfPML*hz_*control_.omega);
+        return C(realPart,imagPart);
+    }
+    else if( z > (control_.nz-bz_) && control_.bottomBC==PML )
+    {
+        const R delta = z - (control_.nz-bz_);
+        const R realPart = 1;
+        const R imagPart = 
+            control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
+        return C(realPart,imagPart);
+    }
+    else
+        return 1;
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::FormRow
+( R imagShift, int x, int y, int z, int zOffset, int zSize, int rowOffset, 
+  R alpha )
+{
+    const R pmlSize = bzCeil_;
+
+    // Evaluate all of the inverse s functions
+    const C s1InvL = s1Inv( x-1 );
+    const C s1InvM = s1Inv( x   );
+    const C s1InvR = s1Inv( x+1 );
+    const C s2InvL = s2Inv( y-1 );
+    const C s2InvM = s2Inv( y   );
+    const C s2InvR = s2Inv( y+1 );
+    const C s3InvL = s3InvArtificial( z-1, zOffset, pmlSize );
+    const C s3InvM = s3InvArtificial( z,   zOffset, pmlSize );
+    const C s3InvR = s3InvArtificial( z+1, zOffset, pmlSize );
+
+    // Compute all of the x-shifted terms
+    const C xTempL = s2InvM*s3InvM/s1InvL;
+    const C xTempM = s2InvM*s3InvM/s1InvM;
+    const C xTempR = s2InvM*s3InvM/s1InvR;
+    const C xTermL = (xTempL+xTempM) / (2*hx_*hx_);
+    const C xTermR = (xTempR+xTempM) / (2*hx_*hx_);
+
+    // Compute all of the y-shifted terms
+    const C yTempL = s1InvM*s3InvM/s2InvL;
+    const C yTempM = s1InvM*s3InvM/s2InvM;
+    const C yTempR = s1InvM*s3InvM/s2InvR;
+    const C yTermL = (yTempL+yTempM) / (2*hy_*hy_);
+    const C yTermR = (yTempR+yTempM) / (2*hy_*hy_);
+
+    // Compute all of the z-shifted terms
+    const C zTempL = s1InvM*s2InvM/s3InvL;
+    const C zTempM = s1InvM*s2InvM/s3InvM;
+    const C zTempR = s1InvM*s2InvM/s3InvR;
+    const C zTermL = (zTempL+zTempM) / (2*hz_*hz_);
+    const C zTermR = (zTempR+zTempM) / (2*hz_*hz_);
+
+    // Compute the center term
+    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR) + 
+        (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM + 
+        C(0,imagShift);
+
+    // Fill in the center term
+    int offset = rowOffset;
+    localEntries_[offset++] = centerTerm;
+
+    // Fill the rest of the terms
+    const int zLocal = z - zOffset;
+    if( x > 0 )
+        localEntries_[offset++] = xTermL;
+    if( x+1 < control_.nx )
+        localEntries_[offset++] = xTermR;
+    if( y > 0 )
+        localEntries_[offset++] = yTermL;
+    if( y+1 < control_.ny )
+        localEntries_[offset++] = yTermR;
+    if( zLocal > 0 )
+        localEntries_[offset++] = zTermL;
+    if( zLocal+1 < zSize )
+        localEntries_[offset++] = zTermR;
+}
+

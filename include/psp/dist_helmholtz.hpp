@@ -108,6 +108,10 @@ private:
     C s1Inv( int x ) const;
     C s2Inv( int y ) const;
     C s3Inv( int z ) const;
+    C s3InvArtificial( int z, int zOffset, R sizeOfPML ) const;
+    void FormRow
+    ( R imagShift, int x, int y, int z, int zOffset, int zSize,
+      int rowOffset, R alpha );
 
     static void RecursiveReordering
     ( int nx, int xOffset, int xSize, int yOffset, int ySize, 
