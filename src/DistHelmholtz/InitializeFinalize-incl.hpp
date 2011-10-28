@@ -43,23 +43,159 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
         FormRow( 0, x, y, z, 0, nz, rowOffset, alpha );
     }
 
-    // Initialize the front panel
-    // TODO: Traverse symbolic local tree in order to initialize fronts
+    //
+    // Initialize and factor the bottom panel (first, since it is the largest)
+    //
+    {
+        // Initialize the local part of the bottom panel
+        clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;
+        const clique::symbolic::LocalSymmFact& localSymbFact = 
+            bottomSymbolicFact_.local;
+        const int numLocalSupernodes = localSymbFact.supernodes.size();
+        for( int t=0; t<numLocalSupernodes; ++t )
+        {
+            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
+            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
+                localSymbFact.supernodes[t];
 
-    // Initialize the full inner panels
+            // TODO: Initialize this front
+        }
+
+        // Initialize the distributed part of the bottom panel
+        clique::numeric::DistSymmFrontTree<C>& distFact = bottomFact_.dist;
+        const clique::symbolic::DistSymmFact& distSymbFact = 
+            bottomSymbolicFact_.dist;
+        const int numDistSupernodes = distSymbFact.supernodes.size();
+        for( int t=0; t<numDistSupernodes; ++t )
+        {
+            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
+            const clique::symbolic::DistSymmFactSupernode& symbSN = 
+                distSymbFact.supernodes[t];
+
+            // TODO: Initialize this front
+        }
+
+        // Compute the sparse-direct LDL^T factorization of the bottom panel
+        clique::numeric::LDL
+        ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+    }
+
+    //
+    // Initialize and factor the top panel
+    //
+    {
+        // Initialize the local part of the top panel
+        clique::numeric::LocalSymmFrontTree<C>& localFact = topFact_.local;
+        const clique::symbolic::LocalSymmFact& localSymbFact = 
+            topSymbolicFact_.local;
+        const int numLocalSupernodes = localSymbFact.supernodes.size();
+        for( int t=0; t<numLocalSupernodes; ++t )
+        {
+            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
+            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
+                localSymbFact.supernodes[t];
+
+            // TODO: Initialize this front
+        }
+
+        // Initialize the distributed part of the top panel
+        clique::numeric::DistSymmFrontTree<C>& distFact = topFact_.dist;
+        const clique::symbolic::DistSymmFact& distSymbFact = 
+            topSymbolicFact_.dist;
+        const int numDistSupernodes = distSymbFact.supernodes.size();
+        for( int t=0; t<numDistSupernodes; ++t )
+        {
+            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
+            const clique::symbolic::DistSymmFactSupernode& symbSN = 
+                distSymbFact.supernodes[t];
+
+            // TODO: Initialize this front
+        }
+
+        // Compute the sparse-direct LDL^T factorization of the top panel
+        clique::numeric::LDL
+        ( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
+    }
+
+    //
+    // Initialize and factor the full inner panels
+    //
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
-        // TODO: Traverse symbolic local tree in order to initialize fronts
+        clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
+
+        // Initialize the local part of the k'th full inner panel
+        clique::numeric::LocalSymmFrontTree<C>& localFact = fullInnerFact.local;
+        const clique::symbolic::LocalSymmFact& localSymbFact = 
+            fullInnerSymbolicFact_.local;
+        const int numLocalSupernodes = localSymbFact.supernodes.size();
+        for( int t=0; t<numLocalSupernodes; ++t )
+        {
+            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
+            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
+                localSymbFact.supernodes[t];
+
+            // TODO: Initialize this front
+        }
+
+        // Initialize the distributed part of the k'th full inner panel
+        clique::numeric::DistSymmFrontTree<C>& distFact = fullInnerFact.dist;
+        const clique::symbolic::DistSymmFact& distSymbFact = 
+            fullInnerSymbolicFact_.dist;
+        const int numDistSupernodes = distSymbFact.supernodes.size();
+        for( int t=0; t<numDistSupernodes; ++t )
+        {
+            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
+            const clique::symbolic::DistSymmFactSupernode& symbSN = 
+                distSymbFact.supernodes[t];
+
+            // TODO: Initialize this front
+        }
+
+        // Compute the sparse-direct LDL^T factorization of the k'th inner panel
+        clique::numeric::LDL
+        ( clique::TRANSPOSE, fullInnerSymbolicFact_, fullInnerFact );
     }
 
+    //
+    // Initialize and factor the leftover inner panel (if it exists)
+    //
     if( haveLeftover_ )
     {
-        // Initialize the leftover panel
-        // TODO: Traverse symbolic local tree in order to initialize fronts
-    }
+        // Initialize the local portion of the leftover panel
+        clique::numeric::LocalSymmFrontTree<C>& localFact = 
+            leftoverInnerFact_.local;
+        const clique::symbolic::LocalSymmFact& localSymbFact = 
+            leftoverInnerSymbolicFact_.local;
+        const int numLocalSupernodes = localSymbFact.supernodes.size();
+        for( int t=0; t<numLocalSupernodes; ++t )
+        {
+            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
+            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
+                localSymbFact.supernodes[t];
 
-    // Initialize the back panel
-    // TODO: Traverse symbolic local tree in order to initialize fronts
+            // TODO: Initialize this front
+        }
+
+        // Initialize the distributed portion of the leftover panel
+        clique::numeric::DistSymmFrontTree<C>& distFact = 
+            leftoverInnerFact_.dist;
+        const clique::symbolic::DistSymmFact& distSymbFact = 
+            leftoverInnerSymbolicFact_.dist;
+        const int numDistSupernodes = distSymbFact.supernodes.size();
+        for( int t=0; t<numDistSupernodes; ++t )
+        {
+            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
+            const clique::symbolic::DistSymmFactSupernode& symbSN = 
+                distSymbFact.supernodes[t];
+
+            // TODO: Initialize this front
+        }
+
+        // Compute the sparse-direct LDL^T factorization of the leftover panel
+        clique::numeric::LDL
+        ( clique::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+    }
 }
 
 template<typename R>

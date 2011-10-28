@@ -44,9 +44,22 @@ void PopCallStack();
 void DumpCallStack();
 #endif
 
+// Pull in some of Elemental's imported libraries
 namespace blas = elemental::blas;
 namespace lapack = elemental::lapack;
 namespace mpi = elemental::mpi;
+
+// Pull in a number of useful enums from Elemental
+using namespace elemental::diagonal_wrapper;
+using namespace elemental::distribution_wrapper;
+using namespace elemental::orientation_wrapper;
+using namespace elemental::shape_wrapper;
+using namespace elemental::side_wrapper;
+
+// Pull in a few classes from Elemental
+using elemental::DistMatrix;
+using elemental::Grid;
+using elemental::Matrix;
 
 } // namespace clique
 
