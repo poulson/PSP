@@ -57,17 +57,52 @@ private:
     elemental::mpi::Comm comm_;
     const FiniteDiffControl<R> control_;
 
-    // Useful constants
+    // Frequently used extra grid constants
     const R hx_, hy_, hz_; // grid spacings
     const R bx_, by_, bz_; // (PML width)/(grid spacings)
     const int bzCeil_;     // ceil(bz)
 
-    // General panel information
+    // Whether or not we have used slowness information to set up a preconditioner
+    bool initialized_; 
+
+    //
+    // Information related to the decomposition of the domain into panels
+    //
+
+    // Information about the top panel
+    int topDepth_;       // including the original PML
+    int localTopHeight_; // our process's local height of the top panel
+
+    // Information about the full inner panels
+    int innerDepth_;           // total physical inner depth
+    int numFullInnerPanels_;   // number of full inner panels we need
+    int localFullInnerHeight_; // local height of each full inner panel
+
+    // Information about the leftover inner panel
     bool haveLeftover_;
-    int topDepth_, innerDepth_, leftoverInnerDepth_, bottomOrigDepth_;
-    int numFullInnerPanels_;
-    int localTopHeight_, localFullInnerHeight_, localLeftoverInnerHeight_, 
-        localBottomHeight_;
+    int leftoverInnerDepth_;
+    int localLeftoverInnerHeight_;
+
+    // Information about the bottom panel
+    int bottomOrigDepth_;
+    int localBottomHeight_;
+
+    // Symbolic factorizations of each class of panels
+    clique::symbolic::SymmFact 
+        topSymbolicFact_, 
+        fullInnerSymbolicFact_, 
+        leftoverInnerSymbolicFact_, 
+        bottomSymbolicFact_;
+
+    // Numeric factorizations of each panel
+    clique::numeric::SymmFrontTree<C> topFact_;
+    std::vector<clique::numeric::SymmFrontTree<C>*> fullInnerFacts_;
+    clique::numeric::SymmFrontTree<C> leftoverInnerFact_;
+    clique::numeric::SymmFrontTree<C> bottomFact_;
+
+    //
+    // Information related to the global sparse matrix
+    //
 
     // Sparse matrix storage
     int localHeight_;
@@ -80,29 +115,8 @@ private:
     std::vector<int> actualSendSizes_, actualRecvSizes_; // length p
     std::vector<int> sendIndices_; // length p*allToAllSize_
 
-    // TODO: 
-    // Information for communication needed by application of A_{i+1,i} blocks.
-    // This will be needed for more general stencils than SEVEN_POINT.
-
-    bool initialized_;
-
-    // Sparse-direct symbolic factorizations of PML-padded panels.
-    // Since most of the inner panels are structurally equivalent, we can get
-    // away with only a few symbolic factorizations.
-    clique::symbolic::SymmFact 
-        topSymbolicFact_, 
-        fullInnerSymbolicFact_, 
-        leftoverInnerSymbolicFact_, 
-        bottomSymbolicFact_;
-
-    // Sparse-direct numeric factorizations of PML-padded panels
-    clique::numeric::SymmFrontTree<C> topFact_;
-    std::vector<clique::numeric::SymmFrontTree<C>*> fullInnerFacts_;
-    clique::numeric::SymmFrontTree<C> leftoverInnerFact_;
-    clique::numeric::SymmFrontTree<C> bottomFact_;
-
     //
-    // Helper routines
+    // Helper routines 
     //
 
     C s1Inv( int x ) const;
@@ -131,6 +145,8 @@ private:
     int LocalZ( int z ) const;
     int LocalPanelOffset( int z ) const;
 
+    // For building localToNaturalMap_, which takes our local index in the 
+    // global sparse matrix and returns the original 'natural' index.
     void MapLocalPanelIndices
     ( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize, 
       int& localOffset );
