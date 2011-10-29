@@ -58,7 +58,19 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
             const clique::symbolic::LocalSymmFactSupernode& symbSN = 
                 localSymbFact.supernodes[t];
 
-            // TODO: Initialize this front
+            // Initialize this front
+            const int size = symbSN.size;
+            const int updateSize = symbSN.lowerStruct.size();
+            const int frontSize = size + updateSize;
+            front.frontL.ResizeTo( frontSize, size );
+            front.frontR.ResizeTo( frontSize, updateSize );
+            front.frontL.SetToZero();
+            front.frontR.SetToZero();
+            for( int j=0; j<size; ++j )
+            {
+                // Fill in the j'th column of frontL
+                // TODO
+            }
         }
 
         // Initialize the distributed part of the bottom panel
@@ -72,12 +84,35 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
             const clique::symbolic::DistSymmFactSupernode& symbSN = 
                 distSymbFact.supernodes[t];
 
-            // TODO: Initialize this front
+            // Initialize this front
+            Grid& grid = *symbSN.grid;
+            const int gridWidth = grid.Width();
+            const int gridCol = grid.MRRank();
+            const int size = symbSN.size;
+            const int updateSize = symbSN.lowerStruct.size();
+            const int frontSize = size + updateSize;
+            front.front2dL.SetGrid( grid );
+            front.front2dR.SetGrid( grid );
+            front.front2dL.ResizeTo( frontSize, size );
+            front.front2dR.ResizeTo( frontSize, updateSize );
+            front.front2dL.SetToZero();
+            front.front2dR.SetToZero();
+            const int localSize = front.front2dL.LocalWidth();
+            for( int jLocal=0; jLocal<localSize; ++jLocal )
+            {
+                const int j = gridCol + jLocal*gridWidth;
+
+                // Fill in the j'th column of frontL
+                // TODO
+            }
         }
 
         // Compute the sparse-direct LDL^T factorization of the bottom panel
         clique::numeric::LDL
         ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+
+        // Redistribute the LDL^T factorization for faster solves
+        clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
     }
 
     //
@@ -115,6 +150,9 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
         // Compute the sparse-direct LDL^T factorization of the top panel
         clique::numeric::LDL
         ( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
+
+        // Redistribute the LDL^T factorization for faster solves
+        clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
     }
 
     //
@@ -155,6 +193,9 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         clique::numeric::LDL
         ( clique::TRANSPOSE, fullInnerSymbolicFact_, fullInnerFact );
+
+        // Redistribute the LDL^T factorization for faster solves
+        clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
     }
 
     //
@@ -195,6 +236,9 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         clique::numeric::LDL
         ( clique::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+
+        // Redistribute the LDL^T factorization for faster solves
+        clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
     }
 }
 
