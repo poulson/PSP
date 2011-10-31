@@ -21,7 +21,7 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Precondition( C* localY ) const
+psp::DistHelmholtz<R>::Precondition( GridData<C>& y ) const
 {
     // HERE
 }

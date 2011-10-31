@@ -21,8 +21,6 @@
 #ifndef PSP_DIST_HELMHOLTZ_HPP
 #define PSP_DIST_HELMHOLTZ_HPP 1
 
-#include "clique.hpp"
-
 namespace psp {
 
 template<typename R>
@@ -37,19 +35,17 @@ public:
     ~DistHelmholtz();
 
     // Build the sparse matrix and the preconditioner
-    void Initialize( const R* localSlowness );
+    void Initialize( const GridData<R>& slowness );
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
 
-    // Y := alpha A X + beta Y
-    void Multiply( C alpha, const C* localX, C beta, C* localY ) const;
+    // y := alpha A x + beta y
+    void Multiply
+    ( C alpha, const GridData<C>& x, C beta, GridData<C>& y ) const;
 
-    // Y := approximateInv(A) Y
-    void Precondition( C* localY ) const;
-
-    // Return the number of rows of the sparse matrix that our process stores.
-    int LocalSize() const;
+    // y := approximateInv(A) y
+    void Precondition( GridData<C>& y ) const;
 
     //void WriteParallelVtkFile( const F* vLocal, const char* basename ) const;
 
@@ -62,7 +58,8 @@ private:
     const R bx_, by_, bz_; // (PML width)/(grid spacings)
     const int bzCeil_;     // ceil(bz)
 
-    // Whether or not we have used slowness information to set up a preconditioner
+    // Whether or not we have used slowness information to set up a 
+    // preconditioner
     bool initialized_; 
 
     //
@@ -202,11 +199,6 @@ template<typename R>
 inline 
 DistHelmholtz<R>::~DistHelmholtz() 
 { }
-
-template<typename R>
-inline int
-DistHelmholtz<R>::LocalSize() const
-{ return localHeight_; }
 
 } // namespace psp
 

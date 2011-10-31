@@ -22,7 +22,7 @@
 template<typename R>
 void
 psp::DistHelmholtz<R>::Multiply
-( C alpha, const C* localX, C beta, C* localY ) const
+( C alpha, const GridData<C>& x, C beta, GridData<C>& y ) const
 {
     // HERE
 }

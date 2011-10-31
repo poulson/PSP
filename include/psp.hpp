@@ -21,8 +21,11 @@
 #ifndef PSP_HPP
 #define PSP_HPP 1
 
+#include "clique.hpp"
+
 #include "psp/config.h"
 #include "psp/finite_diff_control.hpp"
+#include "psp/grid_data.hpp"
 #include "psp/dist_helmholtz.hpp"
 
 #endif // PSP_HPP

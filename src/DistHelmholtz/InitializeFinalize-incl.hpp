@@ -23,11 +23,17 @@
 // of the panels, with the front panel first.
 template<typename R>
 void
-psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
+psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
+
+    // Gather the necessary slowness data using two AllToAll's
+    std::vector<R> localSlowness;
+    {
+        // TODO
+    }
 
     // Initialize the global sparse matrix first
     localEntries_.resize( localRowOffsets_.back() );
@@ -47,6 +53,9 @@ psp::DistHelmholtz<R>::Initialize( const R* localSlowness )
     // Initialize and factor the bottom panel (first, since it is the largest)
     //
     {
+        // Perform two AllToAll's in order to gather the slowness data
+        // TODO
+
         // Initialize the local part of the bottom panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;
         const clique::symbolic::LocalSymmFact& localSymbFact = 
