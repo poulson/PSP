@@ -135,7 +135,7 @@ private:
     ( R imagShift, int x, int y, int z, int zOffset, int zSize,
       int rowOffset, R alpha );
 
-    int LocalPanelHeight( int zSize, unsigned commRank ) const;
+    int LocalPanelHeight( int zSize, int zPadding, unsigned commRank ) const;
     static void LocalPanelHeightRecursion
     ( int xSize, int ySize, int zSize, int zPadding, int cutoff, 
       unsigned commRank, unsigned depthTilSerial, int& localHeight );
@@ -146,7 +146,8 @@ private:
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
     void MapLocalPanelIndices
-    ( int zSize, int& zOffset, unsigned commRank, int& localOffset );
+    ( int zSize, int zPadding, int& zOffset, unsigned commRank, 
+      int& localOffset );
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
       int xOffset, int yOffset, int zOffset, int cutoff,
@@ -155,7 +156,7 @@ private:
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( int zSize, int& zOffset, unsigned commRank,  
+    ( int zSize, int zPadding, int& zOffset, unsigned commRank,  
       std::vector<int>& localConnections, int& localOffset ) const;
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
