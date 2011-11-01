@@ -51,6 +51,7 @@ public:
 
 private:
     elemental::mpi::Comm comm_;
+    unsigned log2CommSize_;
     const FiniteDiffControl<R> control_;
 
     // Frequently used extra grid constants
@@ -124,20 +125,15 @@ private:
     ( R imagShift, int x, int y, int z, int zOffset, int zSize,
       int rowOffset, R alpha );
 
-    static void RecursiveReordering
-    ( int nx, int xOffset, int xSize, int yOffset, int ySize, 
-      int cutoff, int depthTilSerial, int* reordering );
-
-    int LocalPanelHeight
-    ( int zSize, unsigned commRank, unsigned log2CommSize ) const;
+    int LocalPanelHeight( int zSize, unsigned commRank ) const;
     static void LocalPanelHeightRecursion
     ( int xSize, int ySize, int zSize, int cutoff, 
-      unsigned commRank, unsigned log2CommSize, int& localHeight );
+      unsigned commRank, unsigned depthTilSerial, int& localHeight );
 
-    int NumLocalSupernodes( unsigned commRank, unsigned log2CommSize ) const;
+    int NumLocalSupernodes( unsigned commRank ) const;
     static void NumLocalSupernodesRecursion
     ( int xSize, int ySize, int cutoff, 
-      unsigned commRank, unsigned log2CommSize, int& numLocal );
+      unsigned commRank, unsigned depthTilSerial, int& numLocal );
 
     int LocalZ( int z ) const;
     int LocalPanelOffset( int z ) const;
@@ -145,43 +141,46 @@ private:
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
     void MapLocalPanelIndices
-    ( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize, 
-      int& localOffset );
+    ( int zSize, int& zOffset, unsigned commRank, int& localOffset );
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int zSize,
       int xOffset, int yOffset, int zOffset, int cutoff,
-      unsigned commRank, unsigned log2CommSize,
+      unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( int zSize, int& zOffset, unsigned commRank, unsigned log2CommSize, 
+    ( int zSize, int& zOffset, unsigned commRank,  
       std::vector<int>& localConnections, int& localOffset ) const;
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int zSize,
       int xOffset, int yOffset, int zOffset, int cutoff,
-      unsigned commRank, unsigned log2CommSize,
+      unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localConnections, int& localOffset );
 
-    int OwningProcess( int x, int y, int zLocal, unsigned log2CommSize ) const;
+    int OwningProcess( int x, int y, int zLocal ) const;
     static void OwningProcessRecursion
-    ( int x, int y, int zLocal, int xSize, int ySize, unsigned log2CommSize,
+    ( int x, int y, int zLocal, int xSize, int ySize, unsigned depthTilSerial,
       int& process );
 
-    int ReorderedIndex
-    ( int x, int y, int z, int zSize, int log2CommSize ) const;
-    static int ReorderedIndexRecursion
-    ( int x, int y, int z, int nx, int ny, int nz,
-      int log2CommSize, int cutoff, int offset );
+    void Reordering( std::vector<int>& reordering, int zSize ) const;
+    static void ReorderingRecursion
+    ( std::vector<int>& reordering, int& offset, 
+      int xOffset, int yOffset, int xSize, int ySize, int zSize, int nx, int ny,
+      int depthTilSerial, int cutoff );
 
-    void FillOrigPanelStruct
-    ( int zSize, unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const;
+    int ReorderedIndex( int x, int y, int z, int zSize ) const;
+    static int ReorderedIndexRecursion
+    ( int x, int y, int z, int xSize, int ySize, int zSize,
+      int depthTilSerial, int cutoff, int offset );
+
+    void FillOrigPanelStruct( int zSize, clique::symbolic::SymmOrig& S ) const;
     void FillDistOrigPanelStruct
     ( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const;
+      clique::symbolic::SymmOrig& S ) const;
     void FillLocalOrigPanelStruct
     ( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      unsigned log2CommSize, clique::symbolic::SymmOrig& S ) const;
+      clique::symbolic::SymmOrig& S ) const;
    
     // For use in FillLocalOrigPanelStruct
     struct Box

@@ -43,7 +43,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     // Initialize and factor the bottom panel (first, since it is the largest)
     //
     {
-        // TODO: Mirror approach from below in order to gather the slowness data
+        // Mirror approach from below in order to gather the slowness data
+        std::vector<int> reordering;
+        Reordering( reordering, bottomOrigDepth_+bzCeil_ );
+        // TODO
 
         // Initialize the local part of the bottom panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;
