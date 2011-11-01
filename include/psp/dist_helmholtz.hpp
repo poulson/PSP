@@ -114,26 +114,31 @@ private:
     std::vector<int> sendIndices_; // length p*allToAllSize_
 
     //
-    // Helper routines 
+    // General helper routines 
     //
 
     C s1Inv( int x ) const;
     C s2Inv( int y ) const;
     C s3Inv( int z ) const;
     C s3InvArtificial( int z, int zOffset, R sizeOfPML ) const;
+
+    int NumLocalSupernodes( unsigned commRank ) const;
+    static void NumLocalSupernodesRecursion
+    ( int xSize, int ySize, int cutoff, 
+      unsigned commRank, unsigned depthTilSerial, int& numLocal );
+
+    //
+    // Global sparse helper routines
+    //
+
     void FormRow
     ( R imagShift, int x, int y, int z, int zOffset, int zSize,
       int rowOffset, R alpha );
 
     int LocalPanelHeight( int zSize, unsigned commRank ) const;
     static void LocalPanelHeightRecursion
-    ( int xSize, int ySize, int zSize, int cutoff, 
+    ( int xSize, int ySize, int zSize, int zPadding, int cutoff, 
       unsigned commRank, unsigned depthTilSerial, int& localHeight );
-
-    int NumLocalSupernodes( unsigned commRank ) const;
-    static void NumLocalSupernodesRecursion
-    ( int xSize, int ySize, int cutoff, 
-      unsigned commRank, unsigned depthTilSerial, int& numLocal );
 
     int LocalZ( int z ) const;
     int LocalPanelOffset( int z ) const;
@@ -143,7 +148,7 @@ private:
     void MapLocalPanelIndices
     ( int zSize, int& zOffset, unsigned commRank, int& localOffset );
     static void MapLocalPanelIndicesRecursion
-    ( int nx, int ny, int nz, int xSize, int ySize, int zSize,
+    ( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
       int xOffset, int yOffset, int zOffset, int cutoff,
       unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
@@ -153,15 +158,19 @@ private:
     ( int zSize, int& zOffset, unsigned commRank,  
       std::vector<int>& localConnections, int& localOffset ) const;
     static void MapLocalConnectionIndicesRecursion
-    ( int nx, int ny, int nz, int xSize, int ySize, int zSize,
+    ( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
       int xOffset, int yOffset, int zOffset, int cutoff,
       unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localConnections, int& localOffset );
 
     int OwningProcess( int x, int y, int zLocal ) const;
     static void OwningProcessRecursion
-    ( int x, int y, int zLocal, int xSize, int ySize, unsigned depthTilSerial,
-      int& process );
+    ( int x, int y, int zLocal, int xSize, int ySize, 
+      unsigned depthTilSerial, int& process );
+
+    //
+    // Helpers for the PML-padded sparse-direct portion
+    //
 
     void Reordering( std::vector<int>& reordering, int zSize ) const;
     static void ReorderingRecursion

@@ -47,6 +47,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         std::vector<int> reordering;
         Reordering( reordering, bottomOrigDepth_+bzCeil_ );
         // TODO
+        // HERE
 
         // Initialize the local part of the bottom panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;

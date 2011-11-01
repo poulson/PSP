@@ -252,7 +252,7 @@ psp::DistHelmholtz<R>::LocalPanelHeight( int zSize, unsigned commRank ) const
 {
     int localHeight = 0;
     LocalPanelHeightRecursion
-    ( control_.nx, control_.ny, zSize, control_.cutoff, 
+    ( control_.nx, control_.ny, zSize, bzCeil_, control_.cutoff, 
       commRank, log2CommSize_, localHeight );
     return localHeight;
 }
@@ -260,7 +260,7 @@ psp::DistHelmholtz<R>::LocalPanelHeight( int zSize, unsigned commRank ) const
 template<typename R>
 void
 psp::DistHelmholtz<R>::LocalPanelHeightRecursion
-( int xSize, int ySize, int zSize, int cutoff, 
+( int xSize, int ySize, int zSize, int zPadding, int cutoff, 
   unsigned commRank, unsigned depthTilSerial, int& localHeight ) 
 {
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
@@ -276,8 +276,9 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
 
         // Add our local portion of the partition
         const int commSize = 1u<<depthTilSerial;
+        const int alignment = (ySize*zPadding) % commSize;
         localHeight += 
-            elemental::LocalLength( ySize*zSize, commRank, commSize );
+            elemental::LocalLength( ySize*zSize, alignment, commSize );
 
         // Add the left and/or right sides
         const int xLeftSize = (xSize-1) / 2;
@@ -285,23 +286,24 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         {
             // Add the left side
             LocalPanelHeightRecursion
-            ( xLeftSize, ySize, zSize, cutoff, 0, 0, localHeight );
+            ( xLeftSize, ySize, zSize, zPadding, cutoff, 0, 0, localHeight );
             // Add the right side
             LocalPanelHeightRecursion
-            ( xSize-(xLeftSize+1), ySize, zSize, cutoff, 0, 0, localHeight );
+            ( xSize-(xLeftSize+1), ySize, zSize, zPadding, cutoff, 0, 0, 
+              localHeight );
         }
         else if( commRank & 1 )
         {
             // Add the right side
             LocalPanelHeightRecursion
-            ( xSize-(xLeftSize+1), ySize, zSize, cutoff,
+            ( xSize-(xLeftSize+1), ySize, zSize, zPadding, cutoff,
               commRank/2, depthTilSerial-1, localHeight );
         }
         else // depthTilSerial != 0 && commRank & 1 == 0
         {
             // Add the left side
             LocalPanelHeightRecursion
-            ( xLeftSize, ySize, zSize, cutoff,
+            ( xLeftSize, ySize, zSize, zPadding, cutoff,
               commRank/2, depthTilSerial-1, localHeight );
         }
     }
@@ -313,8 +315,9 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
 
         // Add our local portion of the partition
         const int commSize = 1u<<depthTilSerial;
+        const int alignment = (xSize*zPadding) % commSize;
         localHeight +=
-            elemental::LocalLength( xSize*zSize, commRank, commSize );
+            elemental::LocalLength( xSize*zSize, alignment, commSize );
 
         // Add the left and/or right sides
         const int yLeftSize = (ySize-1) / 2;
@@ -322,23 +325,24 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         {
             // Add the left side
             LocalPanelHeightRecursion
-            ( xSize, yLeftSize, zSize, cutoff, 0, 0, localHeight );
+            ( xSize, yLeftSize, zSize, zPadding, cutoff, 0, 0, localHeight );
             // Add the right side
             LocalPanelHeightRecursion
-            ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 0, 0, localHeight );
+            ( xSize, ySize-(yLeftSize+1), zSize, zPadding, cutoff, 0, 0, 
+              localHeight );
         }
         else if( commRank & 1 )
         {
             // Add the right side
             LocalPanelHeightRecursion
-            ( xSize, ySize-(yLeftSize+1), zSize, cutoff, 
+            ( xSize, ySize-(yLeftSize+1), zSize, zPadding, cutoff, 
               commRank/2, depthTilSerial-1, localHeight );
         }
         else // depthTilSerial != 0 && commRank & 1 == 0
         {
             // Add the left side
             LocalPanelHeightRecursion
-            ( xSize, yLeftSize, zSize, cutoff,
+            ( xSize, yLeftSize, zSize, zPadding, cutoff,
               commRank/2, depthTilSerial-1, localHeight );
         }
     }
@@ -449,7 +453,7 @@ psp::DistHelmholtz<R>::LocalZ( int z ) const
     }
     else if( z < topDepth_ + innerDepth_ )
     {
-        return (z-topDepth_) % control_.planesPerPanel;
+        return ((z-topDepth_) % control_.planesPerPanel) + bzCeil_;
     }
     else // z in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
     {
@@ -458,10 +462,12 @@ psp::DistHelmholtz<R>::LocalZ( int z ) const
             z >= topDepth_+innerDepth_+bottomOrigDepth_ )
             throw std::logic_error("z is out of bounds");
 #endif
-        return z - (topDepth_+innerDepth_);
+        return (z - (topDepth_+innerDepth_)) + bzCeil_;
     }
 }
 
+// Return the local offset into the global sparse matrix for the panel 
+// containing the given z index
 template<typename R>
 int 
 psp::DistHelmholtz<R>::LocalPanelOffset( int z ) const
@@ -489,7 +495,7 @@ psp::DistHelmholtz<R>::MapLocalPanelIndices
 {
     MapLocalPanelIndicesRecursion
     ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, zSize, 
-      0, 0, zOffset, control_.cutoff, commRank, log2CommSize_, 
+      bzCeil_, 0, 0, zOffset, control_.cutoff, commRank, log2CommSize_, 
       localToNaturalMap_, localRowOffsets_, localOffset );
     zOffset += zSize;
 }
@@ -497,7 +503,7 @@ psp::DistHelmholtz<R>::MapLocalPanelIndices
 template<typename R>
 void
 psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
-( int nx, int ny, int nz, int xSize, int ySize, int zSize, 
+( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
   int xOffset, int yOffset, int zOffset, int cutoff, 
   unsigned commRank, unsigned depthTilSerial,
   std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
@@ -554,11 +560,12 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         {
             // Add the left side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
-              cutoff, 0, 0, localToNaturalMap, localRowOffsets, localOffset );
+            ( nx, ny, nz, xSize, yLeftSize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, 0, 0, localToNaturalMap, 
+              localRowOffsets, localOffset );
             // Add the right side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, 
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, zPadding,
               xOffset, yOffset+(yLeftSize+1), zOffset, cutoff, 
               0, 0, localToNaturalMap, localRowOffsets, localOffset );
         }
@@ -566,7 +573,7 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         {
             // Add the right side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize,
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, zPadding,
               xOffset, yOffset+(yLeftSize+1), zOffset, cutoff,
               commRank/2, depthTilSerial-1, localToNaturalMap, 
               localRowOffsets, localOffset );
@@ -575,17 +582,18 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         {
             // Add the left side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
-              cutoff, commRank/2, depthTilSerial-1, localToNaturalMap, 
-              localRowOffsets, localOffset );
+            ( nx, ny, nz, xSize, yLeftSize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, commRank/2, depthTilSerial-1, 
+              localToNaturalMap, localRowOffsets, localOffset );
         }
         
         // Add our local portion of the partition
+        const int alignment = (xSize*zPadding) % commSize;
         const int localHeight = 
-            elemental::LocalLength( xSize*zSize, commRank, commSize );
+            elemental::LocalLength( xSize*zSize, alignment, commSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = commRank + iLocal*commSize;
+            const int i = alignment + iLocal*commSize;
             const int xDelta = i % xSize;
             const int zDelta = i / xSize;
             const int x = xOffset + xDelta;
@@ -628,11 +636,12 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         {
             // Add the left side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xLeftSize, xSize, zSize, xOffset, yOffset, zOffset,
-              cutoff, 0, 0, localToNaturalMap, localRowOffsets, localOffset );
+            ( nx, ny, nz, xLeftSize, xSize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, 0, 0, localToNaturalMap, 
+              localRowOffsets, localOffset );
             // Add the right side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, 
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, zPadding,
               xOffset+(xLeftSize+1), yOffset, zOffset, cutoff, 
               0, 0, localToNaturalMap, localRowOffsets, localOffset );
         }
@@ -640,7 +649,7 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         {
             // Add the right side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize,
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, zPadding,
               xOffset+(xLeftSize+1), yOffset, zOffset, cutoff,
               commRank/2, depthTilSerial-1, localToNaturalMap, localRowOffsets, 
               localOffset );
@@ -649,17 +658,18 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         {
             // Add the left side
             MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xLeftSize, ySize, zSize, xOffset, yOffset, zOffset,
-              cutoff, commRank/2, depthTilSerial-1, localToNaturalMap, 
-              localRowOffsets, localOffset );
+            ( nx, ny, nz, xLeftSize, ySize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, commRank/2, depthTilSerial-1, 
+              localToNaturalMap, localRowOffsets, localOffset );
         }
         
         // Add our local portion of the partition
+        const int alignment = (ySize*zPadding) % commSize;
         const int localHeight = 
-            elemental::LocalLength( ySize*zSize, commRank, commSize );
+            elemental::LocalLength( ySize*zSize, alignment, commSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = commRank + iLocal*commSize;
+            const int i = alignment + iLocal*commSize;
             const int yDelta = i % ySize;
             const int zDelta = i / ySize;
             const int x = xOffset + xLeftSize;
@@ -699,7 +709,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndices
 {
     MapLocalConnectionIndicesRecursion
     ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, zSize, 
-      0, 0, zOffset, control_.cutoff, commRank, log2CommSize_, 
+      bzCeil_, 0, 0, zOffset, control_.cutoff, commRank, log2CommSize_, 
       localConnections, localOffset );
     zOffset += zSize;
 }
@@ -707,7 +717,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndices
 template<typename R>
 void
 psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
-( int nx, int ny, int nz, int xSize, int ySize, int zSize, 
+( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
   int xOffset, int yOffset, int zOffset, int cutoff, 
   unsigned commRank, unsigned depthTilSerial,
   std::vector<int>& localConnections, int& localOffset )
@@ -755,11 +765,12 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         {
             // Add the left side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
-              cutoff, 0, 0, localConnections, localOffset );
+            ( nx, ny, nz, xSize, yLeftSize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, 0, 0, localConnections, 
+              localOffset );
             // Add the right side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, 
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, zPadding,
               xOffset, yOffset+(yLeftSize+1), zOffset, cutoff, 
               0, 0, localConnections, localOffset );
         }
@@ -767,7 +778,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         {
             // Add the right side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize,
+            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), zSize, zPadding,
               xOffset, yOffset+(yLeftSize+1), zOffset, cutoff,
               commRank/2, depthTilSerial-1, localConnections, localOffset );
         }
@@ -775,17 +786,18 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         {
             // Add the left side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize, yLeftSize, zSize, xOffset, yOffset, zOffset,
-              cutoff, commRank/2, depthTilSerial-1, localConnections, 
-              localOffset );
+            ( nx, ny, nz, xSize, yLeftSize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, commRank/2, depthTilSerial-1, 
+              localConnections, localOffset );
         }
         
         // Add our local portion of the partition
+        const int alignment = (xSize*zPadding) % commSize;
         const int localHeight = 
-            elemental::LocalLength( xSize*zSize, commRank, commSize );
+            elemental::LocalLength( xSize*zSize, alignment, commSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = commRank + iLocal*commSize;
+            const int i = alignment + iLocal*commSize;
             const int xDelta = i % xSize;
             const int zDelta = i / xSize;
             const int x = xOffset + xDelta;
@@ -820,11 +832,12 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         {
             // Add the left side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xLeftSize, xSize, zSize, xOffset, yOffset, zOffset,
-              cutoff, 0, 0, localConnections, localOffset );
+            ( nx, ny, nz, xLeftSize, xSize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, 0, 0, localConnections, 
+              localOffset );
             // Add the right side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, 
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, zPadding,
               xOffset+(xLeftSize+1), yOffset, zOffset, cutoff, 
               0, 0, localConnections, localOffset );
         }
@@ -832,7 +845,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         {
             // Add the right side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize,
+            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, zSize, zPadding,
               xOffset+(xLeftSize+1), yOffset, zOffset, cutoff,
               commRank/2, depthTilSerial-1, localConnections, localOffset );
         }
@@ -840,17 +853,18 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         {
             // Add the left side
             MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xLeftSize, ySize, zSize, xOffset, yOffset, zOffset,
-              cutoff, commRank/2, depthTilSerial-1, localConnections, 
-              localOffset );
+            ( nx, ny, nz, xLeftSize, ySize, zSize, zPadding, 
+              xOffset, yOffset, zOffset, cutoff, commRank/2, depthTilSerial-1, 
+              localConnections, localOffset );
         }
         
         // Add our local portion of the partition
+        const int alignment = (ySize*zPadding) % commSize;
         const int localHeight = 
-            elemental::LocalLength( ySize*zSize, commRank, commSize );
+            elemental::LocalLength( ySize*zSize, alignment, commSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = commRank + iLocal*commSize;
+            const int i = alignment + iLocal*commSize;
             const int yDelta = i % ySize;
             const int zDelta = i / ySize;
             const int x = xOffset + xLeftSize;
