@@ -242,7 +242,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
                 const R alpha = recvBuffer[++recvOffsets[proc]];
 
                 // Form the j'th lower column of this supernode
-                FormLowerColumn
+                FormLowerColumnOfSupernode
                 ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
                   symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
                   panelNaturalToNested, frontIndices, values );
@@ -295,7 +295,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
                 const R alpha = recvBuffer[++recvOffsets[proc]];
 
                 // Form the j'th lower column of this supernode
-                FormLowerColumn
+                FormLowerColumnOfSupernode
                 ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
                   symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
                   panelNaturalToNested, frontIndices, values );
@@ -697,7 +697,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         const R alpha = recvBuffer[++recvOffsets[proc]];
         const int rowOffset = localRowOffsets_[iLocal];
-        FormRow( alpha, x, y, z, rowOffset );
+        FormGlobalRow( alpha, x, y, z, rowOffset );
     }
 }
 
@@ -819,7 +819,7 @@ psp::DistHelmholtz<R>::s3InvArtificial( int z, int zOffset, R sizeOfPML ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FormRow
+psp::DistHelmholtz<R>::FormGlobalRow
 ( R alpha, int x, int y, int z, int row )
 {
     // Evaluate all of the inverse s functions
@@ -879,7 +879,7 @@ psp::DistHelmholtz<R>::FormRow
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FormLowerColumn
+psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
 ( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize, 
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 

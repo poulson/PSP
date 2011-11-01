@@ -131,7 +131,7 @@ private:
     // Global sparse helper routines
     //
 
-    void FormRow( R alpha, int x, int y, int z, int row );
+    void FormGlobalRow( R alpha, int x, int y, int z, int row );
 
     int LocalPanelHeight( int zSize, int zPadding, unsigned commRank ) const;
     static void LocalPanelHeightRecursion
@@ -171,7 +171,7 @@ private:
     // Helpers for the PML-padded sparse-direct portion
     //
 
-    void FormLowerColumn
+    void FormLowerColumnOfSupernode
     ( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize,
       int offset, int size, int j, 
       const std::vector<int>& origLowerStruct, 
