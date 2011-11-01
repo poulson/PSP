@@ -53,10 +53,15 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int numDistSupernodes = distSymbFact.supernodes.size();
         const int zOffset = topDepth_ + innerDepth_ - bzCeil_;
 
-        // Compute the full reordering of this panel in order to make the 
-        // redistribution of the slowness data manageable
-        std::vector<int> panelReordering;
-        Reordering( panelReordering, bottomOrigDepth_+bzCeil_ );
+        // Compute the reorderings for the indices in the supernodes in our 
+        // local tree
+        std::map<int,int> panelNestedToNatural;
+        LocalReordering( panelNestedToNatural, bottomOrigDepth_+bzCeil_ );
+        std::map<int,int> panelNaturalToNested;
+        std::map<int,int>::const_iterator it;
+        for( it=panelNestedToNatural.begin(); 
+             it!=panelNestedToNatural.end(); ++it )
+            panelNaturalToNested[it->second] = it->first;
 
         // Gather the slowness data using three AllToAlls
         std::vector<int> recvPairs( 2*commSize, 0 );
@@ -68,7 +73,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             const int offset = symbSN.offset;
             for( int j=0; j<size; ++j )
             {
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -94,7 +99,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             for( int jLocal=0; jLocal<localWidth; ++jLocal )
             {
                 const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -131,7 +136,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             const int offset = symbSN.offset;
             for( int j=0; j<size; ++j )
             {
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -157,7 +162,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             for( int jLocal=0; jLocal<localWidth; ++jLocal )
             {
                 const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -272,10 +277,15 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int numDistSupernodes = distSymbFact.supernodes.size();
         const int zOffset = 0;
 
-        // Compute the full reordering of this panel in order to make the 
-        // redistribution of the slowness data manageable
-        std::vector<int> panelReordering;
-        Reordering( panelReordering, topDepth_ );
+        // Compute the reorderings for the indices in the supernodes in our 
+        // local tree
+        std::map<int,int> panelNestedToNatural;
+        LocalReordering( panelNestedToNatural, topDepth_ );
+        std::map<int,int> panelNaturalToNested;
+        std::map<int,int>::const_iterator it;
+        for( it=panelNestedToNatural.begin(); 
+             it!=panelNestedToNatural.end(); ++it )
+            panelNaturalToNested[it->second] = it->first;
 
         // Gather the slowness data using three AllToAlls
         std::vector<int> recvPairs( 2*commSize, 0 );
@@ -287,7 +297,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             const int offset = symbSN.offset;
             for( int j=0; j<size; ++j )
             {
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -313,7 +323,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             for( int jLocal=0; jLocal<localWidth; ++jLocal )
             {
                 const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -350,7 +360,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             const int offset = symbSN.offset;
             for( int j=0; j<size; ++j )
             {
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);
@@ -376,7 +386,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             for( int jLocal=0; jLocal<localWidth; ++jLocal )
             {
                 const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelReordering[offset+j];
+                const int naturalIndex = panelNestedToNatural[offset+j];
                 const int x = naturalIndex % nx;
                 const int y = (naturalIndex/nx) % ny;
                 const int z = zOffset + naturalIndex/(nx*ny);

@@ -173,11 +173,11 @@ private:
     // Helpers for the PML-padded sparse-direct portion
     //
 
-    void Reordering( std::vector<int>& reordering, int zSize ) const;
-    static void ReorderingRecursion
-    ( std::vector<int>& reordering, int& offset, 
+    void LocalReordering( std::map<int,int>& reordering, int zSize ) const;
+    static void LocalReorderingRecursion
+    ( std::map<int,int>& reordering, int offset, 
       int xOffset, int yOffset, int xSize, int ySize, int zSize, int nx, int ny,
-      int depthTilSerial, int cutoff );
+      int depthTilSerial, int cutoff, int commRank );
 
     int ReorderedIndex( int x, int y, int z, int zSize ) const;
     static int ReorderedIndexRecursion

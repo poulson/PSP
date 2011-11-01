@@ -975,22 +975,21 @@ psp::DistHelmholtz<R>::OwningProcessRecursion
 }
 
 template<typename R>
-void psp::DistHelmholtz<R>::Reordering
-( std::vector<int>& reordering, int zSize ) const
+void psp::DistHelmholtz<R>::LocalReordering
+( std::map<int,int>& reordering, int zSize ) const
 {
-    reordering.resize( control_.nx*control_.ny*zSize );
     int offset = 0;
-    ReorderingRecursion
+    LocalReorderingRecursion
     ( reordering, offset, 
       0, 0, control_.nx, control_.ny, zSize, control_.nx, control_.ny, 
-      log2CommSize_, control_.cutoff );
+      log2CommSize_, control_.cutoff, mpi::CommRank(comm_) );
 }
 
 template<typename R>
-void psp::DistHelmholtz<R>::ReorderingRecursion
-( std::vector<int>& reordering, int& offset,
+void psp::DistHelmholtz<R>::LocalReorderingRecursion
+( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int zSize, int nx, int ny, 
-  int depthTilSerial, int cutoff )
+  int depthTilSerial, int cutoff, int commRank )
 {
     const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
@@ -1018,16 +1017,21 @@ void psp::DistHelmholtz<R>::ReorderingRecursion
         const int middle = (xSize-1)/2;
 
         // Recurse on the left side
-        ReorderingRecursion
-        ( reordering, offset, 
-          xOffset, yOffset, middle, ySize, zSize, nx, ny,
-          nextDepthTilSerial, cutoff );
+        if( depthTilSerial == 0 || !(commRank&1) )
+            LocalReorderingRecursion
+            ( reordering, offset, 
+              xOffset, yOffset, middle, ySize, zSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += middle*ySize*zSize;
 
         // Recurse on the right side
-        ReorderingRecursion
-        ( reordering, offset,
-          xOffset+middle+1, yOffset, std::max(xSize-middle-1,0), ySize, zSize,
-          nx, ny, nextDepthTilSerial, cutoff );
+        if( depthTilSerial == 0 || commRank&1 )
+            LocalReorderingRecursion
+            ( reordering, offset,
+              xOffset+middle+1, yOffset, 
+              std::max(xSize-middle-1,0), ySize, zSize, nx, ny, 
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += std::max(xSize-middle-1,0)*ySize*zSize;
 
         // Store the separator
         const int x = xOffset + middle;
@@ -1050,16 +1054,21 @@ void psp::DistHelmholtz<R>::ReorderingRecursion
         const int middle = (ny-1)/2;
 
         // Recurse on the left side
-        ReorderingRecursion
-        ( reordering, offset, 
-          xOffset, yOffset, xSize, middle, zSize, nx, ny,
-          nextDepthTilSerial, cutoff );
+        if( depthTilSerial == 0 || !(commRank&1) )
+            LocalReorderingRecursion
+            ( reordering, offset, 
+              xOffset, yOffset, xSize, middle, zSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += xSize*middle*zSize;
 
         // Recurse on the right side
-        ReorderingRecursion
-        ( reordering, offset,
-          xOffset, yOffset+middle+1, xSize, std::max(ySize-middle-1,0), zSize,
-          nx, ny, nextDepthTilSerial, cutoff );
+        if( depthTilSerial == 0 || commRank&1 )
+            LocalReorderingRecursion
+            ( reordering, offset,
+              xOffset, yOffset+middle+1, 
+              xSize, std::max(ySize-middle-1,0), zSize, nx, ny, 
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += xSize*std::max(ySize-middle-1,0)*zSize;
 
         // Store the separator
         const int y = yOffset + middle;
