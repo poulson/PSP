@@ -52,11 +52,12 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int numLocalSupernodes = localSymbFact.supernodes.size();
         const int numDistSupernodes = distSymbFact.supernodes.size();
         const int zOffset = topDepth_ + innerDepth_ - bzCeil_;
+        const int zSize = bottomOrigDepth_ + bzCeil_;
 
         // Compute the reorderings for the indices in the supernodes in our 
         // local tree
         std::map<int,int> panelNestedToNatural;
-        LocalReordering( panelNestedToNatural, bottomOrigDepth_+bzCeil_ );
+        LocalReordering( panelNestedToNatural, zSize );
         std::map<int,int> panelNaturalToNested;
         std::map<int,int>::const_iterator it;
         for( it=panelNestedToNatural.begin(); 
@@ -201,7 +202,14 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         ( &sendBuffer[0], maxSize, &recvBuffer[0], maxSize, comm_ );
         sendBuffer.clear();
 
+        // Reset the recv offsets before we start unpacking
+        for( int proc=0; proc<commSize; ++proc )
+            recvOffsets[proc] = maxSize*proc;
+
         // Initialize the local part of the bottom panel
+        R imagShift = 1;
+        std::vector<int> frontIndices;
+        std::vector<C> values;
         clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;
         localFact.fronts.resize( numLocalSupernodes );
         for( int t=0; t<numLocalSupernodes; ++t )
@@ -211,6 +219,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
                 localSymbFact.supernodes[t];
 
             // Initialize this front
+            const int offset = symbSN.offset;
             const int size = symbSN.size;
             const int updateSize = symbSN.lowerStruct.size();
             const int frontSize = size + updateSize;
@@ -220,8 +229,26 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             front.frontR.SetToZero();
             for( int j=0; j<size; ++j )
             {
-                // Fill in the j'th column of frontL
-                // TODO
+                // Extract the slowness from the recv buffer
+                const int panelNaturalIndex = panelNestedToNatural[j+offset];
+                const int x = panelNaturalIndex % nx;
+                const int y = (panelNaturalIndex/nx) % ny;
+                const int zPanel = panelNaturalIndex/(nx*ny);
+                const int z = zOffset + zPanel;
+                const int xProc = x % xStride;
+                const int yProc = y % yStride;
+                const int zProc = z % zStride;
+                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+                const R alpha = recvBuffer[++recvOffsets[proc]];
+
+                // Form the j'th lower column of this supernode
+                FormLowerColumn
+                ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
+                  symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+                  panelNaturalToNested, frontIndices, values );
+                const int numMatches = frontIndices.size();
+                for( int k=0; k<numMatches; ++k )
+                    front.frontL.Set( frontIndices[k], j, values[k] );
             }
         }
 
@@ -236,8 +263,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
             // Initialize this front
             Grid& grid = *symbSN.grid;
+            const int gridHeight = grid.Height();
             const int gridWidth = grid.Width();
+            const int gridRow = grid.MCRank();
             const int gridCol = grid.MRRank();
+            const int offset = symbSN.offset;
             const int size = symbSN.size;
             const int updateSize = symbSN.lowerStruct.size();
             const int frontSize = size + updateSize;
@@ -252,8 +282,34 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
             {
                 const int j = gridCol + jLocal*gridWidth;
 
-                // Fill in the j'th column of frontL
-                // TODO
+                // Extract the slowness from the recv buffer
+                const int panelNaturalIndex = panelNestedToNatural[j+offset];
+                const int x = panelNaturalIndex % nx;
+                const int y = (panelNaturalIndex/nx) % ny;
+                const int zPanel = panelNaturalIndex/(nx*ny);
+                const int z = zOffset + zPanel;
+                const int xProc = x % xStride;
+                const int yProc = y % yStride;
+                const int zProc = z % zStride;
+                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+                const R alpha = recvBuffer[++recvOffsets[proc]];
+
+                // Form the j'th lower column of this supernode
+                FormLowerColumn
+                ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
+                  symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+                  panelNaturalToNested, frontIndices, values );
+                const int numMatches = frontIndices.size();
+                for( int k=0; k<numMatches; ++k )
+                {
+                    const int i = frontIndices[k];
+                    if( i % gridHeight == gridRow )
+                    {
+                        const int iLocal = (i-gridRow) / gridHeight;
+                        front.front2dL.SetLocalEntry
+                        ( iLocal, jLocal, values[k] );
+                    }
+                }
             }
         }
 
@@ -276,11 +332,12 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int numLocalSupernodes = localSymbFact.supernodes.size();
         const int numDistSupernodes = distSymbFact.supernodes.size();
         const int zOffset = 0;
+        const int zSize = topDepth_;
 
         // Compute the reorderings for the indices in the supernodes in our 
         // local tree
         std::map<int,int> panelNestedToNatural;
-        LocalReordering( panelNestedToNatural, topDepth_ );
+        LocalReordering( panelNestedToNatural, zSize );
         std::map<int,int> panelNaturalToNested;
         std::map<int,int>::const_iterator it;
         for( it=panelNestedToNatural.begin(); 
@@ -620,11 +677,13 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     mpi::AllToAll( &sendBuffer[0], maxSize, &recvBuffer[0], maxSize, comm_ );
     sendBuffer.clear();
 
+    // Reset the recv offsets before unpacking
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+
     // Now make use of the redistributed slowness data to form the global 
     // sparse matrix
     localEntries_.resize( localRowOffsets_.back() );
-    for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
@@ -638,7 +697,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         const R alpha = recvBuffer[++recvOffsets[proc]];
         const int rowOffset = localRowOffsets_[iLocal];
-        FormRow( 0, x, y, z, 0, nz, rowOffset, alpha );
+        FormRow( alpha, x, y, z, rowOffset );
     }
 }
 
@@ -761,8 +820,72 @@ psp::DistHelmholtz<R>::s3InvArtificial( int z, int zOffset, R sizeOfPML ) const
 template<typename R>
 void
 psp::DistHelmholtz<R>::FormRow
-( R imagShift, int x, int y, int z, int zOffset, int zSize, int rowOffset, 
-  R alpha )
+( R alpha, int x, int y, int z, int row )
+{
+    // Evaluate all of the inverse s functions
+    const C s1InvL = s1Inv( x-1 );
+    const C s1InvM = s1Inv( x   );
+    const C s1InvR = s1Inv( x+1 );
+    const C s2InvL = s2Inv( y-1 );
+    const C s2InvM = s2Inv( y   );
+    const C s2InvR = s2Inv( y+1 );
+    const C s3InvL = s3Inv( z-1 );
+    const C s3InvM = s3Inv( z   );
+    const C s3InvR = s3Inv( z+1 );
+
+    // Compute all of the x-shifted terms
+    const C xTempL = s2InvM*s3InvM/s1InvL;
+    const C xTempM = s2InvM*s3InvM/s1InvM;
+    const C xTempR = s2InvM*s3InvM/s1InvR;
+    const C xTermL = (xTempL+xTempM) / (2*hx_*hx_);
+    const C xTermR = (xTempR+xTempM) / (2*hx_*hx_);
+
+    // Compute all of the y-shifted terms
+    const C yTempL = s1InvM*s3InvM/s2InvL;
+    const C yTempM = s1InvM*s3InvM/s2InvM;
+    const C yTempR = s1InvM*s3InvM/s2InvR;
+    const C yTermL = (yTempL+yTempM) / (2*hy_*hy_);
+    const C yTermR = (yTempR+yTempM) / (2*hy_*hy_);
+
+    // Compute all of the z-shifted terms
+    const C zTempL = s1InvM*s2InvM/s3InvL;
+    const C zTempM = s1InvM*s2InvM/s3InvM;
+    const C zTempR = s1InvM*s2InvM/s3InvR;
+    const C zTermL = (zTempL+zTempM) / (2*hz_*hz_);
+    const C zTermR = (zTempR+zTempM) / (2*hz_*hz_);
+
+    // Compute the center term
+    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR) + 
+        (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM;
+
+    // Fill in the center term
+    int offset = row;
+    localEntries_[offset++] = centerTerm;
+
+    // Fill the rest of the terms
+    if( x > 0 )
+        localEntries_[offset++] = xTermL;
+    if( x+1 < control_.nx )
+        localEntries_[offset++] = xTermR;
+    if( y > 0 )
+        localEntries_[offset++] = yTermL;
+    if( y+1 < control_.ny )
+        localEntries_[offset++] = yTermR;
+    if( z > 0 )
+        localEntries_[offset++] = zTermL;
+    if( z+1 < control_.nz )
+        localEntries_[offset++] = zTermR;
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::FormLowerColumn
+( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize, 
+  int offset, int size, int j,
+  const std::vector<int>& origLowerStruct, 
+  const std::vector<int>& origLowerRelIndices,
+  std::map<int,int>& panelNaturalToNested, 
+  std::vector<int>& frontIndices, std::vector<C>& values ) const
 {
     const R pmlSize = bzCeil_;
 
@@ -802,24 +925,166 @@ psp::DistHelmholtz<R>::FormRow
     const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR) + 
         (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM + 
         C(0,imagShift);
-
-    // Fill in the center term
-    int offset = rowOffset;
-    localEntries_[offset++] = centerTerm;
-
-    // Fill the rest of the terms
     const int zLocal = z - zOffset;
-    if( x > 0 )
-        localEntries_[offset++] = xTermL;
-    if( x+1 < control_.nx )
-        localEntries_[offset++] = xTermR;
-    if( y > 0 )
-        localEntries_[offset++] = yTermL;
-    if( y+1 < control_.ny )
-        localEntries_[offset++] = yTermR;
-    if( zLocal > 0 )
-        localEntries_[offset++] = zTermL;
-    if( zLocal+1 < zSize )
-        localEntries_[offset++] = zTermR;
-}
+    const int nx = control_.nx;
+    const int ny = control_.ny;
 
+    // Fill in the connections
+    std::vector<int>::const_iterator first;
+    frontIndices.resize( 1 );
+    values.resize( 1 );
+    // Center term
+    frontIndices[0] = j;
+    values[0] = centerTerm;
+    // Left connection
+    if( x > 0 )
+    {
+        const int naturalIndex = (x-1) + y*nx + zLocal*nx*ny;
+        if( panelNaturalToNested.count(naturalIndex) )
+        {
+            const int nestedIndex = panelNaturalToNested[naturalIndex];
+            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            {
+                frontIndices.push_back( nestedIndex-offset ); 
+                values.push_back( xTermL );
+            }
+            else
+            {
+                first = std::lower_bound
+                    ( origLowerStruct.begin(), origLowerStruct.end(), 
+                      nestedIndex ); 
+                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
+                {
+                    const int whichLower = int(first-origLowerStruct.begin());
+                    frontIndices.push_back( origLowerRelIndices[whichLower] );
+                    values.push_back( xTermL );
+                }
+            }
+        }
+    }
+    if( x+1 < nx )
+    {
+        const int naturalIndex = (x+1) + y*nx + zLocal*nx*ny;
+        if( panelNaturalToNested.count(naturalIndex) )
+        {
+            const int nestedIndex = panelNaturalToNested[naturalIndex];
+            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            {
+                frontIndices.push_back( nestedIndex-offset );
+                values.push_back( xTermR );
+            }
+            else
+            {
+                first = std::lower_bound
+                    ( origLowerStruct.begin(), origLowerStruct.end(), 
+                      nestedIndex ); 
+                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
+                {
+                    const int whichLower = int(first-origLowerStruct.begin());
+                    frontIndices.push_back( origLowerRelIndices[whichLower] );
+                    values.push_back( xTermR );
+                }
+            }
+        }
+    }
+    if( y > 0 )
+    {
+        const int naturalIndex = x + (y-1)*nx + zLocal*nx*ny;
+        if( panelNaturalToNested.count(naturalIndex) )
+        {
+            const int nestedIndex = panelNaturalToNested[naturalIndex];
+            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            {
+                frontIndices.push_back( nestedIndex-offset );
+                values.push_back( yTermL );
+            }
+            else
+            {
+                first = std::lower_bound
+                    ( origLowerStruct.begin(), origLowerStruct.end(), 
+                      nestedIndex ); 
+                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
+                {
+                    const int whichLower = int(first-origLowerStruct.begin());
+                    frontIndices.push_back( origLowerRelIndices[whichLower] );
+                    values.push_back( yTermL );
+                }
+            }
+        }
+    }
+    if( y+1 < ny )
+    {
+        const int naturalIndex = x + (y+1)*nx + zLocal*nx*ny;
+        if( panelNaturalToNested.count(naturalIndex) )
+        {
+            const int nestedIndex = panelNaturalToNested[naturalIndex];
+            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            {
+                frontIndices.push_back( nestedIndex-offset );
+                values.push_back( yTermR );
+            }
+            else
+            {
+                first = std::lower_bound
+                    ( origLowerStruct.begin(), origLowerStruct.end(), 
+                      nestedIndex ); 
+                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
+                {
+                    const int whichLower = int(first-origLowerStruct.begin());
+                    frontIndices.push_back( origLowerRelIndices[whichLower] );
+                    values.push_back( yTermR );
+                }
+            }
+        }
+    }
+    if( zLocal > 0 )
+    {
+        const int naturalIndex = x + y*nx + (zLocal-1)*nx*ny;
+        if( panelNaturalToNested.count(naturalIndex) )
+        {
+            const int nestedIndex = panelNaturalToNested[naturalIndex];
+            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            {
+                frontIndices.push_back( nestedIndex-offset );
+                values.push_back( zTermL );
+            }
+            else
+            {
+                first = std::lower_bound
+                    ( origLowerStruct.begin(), origLowerStruct.end(), 
+                      nestedIndex ); 
+                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
+                {
+                    const int whichLower = int(first-origLowerStruct.begin());
+                    frontIndices.push_back( origLowerRelIndices[whichLower] );
+                    values.push_back( zTermL );
+                }
+            }
+        }
+    }
+    if( zLocal+1 < zSize )
+    {
+        const int naturalIndex = x + y*nx + (zLocal+1)*nx*ny;
+        if( panelNaturalToNested.count(naturalIndex) )
+        {
+            const int nestedIndex = panelNaturalToNested[naturalIndex];
+            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            {
+                frontIndices.push_back( nestedIndex-offset );
+                values.push_back( zTermR );
+            }
+            else
+            {
+                first = std::lower_bound
+                    ( origLowerStruct.begin(), origLowerStruct.end(), 
+                      nestedIndex ); 
+                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
+                {
+                    const int whichLower = int(first-origLowerStruct.begin());
+                    frontIndices.push_back( origLowerRelIndices[whichLower] );
+                    values.push_back( zTermR );
+                }
+            }
+        }
+    }
+}
