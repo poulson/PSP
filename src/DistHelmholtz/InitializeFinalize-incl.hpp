@@ -28,33 +28,22 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-
-    // Gather the necessary slowness data using two AllToAll's
-    std::vector<R> localSlowness;
-    {
-        // TODO
-    }
-
-    // Initialize the global sparse matrix first
-    localEntries_.resize( localRowOffsets_.back() );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
-    {
-        const int naturalIndex = localToNaturalMap_[iLocal];
-        const int x = naturalIndex % nx;
-        const int y = (naturalIndex/nx) % ny;
-        const int z = naturalIndex/(nx*ny);
-
-        const R alpha = localSlowness[iLocal];
-        const int rowOffset = localRowOffsets_[iLocal];
-        FormRow( 0, x, y, z, 0, nz, rowOffset, alpha );
-    }
+    const int xShift = slowness.XShift();
+    const int yShift = slowness.YShift();
+    const int zShift = slowness.ZShift();
+    const int xStride = slowness.XStride();
+    const int yStride = slowness.YStride();
+    const int zStride = slowness.ZStride();
+    const int xLocalSize = slowness.XLocalSize();
+    const int yLocalSize = slowness.YLocalSize();
+    const int zLocalSize = slowness.ZLocalSize();
+    const R* localSlowness = slowness.LockedLocalBuffer();
 
     //
     // Initialize and factor the bottom panel (first, since it is the largest)
     //
     {
-        // Perform two AllToAll's in order to gather the slowness data
-        // TODO
+        // TODO: Mirror approach from below in order to gather the slowness data
 
         // Initialize the local part of the bottom panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;
@@ -248,6 +237,105 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
+    }
+    
+    //
+    // Initialize the global sparse matrix
+    //
+
+    // Gather the necessary slowness data using three AllToAll's:
+    // 1) Send the necessary recv sizes to each process
+    // 2) Send the list of recv indices to each process
+    // 3) Fill the requests and recv the slowness data
+    const int commSize = mpi::CommSize( comm_ );
+    std::vector<int> recvPairs( 2*commSize, 0 );
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalIndex = localToNaturalMap_[iLocal];
+        const int x = naturalIndex % nx;
+        const int y = (naturalIndex/nx) % ny;
+        const int z = naturalIndex/(nx*ny);
+        const int xProc = x % xStride;
+        const int yProc = y % yStride;
+        const int zProc = z % zStride;
+        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        ++recvPairs[2*proc];
+    }
+    int maxSize = 0;
+    for( int proc=0; proc<commSize; ++proc )
+        maxSize = std::max(recvPairs[2*proc],maxSize);
+    for( int proc=0; proc<commSize; ++proc )
+        recvPairs[2*proc+1] = maxSize;
+    std::vector<int> sendPairs( 2*commSize );
+    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
+    recvPairs.clear();
+    for( int proc=0; proc<commSize; ++proc )
+        maxSize = std::max(sendPairs[2*proc+1],maxSize);
+    std::vector<int> actualSendSizes( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        actualSendSizes[proc] = sendPairs[2*proc];
+    sendPairs.clear();
+    std::vector<int> recvIndices( maxSize*commSize );
+    std::vector<int> recvOffsets( commSize, 0 );
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalIndex = localToNaturalMap_[iLocal];
+        const int x = naturalIndex % nx;
+        const int y = (naturalIndex/nx) % ny;
+        const int z = naturalIndex/(nx*ny);
+        const int xProc = x % xStride;
+        const int yProc = y % yStride;
+        const int zProc = z % zStride;
+        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        recvIndices[++recvOffsets[proc]] = naturalIndex;
+    }
+    std::vector<int> sendIndices( commSize );
+    mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
+    recvIndices.clear();
+    std::vector<R> sendBuffer( maxSize*commSize );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        R* send = &sendBuffer[proc*maxSize];
+        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
+        {
+            const int naturalIndex = sendIndices[iLocal];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = naturalIndex/(nx*ny);
+            const int xLocal = (x-xShift) / xStride;
+            const int yLocal = (y-yShift) / yStride;
+            const int zLocal = (z-zShift) / zStride;
+            const int localIndex = 
+                xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+            send[iLocal] = localSlowness[localIndex];
+        }
+    }
+    sendIndices.clear();
+    std::vector<R> recvBuffer( maxSize*commSize );
+    mpi::AllToAll( &sendBuffer[0], maxSize, &recvBuffer[0], maxSize, comm_ );
+    sendBuffer.clear();
+
+    // Now make use of the redistributed slowness data to form the global 
+    // sparse matrix
+    localEntries_.resize( localRowOffsets_.back() );
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalIndex = localToNaturalMap_[iLocal];
+        const int x = naturalIndex % nx;
+        const int y = (naturalIndex/nx) % ny;
+        const int z = naturalIndex/(nx*ny);
+        const int xProc = x % xStride;
+        const int yProc = y % yStride;
+        const int zProc = z % zStride;
+        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+
+        const R alpha = recvBuffer[++recvOffsets[proc]];
+        const int rowOffset = localRowOffsets_[iLocal];
+        FormRow( 0, x, y, z, 0, nz, rowOffset, alpha );
     }
 }
 
