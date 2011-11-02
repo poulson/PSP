@@ -28,183 +28,37 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int xShift = slowness.XShift();
-    const int yShift = slowness.YShift();
-    const int zShift = slowness.ZShift();
     const int xStride = slowness.XStride();
     const int yStride = slowness.YStride();
     const int zStride = slowness.ZStride();
-    const int xLocalSize = slowness.XLocalSize();
-    const int yLocalSize = slowness.YLocalSize();
-    const int zLocalSize = slowness.ZLocalSize();
-    const R* localSlowness = slowness.LockedLocalBuffer();
     const int commRank = mpi::CommRank( comm_ );
     const int commSize = mpi::CommSize( comm_ );
+    elemental::mpi::Comm slownessComm = slowness.Comm();
+    if( !elemental::mpi::CongruentComms( comm_, slownessComm ) )
+        throw std::logic_error("Slowness does not have a congruent comm");
 
     //
     // Initialize and factor the bottom panel (first, since it is the largest)
     //
     {
+        // Retrieve the slowness for this panel
+        const int zOffset = topDepth_ + innerDepth_ - bzCeil_;
+        const int zSize = bottomOrigDepth_ + bzCeil_;
+        std::vector<R> recvSlowness;
+        std::vector<int> recvOffsets;
+        std::map<int,int> panelNestedToNatural, panelNaturalToNested;
+        GetPanelSlowness
+        ( zOffset, zSize, bottomSymbolicFact_, slowness,
+          recvSlowness, recvOffsets, 
+          panelNestedToNatural, panelNaturalToNested );
+
+        // Grab a few convenience variables
         const clique::symbolic::LocalSymmFact& localSymbFact = 
             bottomSymbolicFact_.local;
         const clique::symbolic::DistSymmFact& distSymbFact = 
             bottomSymbolicFact_.dist;
         const int numLocalSupernodes = localSymbFact.supernodes.size();
         const int numDistSupernodes = distSymbFact.supernodes.size();
-        const int zOffset = topDepth_ + innerDepth_ - bzCeil_;
-        const int zSize = bottomOrigDepth_ + bzCeil_;
-
-        // Compute the reorderings for the indices in the supernodes in our 
-        // local tree
-        std::map<int,int> panelNestedToNatural;
-        LocalReordering( panelNestedToNatural, zSize );
-        std::map<int,int> panelNaturalToNested;
-        std::map<int,int>::const_iterator it;
-        for( it=panelNestedToNatural.begin(); 
-             it!=panelNestedToNatural.end(); ++it )
-            panelNaturalToNested[it->second] = it->first;
-
-        // Gather the slowness data using three AllToAlls
-        std::vector<int> recvPairs( 2*commSize, 0 );
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            for( int j=0; j<size; ++j )
-            {
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                ++recvPairs[2*proc];
-            }
-        }
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-            const clique::Grid& grid = *symbSN.grid;
-            const int gridCol = grid.MRRank();
-            const int gridWidth = grid.Width();
-
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            const int localWidth = 
-                elemental::LocalLength( size, gridCol, gridWidth );
-            for( int jLocal=0; jLocal<localWidth; ++jLocal )
-            {
-                const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                ++recvPairs[2*proc];
-            }
-        }
-        int maxSize = 0;
-        for( int proc=0; proc<commSize; ++proc )
-            maxSize = std::max(recvPairs[2*proc],maxSize);
-        for( int proc=0; proc<commSize; ++proc )
-            recvPairs[2*proc+1] = maxSize;
-        std::vector<int> sendPairs( 2*commSize );
-        mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
-        recvPairs.clear();
-        for( int proc=0; proc<commSize; ++proc )
-            maxSize = std::max(sendPairs[2*proc+1],maxSize);
-        std::vector<int> actualSendSizes( commSize );
-        for( int proc=0; proc<commSize; ++proc )
-            actualSendSizes[proc] = sendPairs[2*proc];
-        sendPairs.clear();
-        std::vector<int> recvIndices( maxSize*commSize );
-        std::vector<int> recvOffsets( commSize, 0 );
-        for( int proc=0; proc<commSize; ++proc )
-            recvOffsets[proc] = maxSize*proc;
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            for( int j=0; j<size; ++j )
-            {
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                recvIndices[++recvOffsets[proc]] = naturalIndex;
-            }
-        }
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-            const clique::Grid& grid = *symbSN.grid;
-            const int gridCol = grid.MRRank();
-            const int gridWidth = grid.Width();
-
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            const int localWidth = 
-                elemental::LocalLength( size, gridCol, gridWidth );
-            for( int jLocal=0; jLocal<localWidth; ++jLocal )
-            {
-                const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                recvIndices[++recvOffsets[proc]] = naturalIndex;
-            }
-        }
-        std::vector<int> sendIndices( maxSize*commSize );
-        mpi::AllToAll
-        ( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
-        recvIndices.clear();
-        std::vector<R> sendBuffer( maxSize*commSize );
-        for( int proc=0; proc<commSize; ++proc )
-        {
-            R* send = &sendBuffer[proc*maxSize];
-            for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
-            {
-                const int naturalIndex = sendIndices[iLocal];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xLocal = (x-xShift) / xStride;
-                const int yLocal = (y-yShift) / yStride;
-                const int zLocal = (z-zShift) / zStride;
-                const int localIndex =
-                    xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
-                send[iLocal] = localSlowness[localIndex];
-            }
-        }
-        sendIndices.clear();
-        std::vector<R> recvBuffer( maxSize*commSize );
-        mpi::AllToAll
-        ( &sendBuffer[0], maxSize, &recvBuffer[0], maxSize, comm_ );
-        sendBuffer.clear();
-
-        // Reset the recv offsets before we start unpacking
-        for( int proc=0; proc<commSize; ++proc )
-            recvOffsets[proc] = maxSize*proc;
 
         // Initialize the local part of the bottom panel
         R imagShift = 1;
@@ -239,7 +93,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
                 const int yProc = y % yStride;
                 const int zProc = z % zStride;
                 const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                const R alpha = recvBuffer[++recvOffsets[proc]];
+                const R alpha = recvSlowness[++recvOffsets[proc]];
 
                 // Form the j'th lower column of this supernode
                 FormLowerColumnOfSupernode
@@ -292,7 +146,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
                 const int yProc = y % yStride;
                 const int zProc = z % zStride;
                 const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                const R alpha = recvBuffer[++recvOffsets[proc]];
+                const R alpha = recvSlowness[++recvOffsets[proc]];
 
                 // Form the j'th lower column of this supernode
                 FormLowerColumnOfSupernode
@@ -325,162 +179,24 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     // Initialize and factor the top panel
     //
     {
+        // Retrieve the slowness for this panel
+        const int zOffset = 0;
+        const int zSize = topDepth_;
+        std::vector<R> recvSlowness;
+        std::vector<int> recvOffsets;
+        std::map<int,int> panelNestedToNatural, panelNaturalToNested;
+        GetPanelSlowness
+        ( zOffset, zSize, topSymbolicFact_, slowness,
+          recvSlowness, recvOffsets,
+          panelNestedToNatural, panelNaturalToNested );
+
+        // Grab a few convenience variables
         const clique::symbolic::LocalSymmFact& localSymbFact = 
             topSymbolicFact_.local;
         const clique::symbolic::DistSymmFact& distSymbFact = 
             topSymbolicFact_.dist;
         const int numLocalSupernodes = localSymbFact.supernodes.size();
         const int numDistSupernodes = distSymbFact.supernodes.size();
-        const int zOffset = 0;
-        const int zSize = topDepth_;
-
-        // Compute the reorderings for the indices in the supernodes in our 
-        // local tree
-        std::map<int,int> panelNestedToNatural;
-        LocalReordering( panelNestedToNatural, zSize );
-        std::map<int,int> panelNaturalToNested;
-        std::map<int,int>::const_iterator it;
-        for( it=panelNestedToNatural.begin(); 
-             it!=panelNestedToNatural.end(); ++it )
-            panelNaturalToNested[it->second] = it->first;
-
-        // Gather the slowness data using three AllToAlls
-        std::vector<int> recvPairs( 2*commSize, 0 );
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            for( int j=0; j<size; ++j )
-            {
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                ++recvPairs[2*proc];
-            }
-        }
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-            const clique::Grid& grid = *symbSN.grid;
-            const int gridCol = grid.MRRank();
-            const int gridWidth = grid.Width();
-
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            const int localWidth = 
-                elemental::LocalLength( size, gridCol, gridWidth );
-            for( int jLocal=0; jLocal<localWidth; ++jLocal )
-            {
-                const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                ++recvPairs[2*proc];
-            }
-        }
-        int maxSize = 0;
-        for( int proc=0; proc<commSize; ++proc )
-            maxSize = std::max(recvPairs[2*proc],maxSize);
-        for( int proc=0; proc<commSize; ++proc )
-            recvPairs[2*proc+1] = maxSize;
-        std::vector<int> sendPairs( 2*commSize );
-        mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
-        recvPairs.clear();
-        for( int proc=0; proc<commSize; ++proc )
-            maxSize = std::max(sendPairs[2*proc+1],maxSize);
-        std::vector<int> actualSendSizes( commSize );
-        for( int proc=0; proc<commSize; ++proc )
-            actualSendSizes[proc] = sendPairs[2*proc];
-        sendPairs.clear();
-        std::vector<int> recvIndices( maxSize*commSize );
-        std::vector<int> recvOffsets( commSize, 0 );
-        for( int proc=0; proc<commSize; ++proc )
-            recvOffsets[proc] = maxSize*proc;
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            for( int j=0; j<size; ++j )
-            {
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                recvIndices[++recvOffsets[proc]] = naturalIndex;
-            }
-        }
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-            const clique::Grid& grid = *symbSN.grid;
-            const int gridCol = grid.MRRank();
-            const int gridWidth = grid.Width();
-
-            const int size = symbSN.size;
-            const int offset = symbSN.offset;
-            const int localWidth = 
-                elemental::LocalLength( size, gridCol, gridWidth );
-            for( int jLocal=0; jLocal<localWidth; ++jLocal )
-            {
-                const int j = gridCol + jLocal*gridWidth;
-                const int naturalIndex = panelNestedToNatural[offset+j];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                recvIndices[++recvOffsets[proc]] = naturalIndex;
-            }
-        }
-        std::vector<int> sendIndices( maxSize*commSize );
-        mpi::AllToAll
-        ( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
-        recvIndices.clear();
-        std::vector<R> sendBuffer( maxSize*commSize );
-        for( int proc=0; proc<commSize; ++proc )
-        {
-            R* send = &sendBuffer[proc*maxSize];
-            for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
-            {
-                const int naturalIndex = sendIndices[iLocal];
-                const int x = naturalIndex % nx;
-                const int y = (naturalIndex/nx) % ny;
-                const int z = zOffset + naturalIndex/(nx*ny);
-                const int xLocal = (x-xShift) / xStride;
-                const int yLocal = (y-yShift) / yStride;
-                const int zLocal = (z-zShift) / zStride;
-                const int localIndex =
-                    xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
-                send[iLocal] = localSlowness[localIndex];
-            }
-        }
-        sendIndices.clear();
-        std::vector<R> recvBuffer( maxSize*commSize );
-        mpi::AllToAll
-        ( &sendBuffer[0], maxSize, &recvBuffer[0], maxSize, comm_ );
-        sendBuffer.clear();
 
         // Initialize the local part of the top panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = topFact_.local;
@@ -519,13 +235,29 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
+        // Retrieve the slowness for this panel
+        const int numPlanesPerPanel = control_.numPlanesPerPanel;
+        const int zOffset = topDepth_ + k*numPlanesPerPanel - bzCeil_;
+        const int zSize = numPlanesPerPanel + bzCeil_;
+        std::vector<R> recvSlowness;
+        std::vector<int> recvOffsets;
+        std::map<int,int> panelNestedToNatural, panelNaturalToNested;
+        GetPanelSlowness
+        ( zOffset, zSize, fullInnerSymbolicFact_, slowness,
+          recvSlowness, recvOffsets, 
+          panelNestedToNatural, panelNaturalToNested );
+
+        // Grab a few convenience variables
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
+        const clique::symbolic::LocalSymmFact& localSymbFact = 
+            fullInnerSymbolicFact_.local;
+        const clique::symbolic::DistSymmFact& distSymbFact = 
+            fullInnerSymbolicFact_.dist;
+        const int numLocalSupernodes = localSymbFact.supernodes.size();
+        const int numDistSupernodes = distSymbFact.supernodes.size();
 
         // Initialize the local part of the k'th full inner panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = fullInnerFact.local;
-        const clique::symbolic::LocalSymmFact& localSymbFact = 
-            fullInnerSymbolicFact_.local;
-        const int numLocalSupernodes = localSymbFact.supernodes.size();
         for( int t=0; t<numLocalSupernodes; ++t )
         {
             clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
@@ -537,9 +269,6 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Initialize the distributed part of the k'th full inner panel
         clique::numeric::DistSymmFrontTree<C>& distFact = fullInnerFact.dist;
-        const clique::symbolic::DistSymmFact& distSymbFact = 
-            fullInnerSymbolicFact_.dist;
-        const int numDistSupernodes = distSymbFact.supernodes.size();
         for( int t=0; t<numDistSupernodes; ++t )
         {
             clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
@@ -561,13 +290,30 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     // Initialize and factor the leftover inner panel (if it exists)
     //
     if( haveLeftover_ )
-    {
+    {        
+        // Retrieve the slowness for this panel
+        const int zOffset = topDepth_ + innerDepth_ - 
+                            leftoverInnerDepth_ - bzCeil_;
+        const int zSize = leftoverInnerDepth_ + bzCeil_;
+        std::vector<R> recvSlowness;
+        std::vector<int> recvOffsets;
+        std::map<int,int> panelNestedToNatural, panelNaturalToNested;
+        GetPanelSlowness
+        ( zOffset, zSize, leftoverInnerSymbolicFact_, slowness,
+          recvSlowness, recvOffsets, 
+          panelNestedToNatural, panelNaturalToNested );
+
+        // Grab a few convenience variables
+        const clique::symbolic::LocalSymmFact& localSymbFact = 
+            leftoverInnerSymbolicFact_.local;
+        const clique::symbolic::DistSymmFact& distSymbFact = 
+            leftoverInnerSymbolicFact_.dist;
+        const int numLocalSupernodes = localSymbFact.supernodes.size();
+        const int numDistSupernodes = distSymbFact.supernodes.size();
+
         // Initialize the local portion of the leftover panel
         clique::numeric::LocalSymmFrontTree<C>& localFact = 
             leftoverInnerFact_.local;
-        const clique::symbolic::LocalSymmFact& localSymbFact = 
-            leftoverInnerSymbolicFact_.local;
-        const int numLocalSupernodes = localSymbFact.supernodes.size();
         for( int t=0; t<numLocalSupernodes; ++t )
         {
             clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
@@ -580,9 +326,6 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Initialize the distributed portion of the leftover panel
         clique::numeric::DistSymmFrontTree<C>& distFact = 
             leftoverInnerFact_.dist;
-        const clique::symbolic::DistSymmFact& distSymbFact = 
-            leftoverInnerSymbolicFact_.dist;
-        const int numDistSupernodes = distSymbFact.supernodes.size();
         for( int t=0; t<numDistSupernodes; ++t )
         {
             clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
@@ -604,82 +347,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     // Initialize the global sparse matrix
     //
 
-    // Gather the necessary slowness data using three AllToAll's:
-    // 1) Send the necessary recv sizes to each process
-    // 2) Send the list of recv indices to each process
-    // 3) Fill the requests and recv the slowness data
-    std::vector<int> recvPairs( 2*commSize, 0 );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
-    {
-        const int naturalIndex = localToNaturalMap_[iLocal];
-        const int x = naturalIndex % nx;
-        const int y = (naturalIndex/nx) % ny;
-        const int z = naturalIndex/(nx*ny);
-        const int xProc = x % xStride;
-        const int yProc = y % yStride;
-        const int zProc = z % zStride;
-        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-        ++recvPairs[2*proc];
-    }
-    int maxSize = 0;
-    for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(recvPairs[2*proc],maxSize);
-    for( int proc=0; proc<commSize; ++proc )
-        recvPairs[2*proc+1] = maxSize;
-    std::vector<int> sendPairs( 2*commSize );
-    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
-    recvPairs.clear();
-    for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(sendPairs[2*proc+1],maxSize);
-    std::vector<int> actualSendSizes( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        actualSendSizes[proc] = sendPairs[2*proc];
-    sendPairs.clear();
-    std::vector<int> recvIndices( maxSize*commSize );
-    std::vector<int> recvOffsets( commSize, 0 );
-    for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
-    {
-        const int naturalIndex = localToNaturalMap_[iLocal];
-        const int x = naturalIndex % nx;
-        const int y = (naturalIndex/nx) % ny;
-        const int z = naturalIndex/(nx*ny);
-        const int xProc = x % xStride;
-        const int yProc = y % yStride;
-        const int zProc = z % zStride;
-        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-        recvIndices[++recvOffsets[proc]] = naturalIndex;
-    }
-    std::vector<int> sendIndices( maxSize*commSize );
-    mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
-    recvIndices.clear();
-    std::vector<R> sendBuffer( maxSize*commSize );
-    for( int proc=0; proc<commSize; ++proc )
-    {
-        R* send = &sendBuffer[proc*maxSize];
-        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
-        {
-            const int naturalIndex = sendIndices[iLocal];
-            const int x = naturalIndex % nx;
-            const int y = (naturalIndex/nx) % ny;
-            const int z = naturalIndex/(nx*ny);
-            const int xLocal = (x-xShift) / xStride;
-            const int yLocal = (y-yShift) / yStride;
-            const int zLocal = (z-zShift) / zStride;
-            const int localIndex = 
-                xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
-            send[iLocal] = localSlowness[localIndex];
-        }
-    }
-    sendIndices.clear();
-    std::vector<R> recvBuffer( maxSize*commSize );
-    mpi::AllToAll( &sendBuffer[0], maxSize, &recvBuffer[0], maxSize, comm_ );
-    sendBuffer.clear();
-
-    // Reset the recv offsets before unpacking
-    for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
+    // Gather the slowness for the global sparse matrix
+    std::vector<R> recvSlowness;
+    std::vector<int> recvOffsets;
+    GetGlobalSlowness( slowness, recvSlowness, recvOffsets );
 
     // Now make use of the redistributed slowness data to form the global 
     // sparse matrix
@@ -695,7 +366,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int zProc = z % zStride;
         const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
 
-        const R alpha = recvBuffer[++recvOffsets[proc]];
+        const R alpha = recvSlowness[++recvOffsets[proc]];
         const int rowOffset = localRowOffsets_[iLocal];
         FormGlobalRow( alpha, x, y, z, rowOffset );
     }
@@ -1088,3 +759,288 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
         }
     }
 }
+        
+template<typename R>
+void
+psp::DistHelmholtz<R>::GetGlobalSlowness
+( const GridData<R>& slowness,
+  std::vector<R>& recvSlowness,
+  std::vector<int>& recvOffsets ) const
+{
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int nz = control_.nz;
+    const int xShift = slowness.XShift();
+    const int yShift = slowness.YShift();
+    const int zShift = slowness.ZShift();
+    const int xStride = slowness.XStride();
+    const int yStride = slowness.YStride();
+    const int zStride = slowness.ZStride();
+    const int xLocalSize = slowness.XLocalSize();
+    const int yLocalSize = slowness.YLocalSize();
+    const int zLocalSize = slowness.ZLocalSize();
+    const R* localSlowness = slowness.LockedLocalBuffer();
+    const int commRank = mpi::CommRank( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
+    elemental::mpi::Comm slownessComm = slowness.Comm();
+
+    std::vector<int> recvPairs( 2*commSize, 0 );
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalIndex = localToNaturalMap_[iLocal];
+        const int x = naturalIndex % nx;
+        const int y = (naturalIndex/nx) % ny;
+        const int z = naturalIndex/(nx*ny);
+        const int xProc = x % xStride;
+        const int yProc = y % yStride;
+        const int zProc = z % zStride;
+        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        ++recvPairs[2*proc];
+    }
+    int maxSize = 0;
+    for( int proc=0; proc<commSize; ++proc )
+        maxSize = std::max(recvPairs[2*proc],maxSize);
+    for( int proc=0; proc<commSize; ++proc )
+        recvPairs[2*proc+1] = maxSize;
+    std::vector<int> sendPairs( 2*commSize );
+    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
+    recvPairs.clear();
+    for( int proc=0; proc<commSize; ++proc )
+        maxSize = std::max(sendPairs[2*proc+1],maxSize);
+    std::vector<int> actualSendSizes( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        actualSendSizes[proc] = sendPairs[2*proc];
+    sendPairs.clear();
+    std::vector<int> recvIndices( maxSize*commSize );
+    recvOffsets.resize( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalIndex = localToNaturalMap_[iLocal];
+        const int x = naturalIndex % nx;
+        const int y = (naturalIndex/nx) % ny;
+        const int z = naturalIndex/(nx*ny);
+        const int xProc = x % xStride;
+        const int yProc = y % yStride;
+        const int zProc = z % zStride;
+        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        recvIndices[++recvOffsets[proc]] = naturalIndex;
+    }
+    std::vector<int> sendIndices( maxSize*commSize );
+    mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
+    recvIndices.clear();
+    std::vector<R> sendSlowness( maxSize*commSize );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        R* send = &sendSlowness[proc*maxSize];
+        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
+        {
+            const int naturalIndex = sendIndices[iLocal];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = naturalIndex/(nx*ny);
+            const int xLocal = (x-xShift) / xStride;
+            const int yLocal = (y-yShift) / yStride;
+            const int zLocal = (z-zShift) / zStride;
+            const int localIndex = 
+                xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+            send[iLocal] = localSlowness[localIndex];
+        }
+    }
+    sendIndices.clear();
+    recvSlowness.resize( maxSize*commSize );
+    mpi::AllToAll
+    ( &sendSlowness[0], maxSize, &recvSlowness[0], maxSize, comm_ );
+
+    // Reset the recv offsets
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::GetPanelSlowness
+( int zOffset, int zSize, 
+  const clique::symbolic::SymmFact& fact,
+  const GridData<R>& slowness,
+  std::vector<R>& recvSlowness,
+  std::vector<int>& recvOffsets,
+  std::map<int,int>& panelNestedToNatural,
+  std::map<int,int>& panelNaturalToNested ) const
+{
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int nz = control_.nz;
+    const int xShift = slowness.XShift();
+    const int yShift = slowness.YShift();
+    const int zShift = slowness.ZShift();
+    const int xStride = slowness.XStride();
+    const int yStride = slowness.YStride();
+    const int zStride = slowness.ZStride();
+    const int xLocalSize = slowness.XLocalSize();
+    const int yLocalSize = slowness.YLocalSize();
+    const int zLocalSize = slowness.ZLocalSize();
+    const R* localSlowness = slowness.LockedLocalBuffer();
+    const int commRank = mpi::CommRank( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
+    elemental::mpi::Comm slownessComm = slowness.Comm();
+
+    const clique::symbolic::LocalSymmFact& localFact = fact.local;
+    const clique::symbolic::DistSymmFact& distFact = fact.dist;
+    const int numLocalSupernodes = fact.local.supernodes.size();
+    const int numDistSupernodes = fact.dist.supernodes.size();
+
+    // Compute the reorderings for the indices in the supernodes in our 
+    // local tree
+    panelNestedToNatural.clear();
+    panelNaturalToNested.clear();
+    LocalReordering( panelNestedToNatural, zSize );
+    std::map<int,int>::const_iterator it;
+    for( it=panelNestedToNatural.begin(); 
+         it!=panelNestedToNatural.end(); ++it )
+        panelNaturalToNested[it->second] = it->first;
+
+    // Gather the slowness data using three AllToAlls
+    std::vector<int> recvPairs( 2*commSize, 0 );
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        const clique::symbolic::LocalSymmFactSupernode& sn = 
+            localFact.supernodes[t];
+        const int size = sn.size;
+        const int offset = sn.offset;
+        for( int j=0; j<size; ++j )
+        {
+            const int naturalIndex = panelNestedToNatural[offset+j];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = zOffset + naturalIndex/(nx*ny);
+            const int xProc = x % xStride;
+            const int yProc = y % yStride;
+            const int zProc = z % zStride;
+            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            ++recvPairs[2*proc];
+        }
+    }
+    for( int t=0; t<numDistSupernodes; ++t )
+    {
+        const clique::symbolic::DistSymmFactSupernode& sn = 
+            distFact.supernodes[t];
+        const clique::Grid& grid = *sn.grid;
+        const int gridCol = grid.MRRank();
+        const int gridWidth = grid.Width();
+
+        const int size = sn.size;
+        const int offset = sn.offset;
+        const int localWidth = 
+            elemental::LocalLength( size, gridCol, gridWidth );
+        for( int jLocal=0; jLocal<localWidth; ++jLocal )
+        {
+            const int j = gridCol + jLocal*gridWidth;
+            const int naturalIndex = panelNestedToNatural[offset+j];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = zOffset + naturalIndex/(nx*ny);
+            const int xProc = x % xStride;
+            const int yProc = y % yStride;
+            const int zProc = z % zStride;
+            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            ++recvPairs[2*proc];
+        }
+    }
+    int maxSize = 0;
+    for( int proc=0; proc<commSize; ++proc )
+        maxSize = std::max(recvPairs[2*proc],maxSize);
+    for( int proc=0; proc<commSize; ++proc )
+        recvPairs[2*proc+1] = maxSize;
+    std::vector<int> sendPairs( 2*commSize );
+    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
+    recvPairs.clear();
+    for( int proc=0; proc<commSize; ++proc )
+        maxSize = std::max(sendPairs[2*proc+1],maxSize);
+    std::vector<int> actualSendSizes( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        actualSendSizes[proc] = sendPairs[2*proc];
+    sendPairs.clear();
+    std::vector<int> recvIndices( maxSize*commSize );
+    recvOffsets.resize( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        const clique::symbolic::LocalSymmFactSupernode& sn = 
+            localFact.supernodes[t];
+        const int size = sn.size;
+        const int offset = sn.offset;
+        for( int j=0; j<size; ++j )
+        {
+            const int naturalIndex = panelNestedToNatural[offset+j];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = zOffset + naturalIndex/(nx*ny);
+            const int xProc = x % xStride;
+            const int yProc = y % yStride;
+            const int zProc = z % zStride;
+            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            recvIndices[++recvOffsets[proc]] = naturalIndex;
+        }
+    }
+    for( int t=0; t<numDistSupernodes; ++t )
+    {
+        const clique::symbolic::DistSymmFactSupernode& sn = 
+            distFact.supernodes[t];
+        const clique::Grid& grid = *sn.grid;
+        const int gridCol = grid.MRRank();
+        const int gridWidth = grid.Width();
+
+        const int size = sn.size;
+        const int offset = sn.offset;
+        const int localWidth = 
+            elemental::LocalLength( size, gridCol, gridWidth );
+        for( int jLocal=0; jLocal<localWidth; ++jLocal )
+        {
+            const int j = gridCol + jLocal*gridWidth;
+            const int naturalIndex = panelNestedToNatural[offset+j];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = zOffset + naturalIndex/(nx*ny);
+            const int xProc = x % xStride;
+            const int yProc = y % yStride;
+            const int zProc = z % zStride;
+            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            recvIndices[++recvOffsets[proc]] = naturalIndex;
+        }
+    }
+    std::vector<int> sendIndices( maxSize*commSize );
+    mpi::AllToAll
+    ( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
+    recvIndices.clear();
+    std::vector<R> sendSlowness( maxSize*commSize );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        R* send = &sendSlowness[proc*maxSize];
+        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
+        {
+            const int naturalIndex = sendIndices[iLocal];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = zOffset + naturalIndex/(nx*ny);
+            const int xLocal = (x-xShift) / xStride;
+            const int yLocal = (y-yShift) / yStride;
+            const int zLocal = (z-zShift) / zStride;
+            const int localIndex =
+                xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+            send[iLocal] = localSlowness[localIndex];
+        }
+    }
+    sendIndices.clear();
+    recvSlowness.resize( maxSize*commSize );
+    mpi::AllToAll
+    ( &sendSlowness[0], maxSize, &recvSlowness[0], maxSize, comm_ );
+    sendSlowness.clear();
+
+    // Reset the recv offsets
+    for( int proc=0; proc<commSize; ++proc )
+        recvOffsets[proc] = maxSize*proc;
+}
+

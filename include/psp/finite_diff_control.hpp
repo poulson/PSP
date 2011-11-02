@@ -59,8 +59,8 @@ struct FiniteDiffControl
     R etax, etay, etaz; // widths of PML in each direction
 
     R imagShift; // stabilizing shift for preconditioner
-    int cutoff;         // minimum acceptable leaf size (when depth=1)
-    int planesPerPanel; // number of xy planes to put into each panel
+    int cutoff;            // minimum acceptable leaf size (when depth=1)
+    int numPlanesPerPanel; // number of xy planes to put into each panel
 
     BoundaryCondition frontBC;
     BoundaryCondition rightBC;

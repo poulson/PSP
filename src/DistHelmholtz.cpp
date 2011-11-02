@@ -42,7 +42,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     const int ny = control.ny;
     const int nz = control.nz;
     const int cutoff = control.cutoff;
-    const int planesPerPanel = control.planesPerPanel;
+    const int numPlanesPerPanel = control.numPlanesPerPanel;
     const int bzCeil = bzCeil_;
 
     // Pull out some information about our communicator
@@ -55,9 +55,9 @@ psp::DistHelmholtz<R>::DistHelmholtz
 
     // Decide if the domain is sufficiently deep to warrant sweeping
     const bool bottomHasPML = (control.bottomBC == PML);
-    topDepth_ = bzCeil+planesPerPanel;
+    topDepth_ = bzCeil+numPlanesPerPanel;
     bottomOrigDepth_ = 
-        (bottomHasPML ? bzCeil+planesPerPanel : planesPerPanel );
+        (bottomHasPML ? bzCeil+numPlanesPerPanel : numPlanesPerPanel );
     if( nz <= topDepth_+bottomOrigDepth_ )
         throw std::logic_error
         ("The domain is very shallow. Please run a sparse-direct factorization "
@@ -74,14 +74,14 @@ psp::DistHelmholtz<R>::DistHelmholtz
     //   | Bottom    |
     //    -----------
     innerDepth_ = nz-(topDepth_+bottomOrigDepth_);
-    leftoverInnerDepth_ = innerDepth_ % planesPerPanel;
+    leftoverInnerDepth_ = innerDepth_ % numPlanesPerPanel;
     haveLeftover_ = ( leftoverInnerDepth_ != 0 );
-    numFullInnerPanels_ = innerDepth_ / planesPerPanel;
+    numFullInnerPanels_ = innerDepth_ / numPlanesPerPanel;
 
     // Compute the number of rows we own of the sparse distributed matrix
     localTopHeight_ = LocalPanelHeight( topDepth_, 0, commRank );
     localFullInnerHeight_ = 
-        LocalPanelHeight( planesPerPanel, bzCeil_, commRank );
+        LocalPanelHeight( numPlanesPerPanel, bzCeil_, commRank );
     localLeftoverInnerHeight_ = 
         LocalPanelHeight( leftoverInnerDepth_, bzCeil_, commRank );
     localBottomHeight_ = 
@@ -98,7 +98,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     MapLocalPanelIndices( topDepth_, 0, zOffset, commRank, localOffset );
     for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalPanelIndices
-        ( planesPerPanel, bzCeil_, zOffset, commRank, localOffset );
+        ( numPlanesPerPanel, bzCeil_, zOffset, commRank, localOffset );
     if( haveLeftover_ )
         MapLocalPanelIndices
         ( leftoverInnerDepth_, bzCeil_, zOffset, commRank, localOffset );
@@ -113,7 +113,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     ( topDepth_, 0, zOffset, commRank, localConnections, localOffset );
     for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalConnectionIndices
-        ( planesPerPanel, bzCeil_, zOffset, commRank, localConnections, 
+        ( numPlanesPerPanel, bzCeil_, zOffset, commRank, localConnections, 
           localOffset );
     if( haveLeftover_ )
         MapLocalConnectionIndices
@@ -234,7 +234,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // be performed, and to simplify distribution issues, the leading PML region
     // on each inner panel will always be ordered _LAST_ within that panel.
     FillOrigPanelStruct( topDepth_, topSymbolicOrig );
-    FillOrigPanelStruct( planesPerPanel+bzCeil, fullInnerSymbolicOrig );
+    FillOrigPanelStruct( numPlanesPerPanel+bzCeil, fullInnerSymbolicOrig );
     if( haveLeftover_ )
         FillOrigPanelStruct
         ( leftoverInnerDepth_+bzCeil, leftoverInnerSymbolicOrig );
@@ -460,7 +460,7 @@ psp::DistHelmholtz<R>::LocalZ( int z ) const
     }
     else if( z < topDepth_ + innerDepth_ )
     {
-        return ((z-topDepth_) % control_.planesPerPanel) + bzCeil_;
+        return ((z-topDepth_) % control_.numPlanesPerPanel) + bzCeil_;
     }
     else // z in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
     {
@@ -486,7 +486,7 @@ psp::DistHelmholtz<R>::LocalPanelOffset( int z ) const
     else if( z < topDepth_ + innerDepth_ )
     {
         return localTopHeight_ + 
-               ((z-topDepth_)/control_.planesPerPanel)*localFullInnerHeight_;
+               ((z-topDepth_)/control_.numPlanesPerPanel)*localFullInnerHeight_;
     }
     else
     {

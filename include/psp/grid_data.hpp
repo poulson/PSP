@@ -49,6 +49,8 @@ public:
     ( int nx, int ny,int nz, int px, int py, int pz, 
       elemental::mpi::Comm comm );
 
+    elemental::mpi::Comm Comm() const;
+
     int XShift() const;
     int YShift() const;
     int ZShift() const;
@@ -97,6 +99,10 @@ inline GridData<T>::GridData
     zLocalSize_ = elemental::LocalLength( nz, zShift_, pz );
     localData_.resize( xLocalSize_*yLocalSize_*zLocalSize_ );
 }
+
+template<typename T>
+inline elemental::mpi::Comm GridData<T>::Comm() const
+{ return comm_; }
 
 template<typename T>
 inline int GridData<T>::XShift() const

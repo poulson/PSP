@@ -131,6 +131,11 @@ private:
     // Global sparse helper routines
     //
 
+    void GetGlobalSlowness
+    ( const GridData<R>& slowness,
+      std::vector<R>& recvSlowness,
+      std::vector<int>& recvOffsets ) const;
+
     void FormGlobalRow( R alpha, int x, int y, int z, int row );
 
     int LocalPanelHeight( int zSize, int zPadding, unsigned commRank ) const;
@@ -170,6 +175,15 @@ private:
     //
     // Helpers for the PML-padded sparse-direct portion
     //
+
+    void GetPanelSlowness
+    ( int zOffset, int zSize, 
+      const clique::symbolic::SymmFact& fact,
+      const GridData<R>& slowness,
+      std::vector<R>& recvSlowness,
+      std::vector<int>& recvOffsets,
+      std::map<int,int>& panelNestedToNatural, 
+      std::map<int,int>& panelNaturalToNested ) const;
 
     void FormLowerColumnOfSupernode
     ( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize,
