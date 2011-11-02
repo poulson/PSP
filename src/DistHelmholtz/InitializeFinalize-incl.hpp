@@ -31,7 +31,6 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     const int xStride = slowness.XStride();
     const int yStride = slowness.YStride();
     const int zStride = slowness.ZStride();
-    const int commRank = mpi::CommRank( comm_ );
     const int commSize = mpi::CommSize( comm_ );
     elemental::mpi::Comm slownessComm = slowness.Comm();
     if( !elemental::mpi::CongruentComms( comm_, slownessComm ) )
@@ -52,120 +51,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
           recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
-        // Grab a few convenience variables
-        const clique::symbolic::LocalSymmFact& localSymbFact = 
-            bottomSymbolicFact_.local;
-        const clique::symbolic::DistSymmFact& distSymbFact = 
-            bottomSymbolicFact_.dist;
-        const int numLocalSupernodes = localSymbFact.supernodes.size();
-        const int numDistSupernodes = distSymbFact.supernodes.size();
-
-        // Initialize the local part of the bottom panel
-        R imagShift = 1;
-        std::vector<int> frontIndices;
-        std::vector<C> values;
-        clique::numeric::LocalSymmFrontTree<C>& localFact = bottomFact_.local;
-        localFact.fronts.resize( numLocalSupernodes );
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-
-            // Initialize this front
-            const int offset = symbSN.offset;
-            const int size = symbSN.size;
-            const int updateSize = symbSN.lowerStruct.size();
-            const int frontSize = size + updateSize;
-            front.frontL.ResizeTo( frontSize, size );
-            front.frontR.ResizeTo( frontSize, updateSize );
-            front.frontL.SetToZero();
-            front.frontR.SetToZero();
-            for( int j=0; j<size; ++j )
-            {
-                // Extract the slowness from the recv buffer
-                const int panelNaturalIndex = panelNestedToNatural[j+offset];
-                const int x = panelNaturalIndex % nx;
-                const int y = (panelNaturalIndex/nx) % ny;
-                const int zPanel = panelNaturalIndex/(nx*ny);
-                const int z = zOffset + zPanel;
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                const R alpha = recvSlowness[++recvOffsets[proc]];
-
-                // Form the j'th lower column of this supernode
-                FormLowerColumnOfSupernode
-                ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
-                  symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
-                  panelNaturalToNested, frontIndices, values );
-                const int numMatches = frontIndices.size();
-                for( int k=0; k<numMatches; ++k )
-                    front.frontL.Set( frontIndices[k], j, values[k] );
-            }
-        }
-
-        // Initialize the distributed part of the bottom panel
-        clique::numeric::DistSymmFrontTree<C>& distFact = bottomFact_.dist;
-        distFact.fronts.resize( numDistSupernodes );
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-
-            // Initialize this front
-            Grid& grid = *symbSN.grid;
-            const int gridHeight = grid.Height();
-            const int gridWidth = grid.Width();
-            const int gridRow = grid.MCRank();
-            const int gridCol = grid.MRRank();
-            const int offset = symbSN.offset;
-            const int size = symbSN.size;
-            const int updateSize = symbSN.lowerStruct.size();
-            const int frontSize = size + updateSize;
-            front.front2dL.SetGrid( grid );
-            front.front2dR.SetGrid( grid );
-            front.front2dL.ResizeTo( frontSize, size );
-            front.front2dR.ResizeTo( frontSize, updateSize );
-            front.front2dL.SetToZero();
-            front.front2dR.SetToZero();
-            const int localSize = front.front2dL.LocalWidth();
-            for( int jLocal=0; jLocal<localSize; ++jLocal )
-            {
-                const int j = gridCol + jLocal*gridWidth;
-
-                // Extract the slowness from the recv buffer
-                const int panelNaturalIndex = panelNestedToNatural[j+offset];
-                const int x = panelNaturalIndex % nx;
-                const int y = (panelNaturalIndex/nx) % ny;
-                const int zPanel = panelNaturalIndex/(nx*ny);
-                const int z = zOffset + zPanel;
-                const int xProc = x % xStride;
-                const int yProc = y % yStride;
-                const int zProc = z % zStride;
-                const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
-                const R alpha = recvSlowness[++recvOffsets[proc]];
-
-                // Form the j'th lower column of this supernode
-                FormLowerColumnOfSupernode
-                ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
-                  symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
-                  panelNaturalToNested, frontIndices, values );
-                const int numMatches = frontIndices.size();
-                for( int k=0; k<numMatches; ++k )
-                {
-                    const int i = frontIndices[k];
-                    if( i % gridHeight == gridRow )
-                    {
-                        const int iLocal = (i-gridRow) / gridHeight;
-                        front.front2dL.SetLocalEntry
-                        ( iLocal, jLocal, values[k] );
-                    }
-                }
-            }
-        }
+        // Initialize the fronts with the original sparse matrix
+        FillPanelFronts
+        ( zOffset, zSize, bottomSymbolicFact_, bottomFact_,
+          slowness, recvSlowness, recvOffsets, 
+          panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the bottom panel
         clique::numeric::LDL
@@ -190,37 +80,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
           recvSlowness, recvOffsets,
           panelNestedToNatural, panelNaturalToNested );
 
-        // Grab a few convenience variables
-        const clique::symbolic::LocalSymmFact& localSymbFact = 
-            topSymbolicFact_.local;
-        const clique::symbolic::DistSymmFact& distSymbFact = 
-            topSymbolicFact_.dist;
-        const int numLocalSupernodes = localSymbFact.supernodes.size();
-        const int numDistSupernodes = distSymbFact.supernodes.size();
-
-        // Initialize the local part of the top panel
-        clique::numeric::LocalSymmFrontTree<C>& localFact = topFact_.local;
-        localFact.fronts.resize( numLocalSupernodes );
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-
-            // TODO: Initialize this front
-        }
-
-        // Initialize the distributed part of the top panel
-        clique::numeric::DistSymmFrontTree<C>& distFact = topFact_.dist;
-        distFact.fronts.resize( numDistSupernodes );
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-
-            // TODO: Initialize this front
-        }
+        // Initialize the fronts with the original sparse matrix
+        FillPanelFronts
+        ( zOffset, zSize, topSymbolicFact_, topFact_,
+          slowness, recvSlowness, recvOffsets,
+          panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the top panel
         clique::numeric::LDL
@@ -247,36 +111,12 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
           recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
-        // Grab a few convenience variables
+        // Initialize the fronts with the original sparse matrix
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
-        const clique::symbolic::LocalSymmFact& localSymbFact = 
-            fullInnerSymbolicFact_.local;
-        const clique::symbolic::DistSymmFact& distSymbFact = 
-            fullInnerSymbolicFact_.dist;
-        const int numLocalSupernodes = localSymbFact.supernodes.size();
-        const int numDistSupernodes = distSymbFact.supernodes.size();
-
-        // Initialize the local part of the k'th full inner panel
-        clique::numeric::LocalSymmFrontTree<C>& localFact = fullInnerFact.local;
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-
-            // TODO: Initialize this front
-        }
-
-        // Initialize the distributed part of the k'th full inner panel
-        clique::numeric::DistSymmFrontTree<C>& distFact = fullInnerFact.dist;
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-
-            // TODO: Initialize this front
-        }
+        FillPanelFronts
+        ( zOffset, zSize, fullInnerSymbolicFact_, fullInnerFact,
+          slowness, recvSlowness, recvOffsets,
+          panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         clique::numeric::LDL
@@ -303,37 +143,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
           recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
-        // Grab a few convenience variables
-        const clique::symbolic::LocalSymmFact& localSymbFact = 
-            leftoverInnerSymbolicFact_.local;
-        const clique::symbolic::DistSymmFact& distSymbFact = 
-            leftoverInnerSymbolicFact_.dist;
-        const int numLocalSupernodes = localSymbFact.supernodes.size();
-        const int numDistSupernodes = distSymbFact.supernodes.size();
-
-        // Initialize the local portion of the leftover panel
-        clique::numeric::LocalSymmFrontTree<C>& localFact = 
-            leftoverInnerFact_.local;
-        for( int t=0; t<numLocalSupernodes; ++t )
-        {
-            clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
-            const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-                localSymbFact.supernodes[t];
-
-            // TODO: Initialize this front
-        }
-
-        // Initialize the distributed portion of the leftover panel
-        clique::numeric::DistSymmFrontTree<C>& distFact = 
-            leftoverInnerFact_.dist;
-        for( int t=0; t<numDistSupernodes; ++t )
-        {
-            clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
-            const clique::symbolic::DistSymmFactSupernode& symbSN = 
-                distSymbFact.supernodes[t];
-
-            // TODO: Initialize this front
-        }
+        // Initialize the fronts with the original sparse matrix
+        FillPanelFronts
+        ( zOffset, zSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
+          slowness, recvSlowness, recvOffsets,
+          panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         clique::numeric::LDL
@@ -555,8 +369,9 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 
   const std::vector<int>& origLowerRelIndices,
-  std::map<int,int>& panelNaturalToNested, 
-  std::vector<int>& frontIndices, std::vector<C>& values ) const
+        std::map<int,int>& panelNaturalToNested, 
+        std::vector<int>& frontIndices, 
+        std::vector<C>& values ) const
 {
     const R pmlSize = bzCeil_;
 
@@ -764,12 +579,11 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::GetGlobalSlowness
 ( const GridData<R>& slowness,
-  std::vector<R>& recvSlowness,
-  std::vector<int>& recvOffsets ) const
+        std::vector<R>& recvSlowness,
+        std::vector<int>& recvOffsets ) const
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
-    const int nz = control_.nz;
     const int xShift = slowness.XShift();
     const int yShift = slowness.YShift();
     const int zShift = slowness.ZShift();
@@ -778,11 +592,8 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
     const int zStride = slowness.ZStride();
     const int xLocalSize = slowness.XLocalSize();
     const int yLocalSize = slowness.YLocalSize();
-    const int zLocalSize = slowness.ZLocalSize();
     const R* localSlowness = slowness.LockedLocalBuffer();
-    const int commRank = mpi::CommRank( comm_ );
     const int commSize = mpi::CommSize( comm_ );
-    elemental::mpi::Comm slownessComm = slowness.Comm();
 
     std::vector<int> recvPairs( 2*commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
@@ -864,14 +675,13 @@ psp::DistHelmholtz<R>::GetPanelSlowness
 ( int zOffset, int zSize, 
   const clique::symbolic::SymmFact& fact,
   const GridData<R>& slowness,
-  std::vector<R>& recvSlowness,
-  std::vector<int>& recvOffsets,
-  std::map<int,int>& panelNestedToNatural,
-  std::map<int,int>& panelNaturalToNested ) const
+        std::vector<R>& recvSlowness,
+        std::vector<int>& recvOffsets,
+        std::map<int,int>& panelNestedToNatural,
+        std::map<int,int>& panelNaturalToNested ) const
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
-    const int nz = control_.nz;
     const int xShift = slowness.XShift();
     const int yShift = slowness.YShift();
     const int zShift = slowness.ZShift();
@@ -880,11 +690,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     const int zStride = slowness.ZStride();
     const int xLocalSize = slowness.XLocalSize();
     const int yLocalSize = slowness.YLocalSize();
-    const int zLocalSize = slowness.ZLocalSize();
     const R* localSlowness = slowness.LockedLocalBuffer();
-    const int commRank = mpi::CommRank( comm_ );
     const int commSize = mpi::CommSize( comm_ );
-    elemental::mpi::Comm slownessComm = slowness.Comm();
 
     const clique::symbolic::LocalSymmFact& localFact = fact.local;
     const clique::symbolic::DistSymmFact& distFact = fact.dist;
@@ -1042,5 +849,137 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     // Reset the recv offsets
     for( int proc=0; proc<commSize; ++proc )
         recvOffsets[proc] = maxSize*proc;
+}
+
+template<typename R>        
+void
+psp::DistHelmholtz<R>::FillPanelFronts
+( int zOffset, int zSize, 
+  const clique::symbolic::SymmFact& symbFact,
+        clique::numeric::SymmFrontTree<C>& fact,
+  const GridData<R>& slowness,
+  const std::vector<R>& recvSlowness,
+        std::vector<int>& recvOffsets,
+        std::map<int,int>& panelNestedToNatural,
+        std::map<int,int>& panelNaturalToNested ) const
+{
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int xStride = slowness.XStride();
+    const int yStride = slowness.YStride();
+    const int zStride = slowness.ZStride();
+
+    // Grab a few convenience variables
+    const clique::symbolic::LocalSymmFact& localSymbFact = symbFact.local;
+    const clique::symbolic::DistSymmFact& distSymbFact = symbFact.dist;
+    const int numLocalSupernodes = localSymbFact.supernodes.size();
+    const int numDistSupernodes = distSymbFact.supernodes.size();
+
+    // Initialize the local part of the bottom panel
+    R imagShift = 1;
+    std::vector<int> frontIndices;
+    std::vector<C> values;
+    clique::numeric::LocalSymmFrontTree<C>& localFact = fact.local;
+    localFact.fronts.resize( numLocalSupernodes );
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
+        const clique::symbolic::LocalSymmFactSupernode& symbSN = 
+            localSymbFact.supernodes[t];
+
+        // Initialize this front
+        const int offset = symbSN.offset;
+        const int size = symbSN.size;
+        const int updateSize = symbSN.lowerStruct.size();
+        const int frontSize = size + updateSize;
+        front.frontL.ResizeTo( frontSize, size );
+        front.frontR.ResizeTo( frontSize, updateSize );
+        front.frontL.SetToZero();
+        front.frontR.SetToZero();
+        for( int j=0; j<size; ++j )
+        {
+            // Extract the slowness from the recv buffer
+            const int panelNaturalIndex = panelNestedToNatural[j+offset];
+            const int x = panelNaturalIndex % nx;
+            const int y = (panelNaturalIndex/nx) % ny;
+            const int zPanel = panelNaturalIndex/(nx*ny);
+            const int z = zOffset + zPanel;
+            const int xProc = x % xStride;
+            const int yProc = y % yStride;
+            const int zProc = z % zStride;
+            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const R alpha = recvSlowness[++recvOffsets[proc]];
+
+            // Form the j'th lower column of this supernode
+            FormLowerColumnOfSupernode
+            ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
+              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              panelNaturalToNested, frontIndices, values );
+            const int numMatches = frontIndices.size();
+            for( int k=0; k<numMatches; ++k )
+                front.frontL.Set( frontIndices[k], j, values[k] );
+        }
+    }
+
+    // Initialize the distributed part of the bottom panel
+    clique::numeric::DistSymmFrontTree<C>& distFact = fact.dist;
+    distFact.fronts.resize( numDistSupernodes );
+    for( int t=0; t<numDistSupernodes; ++t )
+    {
+        clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
+        const clique::symbolic::DistSymmFactSupernode& symbSN = 
+            distSymbFact.supernodes[t];
+
+        // Initialize this front
+        Grid& grid = *symbSN.grid;
+        const int gridHeight = grid.Height();
+        const int gridWidth = grid.Width();
+        const int gridRow = grid.MCRank();
+        const int gridCol = grid.MRRank();
+        const int offset = symbSN.offset;
+        const int size = symbSN.size;
+        const int updateSize = symbSN.lowerStruct.size();
+        const int frontSize = size + updateSize;
+        front.front2dL.SetGrid( grid );
+        front.front2dR.SetGrid( grid );
+        front.front2dL.ResizeTo( frontSize, size );
+        front.front2dR.ResizeTo( frontSize, updateSize );
+        front.front2dL.SetToZero();
+        front.front2dR.SetToZero();
+        const int localSize = front.front2dL.LocalWidth();
+        for( int jLocal=0; jLocal<localSize; ++jLocal )
+        {
+            const int j = gridCol + jLocal*gridWidth;
+
+            // Extract the slowness from the recv buffer
+            const int panelNaturalIndex = panelNestedToNatural[j+offset];
+            const int x = panelNaturalIndex % nx;
+            const int y = (panelNaturalIndex/nx) % ny;
+            const int zPanel = panelNaturalIndex/(nx*ny);
+            const int z = zOffset + zPanel;
+            const int xProc = x % xStride;
+            const int yProc = y % yStride;
+            const int zProc = z % zStride;
+            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const R alpha = recvSlowness[++recvOffsets[proc]];
+
+            // Form the j'th lower column of this supernode
+            FormLowerColumnOfSupernode
+            ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
+              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              panelNaturalToNested, frontIndices, values );
+            const int numMatches = frontIndices.size();
+            for( int k=0; k<numMatches; ++k )
+            {
+                const int i = frontIndices[k];
+                if( i % gridHeight == gridRow )
+                {
+                    const int iLocal = (i-gridRow) / gridHeight;
+                    front.front2dL.SetLocalEntry
+                    ( iLocal, jLocal, values[k] );
+                }
+            }
+        }
+    }
 }
 

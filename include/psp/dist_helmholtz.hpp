@@ -185,6 +185,16 @@ private:
       std::map<int,int>& panelNestedToNatural, 
       std::map<int,int>& panelNaturalToNested ) const;
 
+    void FillPanelFronts
+    ( int zOffset, int zSize,
+      const clique::symbolic::SymmFact& symbFact,
+            clique::numeric::SymmFrontTree<C>& fact,
+      const GridData<R>& slowness,
+      const std::vector<R>& recvSlowness,
+            std::vector<int>& recvOffsets,
+            std::map<int,int>& panelNestedToNatural,
+            std::map<int,int>& panelNaturalToNested ) const;
+
     void FormLowerColumnOfSupernode
     ( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize,
       int offset, int size, int j, 
