@@ -196,7 +196,7 @@ private:
             std::map<int,int>& panelNaturalToNested ) const;
 
     void FormLowerColumnOfSupernode
-    ( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize,
+    ( R alpha, int x, int y, int z, int zOffset, int zSize,
       int offset, int size, int j, 
       const std::vector<int>& origLowerStruct, 
       const std::vector<int>& origLowerRelIndices,

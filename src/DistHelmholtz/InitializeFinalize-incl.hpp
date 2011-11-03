@@ -365,7 +365,7 @@ psp::DistHelmholtz<R>::FormGlobalRow
 template<typename R>
 void
 psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
-( R alpha, R imagShift, int x, int y, int z, int zOffset, int zSize, 
+( R alpha, int x, int y, int z, int zOffset, int zSize, 
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 
   const std::vector<int>& origLowerRelIndices,
@@ -410,7 +410,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Compute the center term
     const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR) + 
         (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM + 
-        C(0,imagShift);
+        C(0,control_.imagShift);
     const int zLocal = z - zOffset;
     const int nx = control_.nx;
     const int ny = control_.ny;
@@ -876,7 +876,6 @@ psp::DistHelmholtz<R>::FillPanelFronts
     const int numDistSupernodes = distSymbFact.supernodes.size();
 
     // Initialize the local part of the bottom panel
-    R imagShift = 1;
     std::vector<int> frontIndices;
     std::vector<C> values;
     clique::numeric::LocalSymmFrontTree<C>& localFact = fact.local;
@@ -912,7 +911,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
-            ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
+            ( alpha, x, y, z, zOffset, zSize, size, offset, j,
               symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
@@ -965,7 +964,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
-            ( alpha, imagShift, x, y, z, zOffset, zSize, size, offset, j,
+            ( alpha, x, y, z, zOffset, zSize, size, offset, j,
               symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
