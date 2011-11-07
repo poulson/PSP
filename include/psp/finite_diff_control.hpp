@@ -34,17 +34,18 @@ enum Stencil { SEVEN_POINT }; // TWENTY_SEVEN_POINT not yet supported
 //                 _______________ (wx,wy,0)
 //                /              /|
 //            x  /              / |
-//              /              /  |
-// sweep dir.  /______________/   |
+//  sweep dir   /              /  |
+//     /\      /______________/   |
 //     ||      |              |   |
 //     ||      |              |   / (wx,wy,wz)
 //     ||    z |              |  /  
 //     ||      |              | /  
-//     \/      |______________|/
+//             |______________|/
 //          (0,0,wz)    y    (0,wy,wz)
 //
-// PML must be enforced at least on the top face, and the remaining faces 
+// PML must be enforced at least on the bottom face, and the remaining faces 
 // may be set as either PML or a zero Dirichlet boundary condition.
+//
 template<typename R>
 struct FiniteDiffControl
 {
@@ -66,8 +67,8 @@ struct FiniteDiffControl
     BoundaryCondition rightBC;
     BoundaryCondition backBC;
     BoundaryCondition leftBC;
-    BoundaryCondition bottomBC;
-    // The top boundary condition must be PML since we are sweeping from it.
+    BoundaryCondition topBC;
+    // The bottom boundary condition must be PML since we are sweeping from it.
 };
 
 } // namespace psp

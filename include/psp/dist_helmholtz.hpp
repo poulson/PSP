@@ -47,6 +47,8 @@ public:
     // y := approximateInv(A) y
     void Precondition( GridData<C>& y ) const;
 
+    // TODO: Add GMRES and/or QMR solvers
+
     //void WriteParallelVtkFile( const F* vLocal, const char* basename ) const;
 
 private:
@@ -67,9 +69,9 @@ private:
     // Information related to the decomposition of the domain into panels
     //
 
-    // Information about the top panel
-    int topDepth_;       // including the original PML
-    int localTopHeight_; // our process's local height of the top panel
+    // Information about the bottom panel
+    int bottomDepth_;       // including the original PML
+    int localBottomHeight_; // our process's local height of the bottom panel
 
     // Information about the full inner panels
     int innerDepth_;           // total physical inner depth
@@ -81,22 +83,22 @@ private:
     int leftoverInnerDepth_;
     int localLeftoverInnerHeight_;
 
-    // Information about the bottom panel
-    int bottomOrigDepth_;
-    int localBottomHeight_;
+    // Information about the top panel
+    int topOrigDepth_;
+    int localTopHeight_;
 
     // Symbolic factorizations of each class of panels
     clique::symbolic::SymmFact 
-        topSymbolicFact_, 
+        bottomSymbolicFact_, 
         fullInnerSymbolicFact_, 
         leftoverInnerSymbolicFact_, 
-        bottomSymbolicFact_;
+        topSymbolicFact_;
 
     // Numeric factorizations of each panel
-    clique::numeric::SymmFrontTree<C> topFact_;
+    clique::numeric::SymmFrontTree<C> bottomFact_;
     std::vector<clique::numeric::SymmFrontTree<C>*> fullInnerFacts_;
     clique::numeric::SymmFrontTree<C> leftoverInnerFact_;
-    clique::numeric::SymmFrontTree<C> bottomFact_;
+    clique::numeric::SymmFrontTree<C> topFact_;
 
     //
     // Information related to the global sparse matrix
@@ -119,8 +121,8 @@ private:
 
     C s1Inv( int x ) const;
     C s2Inv( int y ) const;
-    C s3Inv( int z ) const;
-    C s3InvArtificial( int z, int zOffset, R sizeOfPML ) const;
+    C s3Inv( int v ) const;
+    C s3InvArtificial( int v, int vOffset, R sizeOfPML ) const;
 
     int NumLocalSupernodes( unsigned commRank ) const;
     static void NumLocalSupernodesRecursion
@@ -136,40 +138,40 @@ private:
       std::vector<R>& recvSlowness,
       std::vector<int>& recvOffsets ) const;
 
-    void FormGlobalRow( R alpha, int x, int y, int z, int row );
+    void FormGlobalRow( R alpha, int x, int y, int v, int row );
 
-    int LocalPanelHeight( int zSize, int zPadding, unsigned commRank ) const;
+    int LocalPanelHeight( int vSize, int vPadding, unsigned commRank ) const;
     static void LocalPanelHeightRecursion
-    ( int xSize, int ySize, int zSize, int zPadding, int cutoff, 
+    ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
       unsigned commRank, unsigned depthTilSerial, int& localHeight );
 
-    int LocalZ( int z ) const;
-    int LocalPanelOffset( int z ) const;
+    int LocalV( int v ) const;
+    int LocalPanelOffset( int v ) const;
 
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
     void MapLocalPanelIndices
-    ( int zSize, int zPadding, int& zOffset, unsigned commRank, 
+    ( int vSize, int vPadding, int& vOffset, unsigned commRank, 
       int& localOffset );
     static void MapLocalPanelIndicesRecursion
-    ( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
-      int xOffset, int yOffset, int zOffset, int cutoff,
+    ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
+      int xOffset, int yOffset, int vOffset, int cutoff,
       unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( int zSize, int zPadding, int& zOffset, unsigned commRank,  
+    ( int vSize, int vPadding, int& vOffset, unsigned commRank,  
       std::vector<int>& localConnections, int& localOffset ) const;
     static void MapLocalConnectionIndicesRecursion
-    ( int nx, int ny, int nz, int xSize, int ySize, int zSize, int zPadding,
-      int xOffset, int yOffset, int zOffset, int cutoff,
+    ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
+      int xOffset, int yOffset, int vOffset, int cutoff,
       unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localConnections, int& localOffset );
 
-    int OwningProcess( int x, int y, int zLocal ) const;
+    int OwningProcess( int x, int y, int vLocal ) const;
     static void OwningProcessRecursion
-    ( int x, int y, int zLocal, int xSize, int ySize, 
+    ( int x, int y, int vLocal, int xSize, int ySize, 
       unsigned depthTilSerial, int& process );
 
     //
@@ -177,7 +179,7 @@ private:
     //
 
     void GetPanelSlowness
-    ( int zOffset, int zSize, 
+    ( int vOffset, int vSize, 
       const clique::symbolic::SymmFact& fact,
       const GridData<R>& slowness,
       std::vector<R>& recvSlowness,
@@ -186,7 +188,7 @@ private:
       std::map<int,int>& panelNaturalToNested ) const;
 
     void FillPanelFronts
-    ( int zOffset, int zSize,
+    ( int vOffset, int vSize,
       const clique::symbolic::SymmFact& symbFact,
             clique::numeric::SymmFrontTree<C>& fact,
       const GridData<R>& slowness,
@@ -196,30 +198,30 @@ private:
             std::map<int,int>& panelNaturalToNested ) const;
 
     void FormLowerColumnOfSupernode
-    ( R alpha, int x, int y, int z, int zOffset, int zSize,
+    ( R alpha, int x, int y, int v, int vOffset, int vSize,
       int offset, int size, int j, 
       const std::vector<int>& origLowerStruct, 
       const std::vector<int>& origLowerRelIndices,
       std::map<int,int>& panelNaturalToNested, 
       std::vector<int>& frontIndices, std::vector<C>& values ) const;
 
-    void LocalReordering( std::map<int,int>& reordering, int zSize ) const;
+    void LocalReordering( std::map<int,int>& reordering, int vSize ) const;
     static void LocalReorderingRecursion
     ( std::map<int,int>& reordering, int offset, 
-      int xOffset, int yOffset, int xSize, int ySize, int zSize, int nx, int ny,
+      int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
       int depthTilSerial, int cutoff, int commRank );
 
-    int ReorderedIndex( int x, int y, int z, int zSize ) const;
+    int ReorderedIndex( int x, int y, int vLocal, int vSize ) const;
     static int ReorderedIndexRecursion
-    ( int x, int y, int z, int xSize, int ySize, int zSize,
+    ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
       int depthTilSerial, int cutoff, int offset );
 
-    void FillOrigPanelStruct( int zSize, clique::symbolic::SymmOrig& S ) const;
+    void FillOrigPanelStruct( int vSize, clique::symbolic::SymmOrig& S ) const;
     void FillDistOrigPanelStruct
-    ( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
+    ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
       clique::symbolic::SymmOrig& S ) const;
     void FillLocalOrigPanelStruct
-    ( int zSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
+    ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
       clique::symbolic::SymmOrig& S ) const;
    
     // For use in FillLocalOrigPanelStruct

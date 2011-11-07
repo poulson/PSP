@@ -28,13 +28,13 @@ namespace psp {
 //                 _______________ (wx,wy,0)
 //                /              /|
 //            x  /              / |
-//              /              /  |
-// sweep dir.  /______________/   |
+// sweep dir    /              /  |
+//     /\      /______________/   |
 //     ||      |              |   |
 //     ||      |              |   / (wx,wy,wz)
 //     ||    z |              |  /  
 //     ||      |              | /  
-//     \/      |______________|/
+//             |______________|/
 //          (0,0,wz)    y    (0,wy,wz)
 //
 // The communicator is decomposed into a px x py x pz grid, and the data is 

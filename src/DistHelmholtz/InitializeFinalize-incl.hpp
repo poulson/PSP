@@ -37,61 +37,60 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         throw std::logic_error("Slowness does not have a congruent comm");
 
     //
-    // Initialize and factor the bottom panel (first, since it is the largest)
+    // Initialize and factor the top panel (first, since it is the largest)
     //
     {
         // Retrieve the slowness for this panel
-        const int zOffset = topDepth_ + innerDepth_ - bzCeil_;
-        const int zSize = bottomOrigDepth_ + bzCeil_;
+        const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
+        const int vSize = topOrigDepth_ + bzCeil_;
         std::vector<R> recvSlowness;
         std::vector<int> recvOffsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
-        ( zOffset, zSize, bottomSymbolicFact_, slowness,
+        ( vOffset, vSize, topSymbolicFact_, slowness,
           recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         FillPanelFronts
-        ( zOffset, zSize, bottomSymbolicFact_, bottomFact_,
+        ( vOffset, vSize, topSymbolicFact_, topFact_,
           slowness, recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
-        // Compute the sparse-direct LDL^T factorization of the bottom panel
-        clique::numeric::LDL
-        ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+        // Compute the sparse-direct LDL^T factorization
+        clique::numeric::LDL( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
 
         // Redistribute the LDL^T factorization for faster solves
-        clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
+        clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
     }
 
     //
-    // Initialize and factor the top panel
+    // Initialize and factor the bottom panel
     //
     {
         // Retrieve the slowness for this panel
-        const int zOffset = 0;
-        const int zSize = topDepth_;
+        const int vOffset = 0;
+        const int vSize = bottomDepth_;
         std::vector<R> recvSlowness;
         std::vector<int> recvOffsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
-        ( zOffset, zSize, topSymbolicFact_, slowness,
+        ( vOffset, vSize, bottomSymbolicFact_, slowness,
           recvSlowness, recvOffsets,
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         FillPanelFronts
-        ( zOffset, zSize, topSymbolicFact_, topFact_,
+        ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
           slowness, recvSlowness, recvOffsets,
           panelNestedToNatural, panelNaturalToNested );
 
-        // Compute the sparse-direct LDL^T factorization of the top panel
+        // Compute the sparse-direct LDL^T factorization
         clique::numeric::LDL
-        ( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
+        ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
 
         // Redistribute the LDL^T factorization for faster solves
-        clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
+        clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
     }
 
     //
@@ -101,20 +100,20 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     {
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
-        const int zOffset = topDepth_ + k*numPlanesPerPanel - bzCeil_;
-        const int zSize = numPlanesPerPanel + bzCeil_;
+        const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bzCeil_;
+        const int vSize = numPlanesPerPanel + bzCeil_;
         std::vector<R> recvSlowness;
         std::vector<int> recvOffsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
-        ( zOffset, zSize, fullInnerSymbolicFact_, slowness,
+        ( vOffset, vSize, fullInnerSymbolicFact_, slowness,
           recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
         FillPanelFronts
-        ( zOffset, zSize, fullInnerSymbolicFact_, fullInnerFact,
+        ( vOffset, vSize, fullInnerSymbolicFact_, fullInnerFact,
           slowness, recvSlowness, recvOffsets,
           panelNestedToNatural, panelNaturalToNested );
 
@@ -132,20 +131,20 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     if( haveLeftover_ )
     {        
         // Retrieve the slowness for this panel
-        const int zOffset = topDepth_ + innerDepth_ - 
+        const int vOffset = bottomDepth_ + innerDepth_ - 
                             leftoverInnerDepth_ - bzCeil_;
-        const int zSize = leftoverInnerDepth_ + bzCeil_;
+        const int vSize = leftoverInnerDepth_ + bzCeil_;
         std::vector<R> recvSlowness;
         std::vector<int> recvOffsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
-        ( zOffset, zSize, leftoverInnerSymbolicFact_, slowness,
+        ( vOffset, vSize, leftoverInnerSymbolicFact_, slowness,
           recvSlowness, recvOffsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         FillPanelFronts
-        ( zOffset, zSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
+        ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
           slowness, recvSlowness, recvOffsets,
           panelNestedToNatural, panelNaturalToNested );
 
@@ -175,6 +174,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int x = naturalIndex % nx;
         const int y = (naturalIndex/nx) % ny;
         const int z = naturalIndex/(nx*ny);
+        // TODO: Replace with GridData call which allows for different orderings
         const int xProc = x % xStride;
         const int yProc = y % yStride;
         const int zProc = z % zStride;
@@ -182,7 +182,8 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         const R alpha = recvSlowness[++recvOffsets[proc]];
         const int rowOffset = localRowOffsets_[iLocal];
-        FormGlobalRow( alpha, x, y, z, rowOffset );
+        const int v = (nz-1) - z;
+        FormGlobalRow( alpha, x, y, v, rowOffset );
     }
 }
 
@@ -194,15 +195,15 @@ psp::DistHelmholtz<R>::Finalize()
     localEntries_.clear();
 
     // Release the padded panel memory
-    topFact_.local.fronts.clear();
-    topFact_.dist.fronts.clear();
+    bottomFact_.local.fronts.clear();
+    bottomFact_.dist.fronts.clear();
     for( int k=0; k<numFullInnerPanels_; ++k )
         delete fullInnerFacts_[k];
     fullInnerFacts_.clear();
     leftoverInnerFact_.local.fronts.clear();
     leftoverInnerFact_.dist.fronts.clear();
-    bottomFact_.local.fronts.clear();
-    bottomFact_.dist.fronts.clear();
+    topFact_.local.fronts.clear();
+    topFact_.dist.fronts.clear();
 }
 
 template<typename R>
@@ -255,19 +256,19 @@ psp::DistHelmholtz<R>::s2Inv( int y ) const
 
 template<typename R>
 std::complex<R>
-psp::DistHelmholtz<R>::s3Inv( int z ) const
+psp::DistHelmholtz<R>::s3Inv( int v ) const
 {
-    if( z+1 < bz_ )
+    if( v+1 < bz_ )
     {
-        const R delta = bz_ - (z+1);
+        const R delta = bz_ - (v+1);
         const R realPart = 1;
         const R imagPart = 
             control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
         return C(realPart,imagPart);
     }
-    else if( z > (control_.nz-bz_) && control_.bottomBC==PML )
+    else if( v > (control_.nz-bz_) && control_.topBC==PML )
     {
-        const R delta = z - (control_.nz-bz_);
+        const R delta = v - (control_.nz-bz_);
         const R realPart = 1;
         const R imagPart = 
             control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
@@ -279,20 +280,20 @@ psp::DistHelmholtz<R>::s3Inv( int z ) const
 
 template<typename R>
 std::complex<R>
-psp::DistHelmholtz<R>::s3InvArtificial( int z, int zOffset, R sizeOfPML ) const
+psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset, R sizeOfPML ) const
 {
-    if( z+1 < zOffset+sizeOfPML )
+    if( v+1 < vOffset+sizeOfPML )
     {
-        const R delta = zOffset + sizeOfPML - (z+1);
+        const R delta = vOffset + sizeOfPML - (v+1);
         const R realPart = 1;
         const R imagPart = 
             control_.Cz*delta*delta/
             (sizeOfPML*sizeOfPML*sizeOfPML*hz_*control_.omega);
         return C(realPart,imagPart);
     }
-    else if( z > (control_.nz-bz_) && control_.bottomBC==PML )
+    else if( v > (control_.nz-bz_) && control_.topBC==PML )
     {
-        const R delta = z - (control_.nz-bz_);
+        const R delta = v - (control_.nz-bz_);
         const R realPart = 1;
         const R imagPart = 
             control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
@@ -305,7 +306,7 @@ psp::DistHelmholtz<R>::s3InvArtificial( int z, int zOffset, R sizeOfPML ) const
 template<typename R>
 void
 psp::DistHelmholtz<R>::FormGlobalRow
-( R alpha, int x, int y, int z, int row )
+( R alpha, int x, int y, int v, int row )
 {
     // Evaluate all of the inverse s functions
     const C s1InvL = s1Inv( x-1 );
@@ -314,9 +315,9 @@ psp::DistHelmholtz<R>::FormGlobalRow
     const C s2InvL = s2Inv( y-1 );
     const C s2InvM = s2Inv( y   );
     const C s2InvR = s2Inv( y+1 );
-    const C s3InvL = s3Inv( z-1 );
-    const C s3InvM = s3Inv( z   );
-    const C s3InvR = s3Inv( z+1 );
+    const C s3InvL = s3Inv( v-1 );
+    const C s3InvM = s3Inv( v   );
+    const C s3InvR = s3Inv( v+1 );
 
     // Compute all of the x-shifted terms
     const C xTempL = s2InvM*s3InvM/s1InvL;
@@ -332,15 +333,15 @@ psp::DistHelmholtz<R>::FormGlobalRow
     const C yTermL = (yTempL+yTempM) / (2*hy_*hy_);
     const C yTermR = (yTempR+yTempM) / (2*hy_*hy_);
 
-    // Compute all of the z-shifted terms
-    const C zTempL = s1InvM*s2InvM/s3InvL;
-    const C zTempM = s1InvM*s2InvM/s3InvM;
-    const C zTempR = s1InvM*s2InvM/s3InvR;
-    const C zTermL = (zTempL+zTempM) / (2*hz_*hz_);
-    const C zTermR = (zTempR+zTempM) / (2*hz_*hz_);
+    // Compute all of the v-shifted terms
+    const C vTempL = s1InvM*s2InvM/s3InvL;
+    const C vTempM = s1InvM*s2InvM/s3InvM;
+    const C vTempR = s1InvM*s2InvM/s3InvR;
+    const C vTermL = (vTempL+vTempM) / (2*hz_*hz_);
+    const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 
     // Compute the center term
-    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR) + 
+    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
         (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM;
 
     // Fill in the center term
@@ -356,16 +357,16 @@ psp::DistHelmholtz<R>::FormGlobalRow
         localEntries_[offset++] = yTermL;
     if( y+1 < control_.ny )
         localEntries_[offset++] = yTermR;
-    if( z > 0 )
-        localEntries_[offset++] = zTermL;
-    if( z+1 < control_.nz )
-        localEntries_[offset++] = zTermR;
+    if( v > 0 )
+        localEntries_[offset++] = vTermL;
+    if( v+1 < control_.nz )
+        localEntries_[offset++] = vTermR;
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
-( R alpha, int x, int y, int z, int zOffset, int zSize, 
+( R alpha, int x, int y, int v, int vOffset, int vSize, 
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 
   const std::vector<int>& origLowerRelIndices,
@@ -382,9 +383,9 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     const C s2InvL = s2Inv( y-1 );
     const C s2InvM = s2Inv( y   );
     const C s2InvR = s2Inv( y+1 );
-    const C s3InvL = s3InvArtificial( z-1, zOffset, pmlSize );
-    const C s3InvM = s3InvArtificial( z,   zOffset, pmlSize );
-    const C s3InvR = s3InvArtificial( z+1, zOffset, pmlSize );
+    const C s3InvL = s3InvArtificial( v-1, vOffset, pmlSize );
+    const C s3InvM = s3InvArtificial( v,   vOffset, pmlSize );
+    const C s3InvR = s3InvArtificial( v+1, vOffset, pmlSize );
 
     // Compute all of the x-shifted terms
     const C xTempL = s2InvM*s3InvM/s1InvL;
@@ -400,18 +401,18 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     const C yTermL = (yTempL+yTempM) / (2*hy_*hy_);
     const C yTermR = (yTempR+yTempM) / (2*hy_*hy_);
 
-    // Compute all of the z-shifted terms
-    const C zTempL = s1InvM*s2InvM/s3InvL;
-    const C zTempM = s1InvM*s2InvM/s3InvM;
-    const C zTempR = s1InvM*s2InvM/s3InvR;
-    const C zTermL = (zTempL+zTempM) / (2*hz_*hz_);
-    const C zTermR = (zTempR+zTempM) / (2*hz_*hz_);
+    // Compute all of the v-shifted terms
+    const C vTempL = s1InvM*s2InvM/s3InvL;
+    const C vTempM = s1InvM*s2InvM/s3InvM;
+    const C vTempR = s1InvM*s2InvM/s3InvR;
+    const C vTermL = (vTempL+vTempM) / (2*hz_*hz_);
+    const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 
     // Compute the center term
-    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+zTermL+zTermR) + 
+    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
         (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM + 
         C(0,control_.imagShift);
-    const int zLocal = z - zOffset;
+    const int vLocal = v - vOffset;
     const int nx = control_.nx;
     const int ny = control_.ny;
 
@@ -425,7 +426,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Left connection
     if( x > 0 )
     {
-        const int naturalIndex = (x-1) + y*nx + zLocal*nx*ny;
+        const int naturalIndex = (x-1) + y*nx + vLocal*nx*ny;
         if( panelNaturalToNested.count(naturalIndex) )
         {
             const int nestedIndex = panelNaturalToNested[naturalIndex];
@@ -450,7 +451,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     }
     if( x+1 < nx )
     {
-        const int naturalIndex = (x+1) + y*nx + zLocal*nx*ny;
+        const int naturalIndex = (x+1) + y*nx + vLocal*nx*ny;
         if( panelNaturalToNested.count(naturalIndex) )
         {
             const int nestedIndex = panelNaturalToNested[naturalIndex];
@@ -475,7 +476,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     }
     if( y > 0 )
     {
-        const int naturalIndex = x + (y-1)*nx + zLocal*nx*ny;
+        const int naturalIndex = x + (y-1)*nx + vLocal*nx*ny;
         if( panelNaturalToNested.count(naturalIndex) )
         {
             const int nestedIndex = panelNaturalToNested[naturalIndex];
@@ -500,7 +501,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     }
     if( y+1 < ny )
     {
-        const int naturalIndex = x + (y+1)*nx + zLocal*nx*ny;
+        const int naturalIndex = x + (y+1)*nx + vLocal*nx*ny;
         if( panelNaturalToNested.count(naturalIndex) )
         {
             const int nestedIndex = panelNaturalToNested[naturalIndex];
@@ -523,16 +524,16 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
             }
         }
     }
-    if( zLocal > 0 )
+    if( vLocal > 0 )
     {
-        const int naturalIndex = x + y*nx + (zLocal-1)*nx*ny;
+        const int naturalIndex = x + y*nx + (vLocal-1)*nx*ny;
         if( panelNaturalToNested.count(naturalIndex) )
         {
             const int nestedIndex = panelNaturalToNested[naturalIndex];
             if( nestedIndex > offset+j && nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( zTermL );
+                values.push_back( vTermL );
             }
             else
             {
@@ -543,21 +544,21 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
                 {
                     const int whichLower = int(first-origLowerStruct.begin());
                     frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( zTermL );
+                    values.push_back( vTermL );
                 }
             }
         }
     }
-    if( zLocal+1 < zSize )
+    if( vLocal+1 < vSize )
     {
-        const int naturalIndex = x + y*nx + (zLocal+1)*nx*ny;
+        const int naturalIndex = x + y*nx + (vLocal+1)*nx*ny;
         if( panelNaturalToNested.count(naturalIndex) )
         {
             const int nestedIndex = panelNaturalToNested[naturalIndex];
             if( nestedIndex > offset+j && nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( zTermR );
+                values.push_back( vTermR );
             }
             else
             {
@@ -568,7 +569,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
                 {
                     const int whichLower = int(first-origLowerStruct.begin());
                     frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( zTermR );
+                    values.push_back( vTermR );
                 }
             }
         }
@@ -672,7 +673,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
 template<typename R>
 void
 psp::DistHelmholtz<R>::GetPanelSlowness
-( int zOffset, int zSize, 
+( int vOffset, int vSize, 
   const clique::symbolic::SymmFact& fact,
   const GridData<R>& slowness,
         std::vector<R>& recvSlowness,
@@ -682,6 +683,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
+    const int nz = control_.nz;
     const int xShift = slowness.XShift();
     const int yShift = slowness.YShift();
     const int zShift = slowness.ZShift();
@@ -702,7 +704,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     // local tree
     panelNestedToNatural.clear();
     panelNaturalToNested.clear();
-    LocalReordering( panelNestedToNatural, zSize );
+    LocalReordering( panelNestedToNatural, vSize );
     std::map<int,int>::const_iterator it;
     for( it=panelNestedToNatural.begin(); 
          it!=panelNestedToNatural.end(); ++it )
@@ -721,7 +723,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int naturalIndex = panelNestedToNatural[offset+j];
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
-            const int z = zOffset + naturalIndex/(nx*ny);
+            const int v = vOffset + naturalIndex/(nx*ny);
+            const int z = (nz-1) - v;
             const int xProc = x % xStride;
             const int yProc = y % yStride;
             const int zProc = z % zStride;
@@ -747,7 +750,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int naturalIndex = panelNestedToNatural[offset+j];
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
-            const int z = zOffset + naturalIndex/(nx*ny);
+            const int v = vOffset + naturalIndex/(nx*ny);
+            const int z = (nz-1) - v;
             const int xProc = x % xStride;
             const int yProc = y % yStride;
             const int zProc = z % zStride;
@@ -784,7 +788,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int naturalIndex = panelNestedToNatural[offset+j];
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
-            const int z = zOffset + naturalIndex/(nx*ny);
+            const int v = vOffset + naturalIndex/(nx*ny);
+            const int z = (nz-1) - v;
             const int xProc = x % xStride;
             const int yProc = y % yStride;
             const int zProc = z % zStride;
@@ -810,7 +815,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int naturalIndex = panelNestedToNatural[offset+j];
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
-            const int z = zOffset + naturalIndex/(nx*ny);
+            const int v = vOffset + naturalIndex/(nx*ny);
+            const int z = (nz-1) - v;
             const int xProc = x % xStride;
             const int yProc = y % yStride;
             const int zProc = z % zStride;
@@ -831,7 +837,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int naturalIndex = sendIndices[iLocal];
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
-            const int z = zOffset + naturalIndex/(nx*ny);
+            const int v = vOffset + naturalIndex/(nx*ny);
+            const int z = (nz-1) - v;
             const int xLocal = (x-xShift) / xStride;
             const int yLocal = (y-yShift) / yStride;
             const int zLocal = (z-zShift) / zStride;
@@ -854,7 +861,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
 template<typename R>        
 void
 psp::DistHelmholtz<R>::FillPanelFronts
-( int zOffset, int zSize, 
+( int vOffset, int vSize, 
   const clique::symbolic::SymmFact& symbFact,
         clique::numeric::SymmFrontTree<C>& fact,
   const GridData<R>& slowness,
@@ -865,6 +872,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
+    const int nz = control_.nz;
     const int xStride = slowness.XStride();
     const int yStride = slowness.YStride();
     const int zStride = slowness.ZStride();
@@ -901,8 +909,9 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int panelNaturalIndex = panelNestedToNatural[j+offset];
             const int x = panelNaturalIndex % nx;
             const int y = (panelNaturalIndex/nx) % ny;
-            const int zPanel = panelNaturalIndex/(nx*ny);
-            const int z = zOffset + zPanel;
+            const int vPanel = panelNaturalIndex/(nx*ny);
+            const int v = vOffset + vPanel;
+            const int z = (nz-1) - v;
             const int xProc = x % xStride;
             const int yProc = y % yStride;
             const int zProc = z % zStride;
@@ -911,7 +920,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
-            ( alpha, x, y, z, zOffset, zSize, size, offset, j,
+            ( alpha, x, y, v, vOffset, vSize, size, offset, j,
               symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
@@ -954,8 +963,9 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int panelNaturalIndex = panelNestedToNatural[j+offset];
             const int x = panelNaturalIndex % nx;
             const int y = (panelNaturalIndex/nx) % ny;
-            const int zPanel = panelNaturalIndex/(nx*ny);
-            const int z = zOffset + zPanel;
+            const int vPanel = panelNaturalIndex/(nx*ny);
+            const int v = vOffset + vPanel;
+            const int z = (nz-1) - v;
             const int xProc = x % xStride;
             const int yProc = y % yStride;
             const int zProc = z % zStride;
@@ -964,7 +974,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
-            ( alpha, x, y, z, zOffset, zSize, size, offset, j,
+            ( alpha, x, y, v, vOffset, vSize, size, offset, j,
               symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
