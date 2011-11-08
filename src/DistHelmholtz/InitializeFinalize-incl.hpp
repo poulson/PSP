@@ -19,18 +19,11 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-// The localSlowness is assumed to correspond to the local degrees of freedom 
-// of the panels, with the front panel first.
 template<typename R>
 void
 psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
-    const int commSize = mpi::CommSize( comm_ );
-    elemental::mpi::Comm slownessComm = slowness.Comm();
-    if( !elemental::mpi::CongruentComms( comm_, slownessComm ) )
+    if( !elemental::mpi::CongruentComms( comm_, slowness.Comm() ) )
         throw std::logic_error("Slowness does not have a congruent comm");
     if( slowness.NumScalars() != 1 )
         throw std::logic_error("Slowness grid should have one entry per point");
@@ -166,6 +159,9 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
     // Now make use of the redistributed slowness data to form the global 
     // sparse matrix
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int nz = control_.nz;
     localEntries_.resize( localRowOffsets_.back() );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -663,11 +659,6 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     const int nz = control_.nz;
     const int commSize = mpi::CommSize( comm_ );
 
-    const clique::symbolic::LocalSymmFact& localFact = fact.local;
-    const clique::symbolic::DistSymmFact& distFact = fact.dist;
-    const int numLocalSupernodes = fact.local.supernodes.size();
-    const int numDistSupernodes = fact.dist.supernodes.size();
-
     // Compute the reorderings for the indices in the supernodes in our 
     // local tree
     panelNestedToNatural.clear();
@@ -680,10 +671,11 @@ psp::DistHelmholtz<R>::GetPanelSlowness
 
     // Gather the slowness data using three AllToAlls
     std::vector<int> recvPairs( 2*commSize, 0 );
+    const int numLocalSupernodes = fact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
     {
         const clique::symbolic::LocalSymmFactSupernode& sn = 
-            localFact.supernodes[t];
+            fact.local.supernodes[t];
         const int size = sn.size;
         const int offset = sn.offset;
         for( int j=0; j<size; ++j )
@@ -697,10 +689,11 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             ++recvPairs[2*proc];
         }
     }
+    const int numDistSupernodes = fact.dist.supernodes.size();
     for( int t=0; t<numDistSupernodes; ++t )
     {
         const clique::symbolic::DistSymmFactSupernode& sn = 
-            distFact.supernodes[t];
+            fact.dist.supernodes[t];
         const clique::Grid& grid = *sn.grid;
         const int gridCol = grid.MRRank();
         const int gridWidth = grid.Width();
@@ -742,7 +735,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     for( int t=0; t<numLocalSupernodes; ++t )
     {
         const clique::symbolic::LocalSymmFactSupernode& sn = 
-            localFact.supernodes[t];
+            fact.local.supernodes[t];
         const int size = sn.size;
         const int offset = sn.offset;
         for( int j=0; j<size; ++j )
@@ -759,7 +752,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     for( int t=0; t<numDistSupernodes; ++t )
     {
         const clique::symbolic::DistSymmFactSupernode& sn = 
-            distFact.supernodes[t];
+            fact.dist.supernodes[t];
         const clique::Grid& grid = *sn.grid;
         const int gridCol = grid.MRRank();
         const int gridWidth = grid.Width();
@@ -827,22 +820,16 @@ psp::DistHelmholtz<R>::FillPanelFronts
     const int ny = control_.ny;
     const int nz = control_.nz;
 
-    // Grab a few convenience variables
-    const clique::symbolic::LocalSymmFact& localSymbFact = symbFact.local;
-    const clique::symbolic::DistSymmFact& distSymbFact = symbFact.dist;
-    const int numLocalSupernodes = localSymbFact.supernodes.size();
-    const int numDistSupernodes = distSymbFact.supernodes.size();
-
     // Initialize the local part of the bottom panel
     std::vector<int> frontIndices;
     std::vector<C> values;
-    clique::numeric::LocalSymmFrontTree<C>& localFact = fact.local;
-    localFact.fronts.resize( numLocalSupernodes );
+    const int numLocalSupernodes = symbFact.local.supernodes.size();
+    fact.local.fronts.resize( numLocalSupernodes );
     for( int t=0; t<numLocalSupernodes; ++t )
     {
-        clique::numeric::LocalSymmFront<C>& front = localFact.fronts[t];
+        clique::numeric::LocalSymmFront<C>& front = fact.local.fronts[t];
         const clique::symbolic::LocalSymmFactSupernode& symbSN = 
-            localSymbFact.supernodes[t];
+            symbFact.local.supernodes[t];
 
         // Initialize this front
         const int offset = symbSN.offset;
@@ -877,13 +864,13 @@ psp::DistHelmholtz<R>::FillPanelFronts
     }
 
     // Initialize the distributed part of the bottom panel
-    clique::numeric::DistSymmFrontTree<C>& distFact = fact.dist;
-    distFact.fronts.resize( numDistSupernodes );
+    const int numDistSupernodes = symbFact.dist.supernodes.size();
+    fact.dist.fronts.resize( numDistSupernodes );
     for( int t=0; t<numDistSupernodes; ++t )
     {
-        clique::numeric::DistSymmFront<C>& front = distFact.fronts[t];
+        clique::numeric::DistSymmFront<C>& front = fact.dist.fronts[t];
         const clique::symbolic::DistSymmFactSupernode& symbSN = 
-            distSymbFact.supernodes[t];
+            symbFact.dist.supernodes[t];
 
         // Initialize this front
         Grid& grid = *symbSN.grid;

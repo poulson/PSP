@@ -1453,7 +1453,7 @@ psp::DistHelmholtz<R>::FillLocalOrigPanelStruct
                 S.local.supernodes[sn.parent].children[1] = s;
         }
 
-        if( box.nx*box.ny*vSize <= cutoff )
+        if( box.nx*box.ny <= cutoff )
         {
             sn.size = box.nx*box.ny*vSize;
             sn.offset = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
