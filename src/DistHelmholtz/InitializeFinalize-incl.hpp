@@ -28,13 +28,12 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int xStride = slowness.XStride();
-    const int yStride = slowness.YStride();
-    const int zStride = slowness.ZStride();
     const int commSize = mpi::CommSize( comm_ );
     elemental::mpi::Comm slownessComm = slowness.Comm();
     if( !elemental::mpi::CongruentComms( comm_, slownessComm ) )
         throw std::logic_error("Slowness does not have a congruent comm");
+    if( slowness.NumScalars() != 1 )
+        throw std::logic_error("Slowness grid should have one entry per point");
 
     //
     // Initialize and factor the top panel (first, since it is the largest)
@@ -174,11 +173,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int x = naturalIndex % nx;
         const int y = (naturalIndex/nx) % ny;
         const int z = naturalIndex/(nx*ny);
-        // TODO: Replace with GridData call which allows for different orderings
-        const int xProc = x % xStride;
-        const int yProc = y % yStride;
-        const int zProc = z % zStride;
-        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        const int proc = slowness.OwningProcess( x, y, z );
 
         const R alpha = recvSlowness[++recvOffsets[proc]];
         const int rowOffset = localRowOffsets_[iLocal];
@@ -585,15 +580,6 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
-    const int xShift = slowness.XShift();
-    const int yShift = slowness.YShift();
-    const int zShift = slowness.ZShift();
-    const int xStride = slowness.XStride();
-    const int yStride = slowness.YStride();
-    const int zStride = slowness.ZStride();
-    const int xLocalSize = slowness.XLocalSize();
-    const int yLocalSize = slowness.YLocalSize();
-    const R* localSlowness = slowness.LockedLocalBuffer();
     const int commSize = mpi::CommSize( comm_ );
 
     std::vector<int> recvPairs( 2*commSize, 0 );
@@ -603,10 +589,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         const int x = naturalIndex % nx;
         const int y = (naturalIndex/nx) % ny;
         const int z = naturalIndex/(nx*ny);
-        const int xProc = x % xStride;
-        const int yProc = y % yStride;
-        const int zProc = z % zStride;
-        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        const int proc = slowness.OwningProcess( x, y, z );
         ++recvPairs[2*proc];
     }
     int maxSize = 0;
@@ -633,16 +616,14 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         const int x = naturalIndex % nx;
         const int y = (naturalIndex/nx) % ny;
         const int z = naturalIndex/(nx*ny);
-        const int xProc = x % xStride;
-        const int yProc = y % yStride;
-        const int zProc = z % zStride;
-        const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+        const int proc = slowness.OwningProcess( x, y, z );
         recvIndices[++recvOffsets[proc]] = naturalIndex;
     }
     std::vector<int> sendIndices( maxSize*commSize );
     mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
     recvIndices.clear();
     std::vector<R> sendSlowness( maxSize*commSize );
+    const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         R* send = &sendSlowness[proc*maxSize];
@@ -652,11 +633,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
             const int z = naturalIndex/(nx*ny);
-            const int xLocal = (x-xShift) / xStride;
-            const int yLocal = (y-yShift) / yStride;
-            const int zLocal = (z-zShift) / zStride;
-            const int localIndex = 
-                xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+            const int localIndex = slowness.LocalIndex( x, y, z );
             send[iLocal] = localSlowness[localIndex];
         }
     }
@@ -684,15 +661,6 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int xShift = slowness.XShift();
-    const int yShift = slowness.YShift();
-    const int zShift = slowness.ZShift();
-    const int xStride = slowness.XStride();
-    const int yStride = slowness.YStride();
-    const int zStride = slowness.ZStride();
-    const int xLocalSize = slowness.XLocalSize();
-    const int yLocalSize = slowness.YLocalSize();
-    const R* localSlowness = slowness.LockedLocalBuffer();
     const int commSize = mpi::CommSize( comm_ );
 
     const clique::symbolic::LocalSymmFact& localFact = fact.local;
@@ -725,10 +693,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int y = (naturalIndex/nx) % ny;
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
-            const int xProc = x % xStride;
-            const int yProc = y % yStride;
-            const int zProc = z % zStride;
-            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const int proc = slowness.OwningProcess( x, y, z );
             ++recvPairs[2*proc];
         }
     }
@@ -752,10 +717,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int y = (naturalIndex/nx) % ny;
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
-            const int xProc = x % xStride;
-            const int yProc = y % yStride;
-            const int zProc = z % zStride;
-            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const int proc = slowness.OwningProcess( x, y, z );
             ++recvPairs[2*proc];
         }
     }
@@ -790,10 +752,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int y = (naturalIndex/nx) % ny;
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
-            const int xProc = x % xStride;
-            const int yProc = y % yStride;
-            const int zProc = z % zStride;
-            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const int proc = slowness.OwningProcess( x, y, z );
             recvIndices[++recvOffsets[proc]] = naturalIndex;
         }
     }
@@ -817,10 +776,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int y = (naturalIndex/nx) % ny;
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
-            const int xProc = x % xStride;
-            const int yProc = y % yStride;
-            const int zProc = z % zStride;
-            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const int proc = slowness.OwningProcess( x, y, z );
             recvIndices[++recvOffsets[proc]] = naturalIndex;
         }
     }
@@ -829,6 +785,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     ( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
     recvIndices.clear();
     std::vector<R> sendSlowness( maxSize*commSize );
+    const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         R* send = &sendSlowness[proc*maxSize];
@@ -839,11 +796,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int y = (naturalIndex/nx) % ny;
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
-            const int xLocal = (x-xShift) / xStride;
-            const int yLocal = (y-yShift) / yStride;
-            const int zLocal = (z-zShift) / zStride;
-            const int localIndex =
-                xLocal + yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+            const int localIndex = slowness.LocalIndex( x, y, z );
             send[iLocal] = localSlowness[localIndex];
         }
     }
@@ -873,9 +826,6 @@ psp::DistHelmholtz<R>::FillPanelFronts
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int xStride = slowness.XStride();
-    const int yStride = slowness.YStride();
-    const int zStride = slowness.ZStride();
 
     // Grab a few convenience variables
     const clique::symbolic::LocalSymmFact& localSymbFact = symbFact.local;
@@ -912,10 +862,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int vPanel = panelNaturalIndex/(nx*ny);
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
-            const int xProc = x % xStride;
-            const int yProc = y % yStride;
-            const int zProc = z % zStride;
-            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const int proc = slowness.OwningProcess( x, y, z );
             const R alpha = recvSlowness[++recvOffsets[proc]];
 
             // Form the j'th lower column of this supernode
@@ -966,10 +913,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int vPanel = panelNaturalIndex/(nx*ny);
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
-            const int xProc = x % xStride;
-            const int yProc = y % yStride;
-            const int zProc = z % zStride;
-            const int proc = xProc + yProc*xStride + zProc*xStride*yStride;
+            const int proc = slowness.OwningProcess( x, y, z );
             const R alpha = recvSlowness[++recvOffsets[proc]];
 
             // Form the j'th lower column of this supernode

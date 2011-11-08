@@ -23,6 +23,15 @@
 
 namespace psp {
 
+enum GridDataOrder {
+    XYZ,
+    XZY,
+    YXZ,
+    YZX,
+    ZXY,
+    ZYX
+};
+
 // The control structure for passing in the distributed data on a 3d grid.
 // 
 //                 _______________ (wx,wy,0)
@@ -45,11 +54,22 @@ template<typename T>
 class GridData
 {
 public:
+
+    // Generate an nx x ny x nz grid, where each node contains 'numScalars' 
+    // entries of type 'T' and the grid is distributed over a px x py x pz grid 
+    // over the specified communicator.
     GridData
-    ( int nx, int ny,int nz, int px, int py, int pz, 
-      elemental::mpi::Comm comm );
+    ( int numScalars,
+      int nx, int ny,int nz, GridDataOrder order,
+      int px, int py, int pz, elemental::mpi::Comm comm );
 
     elemental::mpi::Comm Comm() const;
+    int OwningProcess( int x, int y, int z ) const;
+
+    int NumScalars() const;
+    int LocalIndex( int x, int y, int z ) const;
+    T* LocalBuffer();
+    const T* LockedLocalBuffer() const;
 
     int XShift() const;
     int YShift() const;
@@ -60,16 +80,16 @@ public:
     int XLocalSize() const;
     int YLocalSize() const;
     int ZLocalSize() const;
-
-    T* LocalBuffer
-    ( int xLocal=0, int yLocal=0, int zLocal=0 );
-    const T* LockedLocalBuffer
-    ( int xLocal=0, int yLocal=0, int zLocal=0 ) const;
+    GridDataOrder Order() const;
 
 private:
-    elemental::mpi::Comm comm_;
+    int numScalars_;
     int nx_, ny_, nz_;
+    GridDataOrder order_;
+
     int px_, py_, pz_;
+    elemental::mpi::Comm comm_;
+
     int xShift_, yShift_, zShift_;
     int xLocalSize_, yLocalSize_, zLocalSize_;
     std::vector<T> localData_;
@@ -81,8 +101,12 @@ private:
 
 template<typename T>
 inline GridData<T>::GridData
-( int nx, int ny, int nz, int px, int py, int pz, elemental::mpi::Comm comm )
-: nx_(nx), ny_(ny), nz_(nz), px_(px), py_(py), pz_(pz)
+( int numScalars,
+  int nx, int ny, int nz, GridDataOrder order,
+  int px, int py, int pz, elemental::mpi::Comm comm )
+: numScalars_(numScalars), 
+  nx_(nx), ny_(ny), nz_(nz), order_(order),
+  px_(px), py_(py), pz_(pz), comm_(comm)
 {
     const int commRank = elemental::mpi::CommRank( comm );
     const int commSize = elemental::mpi::CommSize( comm );
@@ -141,21 +165,56 @@ inline int GridData<T>::ZLocalSize() const
 { return zLocalSize_; }
 
 template<typename T>
-inline T* GridData<T>::LocalBuffer
-( int xLocal, int yLocal, int zLocal )
-{ 
-    const int index = 
-        xLocal + yLocal*xLocalSize_ + zLocal*xLocalSize_*yLocalSize_;
-    return &localData_[index];
+inline T* GridData<T>::LocalBuffer()
+{ return &localData_[0]; }
+
+template<typename T>
+inline const T* GridData<T>::LockedLocalBuffer() const
+{ return &localData_[0]; }
+
+template<typename T>
+inline int GridData<T>::NumScalars() const
+{ return numScalars_; }
+
+template<typename T>
+inline int GridData<T>::OwningProcess( int x, int y, int z ) const
+{
+    const int xProc = x % px_;
+    const int yProc = y % py_;
+    const int zProc = z % pz_;
+    return xProc + yProc*px_ + zProc*px_*py_;
 }
 
 template<typename T>
-inline const T* GridData<T>::LockedLocalBuffer
-( int xLocal, int yLocal, int zLocal ) const
+inline int GridData<T>::LocalIndex( int x, int y, int z ) const
 { 
-    const int index = 
-        xLocal + yLocal*xLocalSize_ + zLocal*xLocalSize_*yLocalSize_;
-    return &localData_[index];
+    const int xLocal = (x-xShift_) / px_;
+    const int yLocal = (y-yShift_) / py_;
+    const int zLocal = (z-zShift_) / pz_;
+
+    int index;
+    switch( order_ )
+    {
+    case XYZ:
+        index = xLocal + yLocal*xLocalSize_ + zLocal*xLocalSize_*yLocalSize_;
+        break;
+    case XZY:
+        index = xLocal + zLocal*xLocalSize_ + yLocal*xLocalSize_*zLocalSize_;
+        break;
+    case YXZ:
+        index = yLocal + xLocal*yLocalSize_ + zLocal*yLocalSize_*xLocalSize_;
+        break;
+    case YZX:
+        index = yLocal + zLocal*yLocalSize_ + xLocal*yLocalSize_*zLocalSize_;
+        break;
+    case ZXY:
+        index = zLocal + xLocal*zLocalSize_ + yLocal*zLocalSize_*yLocalSize_;
+        break;
+    case ZYX:
+        index = zLocal + yLocal*zLocalSize_ + xLocal*zLocalSize_*yLocalSize_;
+        break;
+    }
+    return index*numScalars_;
 }
 
 } // namespace psp
