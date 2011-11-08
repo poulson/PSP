@@ -21,8 +21,11 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Precondition( GridData<C>& y ) const
+psp::DistHelmholtz<R>::Solve( GridData<C>& B, Solver solver ) const
 {
-    // HERE
+    // TODO:
+    //  1) Convert B into custom nested-dissection based ordering
+    //  2) Run GMRES or QMR
+    //  3) Redistribute the solution back into the GridData form
 }
 

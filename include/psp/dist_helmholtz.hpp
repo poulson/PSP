@@ -23,6 +23,11 @@
 
 namespace psp {
 
+enum Solver {
+    GMRES,
+    QMR
+};
+
 template<typename R>
 class DistHelmholtz
 {
@@ -37,19 +42,13 @@ public:
     // Build the sparse matrix and the preconditioner
     void Initialize( const GridData<R>& slowness );
 
+    // Solves an O(1) set of linear systems with the sweeping preconditioner
+    void Solve( GridData<C>& B, Solver solver=QMR ) const;
+
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
 
-    // y := alpha A x + beta y
-    void Multiply
-    ( C alpha, const GridData<C>& x, C beta, GridData<C>& y ) const;
-
-    // y := approximateInv(A) y
-    void Precondition( GridData<C>& y ) const;
-
-    // TODO: Add GMRES and/or QMR solvers
-
-    //void WriteParallelVtkFile( const F* vLocal, const char* basename ) const;
+    // TODO: Add ability to write parallel VTK files
 
 private:
     elemental::mpi::Comm comm_;

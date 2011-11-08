@@ -21,8 +21,7 @@
 #include "psp.hpp"
 
 #include "./DistHelmholtz/InitializeFinalize-incl.hpp"
-#include "./DistHelmholtz/Multiply-incl.hpp"
-#include "./DistHelmholtz/Precondition-incl.hpp"
+#include "./DistHelmholtz/Solve-incl.hpp"
 
 template<typename R>
 psp::DistHelmholtz<R>::DistHelmholtz
