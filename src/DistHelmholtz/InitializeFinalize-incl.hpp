@@ -574,18 +574,13 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         std::vector<R>& recvSlowness,
         std::vector<int>& recvOffsets ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
     const int commSize = mpi::CommSize( comm_ );
 
     std::vector<int> recvPairs( 2*commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int x = naturalIndex % nx;
-        const int y = (naturalIndex/nx) % ny;
-        const int z = naturalIndex/(nx*ny);
-        const int proc = slowness.OwningProcess( x, y, z );
+        const int proc = slowness.OwningProcess( naturalIndex );
         ++recvPairs[2*proc];
     }
     int maxSize = 0;
@@ -609,10 +604,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int x = naturalIndex % nx;
-        const int y = (naturalIndex/nx) % ny;
-        const int z = naturalIndex/(nx*ny);
-        const int proc = slowness.OwningProcess( x, y, z );
+        const int proc = slowness.OwningProcess( naturalIndex );
         recvIndices[++recvOffsets[proc]] = naturalIndex;
     }
     std::vector<int> sendIndices( maxSize*commSize );
@@ -626,10 +618,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
         {
             const int naturalIndex = sendIndices[iLocal];
-            const int x = naturalIndex % nx;
-            const int y = (naturalIndex/nx) % ny;
-            const int z = naturalIndex/(nx*ny);
-            const int localIndex = slowness.LocalIndex( x, y, z );
+            const int localIndex = slowness.LocalIndex( naturalIndex );
             send[iLocal] = localSlowness[localIndex];
         }
     }

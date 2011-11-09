@@ -65,6 +65,19 @@ private:
     bool initialized_; 
 
     //
+    // Solve helpers
+    //
+
+    void PullRightHandSides
+    ( const GridData<C>& B, std::vector<C>& redistB ) const;
+
+    void PushRightHandSides
+    (       GridData<C>& B, const std::vector<C>& redistB ) const;
+
+    void SolveWithGMRES( std::vector<C>& redistB ) const;
+    void SolveWithQMR( std::vector<C>& redistB ) const;
+
+    //
     // Information related to the decomposition of the domain into panels
     //
 

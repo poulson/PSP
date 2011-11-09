@@ -64,9 +64,11 @@ public:
       int px, int py, int pz, elemental::mpi::Comm comm );
 
     elemental::mpi::Comm Comm() const;
+    int OwningProcess( int naturalIndex ) const;
     int OwningProcess( int x, int y, int z ) const;
 
     int NumScalars() const;
+    int LocalIndex( int naturalIndex ) const;
     int LocalIndex( int x, int y, int z ) const;
     T* LocalBuffer();
     const T* LockedLocalBuffer() const;
@@ -177,12 +179,30 @@ inline int GridData<T>::NumScalars() const
 { return numScalars_; }
 
 template<typename T>
+inline int GridData<T>::OwningProcess( int naturalIndex ) const
+{
+    const int x = naturalIndex % nx_;
+    const int y = (naturalIndex/nx_) % ny_;
+    const int z = naturalIndex/(nx_*ny_);
+    return OwningProcess( x, y, z );
+}
+
+template<typename T>
 inline int GridData<T>::OwningProcess( int x, int y, int z ) const
 {
     const int xProc = x % px_;
     const int yProc = y % py_;
     const int zProc = z % pz_;
     return xProc + yProc*px_ + zProc*px_*py_;
+}
+
+template<typename T>
+inline int GridData<T>::LocalIndex( int naturalIndex ) const
+{
+    const int x = naturalIndex % nx_;
+    const int y = (naturalIndex/nx_) % ny_;
+    const int z = naturalIndex/(nx_*ny_);
+    return LocalIndex( x, y, z );
 }
 
 template<typename T>
