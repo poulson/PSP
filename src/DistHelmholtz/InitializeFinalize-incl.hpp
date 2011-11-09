@@ -35,18 +35,18 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
         const int vSize = topOrigDepth_ + bzCeil_;
-        std::vector<R> recvSlowness;
-        std::vector<int> recvOffsets;
+        std::vector<R> myPanelSlowness;
+        std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
         ( vOffset, vSize, topSymbolicFact_, slowness,
-          recvSlowness, recvOffsets, 
+          myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         FillPanelFronts
         ( vOffset, vSize, topSymbolicFact_, topFact_,
-          slowness, recvSlowness, recvOffsets, 
+          slowness, myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization
@@ -63,18 +63,18 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Retrieve the slowness for this panel
         const int vOffset = 0;
         const int vSize = bottomDepth_;
-        std::vector<R> recvSlowness;
-        std::vector<int> recvOffsets;
+        std::vector<R> myPanelSlowness;
+        std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
         ( vOffset, vSize, bottomSymbolicFact_, slowness,
-          recvSlowness, recvOffsets,
+          myPanelSlowness, offsets,
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         FillPanelFronts
         ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
-          slowness, recvSlowness, recvOffsets,
+          slowness, myPanelSlowness, offsets,
           panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization
@@ -94,19 +94,19 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
         const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bzCeil_;
         const int vSize = numPlanesPerPanel + bzCeil_;
-        std::vector<R> recvSlowness;
-        std::vector<int> recvOffsets;
+        std::vector<R> myPanelSlowness;
+        std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
         ( vOffset, vSize, fullInnerSymbolicFact_, slowness,
-          recvSlowness, recvOffsets, 
+          myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
         FillPanelFronts
         ( vOffset, vSize, fullInnerSymbolicFact_, fullInnerFact,
-          slowness, recvSlowness, recvOffsets,
+          slowness, myPanelSlowness, offsets,
           panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
@@ -126,18 +126,18 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int vOffset = bottomDepth_ + innerDepth_ - 
                             leftoverInnerDepth_ - bzCeil_;
         const int vSize = leftoverInnerDepth_ + bzCeil_;
-        std::vector<R> recvSlowness;
-        std::vector<int> recvOffsets;
+        std::vector<R> myPanelSlowness;
+        std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
         ( vOffset, vSize, leftoverInnerSymbolicFact_, slowness,
-          recvSlowness, recvOffsets, 
+          myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         FillPanelFronts
         ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
-          slowness, recvSlowness, recvOffsets,
+          slowness, myPanelSlowness, offsets,
           panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
@@ -153,9 +153,9 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
 
     // Gather the slowness for the global sparse matrix
-    std::vector<R> recvSlowness;
-    std::vector<int> recvOffsets;
-    GetGlobalSlowness( slowness, recvSlowness, recvOffsets );
+    std::vector<R> myGlobalSlowness;
+    std::vector<int> offsets;
+    GetGlobalSlowness( slowness, myGlobalSlowness, offsets );
 
     // Now make use of the redistributed slowness data to form the global 
     // sparse matrix
@@ -171,7 +171,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int z = naturalIndex/(nx*ny);
         const int proc = slowness.OwningProcess( x, y, z );
 
-        const R alpha = recvSlowness[++recvOffsets[proc]];
+        const R alpha = myGlobalSlowness[++offsets[proc]];
         const int rowOffset = localRowOffsets_[iLocal];
         const int v = (nz-1) - z;
         FormGlobalRow( alpha, x, y, v, rowOffset );
@@ -571,11 +571,12 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::GetGlobalSlowness
 ( const GridData<R>& slowness,
-        std::vector<R>& recvSlowness,
-        std::vector<int>& recvOffsets ) const
+        std::vector<R>& myGlobalSlowness,
+        std::vector<int>& offsets ) const
 {
     const int commSize = mpi::CommSize( comm_ );
 
+    // Pack and send the amount of data that we need to recv from each process.
     std::vector<int> recvPairs( 2*commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -591,6 +592,8 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
     std::vector<int> sendPairs( 2*commSize );
     mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
     recvPairs.clear();
+
+    // Pack and send the indices that we need to recv from each process.
     for( int proc=0; proc<commSize; ++proc )
         maxSize = std::max(sendPairs[2*proc+1],maxSize);
     std::vector<int> actualSendSizes( commSize );
@@ -598,18 +601,20 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         actualSendSizes[proc] = sendPairs[2*proc];
     sendPairs.clear();
     std::vector<int> recvIndices( maxSize*commSize );
-    recvOffsets.resize( commSize );
+    offsets.resize( commSize );
     for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
+        offsets[proc] = maxSize*proc;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = slowness.OwningProcess( naturalIndex );
-        recvIndices[++recvOffsets[proc]] = naturalIndex;
+        recvIndices[++offsets[proc]] = naturalIndex;
     }
     std::vector<int> sendIndices( maxSize*commSize );
     mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
     recvIndices.clear();
+
+    // Pack and send our slowness data.
     std::vector<R> sendSlowness( maxSize*commSize );
     const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
@@ -623,13 +628,13 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         }
     }
     sendIndices.clear();
-    recvSlowness.resize( maxSize*commSize );
+    myGlobalSlowness.resize( maxSize*commSize );
     mpi::AllToAll
-    ( &sendSlowness[0], maxSize, &recvSlowness[0], maxSize, comm_ );
+    ( &sendSlowness[0], maxSize, &myGlobalSlowness[0], maxSize, comm_ );
 
-    // Reset the recv offsets
+    // Reset the offsets
     for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
+        offsets[proc] = maxSize*proc;
 }
 
 template<typename R>
@@ -638,8 +643,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
 ( int vOffset, int vSize, 
   const clique::symbolic::SymmFact& fact,
   const GridData<R>& slowness,
-        std::vector<R>& recvSlowness,
-        std::vector<int>& recvOffsets,
+        std::vector<R>& myPanelSlowness,
+        std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
 {
@@ -658,7 +663,11 @@ psp::DistHelmholtz<R>::GetPanelSlowness
          it!=panelNestedToNatural.end(); ++it )
         panelNaturalToNested[it->second] = it->first;
 
+    //
     // Gather the slowness data using three AllToAlls
+    //
+
+    // Send the amount of data that we need to recv from each process.
     std::vector<int> recvPairs( 2*commSize, 0 );
     const int numLocalSupernodes = fact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
@@ -711,6 +720,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     std::vector<int> sendPairs( 2*commSize );
     mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
     recvPairs.clear();
+
+    // Send the indices that we need to recv from each process.
     for( int proc=0; proc<commSize; ++proc )
         maxSize = std::max(sendPairs[2*proc+1],maxSize);
     std::vector<int> actualSendSizes( commSize );
@@ -718,9 +729,9 @@ psp::DistHelmholtz<R>::GetPanelSlowness
         actualSendSizes[proc] = sendPairs[2*proc];
     sendPairs.clear();
     std::vector<int> recvIndices( maxSize*commSize );
-    recvOffsets.resize( commSize );
+    offsets.resize( commSize );
     for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
+        offsets[proc] = maxSize*proc;
     for( int t=0; t<numLocalSupernodes; ++t )
     {
         const clique::symbolic::LocalSymmFactSupernode& sn = 
@@ -735,7 +746,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            recvIndices[++recvOffsets[proc]] = naturalIndex;
+            recvIndices[++offsets[proc]] = naturalIndex;
         }
     }
     for( int t=0; t<numDistSupernodes; ++t )
@@ -759,13 +770,15 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            recvIndices[++recvOffsets[proc]] = naturalIndex;
+            recvIndices[++offsets[proc]] = naturalIndex;
         }
     }
     std::vector<int> sendIndices( maxSize*commSize );
     mpi::AllToAll
     ( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
     recvIndices.clear();
+
+    // Pack and send our slowness data.
     std::vector<R> sendSlowness( maxSize*commSize );
     const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
@@ -783,14 +796,14 @@ psp::DistHelmholtz<R>::GetPanelSlowness
         }
     }
     sendIndices.clear();
-    recvSlowness.resize( maxSize*commSize );
+    myPanelSlowness.resize( maxSize*commSize );
     mpi::AllToAll
-    ( &sendSlowness[0], maxSize, &recvSlowness[0], maxSize, comm_ );
+    ( &sendSlowness[0], maxSize, &myPanelSlowness[0], maxSize, comm_ );
     sendSlowness.clear();
 
-    // Reset the recv offsets
+    // Reset the offsets
     for( int proc=0; proc<commSize; ++proc )
-        recvOffsets[proc] = maxSize*proc;
+        offsets[proc] = maxSize*proc;
 }
 
 template<typename R>        
@@ -800,8 +813,8 @@ psp::DistHelmholtz<R>::FillPanelFronts
   const clique::symbolic::SymmFact& symbFact,
         clique::numeric::SymmFrontTree<C>& fact,
   const GridData<R>& slowness,
-  const std::vector<R>& recvSlowness,
-        std::vector<int>& recvOffsets,
+  const std::vector<R>& myPanelSlowness,
+        std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
 {
@@ -839,7 +852,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            const R alpha = recvSlowness[++recvOffsets[proc]];
+            const R alpha = myPanelSlowness[++offsets[proc]];
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
@@ -890,7 +903,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            const R alpha = recvSlowness[++recvOffsets[proc]];
+            const R alpha = myPanelSlowness[++offsets[proc]];
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode

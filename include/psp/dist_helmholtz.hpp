@@ -147,8 +147,8 @@ private:
 
     void GetGlobalSlowness
     ( const GridData<R>& slowness,
-      std::vector<R>& recvSlowness,
-      std::vector<int>& recvOffsets ) const;
+      std::vector<R>& myGlobalSlowness,
+      std::vector<int>& offsets ) const;
 
     void FormGlobalRow( R alpha, int x, int y, int v, int row );
 
@@ -194,8 +194,8 @@ private:
     ( int vOffset, int vSize, 
       const clique::symbolic::SymmFact& fact,
       const GridData<R>& slowness,
-      std::vector<R>& recvSlowness,
-      std::vector<int>& recvOffsets,
+      std::vector<R>& myPanelSlowness,
+      std::vector<int>& offsets,
       std::map<int,int>& panelNestedToNatural, 
       std::map<int,int>& panelNaturalToNested ) const;
 
@@ -204,8 +204,8 @@ private:
       const clique::symbolic::SymmFact& symbFact,
             clique::numeric::SymmFrontTree<C>& fact,
       const GridData<R>& slowness,
-      const std::vector<R>& recvSlowness,
-            std::vector<int>& recvOffsets,
+      const std::vector<R>& myPanelSlowness,
+            std::vector<int>& offsets,
             std::map<int,int>& panelNestedToNatural,
             std::map<int,int>& panelNaturalToNested ) const;
 
