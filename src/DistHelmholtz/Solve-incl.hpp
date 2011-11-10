@@ -217,17 +217,55 @@ psp::DistHelmholtz<R>::SolveWithQMR( std::vector<C>& redistB ) const
     // TODO: Implement QMR in terms of Multiply and Precondition
 }
 
+// B := A B
 template<typename R>
 void
 psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
 {
     const int numRhs = redistB.size() / localHeight_;
+    const int commSize = mpi::CommSize( comm_ );
 
-    // TODO: 
-    // Multiply the right-hand sides by the global sparse matrix
-    //
-    // 1) AllToAll to gather the necessary portions of the RHS's
-    // 2) Run the local multiplies to form the result
+    // Pack and scatter our portion of the right-hand sides
+    std::vector<C> sendRhs( commSize*allToAllSize_*numRhs );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        C* send = &sendRhs[proc*allToAllSize_*numRhs];
+        for( int iLocal=0; iLocal<actualSendSizes_[proc]; ++iLocal )
+            for( int k=0; k<numRhs; ++k )
+                send[iLocal*numRhs+k] = redistB[iLocal+k*localHeight_];
+    }
+    std::vector<C> recvRhs( commSize*allToAllSize_*numRhs );
+    mpi::AllToAll
+    ( &sendRhs[0], allToAllSize_*numRhs, 
+      &recvRhs[0], allToAllSize_*numRhs, comm_ );
+    sendRhs.clear();
+
+    // Run the local multiplies to form the result
+    std::vector<int> offsets( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+        offsets[proc] = proc*allToAllSize_;
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        const int naturalRow = localToNaturalMap_[iLocal];
+        const int rowOffset = localRowOffsets_[iLocal];
+        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
+
+        // Multiply by the diagonal value
+        const C diagVal = localEntries_[rowOffset];
+        for( int k=0; k<numRhs; ++k )
+            redistB[iLocal+k*localHeight_] *= diagVal;
+
+        // Multiply by the off-diagonal values
+        for( int jLocal=1; jLocal<rowSize; ++jLocal )
+        {
+            const int proc = owningProcesses_[rowOffset+jLocal];
+            const C offDiagVal = localEntries_[rowOffset+jLocal];
+            for( int k=0; k<numRhs; ++k )
+                redistB[iLocal+k*localHeight_] += 
+                    offDiagVal*recvRhs[offsets[proc]*numRhs+k];
+            ++offsets[proc];
+        }
+    }
 }
 
 template<typename R>

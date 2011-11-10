@@ -124,6 +124,7 @@ private:
     std::vector<int> localToNaturalMap_;
     std::vector<int> localRowOffsets_;
     std::vector<C> localEntries_;
+    std::vector<int> owningProcesses_;
 
     // Sparse matrix communication information
     int allToAllSize_;

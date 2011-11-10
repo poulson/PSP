@@ -134,22 +134,28 @@ psp::DistHelmholtz<R>::DistHelmholtz
 
     // Count the number of indices that we will need to recv from each process.
     actualRecvSizes_.resize( commSize, 0 );
+    owningProcesses_.resize( localRowOffsets_.back() );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalRow = localToNaturalMap_[iLocal];
         const int rowOffset = localRowOffsets_[iLocal];
         const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
-        // skip the diagonal value...
-        for( int k=1; k<rowSize; ++k )
+
+        // Handle the diagonal value
+        owningProcesses_[rowOffset] = commRank;
+
+        // Handle the off-diagonal values
+        for( int jLocal=1; jLocal<rowSize; ++jLocal )
         {
-            const int naturalCol = localConnections[rowOffset+k];
+            const int naturalCol = localConnections[rowOffset+jLocal];
             const int x = naturalCol % nx;
             const int y = (naturalCol/nx) % ny;
             const int z = naturalCol/(nx*ny);
             const int v = (nz-1) - z;
             const int vLocal = LocalV( v );
-            const int process = OwningProcess( x, y, vLocal );
-            ++actualRecvSizes_[process];
+            const int proc = OwningProcess( x, y, vLocal );
+            owningProcesses_[rowOffset+jLocal] = proc;
+            ++actualRecvSizes_[proc];
         }
     }
     const int maxRecvSize = 
@@ -172,35 +178,35 @@ psp::DistHelmholtz<R>::DistHelmholtz
         allToAllSize_ = std::max(allToAllSize_,synchMessageRecvs[2*proc+1]);
     synchMessageRecvs.clear();
 
-    // Pack and send the natural indices
-    std::vector<int> packOffsets( commSize );
-    std::vector<int> naturalIndexSends( commSize*allToAllSize_ );
+    // Pack and send the list of indices that we will need from each process
+    std::vector<int> offsets( commSize );
+    std::vector<int> recvIndices( commSize*allToAllSize_ );
     for( int proc=0; proc<commSize; ++proc )
-        packOffsets[proc] = proc*allToAllSize_;
+        offsets[proc] = proc*allToAllSize_;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalRow = localToNaturalMap_[iLocal];
         const int rowOffset = localRowOffsets_[iLocal];
         const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
         // skip the diagonal value...
-        for( int k=1; k<rowSize; ++k )
+        for( int jLocal=1; jLocal<rowSize; ++jLocal )
         {
-            const int naturalCol = localConnections[rowOffset+k];
+            const int naturalCol = localConnections[rowOffset+jLocal];
             const int x = naturalCol % nx;
             const int y = (naturalCol/nx) % ny;
             const int z = naturalCol/(nx*ny);
             const int v = (nz-1) - z;
             const int vLocal = LocalV( v );
-            const int process = OwningProcess( x, y, vLocal );
+            const int proc = OwningProcess( x, y, vLocal );
 
-            naturalIndexSends[packOffsets[process]++] = naturalCol;
+            recvIndices[offsets[proc]++] = naturalCol;
         }
     }
     sendIndices_.resize( commSize*allToAllSize_ );
     clique::mpi::AllToAll
-    ( &naturalIndexSends[0], allToAllSize_, 
-      &sendIndices_[0],      allToAllSize_, comm );
-    naturalIndexSends.clear();
+    ( &recvIndices[0],  allToAllSize_, 
+      &sendIndices_[0], allToAllSize_, comm );
+    recvIndices.clear();
 
     // Invert the local to natural map
     std::map<int,int> naturalToLocalMap;
@@ -912,17 +918,17 @@ template<typename R>
 int
 psp::DistHelmholtz<R>::OwningProcess( int x, int y, int vLocal ) const
 {
-    int process = 0;
+    int proc = 0;
     OwningProcessRecursion
-    ( x, y, vLocal, control_.nx, control_.ny, log2CommSize_, process );
-    return process;
+    ( x, y, vLocal, control_.nx, control_.ny, log2CommSize_, proc );
+    return proc;
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::OwningProcessRecursion
 ( int x, int y, int vLocal, int xSize, int ySize, unsigned depthToSerial, 
-  int& process )
+  int& proc )
 {
     if( depthToSerial == 0 )
         return;
@@ -936,24 +942,24 @@ psp::DistHelmholtz<R>::OwningProcessRecursion
         const int xLeftSize = (xSize-1) / 2;
         if( x == xLeftSize )
         {
-            process <<= depthToSerial;
-            process |= (y+vLocal*ySize) % (1u<<depthToSerial);
+            proc <<= depthToSerial;
+            proc |= (y+vLocal*ySize) % (1u<<depthToSerial);
         }
         else if( x > xLeftSize )
         { 
             // Continue down the right side
-            process <<= 1;
-            process |= 1;
+            proc <<= 1;
+            proc |= 1;
             OwningProcessRecursion
             ( x-(xLeftSize+1), y, vLocal, xSize-(xLeftSize+1), ySize, 
-              depthToSerial-1, process );
+              depthToSerial-1, proc );
         }
         else // x < leftSize
         {
             // Continue down the left side
-            process <<= 1;
+            proc <<= 1;
             OwningProcessRecursion
-            ( x, y, vLocal, xLeftSize, ySize, depthToSerial-1, process );
+            ( x, y, vLocal, xLeftSize, ySize, depthToSerial-1, proc );
         }
     }
     else
@@ -965,24 +971,24 @@ psp::DistHelmholtz<R>::OwningProcessRecursion
         const int yLeftSize = (ySize-1) / 2;
         if( y == yLeftSize )
         {
-            process <<= depthToSerial;
-            process |= (x+vLocal*xSize) % (1u<<depthToSerial);
+            proc <<= depthToSerial;
+            proc |= (x+vLocal*xSize) % (1u<<depthToSerial);
         }
         else if( y > yLeftSize )
         { 
             // Continue down the right side
-            process <<= 1;
-            process |= 1;
+            proc <<= 1;
+            proc |= 1;
             OwningProcessRecursion
             ( x, y-(yLeftSize+1), vLocal, xSize, ySize-(yLeftSize+1), 
-              depthToSerial-1, process );
+              depthToSerial-1, proc );
         }
         else // x < leftSize
         {
             // Continue down the left side
-            process <<= 1;
+            proc <<= 1;
             OwningProcessRecursion
-            ( x, y, vLocal, xSize, yLeftSize, depthToSerial-1, process );
+            ( x, y, vLocal, xSize, yLeftSize, depthToSerial-1, proc );
         }
     }
 }
