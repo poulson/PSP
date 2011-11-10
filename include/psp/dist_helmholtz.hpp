@@ -185,7 +185,7 @@ private:
       unsigned commRank, unsigned depthTilSerial,
       std::vector<int>& localConnections, int& localOffset );
 
-    int OwningProcess( int x, int y, int vLocal ) const;
+    int OwningProcess( int naturalIndex ) const;
     static void OwningProcessRecursion
     ( int x, int y, int vLocal, int xSize, int ySize, 
       unsigned depthTilSerial, int& process );

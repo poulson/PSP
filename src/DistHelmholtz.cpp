@@ -36,14 +36,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
   bzCeil_(std::ceil(control.etaz/hz_)),
   initialized_(false)
 {
-    // Provide some notational shortcuts
-    const int nx = control.nx;
-    const int ny = control.ny;
-    const int nz = control.nz;
-    const int cutoff = control.cutoff;
-    const int numPlanesPerPanel = control.numPlanesPerPanel;
-    const int bzCeil = bzCeil_;
-
     // Pull out some information about our communicator
     const int commRank = elemental::mpi::CommRank( comm );
     const int commSize = elemental::mpi::CommSize( comm );
@@ -53,6 +45,9 @@ psp::DistHelmholtz<R>::DistHelmholtz
         ++log2CommSize_;
 
     // Decide if the domain is sufficiently deep to warrant sweeping
+    const int nz = control.nz;
+    const int numPlanesPerPanel = control.numPlanesPerPanel;
+    const int bzCeil = bzCeil_;
     const bool topHasPML = (control.topBC == PML);
     bottomDepth_ = bzCeil+numPlanesPerPanel;
     topOrigDepth_ = (topHasPML ? bzCeil+numPlanesPerPanel : numPlanesPerPanel );
@@ -137,23 +132,16 @@ psp::DistHelmholtz<R>::DistHelmholtz
     owningProcesses_.resize( localRowOffsets_.back() );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
-        const int naturalRow = localToNaturalMap_[iLocal];
-        const int rowOffset = localRowOffsets_[iLocal];
-        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
-
         // Handle the diagonal value
+        const int rowOffset = localRowOffsets_[iLocal];
         owningProcesses_[rowOffset] = commRank;
 
         // Handle the off-diagonal values
+        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
         for( int jLocal=1; jLocal<rowSize; ++jLocal )
         {
             const int naturalCol = localConnections[rowOffset+jLocal];
-            const int x = naturalCol % nx;
-            const int y = (naturalCol/nx) % ny;
-            const int z = naturalCol/(nx*ny);
-            const int v = (nz-1) - z;
-            const int vLocal = LocalV( v );
-            const int proc = OwningProcess( x, y, vLocal );
+            const int proc = OwningProcess( naturalCol );
             owningProcesses_[rowOffset+jLocal] = proc;
             ++actualRecvSizes_[proc];
         }
@@ -185,20 +173,13 @@ psp::DistHelmholtz<R>::DistHelmholtz
         offsets[proc] = proc*allToAllSize_;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
-        const int naturalRow = localToNaturalMap_[iLocal];
         const int rowOffset = localRowOffsets_[iLocal];
         const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
         // skip the diagonal value...
         for( int jLocal=1; jLocal<rowSize; ++jLocal )
         {
             const int naturalCol = localConnections[rowOffset+jLocal];
-            const int x = naturalCol % nx;
-            const int y = (naturalCol/nx) % ny;
-            const int z = naturalCol/(nx*ny);
-            const int v = (nz-1) - z;
-            const int vLocal = LocalV( v );
-            const int proc = OwningProcess( x, y, vLocal );
-
+            const int proc = OwningProcess( naturalCol );
             recvIndices[offsets[proc]++] = naturalCol;
         }
     }
@@ -916,8 +897,18 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::OwningProcess( int x, int y, int vLocal ) const
+psp::DistHelmholtz<R>::OwningProcess( int naturalIndex ) const
 {
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int nz = control_.nz;
+
+    const int x = naturalIndex % nx;
+    const int y = (naturalIndex/nx) % ny;
+    const int z = naturalIndex/(nx*ny);
+    const int v = (nz-1) - z;
+    const int vLocal = LocalV( v );
+
     int proc = 0;
     OwningProcessRecursion
     ( x, y, vLocal, control_.nx, control_.ny, log2CommSize_, proc );

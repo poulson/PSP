@@ -46,13 +46,9 @@ void
 psp::DistHelmholtz<R>::PullRightHandSides
 ( const GridData<C>& B, std::vector<C>& redistB ) const
 {
-    const int numRhs = B.NumScalars();
-    const int commSize = mpi::CommSize( comm_ );
-
-    redistB.resize( localHeight_*numRhs );
-
     // Pack and send the amount of data that we will need to recv from each
     // process.
+    const int commSize = mpi::CommSize( comm_ );
     std::vector<int> recvPairs( 2*commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -91,6 +87,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     recvIndices.clear();
 
     // Pack and send our right-hand side data.
+    const int numRhs = B.NumScalars();
     std::vector<C> sendB( maxSize*commSize*numRhs );
     const C* BBuffer = B.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
@@ -111,6 +108,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     sendB.clear();
 
     // Unpack the received right-hand side data
+    redistB.resize( localHeight_*numRhs );
     for( int proc=0; proc<commSize; ++proc )
         offsets[proc] = maxSize*proc;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
@@ -128,11 +126,10 @@ void
 psp::DistHelmholtz<R>::PushRightHandSides
 ( GridData<C>& B, const std::vector<C>& redistB ) const
 {
-    const int numRhs = B.NumScalars();
-    const int commSize = mpi::CommSize( comm_ );
-
     // Pack and send the amount of data that we will need to send to 
     // each process.
+    const int numRhs = B.NumScalars();
+    const int commSize = mpi::CommSize( comm_ );
     std::vector<int> sendPairs( 2*commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -222,10 +219,9 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
 {
+    // Pack and scatter our portion of the right-hand sides
     const int numRhs = redistB.size() / localHeight_;
     const int commSize = mpi::CommSize( comm_ );
-
-    // Pack and scatter our portion of the right-hand sides
     std::vector<C> sendRhs( commSize*allToAllSize_*numRhs );
     for( int proc=0; proc<commSize; ++proc )
     {
@@ -246,16 +242,14 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
         offsets[proc] = proc*allToAllSize_;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
-        const int naturalRow = localToNaturalMap_[iLocal];
-        const int rowOffset = localRowOffsets_[iLocal];
-        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
-
         // Multiply by the diagonal value
+        const int rowOffset = localRowOffsets_[iLocal];
         const C diagVal = localEntries_[rowOffset];
         for( int k=0; k<numRhs; ++k )
             redistB[iLocal+k*localHeight_] *= diagVal;
 
         // Multiply by the off-diagonal values
+        const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
         for( int jLocal=1; jLocal<rowSize; ++jLocal )
         {
             const int proc = owningProcesses_[rowOffset+jLocal];
