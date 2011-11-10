@@ -79,13 +79,17 @@ private:
     void Multiply( std::vector<C>& redistB ) const;
     void Precondition( std::vector<C>& redistB ) const;
 
-    // u_i := T_i u_i
-    void PanelSolve( int i, std::vector<C>& redistB ) const;
-    // u_{i+1} := u_{i+1} - A_{i+1,i} u_i
-    void SubdiagonalUpdate( int i, std::vector<C>& redistB ) const;
-    // z := A_{i,i+1} u_{i+1}
-    void MultiplySuperdiagonal
-    ( int i, const std::vector<C>& redistB, std::vector<C>& z ) const;
+    // B_i := T_i B_i
+    void SolvePanel( std::vector<C>& B, int i ) const;
+    // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
+    void SubdiagonalUpdate( std::vector<C>& B, int i ) const;
+    // Z := B_i
+    void ExtractPanel
+    ( const std::vector<C>& B, int i, std::vector<C>& Z ) const;
+    // B_i := -A_{i,i+1} B_{i+1}
+    void MultiplySuperdiagonal( std::vector<C>& B, int i ) const;
+    // B_i := B_i + Z
+    void UpdatePanel( std::vector<C>& B, int i, const std::vector<C>& Z ) const;
 
     //
     // Information related to the decomposition of the domain into panels
