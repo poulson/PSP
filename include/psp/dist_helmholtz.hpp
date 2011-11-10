@@ -70,15 +70,22 @@ private:
 
     void PullRightHandSides
     ( const GridData<C>& B, std::vector<C>& redistB ) const;
-
     void PushRightHandSides
-    (       GridData<C>& B, const std::vector<C>& redistB ) const;
+    ( GridData<C>& B, const std::vector<C>& redistB ) const;
 
     void SolveWithGMRES( std::vector<C>& redistB ) const;
     void SolveWithQMR( std::vector<C>& redistB ) const;
 
     void Multiply( std::vector<C>& redistB ) const;
     void Precondition( std::vector<C>& redistB ) const;
+
+    // u_i := T_i u_i
+    void PanelSolve( int i, std::vector<C>& redistB ) const;
+    // u_{i+1} := u_{i+1} - A_{i+1,i} u_i
+    void SubdiagonalUpdate( int i, std::vector<C>& redistB ) const;
+    // z := A_{i,i+1} u_{i+1}
+    void MultiplySuperdiagonal
+    ( int i, const std::vector<C>& redistB, std::vector<C>& z ) const;
 
     //
     // Information related to the decomposition of the domain into panels

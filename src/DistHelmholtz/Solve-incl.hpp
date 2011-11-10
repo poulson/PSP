@@ -266,18 +266,61 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::Precondition( std::vector<C>& redistB ) const
 {
-    const int numRhs = redistB.size() / localHeight_;
-
-    // TODO: 
     // Apply the sweeping preconditioner
     //
-    // 1) Solve against L
-    // 2) Solve against D
-    // 3) Solve against L^T
+    // Simple algorithm:
+    //   // Solve against L
+    //   for i=1,...,m-1
+    //     u_{i+1} := u_{i+1} - A_{i+1,i} T_i u_i
+    //   // Solve against D 
+    //   for i=1,...,m
+    //     u_i := T_i u_i
+    //   // Solve against L^T
+    //   for i=m-1,...,1
+    //     u_i := u_i - T_i A_{i,i+1} u_{i+1}
+    //
+    // Practical algorithm:
+    //   // Solve against (L D)
+    //   for i=1,...,m-1
+    //     u_i := T_i u_i
+    //     u_{i+1} := u_{i+1} - A_{i+1,i} u_i
+    //   u_m := T_m u_m
+    //   // Solve against L^T
+    //   for i=m-1,...,1
+    //     z_i := A_{i,i+1} u_{i+1}
+    //     z_i := T_i z_i
+    //     u_i := u_i - z_i
     //
     // Each panel solve will require a careful memcpy for each supernode, 
     // and the application of the block Gauss transforms will also require 
     // multiplication with a portion of the global sparse matrix. Perhaps 
     // it should be its own routine?
+
+    // TODO
+}
+
+// u_i := T_i u_i
+template<typename R>
+void
+psp::DistHelmholtz<R>::PanelSolve( int i, std::vector<C>& redistB ) const
+{
+    // TODO
+}
+
+// u_{i+1} := u_{i+1} - A_{i+1,i} u_i
+template<typename R>
+void
+psp::DistHelmholtz<R>::SubdiagonalUpdate( int i, std::vector<C>& redistB ) const
+{
+    // TODO
+}
+
+// z := A_{i,i+1} u_{i+1}
+template<typename R>
+void
+psp::DistHelmholtz<R>::MultiplySuperdiagonal
+( int i, const std::vector<C>& redistB, std::vector<C>& z ) const
+{
+    // TODO
 }
 
