@@ -77,6 +77,9 @@ private:
     void SolveWithGMRES( std::vector<C>& redistB ) const;
     void SolveWithQMR( std::vector<C>& redistB ) const;
 
+    void Multiply( std::vector<C>& redistB ) const;
+    void Precondition( std::vector<C>& redistB ) const;
+
     //
     // Information related to the decomposition of the domain into panels
     //

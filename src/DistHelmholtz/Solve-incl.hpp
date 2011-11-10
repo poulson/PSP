@@ -214,5 +214,38 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SolveWithQMR( std::vector<C>& redistB ) const
 {
-    // TODO
+    // TODO: Implement QMR in terms of Multiply and Precondition
 }
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
+{
+    const int numRhs = redistB.size() / localHeight_;
+
+    // TODO: 
+    // Multiply the right-hand sides by the global sparse matrix
+    //
+    // 1) AllToAll to gather the necessary portions of the RHS's
+    // 2) Run the local multiplies to form the result
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::Precondition( std::vector<C>& redistB ) const
+{
+    const int numRhs = redistB.size() / localHeight_;
+
+    // TODO: 
+    // Apply the sweeping preconditioner
+    //
+    // 1) Solve against L
+    // 2) Solve against D
+    // 3) Solve against L^T
+    //
+    // Each panel solve will require a careful memcpy for each supernode, 
+    // and the application of the block Gauss transforms will also require 
+    // multiplication with a portion of the global sparse matrix. Perhaps 
+    // it should be its own routine?
+}
+
