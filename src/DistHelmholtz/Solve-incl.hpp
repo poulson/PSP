@@ -24,7 +24,7 @@ void
 psp::DistHelmholtz<R>::Solve( GridData<C>& B, Solver solver ) const
 {
     if( !elemental::mpi::CongruentComms( comm_, B.Comm() ) )
-            throw std::logic_error("B does not have a congruent comm");
+        throw std::logic_error("B does not have a congruent comm");
 
     // Convert B into custom nested-dissection based ordering
     std::vector<C> redistB;
@@ -292,14 +292,9 @@ psp::DistHelmholtz<R>::Precondition( std::vector<C>& B ) const
     //     B_i := T_i B_i
     //     B_i := B_i + Z
     //
-    // Each panel solve will require a careful memcpy for each supernode, 
-    // and the application of the block Gauss transforms will also require 
-    // multiplication with a portion of the global sparse matrix. Perhaps 
-    // it should be its own routine?
-
-    const int numPanels = 1 + numFullInnerPanels_ + (haveLeftover_) + 1;
 
     // Solve against L D
+    const int numPanels = 1 + numFullInnerPanels_ + (haveLeftover_) + 1;
     for( int i=0; i<numPanels-1; ++i )
     {
         SolvePanel( B, i );
@@ -324,7 +319,10 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
 {
-    // TODO
+    // TODO:
+    //   1) For each supernode, pull in each right-hand side with memcpy
+    //   2) Run the panel LDL^T solve
+    //   3) For each supernode, extract each right-hand side with memcpy
 }
 
 // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
@@ -332,7 +330,9 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SubdiagonalUpdate( std::vector<C>& B, int i ) const
 {
-    // TODO
+    // TODO:
+    //   1) Gather the necessary pieces of B_i
+    //   2) Perform the local multiply
 }
 
 // Z := B_i
@@ -341,7 +341,9 @@ void
 psp::DistHelmholtz<R>::ExtractPanel
 ( const std::vector<C>& B, int i, std::vector<C>& Z ) const
 {
-    // TODO
+    // TODO: 
+    //   1) Resize Z
+    //   2) Perform a memcpy for each right-hand side
 }
 
 // B_i := -A_{i,i+1} B_{i+1}
@@ -349,7 +351,9 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
 {
-    // TODO
+    // TODO:
+    //   1) Gather the necessary pieces of A_{i,i+1}
+    //   2) Perform the local multiply
 }
 
 // B_i := B_i + Z
@@ -358,6 +362,6 @@ void
 psp::DistHelmholtz<R>::UpdatePanel
 ( std::vector<C>& B, int i, const std::vector<C>& Z ) const
 {
-    // TODO
+    // TODO: Perform an axpy for each right-hand side
 }
 
