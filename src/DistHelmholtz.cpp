@@ -93,34 +93,31 @@ psp::DistHelmholtz<R>::DistHelmholtz
     localToNaturalMap_.resize( localHeight_ );
     localRowOffsets_.resize( localHeight_+1 );
     localRowOffsets_[0] = 0;
-    int localOffset=0, vOffset=0;
-    MapLocalPanelIndices( bottomDepth_, 0, vOffset, commRank, localOffset );
+    int whichPanel = 0;
+    MapLocalPanelIndices( bottomDepth_, 0, commRank, whichPanel++ );
     for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalPanelIndices
-        ( numPlanesPerPanel, bzCeil_, vOffset, commRank, localOffset );
+        ( numPlanesPerPanel, bzCeil_, commRank, whichPanel++ );
     if( haveLeftover_ )
         MapLocalPanelIndices
-        ( leftoverInnerDepth_, bzCeil_, vOffset, commRank, localOffset );
-    MapLocalPanelIndices
-    ( topOrigDepth_, bzCeil_, vOffset, commRank, localOffset );
+        ( leftoverInnerDepth_, bzCeil_, commRank, whichPanel++ );
+    MapLocalPanelIndices( topOrigDepth_, bzCeil_, commRank, whichPanel++ );
 
     // Fill in the natural connection indices
     std::vector<int> localConnections( localRowOffsets_.back() );
-    localOffset = 0;
-    vOffset = 0;
+    whichPanel = 0;
     MapLocalConnectionIndices
-    ( bottomDepth_, 0, vOffset, commRank, localConnections, localOffset );
+    ( bottomDepth_, 0, commRank, localConnections, whichPanel++ );
     for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalConnectionIndices
-        ( numPlanesPerPanel, bzCeil_, vOffset, commRank, localConnections, 
-          localOffset );
+        ( numPlanesPerPanel, bzCeil_, commRank, localConnections, 
+          whichPanel++ );
     if( haveLeftover_ )
         MapLocalConnectionIndices
-        ( leftoverInnerDepth_, bzCeil_, vOffset, commRank, localConnections, 
-          localOffset );
+        ( leftoverInnerDepth_, bzCeil_, commRank, localConnections, 
+          whichPanel++ );
     MapLocalConnectionIndices
-    ( topOrigDepth_, bzCeil_, vOffset, commRank, localConnections, 
-      localOffset );
+    ( topOrigDepth_, bzCeil_, commRank, localConnections, whichPanel++ );
 #ifndef RELEASE
     const int numLocalConnections = localConnections.size();
     if( numLocalConnections != localOffset )
@@ -466,39 +463,65 @@ psp::DistHelmholtz<R>::LocalV( int v ) const
     }
 }
 
-// Return the local offset into the global sparse matrix for the panel 
-// containing the given v index
+// Return the lowest v index of the specified panel
+template<typename R>
+int
+psp::DistHelmholtz<R>::PanelV( int whichPanel ) const
+{
+    const int numPlanesPerPanel = control_.numPlanesPerPanel;
+    if( whichPanel == 0 )
+        return 0;
+    else if( whichPanel < numFullInnerPanels_+1 )
+        return bottomDepth_ + numPlanesPerPanel*(whichPanel-1);
+    else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
+        return bottomDepth_ + numPlanesPerPanel*numFullInnerPanels_;
+    else
+        return bottomDepth_ + numPlanesPerPanel*numFullInnerPanels_ + 
+               leftoverInnerDepth_;
+}
+
+// Return the local offset into the global sparse matrix for the specified 
+// panel, numbered from the bottom up
 template<typename R>
 int 
-psp::DistHelmholtz<R>::LocalPanelOffset( int v ) const
+psp::DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
 {
-    if( v < bottomDepth_ )
-    {
+    if( whichPanel == 0 )
         return 0;
-    }
-    else if( v < bottomDepth_ + innerDepth_ )
-    {
-        return localBottomHeight_ + 
-               ((v-bottomDepth_)/control_.numPlanesPerPanel)*
-               localFullInnerHeight_;
-    }
+    else if( whichPanel < numFullInnerPanels_+1 )
+        return localBottomHeight_ + localFullInnerHeight_*(whichPanel-1);
+    else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
+        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_;
     else
-    {
-        return localBottomHeight_ + numFullInnerPanels_*localFullInnerHeight_ + 
+        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_ +
                localLeftoverInnerHeight_;
-    }
+}
+
+template<typename R>
+int
+psp::DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
+{
+    if( whichPanel == 0 )
+        return localBottomHeight_;
+    else if( whichPanel < numFullInnerPanels_+1 )
+        return localFullInnerHeight_;
+    else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
+        return localLeftoverInnerHeight_;
+    else 
+        return localTopHeight_;
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::MapLocalPanelIndices
-( int vSize, int vPadding, int& vOffset, unsigned commRank, int& localOffset ) 
+( int vSize, int vPadding, unsigned commRank, int whichPanel ) 
 {
+    const int vOffset = PanelV( whichPanel );
+    int localOffset = LocalPanelOffset( whichPanel );
     MapLocalPanelIndicesRecursion
     ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, vSize, 
       vPadding, 0, 0, vOffset, control_.cutoff, commRank, log2CommSize_, 
       localToNaturalMap_, localRowOffsets_, localOffset );
-    vOffset += vSize;
 }
 
 template<typename R>
@@ -708,14 +731,15 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 template<typename R>
 void
 psp::DistHelmholtz<R>::MapLocalConnectionIndices
-( int vSize, int vPadding, int& vOffset, unsigned commRank, 
-  std::vector<int>& localConnections, int& localOffset ) const
+( int vSize, int vPadding, unsigned commRank, 
+  std::vector<int>& localConnections, int whichPanel ) const
 {
+    const int vOffset = PanelV( whichPanel );
+    int localOffset = LocalPanelOffset( whichPanel );
     MapLocalConnectionIndicesRecursion
     ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, vSize, 
       vPadding, 0, 0, vOffset, control_.cutoff, commRank, log2CommSize_, 
       localConnections, localOffset );
-    vOffset += vSize;
 }
 
 template<typename R>

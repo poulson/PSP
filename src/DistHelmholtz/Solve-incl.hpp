@@ -341,9 +341,15 @@ void
 psp::DistHelmholtz<R>::ExtractPanel
 ( const std::vector<C>& B, int i, std::vector<C>& Z ) const
 {
-    // TODO: 
-    //   1) Resize Z
-    //   2) Perform a memcpy for each right-hand side
+    const int localPanelOffset = LocalPanelOffset( i );
+    const int localPanelHeight = LocalPanelHeight( i );
+    const int numRhs = B.size() / localHeight_;
+    Z.resize( localPanelHeight*numRhs );
+
+    for( int k=0; k<numRhs; ++k )
+        std::memcpy
+        ( &Z[k*localPanelHeight], &B[localPanelOffset+k*localHeight_],
+          localPanelHeight*sizeof(C) );
 }
 
 // B_i := -A_{i,i+1} B_{i+1}
@@ -362,6 +368,11 @@ void
 psp::DistHelmholtz<R>::UpdatePanel
 ( std::vector<C>& B, int i, const std::vector<C>& Z ) const
 {
-    // TODO: Perform an axpy for each right-hand side
+    const int localPanelOffset = LocalPanelOffset( i );
+    const int localPanelHeight = LocalPanelHeight( i );
+    const int numRhs = Z.size() / localPanelHeight;
+    for( int k=0; k<numRhs; ++k )
+        for( int s=0; s<localPanelHeight; ++s )
+            B[localPanelOffset+s+k*localHeight_] += Z[s+k*localPanelHeight];
 }
 

@@ -160,6 +160,11 @@ private:
     // Global sparse helper routines
     //
 
+    int PanelV( int whichPanel ) const;
+    int LocalV( int v ) const;
+    int LocalPanelOffset( int whichPanel ) const;
+    int LocalPanelHeight( int whichPanel ) const;
+
     void GetGlobalSlowness
     ( const GridData<R>& slowness,
       std::vector<R>& myGlobalSlowness,
@@ -172,14 +177,10 @@ private:
     ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
       unsigned commRank, unsigned depthTilSerial, int& localHeight );
 
-    int LocalV( int v ) const;
-    int LocalPanelOffset( int v ) const;
-
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
     void MapLocalPanelIndices
-    ( int vSize, int vPadding, int& vOffset, unsigned commRank, 
-      int& localOffset );
+    ( int vSize, int vPadding, unsigned commRank, int whichPanel );
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
@@ -188,8 +189,8 @@ private:
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( int vSize, int vPadding, int& vOffset, unsigned commRank,  
-      std::vector<int>& localConnections, int& localOffset ) const;
+    ( int vSize, int vPadding, unsigned commRank,  
+      std::vector<int>& localConnections, int whichPanel ) const;
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
