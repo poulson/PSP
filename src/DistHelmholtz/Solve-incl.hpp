@@ -319,10 +319,131 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
 {
-    // TODO:
-    //   1) For each supernode, pull in each right-hand side with memcpy
-    //   2) Run the panel LDL^T solve
-    //   3) For each supernode, extract each right-hand side with memcpy
+    const int numRhs = B.size() / localHeight_;
+    const int panelPadding = PanelPadding( i );
+    const int panelDepth = PanelDepth( i );
+    const int localPanelOffset = LocalPanelOffset( i );
+    const int localPanelHeight = LocalPanelHeight( i );
+    const clique::symbolic::SymmFact& symbFact = 
+        PanelSymbolicFactorization( i );
+
+    elemental::Matrix<C> localPanelB( localHeight_, numRhs );
+    localPanelB.SetToZero();
+
+    // For each supernode, pull in each right-hand side with a memcpy
+    int BOffset = 0;
+    const int numLocalSupernodes = symbFact.local.supernodes.size();
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        const clique::symbolic::LocalSymmFactSupernode& sn = 
+            symbFact.local.supernodes[t];
+        const int size = sn.size;
+        const int myOffset = sn.myOffset;
+
+#ifndef RELEASE
+        if( size % (panelPadding+panelDepth) != 0 )
+            throw std::logic_error("Local supernode size problem");
+#endif
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+        const int remainingSize = size - paddingSize;
+
+        for( int k=0; k<numRhs; ++k )
+            std::memcpy
+            ( localPanelB.Buffer(myOffset+paddingSize,k), 
+              &B[BOffset+k*localHeight_], 
+              remainingSize*sizeof(C) );
+        BOffset += remainingSize;
+    }
+    const int numDistSupernodes = symbFact.dist.supernodes.size();
+    for( int t=0; t<numDistSupernodes; ++t )
+    {
+        const clique::symbolic::DistSymmFactSupernode& sn = 
+            symbFact.dist.supernodes[t];
+        const int size = sn.size;
+        const int localOffset1d = sn.localOffset1d;
+        const int localSize1d = sn.localSize1d;
+
+        const elemental::Grid& grid = *sn.grid;
+        const int gridSize = grid.Size();
+        const int gridRank = grid.VCRank();
+
+#ifndef RELEASE
+        if( size % (panelPadding+panelDepth) != 0 )
+            throw std::logic_error("Dist supernode size problem");
+#endif
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+        const int localPaddingSize = 
+            elemental::LocalLength( paddingSize, gridRank, gridSize );
+        const int localRemainingSize = localSize1d - localPaddingSize;
+
+        for( int k=0; k<numRhs; ++k )
+            std::memcpy
+            ( localPanelB.Buffer(localOffset1d+localPaddingSize,k),
+              &B[BOffset+k*localHeight_],
+              localRemainingSize*sizeof(C) );
+        BOffset += localRemainingSize;
+    }
+
+    // Solve against the panel
+    const clique::numeric::SymmFrontTree<C>& fact = 
+        PanelNumericFactorization( i );
+    clique::numeric::LDLSolve( TRANSPOSE, symbFact, fact, localPanelB, true );
+
+    // For each supernode, extract each right-hand side with memcpy
+    BOffset = 0;
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        const clique::symbolic::LocalSymmFactSupernode& sn = 
+            symbFact.local.supernodes[t];
+        const int size = sn.size;
+        const int myOffset = sn.myOffset;
+
+#ifndef RELEASE
+        if( size % (panelPadding+panelDepth) != 0 )
+            throw std::logic_error("Local supernode size problem");
+#endif
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+        const int remainingSize = size - paddingSize;
+
+        for( int k=0; k<numRhs; ++k )
+            std::memcpy
+            ( &B[BOffset+k*localHeight_],
+              localPanelB.LockedBuffer(myOffset+paddingSize,k), 
+              remainingSize*sizeof(C) );
+        BOffset += remainingSize;
+    }
+    for( int t=0; t<numDistSupernodes; ++t )
+    {
+        const clique::symbolic::DistSymmFactSupernode& sn = 
+            symbFact.dist.supernodes[t];
+        const int size = sn.size;
+        const int localOffset1d = sn.localOffset1d;
+        const int localSize1d = sn.localSize1d;
+
+        const elemental::Grid& grid = *sn.grid;
+        const int gridSize = grid.Size();
+        const int gridRank = grid.VCRank();
+
+#ifndef RELEASE
+        if( size % (panelPadding+panelDepth) != 0 )
+            throw std::logic_error("Dist supernode size problem");
+#endif
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+        const int localPaddingSize = 
+            elemental::LocalLength( paddingSize, gridRank, gridSize );
+        const int localRemainingSize = localSize1d - localPaddingSize;
+
+        for( int k=0; k<numRhs; ++k )
+            std::memcpy
+            ( &B[BOffset+k*localHeight_],
+              localPanelB.LockedBuffer(localOffset1d+localPaddingSize,k),
+              localRemainingSize*sizeof(C) );
+        BOffset += localRemainingSize;
+    }
 }
 
 // B_{i+1} := B_{i+1} - A_{i+1,i} B_i

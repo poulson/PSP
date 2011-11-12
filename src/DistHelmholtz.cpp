@@ -441,6 +441,86 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
 }
 
 template<typename R>
+clique::numeric::SymmFrontTree<std::complex<R> >&
+psp::DistHelmholtz<R>::PanelNumericFactorization( int whichPanel )
+{
+    if( whichPanel == 0 )
+        return bottomFact_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return *fullInnerFacts_[whichPanel-1];
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerFact_;
+    else
+        return topFact_;
+}
+
+template<typename R>
+const clique::numeric::SymmFrontTree<std::complex<R> >&
+psp::DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
+{
+    if( whichPanel == 0 )
+        return bottomFact_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return *fullInnerFacts_[whichPanel-1];
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerFact_;
+    else
+        return topFact_;
+}
+
+template<typename R>
+clique::symbolic::SymmFact&
+psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel )
+{
+    if( whichPanel == 0 )
+        return bottomSymbolicFact_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return fullInnerSymbolicFact_;
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerSymbolicFact_;
+    else
+        return topSymbolicFact_;
+}
+
+template<typename R>
+const clique::symbolic::SymmFact&
+psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel ) const
+{
+    if( whichPanel == 0 )
+        return bottomSymbolicFact_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return fullInnerSymbolicFact_;
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerSymbolicFact_;
+    else
+        return topSymbolicFact_;
+}
+
+template<typename R>
+int
+psp::DistHelmholtz<R>::PanelPadding( int whichPanel ) const
+{
+    if( whichPanel == 0 )
+        return 0;
+    else
+        return bzCeil_;
+}
+
+template<typename R>
+int
+psp::DistHelmholtz<R>::PanelDepth( int whichPanel ) const
+{
+    if( whichPanel == 0 )
+        return bottomDepth_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return control_.numPlanesPerPanel;
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerDepth_;
+    else
+        return topOrigDepth_;
+}
+
+template<typename R>
 int 
 psp::DistHelmholtz<R>::LocalV( int v ) const
 {

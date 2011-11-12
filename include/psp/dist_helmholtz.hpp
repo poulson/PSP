@@ -160,6 +160,19 @@ private:
     // Global sparse helper routines
     //
 
+    clique::numeric::SymmFrontTree<C>& 
+    PanelNumericFactorization( int whichPanel );
+
+    const clique::numeric::SymmFrontTree<C>&
+    PanelNumericFactorization( int whichPanel ) const;
+
+    clique::symbolic::SymmFact&
+    PanelSymbolicFactorization( int whichPanel );
+    const clique::symbolic::SymmFact&
+    PanelSymbolicFactorization( int whichPanel ) const;
+
+    int PanelPadding( int whichPanel ) const;
+    int PanelDepth( int whichPanel ) const;
     int PanelV( int whichPanel ) const;
     int LocalV( int v ) const;
     int LocalPanelOffset( int whichPanel ) const;
