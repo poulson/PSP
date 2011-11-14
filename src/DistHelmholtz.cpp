@@ -187,13 +187,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
         naturalToLocalMap[localToNaturalMap_[iLocal]] = iLocal;
 
     // Convert the natural indices to their local indices in place
-    for( int proc=0; proc<commSize; ++proc )
-    {
-        const int sendSize = globalSendCounts_[proc];
-        int* procIndices = &globalSendIndices_[globalSendDispls_[proc]];
-        for( int i=0; i<sendSize; ++i )
-            procIndices[i] = naturalToLocalMap[procIndices[i]];
-    }
+    for( int i=0; i<totalSendCount; ++i )
+        globalSendIndices_[i] = naturalToLocalMap[globalSendIndices_[i]];
 
     // Count the number of indices that we need to recv from each process 
     // during the subdiagonal and superdiagonal block sparse matrix 
@@ -267,40 +262,40 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // Compute the send and recv offsets and total sizes
     int subdiagTotalSendCount=0, subdiagTotalRecvCount=0,
         supdiagTotalSendCount=0, supdiagTotalRecvCount=0;
-    std::vector<int> subdiagTotalSendCounts( numPanels_, 0 ), 
-                     subdiagTotalRecvCounts( numPanels_, 0 ),
-                     supdiagTotalSendCounts( numPanels_, 0 ),
-                     supdiagTotalRecvCounts( numPanels_, 0 );
-    std::vector<int> subdiagTotalSendDispls( numPanels_ ),
-                     subdiagTotalRecvDispls( numPanels_ ),
-                     supdiagTotalSendDispls( numPanels_ ),
-                     supdiagTotalRecvDispls( numPanels_ );
+    std::vector<int> subdiagPanelSendCounts( numPanels_, 0 ), 
+                     subdiagPanelRecvCounts( numPanels_, 0 ),
+                     supdiagPanelSendCounts( numPanels_, 0 ),
+                     supdiagPanelRecvCounts( numPanels_, 0 );
+    std::vector<int> subdiagPanelRecvDispls( numPanels_ ),
+                     supdiagPanelRecvDispls( numPanels_ );
     subdiagSendDispls_.resize( numPanels_*commSize );
     subdiagRecvDispls_.resize( numPanels_*commSize );
     supdiagSendDispls_.resize( numPanels_*commSize );
     supdiagRecvDispls_.resize( numPanels_*commSize );
+    subdiagPanelSendDispls_.resize( numPanels_ );
+    supdiagPanelSendDispls_.resize( numPanels_ );
     for( int i=0; i<numPanels_; ++i )
     {
         for( int proc=0; proc<commSize; ++proc )
         {
             const int index = i*commSize + proc;
-            subdiagSendDispls_[proc] = subdiagTotalSendCounts[i];
-            subdiagRecvDispls_[proc] = subdiagTotalRecvCounts[i];
-            supdiagSendDispls_[proc] = supdiagTotalSendCounts[i];
-            supdiagRecvDispls_[proc] = supdiagTotalRecvCounts[i];
-            subdiagTotalSendCounts[i] += subdiagSendCounts_[index];
-            subdiagTotalRecvCounts[i] += subdiagRecvCounts_[index];
-            supdiagTotalSendCounts[i] += supdiagSendCounts_[index];
-            supdiagTotalRecvCounts[i] += supdiagRecvCounts_[index];
+            subdiagSendDispls_[proc] = subdiagPanelSendCounts[i];
+            subdiagRecvDispls_[proc] = subdiagPanelRecvCounts[i];
+            supdiagSendDispls_[proc] = supdiagPanelSendCounts[i];
+            supdiagRecvDispls_[proc] = supdiagPanelRecvCounts[i];
+            subdiagPanelSendCounts[i] += subdiagSendCounts_[index];
+            subdiagPanelRecvCounts[i] += subdiagRecvCounts_[index];
+            supdiagPanelSendCounts[i] += supdiagSendCounts_[index];
+            supdiagPanelRecvCounts[i] += supdiagRecvCounts_[index];
         }
-        subdiagTotalSendDispls[i] = subdiagTotalSendCount;
-        subdiagTotalRecvDispls[i] = subdiagTotalRecvCount;
-        supdiagTotalSendDispls[i] = supdiagTotalSendCount;
-        supdiagTotalRecvDispls[i] = supdiagTotalRecvCount;
-        subdiagTotalSendCount += subdiagTotalSendCounts[i];
-        subdiagTotalRecvCount += subdiagTotalRecvCounts[i];
-        supdiagTotalSendCount += supdiagTotalSendCounts[i];
-        supdiagTotalRecvCount += supdiagTotalRecvCounts[i];
+        subdiagPanelSendDispls_[i] = subdiagTotalSendCount;
+        supdiagPanelSendDispls_[i] = supdiagTotalSendCount;
+        subdiagPanelRecvDispls[i] = subdiagTotalRecvCount;
+        supdiagPanelRecvDispls[i] = supdiagTotalRecvCount;
+        subdiagTotalSendCount += subdiagPanelSendCounts[i];
+        subdiagTotalRecvCount += subdiagPanelRecvCounts[i];
+        supdiagTotalSendCount += supdiagPanelSendCounts[i];
+        supdiagTotalRecvCount += supdiagPanelRecvCounts[i];
     }
 
     // Pack and send the lists of indices that we will need from each 
@@ -311,17 +306,71 @@ psp::DistHelmholtz<R>::DistHelmholtz
     std::vector<int> supdiagRecvIndices( supdiagTotalRecvCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
-        // HERE
-        // TODO
+        // Get our natural coordinates
+        const int rowOffset = localRowOffsets_[iLocal];
+        const int naturalRow = localToNaturalMap_[iLocal];
+        const int x = naturalRow % nx;
+        const int y = (naturalRow/nx) % ny;
+        const int z = naturalRow/(nx*ny);
+        const int v = (nz-1) - z;
+
+
+        // If there is a v connection which spans panels, count it here.
+        const int localV = LocalV( v );
+        const int whichPanel = WhichPanel( v );
+        const int panelDepth = PanelDepth( whichPanel );
+        const int panelPadding = PanelPadding( whichPanel );
+        if( localV == panelPadding && whichPanel != 0 )
+        {
+            // Handle connection to previous panel, which is relevant to the
+            // computation of A_{i+1,i} B_i
+            const int naturalCol = x + y*nx + (z+1)*nx*ny;
+            const int proc = OwningProcess( x, y, v-1 );
+            const int index = whichPanel*commSize + proc;
+            subdiagRecvIndices[subdiagOffsets[index]++] = naturalCol;
+        }
+        if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
+        {
+            // Handle connection to next panel, which is relevant to the 
+            // computation of A_{i,i+1} B_{i+1}
+            const int naturalCol = x + y*nx + (z-1)*nx*ny;
+            const int proc = OwningProcess( x, y, v+1 );
+            const int index = whichPanel*commSize + proc;
+            supdiagRecvIndices[supdiagOffsets[index]++] = naturalCol;
+        }
     }
     subdiagOffsets.clear();
     supdiagOffsets.clear();
     subdiagSendIndices_.resize( subdiagTotalSendCount );
     supdiagSendIndices_.resize( supdiagTotalSendCount );
-    // HERE
+    // TODO: Think about reducing to a single AllToAll?
+    for( int i=0; i<numPanels_; ++i )
+    {
+        mpi::AllToAll
+        ( &subdiagRecvIndices[subdiagPanelRecvDispls[i]], 
+          &subdiagRecvCounts_[i*commSize],
+          &subdiagRecvDispls_[i*commSize],
+          &subdiagSendIndices_[subdiagPanelSendDispls_[i]],
+          &subdiagSendCounts_[i*commSize], 
+          &subdiagSendDispls_[i*commSize],
+          comm );
+        mpi::AllToAll
+        ( &supdiagRecvIndices[supdiagPanelRecvDispls[i]], 
+          &supdiagRecvCounts_[i*commSize], 
+          &supdiagRecvDispls_[i*commSize],
+          &supdiagSendIndices_[supdiagPanelSendDispls_[i]],
+          &supdiagSendCounts_[i*commSize], 
+          &supdiagSendDispls_[i*commSize],
+          comm );
+    }
+    subdiagRecvIndices.clear();
+    supdiagRecvIndices.clear();
 
     // Convert the natural indices to their local indices in place
-    // TODO
+    for( int i=0; i<subdiagTotalSendCount; ++i )
+        subdiagSendIndices_[i] = naturalToLocalMap[subdiagSendIndices_[i]];
+    for( int i=0; i<supdiagTotalSendCount; ++i )
+        supdiagSendIndices_[i] = naturalToLocalMap[supdiagSendIndices_[i]];
 
     //
     // Form the symbolic factorizations of the three prototypical panels
