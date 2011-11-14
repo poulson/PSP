@@ -73,13 +73,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
 
     // Compute the number of rows we own of the sparse distributed matrix
     localBottomHeight_ = LocalPanelHeight( bottomDepth_, 0, commRank );
-    localFullInnerHeight_ = 
-        LocalPanelHeight( numPlanesPerPanel, bzCeil_, commRank );
     localLeftoverInnerHeight_ = 
         LocalPanelHeight( leftoverInnerDepth_, bzCeil_, commRank );
     localTopHeight_ = LocalPanelHeight( topOrigDepth_, bzCeil_, commRank );
-    localHeight_ = localBottomHeight_ + 
-                   numFullInnerPanels_*localFullInnerHeight_ +
+    localHeight_ = (1+numFullInnerPanels_)*localBottomHeight_ +
                    localLeftoverInnerHeight_ + 
                    localTopHeight_;
 
@@ -125,7 +122,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
 #endif
 
     // Count the number of indices that we will need to recv from each process.
-    actualRecvSizes_.resize( commSize, 0 );
+    sparseRecvCounts_.resize( commSize, 0 );
     owningProcesses_.resize( localRowOffsets_.back() );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -140,34 +137,29 @@ psp::DistHelmholtz<R>::DistHelmholtz
             const int naturalCol = localConnections[rowOffset+jLocal];
             const int proc = OwningProcess( naturalCol );
             owningProcesses_[rowOffset+jLocal] = proc;
-            ++actualRecvSizes_[proc];
+            ++sparseRecvCounts_[proc];
         }
     }
-    const int maxRecvSize = 
-        *std::max_element( actualRecvSizes_.begin(), actualRecvSizes_.end() );
-    std::vector<int> synchMessageSends( 2*commSize );
+    sparseSendCounts_.resize( commSize );
+    mpi::AllToAll
+    ( &sparseRecvCounts_[0], 1,
+      &sparseSendCounts_[0], 1, comm );
+
+    // Compute the send and recv offsets and total sizes
+    int totalSendCount=0, totalRecvCount=0;
+    sparseSendDispls_.resize( commSize );
+    sparseRecvDispls_.resize( commSize );
     for( int proc=0; proc<commSize; ++proc )
     {
-        synchMessageSends[2*proc+0] = actualRecvSizes_[proc];
-        synchMessageSends[2*proc+1] = maxRecvSize;
+        sparseSendDispls_[proc] = totalSendCount;
+        sparseRecvDispls_[proc] = totalRecvCount;
+        totalSendCount += sparseSendCounts_[proc];
+        totalRecvCount += sparseRecvCounts_[proc];
     }
-    std::vector<int> synchMessageRecvs( 2*commSize );
-    clique::mpi::AllToAll
-    ( &synchMessageSends[0], 2, &synchMessageRecvs[0], 2, comm );
-    synchMessageSends.clear();
-    actualSendSizes_.resize( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        actualSendSizes_[proc] = synchMessageRecvs[2*proc];
-    allToAllSize_ = 0;
-    for( int proc=0; proc<commSize; ++proc )
-        allToAllSize_ = std::max(allToAllSize_,synchMessageRecvs[2*proc+1]);
-    synchMessageRecvs.clear();
 
     // Pack and send the list of indices that we will need from each process
-    std::vector<int> offsets( commSize );
-    std::vector<int> recvIndices( commSize*allToAllSize_ );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = proc*allToAllSize_;
+    std::vector<int> offsets = sparseRecvDispls_;
+    std::vector<int> recvIndices( totalRecvCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int rowOffset = localRowOffsets_[iLocal];
@@ -180,10 +172,11 @@ psp::DistHelmholtz<R>::DistHelmholtz
             recvIndices[offsets[proc]++] = naturalCol;
         }
     }
-    sendIndices_.resize( commSize*allToAllSize_ );
+    offsets.clear();
+    sendIndices_.resize( totalSendCount );
     clique::mpi::AllToAll
-    ( &recvIndices[0],  allToAllSize_, 
-      &sendIndices_[0], allToAllSize_, comm );
+    ( &recvIndices[0],  &sparseRecvCounts_[0], &sparseRecvDispls_[0],
+      &sendIndices_[0], &sparseSendCounts_[0], &sparseSendDispls_[0], comm );
     recvIndices.clear();
 
     // Invert the local to natural map
@@ -191,13 +184,13 @@ psp::DistHelmholtz<R>::DistHelmholtz
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
         naturalToLocalMap[localToNaturalMap_[iLocal]] = iLocal;
 
-    // Convert the recv indices in place
+    // Convert the indices in place
     for( int proc=0; proc<commSize; ++proc )
     {
-        const int actualSendSize = actualSendSizes_[proc];
-        int* thisSend = &sendIndices_[proc*allToAllSize_];
-        for( int i=0; i<actualSendSize; ++i )
-            thisSend[i] = naturalToLocalMap[thisSend[i]];
+        const int sendSize = sparseSendCounts_[proc];
+        int* procIndices = &sendIndices_[sparseSendDispls_[proc]];
+        for( int i=0; i<sendSize; ++i )
+            procIndices[i] = naturalToLocalMap[procIndices[i]];
     }
 
     // Count the number of local supernodes in each panel
@@ -206,13 +199,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // Create space for the original structures of the panel classes
     clique::symbolic::SymmOrig 
         bottomSymbolicOrig, 
-        fullInnerSymbolicOrig, 
         leftoverInnerSymbolicOrig, 
         topSymbolicOrig;
     bottomSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
     bottomSymbolicOrig.dist.supernodes.resize( log2CommSize_ );
-    fullInnerSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    fullInnerSymbolicOrig.dist.supernodes.resize( log2CommSize_ );
     leftoverInnerSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
     leftoverInnerSymbolicOrig.dist.supernodes.resize( log2CommSize_ );
     topSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
@@ -224,7 +214,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // be performed, and to simplify distribution issues, the leading PML region
     // on each inner panel will always be ordered _LAST_ within that panel.
     FillOrigPanelStruct( bottomDepth_, bottomSymbolicOrig );
-    FillOrigPanelStruct( numPlanesPerPanel+bzCeil, fullInnerSymbolicOrig );
     if( haveLeftover_ )
         FillOrigPanelStruct
         ( leftoverInnerDepth_+bzCeil, leftoverInnerSymbolicOrig );
@@ -233,8 +222,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // Perform the parallel symbolic factorizations
     clique::symbolic::SymmetricFactorization
     ( bottomSymbolicOrig, bottomSymbolicFact_, true );
-    clique::symbolic::SymmetricFactorization
-    ( fullInnerSymbolicOrig, fullInnerSymbolicFact_, true );
     if( haveLeftover_ )
         clique::symbolic::SymmetricFactorization
         ( leftoverInnerSymbolicOrig, leftoverInnerSymbolicFact_, true );
@@ -472,10 +459,8 @@ template<typename R>
 clique::symbolic::SymmFact&
 psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel )
 {
-    if( whichPanel == 0 )
+    if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomSymbolicFact_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
-        return fullInnerSymbolicFact_;
     else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
         return leftoverInnerSymbolicFact_;
     else
@@ -486,10 +471,8 @@ template<typename R>
 const clique::symbolic::SymmFact&
 psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel ) const
 {
-    if( whichPanel == 0 )
+    if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomSymbolicFact_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
-        return fullInnerSymbolicFact_;
     else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
         return leftoverInnerSymbolicFact_;
     else
@@ -569,11 +552,11 @@ psp::DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
     if( whichPanel == 0 )
         return 0;
     else if( whichPanel < numFullInnerPanels_+1 )
-        return localBottomHeight_ + localFullInnerHeight_*(whichPanel-1);
+        return localBottomHeight_*whichPanel;
     else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
-        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_;
+        return localBottomHeight_*(numFullInnerPanels_+1);
     else
-        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_ +
+        return localBottomHeight_*(numFullInnerPanels_+1) +
                localLeftoverInnerHeight_;
 }
 
@@ -581,10 +564,8 @@ template<typename R>
 int
 psp::DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 {
-    if( whichPanel == 0 )
+    if( whichPanel < numFullInnerPanels_+1 )
         return localBottomHeight_;
-    else if( whichPanel < numFullInnerPanels_+1 )
-        return localFullInnerHeight_;
     else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
         return localLeftoverInnerHeight_;
     else 

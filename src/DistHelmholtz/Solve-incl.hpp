@@ -46,78 +46,92 @@ void
 psp::DistHelmholtz<R>::PullRightHandSides
 ( const GridData<C>& B, std::vector<C>& redistB ) const
 {
-    // Pack and send the amount of data that we will need to recv from each
-    // process.
     const int commSize = mpi::CommSize( comm_ );
-    std::vector<int> recvPairs( 2*commSize, 0 );
+
+    // Pack and send the amount of data that we will need to recv
+    std::vector<int> recvCounts( commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = B.OwningProcess( naturalIndex );
-        ++recvPairs[2*proc];
+        ++recvCounts[proc];
     }
-    int maxSize = 0;
+    std::vector<int> sendCounts( commSize );
+    mpi::AllToAll
+    ( &recvCounts[0], 1,
+      &sendCounts[0], 1, comm_ );
+
+    // Compute the send and recv offsets and total sizes
+    int totalSendCount=0, totalRecvCount=0;
+    std::vector<int> sendDispls( commSize ), recvDispls( commSize );
     for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(recvPairs[2*proc],maxSize);
-    for( int proc=0; proc<commSize; ++proc )
-        recvPairs[2*proc+1] = maxSize;
-    std::vector<int> sendPairs( 2*commSize );
-    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
-    recvPairs.clear();
+    {
+        sendDispls[proc] = totalSendCount;
+        recvDispls[proc] = totalRecvCount;
+        totalSendCount += sendCounts[proc];
+        totalRecvCount += recvCounts[proc];
+    }
 
     // Pack and send the indices that we will need to recv from each process.
-    for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(sendPairs[2*proc+1],maxSize);
-    std::vector<int> actualSendSizes( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        actualSendSizes[proc] = sendPairs[2*proc];
-    sendPairs.clear();
-    std::vector<int> recvIndices( maxSize*commSize );
-    std::vector<int> offsets( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
+    std::vector<int> offsets = recvDispls;
+    std::vector<int> recvIndices( totalRecvCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = B.OwningProcess( naturalIndex );
         recvIndices[++offsets[proc]] = naturalIndex;
     }
-    std::vector<int> sendIndices( maxSize*commSize );
-    mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
+    std::vector<int> sendIndices( totalSendCount );
+    mpi::AllToAll
+    ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
+      &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
 
-    // Pack and send our right-hand side data.
+    // Scale the send and recv counts to make up for their being several RHS
     const int numRhs = B.NumScalars();
-    std::vector<C> sendB( maxSize*commSize*numRhs );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        sendCounts[proc] *= numRhs;
+        recvCounts[proc] *= numRhs;
+        sendDispls[proc] *= numRhs;
+        recvDispls[proc] *= numRhs;
+    }
+    totalSendCount *= numRhs;
+    totalRecvCount *= numRhs;
+
+    // Pack and send our right-hand side data.
+    std::vector<C> sendB( totalSendCount );
     const C* BBuffer = B.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
-        C* send = &sendB[proc*maxSize*numRhs];
-        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
+        C* procB = &sendB[sendDispls[proc]];
+        const int* procIndices = &sendIndices[sendDispls[proc]/numRhs];
+        const int numLocalIndices = sendCounts[proc]/numRhs;
+        for( int s=0; s<numLocalIndices; ++s )
         {
-            const int naturalIndex = sendIndices[iLocal];
+            const int naturalIndex = procIndices[s];
             const int localIndex = B.LocalIndex( naturalIndex );
             for( int k=0; k<numRhs; ++k )
-                send[iLocal*numRhs+k] = BBuffer[localIndex+k];
+                procB[s*numRhs+k] = BBuffer[localIndex+k];
         }
     }
     sendIndices.clear();
-    std::vector<C> recvB( maxSize*commSize*numRhs );
+    std::vector<C> recvB( totalRecvCount );
     mpi::AllToAll
-    ( &sendB[0], maxSize*numRhs, &recvB[0], maxSize*numRhs, comm_ );
+    ( &sendB[0], &sendCounts[0], &sendDispls[0], 
+      &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendB.clear();
 
     // Unpack the received right-hand side data
+    offsets = recvDispls;
     redistB.resize( localHeight_*numRhs );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = B.OwningProcess( naturalIndex );
         for( int k=0; k<numRhs; ++k )
-            redistB[iLocal+k*localHeight_] = recvB[numRhs*offsets[proc]+k];
-        ++offsets[proc];
+            redistB[iLocal+k*localHeight_] = recvB[offsets[proc]+k];
+        offsets[proc] += numRhs;
     }
 }
 
@@ -126,76 +140,90 @@ void
 psp::DistHelmholtz<R>::PushRightHandSides
 ( GridData<C>& B, const std::vector<C>& redistB ) const
 {
-    // Pack and send the amount of data that we will need to send to 
-    // each process.
     const int numRhs = B.NumScalars();
     const int commSize = mpi::CommSize( comm_ );
-    std::vector<int> sendPairs( 2*commSize, 0 );
+
+    // Pack and send the amount of data that we will need to send.
+    std::vector<int> sendCounts( commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = B.OwningProcess( naturalIndex );
-        ++sendPairs[2*proc];
+        ++sendCounts[proc];
     }
-    int maxSize = 0;
+    std::vector<int> recvCounts( commSize );
+    mpi::AllToAll
+    ( &sendCounts[0], 1, 
+      &recvCounts[0], 1, comm_ );
+
+    // Compute the send and recv offsets and total sizes
+    int totalSendCount=0, totalRecvCount=0;
+    std::vector<int> sendDispls( commSize ), recvDispls( commSize );
     for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(sendPairs[2*proc],maxSize);
-    for( int proc=0; proc<commSize; ++proc )
-        sendPairs[2*proc+1] = maxSize;
-    std::vector<int> recvPairs( 2*commSize );
-    mpi::AllToAll( &sendPairs[0], 2, &recvPairs[0], 2, comm_ );
-    sendPairs.clear();
+    {
+        sendDispls[proc] = totalSendCount;
+        recvDispls[proc] = totalRecvCount;
+        totalSendCount += sendCounts[proc];
+        totalRecvCount += recvCounts[proc];
+    }
 
     // Pack and send the particular indices that we will need to send to 
     // each process.
-    for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(recvPairs[2*proc+1],maxSize);
-    std::vector<int> actualRecvSizes( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        actualRecvSizes[proc] = recvPairs[2*proc];
-    recvPairs.clear();
-    std::vector<int> sendIndices( maxSize*commSize );
-    std::vector<int> offsets( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
+    std::vector<int> offsets = sendDispls;
+    std::vector<int> sendIndices( totalSendCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = B.OwningProcess( naturalIndex );
         sendIndices[++offsets[proc]] = naturalIndex;
     }
-    std::vector<int> recvIndices( maxSize*commSize );
-    mpi::AllToAll( &sendIndices[0], maxSize, &recvIndices[0], maxSize, comm_ );
+    std::vector<int> recvIndices( totalRecvCount );
+    mpi::AllToAll
+    ( &sendIndices[0], &sendCounts[0], &sendDispls[0], 
+      &recvIndices[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendIndices.clear();
 
-    // Pack and send the right-hand side data
+    // Scale the counts and offsets by the number of right-hand sides
+    totalSendCount *= numRhs;
+    totalRecvCount *= numRhs;
     for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
-    std::vector<C> sendB( maxSize*commSize*numRhs );
+    {
+        sendCounts[proc] *= numRhs;
+        recvCounts[proc] *= numRhs;
+        sendDispls[proc] *= numRhs;
+        recvDispls[proc] *= numRhs;
+    }
+
+    // Pack and send the right-hand side data
+    offsets = sendDispls;
+    std::vector<C> sendB( totalSendCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal]; 
         const int proc = B.OwningProcess( naturalIndex );
         for( int k=0; k<numRhs; ++k )
-            sendB[offsets[proc]*numRhs+k] = redistB[iLocal+k*localHeight_];
-        ++offsets[proc];
+            sendB[offsets[proc]+k] = redistB[iLocal+k*localHeight_];
+        offsets[proc] += numRhs;
     }
-    std::vector<C> recvB( maxSize*commSize*numRhs );
+    std::vector<C> recvB( totalRecvCount );
     mpi::AllToAll
-    ( &sendB[0], maxSize*numRhs, &recvB[0], maxSize*numRhs, comm_ );
+    ( &sendB[0], &sendCounts[0], &sendDispls[0],
+      &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendB.clear();
 
     // Unpack the right-hand side data
     C* BBuffer = B.LocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
-        const C* recv = &recvB[proc*maxSize*numRhs];
-        for( int iLocal=0; iLocal<actualRecvSizes[proc]; ++iLocal )
+        const C* procB = &recvB[recvDispls[proc]];
+        const int* procIndices = &recvIndices[recvDispls[proc]/numRhs];
+        const int numLocalIndices = recvCounts[proc]/numRhs;
+        for( int s=0; s<numLocalIndices; ++s )
         {
-            const int naturalIndex = recvIndices[iLocal];
+            const int naturalIndex = procIndices[s];
             const int localIndex = B.LocalIndex( naturalIndex );
             for( int k=0; k<numRhs; ++k )
-                BBuffer[localIndex+k] = recv[iLocal*numRhs+k];
+                BBuffer[localIndex+k] = procB[s*numRhs+k];
         }
     }
 }
@@ -219,27 +247,45 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
 {
-    // Pack and scatter our portion of the right-hand sides
     const int numRhs = redistB.size() / localHeight_;
     const int commSize = mpi::CommSize( comm_ );
-    std::vector<C> sendRhs( commSize*allToAllSize_*numRhs );
+
+    // Modify the basic send/recv information for the number of right-hand sides
+    std::vector<int> sendCounts = sparseSendCounts_;
+    std::vector<int> sendDispls = sparseSendDispls_;
+    std::vector<int> recvCounts = sparseRecvCounts_;
+    std::vector<int> recvDispls = sparseRecvDispls_;
     for( int proc=0; proc<commSize; ++proc )
     {
-        C* send = &sendRhs[proc*allToAllSize_*numRhs];
-        for( int iLocal=0; iLocal<actualSendSizes_[proc]; ++iLocal )
-            for( int k=0; k<numRhs; ++k )
-                send[iLocal*numRhs+k] = redistB[iLocal+k*localHeight_];
+        sendCounts[proc] *= numRhs;
+        sendDispls[proc] *= numRhs;
+        recvCounts[proc] *= numRhs;
+        recvDispls[proc] *= numRhs;
     }
-    std::vector<C> recvRhs( commSize*allToAllSize_*numRhs );
+    const int totalSendCount = sendDispls.back() + sendCounts.back();
+    const int totalRecvCount = recvDispls.back() + recvCounts.back();
+
+    // Pack and scatter our portion of the right-hand sides
+    std::vector<C> sendRhs( totalSendCount );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        C* procRhs = &sendRhs[sendDispls[proc]];
+        const int* procIndices = &sendIndices_[sparseSendDispls_[proc]];
+        for( int s=0; s<sparseSendCounts_[proc]; ++s )
+        {
+            const int iLocal = procIndices[s];
+            for( int k=0; k<numRhs; ++k )
+                procRhs[s*numRhs+k] = redistB[iLocal+k*localHeight_];
+        }
+    }
+    std::vector<C> recvRhs( totalRecvCount );
     mpi::AllToAll
-    ( &sendRhs[0], allToAllSize_*numRhs, 
-      &recvRhs[0], allToAllSize_*numRhs, comm_ );
+    ( &sendRhs[0], &sendCounts[0], &sendDispls[0], 
+      &recvRhs[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendRhs.clear();
 
     // Run the local multiplies to form the result
-    std::vector<int> offsets( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = proc*allToAllSize_;
+    std::vector<int> offsets = recvDispls;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         // Multiply by the diagonal value
@@ -256,8 +302,8 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
             const C offDiagVal = localEntries_[rowOffset+jLocal];
             for( int k=0; k<numRhs; ++k )
                 redistB[iLocal+k*localHeight_] += 
-                    offDiagVal*recvRhs[offsets[proc]*numRhs+k];
-            ++offsets[proc];
+                    offDiagVal*recvRhs[offsets[proc]+k];
+            offsets[proc] += numRhs;
         }
     }
 }

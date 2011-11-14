@@ -95,14 +95,11 @@ private:
     // Information related to the decomposition of the domain into panels
     //
 
-    // Information about the bottom panel
+    // Information about the bottom (and full inner) panels
     int bottomDepth_;       // including the original PML
     int localBottomHeight_; // our process's local height of the bottom panel
-
-    // Information about the full inner panels
     int innerDepth_;           // total physical inner depth
     int numFullInnerPanels_;   // number of full inner panels we need
-    int localFullInnerHeight_; // local height of each full inner panel
 
     // Information about the leftover inner panel
     bool haveLeftover_;
@@ -116,7 +113,6 @@ private:
     // Symbolic factorizations of each class of panels
     clique::symbolic::SymmFact 
         bottomSymbolicFact_, 
-        fullInnerSymbolicFact_, 
         leftoverInnerSymbolicFact_, 
         topSymbolicFact_;
 
@@ -139,8 +135,9 @@ private:
 
     // Sparse matrix communication information
     int allToAllSize_;
-    std::vector<int> actualSendSizes_, actualRecvSizes_; // length p
-    std::vector<int> sendIndices_; // length p*allToAllSize_
+    std::vector<int> sparseSendCounts_, sparseRecvCounts_; // length p
+    std::vector<int> sparseSendDispls_, sparseRecvDispls_; // length p
+    std::vector<int> sendIndices_; 
 
     //
     // General helper routines 

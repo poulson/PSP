@@ -98,20 +98,20 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelSlowness
-        ( vOffset, vSize, fullInnerSymbolicFact_, slowness,
+        ( vOffset, vSize, bottomSymbolicFact_, slowness,
           myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
         FillPanelFronts
-        ( vOffset, vSize, fullInnerSymbolicFact_, fullInnerFact,
+        ( vOffset, vSize, bottomSymbolicFact_, fullInnerFact,
           slowness, myPanelSlowness, offsets,
           panelNestedToNatural, panelNaturalToNested );
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         clique::numeric::LDL
-        ( clique::TRANSPOSE, fullInnerSymbolicFact_, fullInnerFact );
+        ( clique::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
@@ -577,64 +577,68 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
     const int commSize = mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we need to recv from each process.
-    std::vector<int> recvPairs( 2*commSize, 0 );
+    std::vector<int> recvCounts( commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = slowness.OwningProcess( naturalIndex );
-        ++recvPairs[2*proc];
+        ++recvCounts[proc];
     }
-    int maxSize = 0;
+    std::vector<int> sendCounts( commSize );
+    mpi::AllToAll
+    ( &recvCounts[0], 1, 
+      &sendCounts[0], 1, comm_ );
+
+    // Compute the send and recv displacement vectors, as well as the total
+    // send and recv counts
+    int totalSendCount=0, totalRecvCount=0;
+    std::vector<int> sendDispls( commSize ), recvDispls( commSize );
     for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(recvPairs[2*proc],maxSize);
-    for( int proc=0; proc<commSize; ++proc )
-        recvPairs[2*proc+1] = maxSize;
-    std::vector<int> sendPairs( 2*commSize );
-    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
-    recvPairs.clear();
+    {
+        sendDispls[proc] = totalSendCount;
+        recvDispls[proc] = totalRecvCount;
+        totalSendCount += sendCounts[proc];
+        totalRecvCount += recvCounts[proc];
+    }
 
     // Pack and send the indices that we need to recv from each process.
-    for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(sendPairs[2*proc+1],maxSize);
-    std::vector<int> actualSendSizes( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        actualSendSizes[proc] = sendPairs[2*proc];
-    sendPairs.clear();
-    std::vector<int> recvIndices( maxSize*commSize );
-    offsets.resize( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
+    std::vector<int> recvIndices( totalRecvCount );
+    offsets = recvDispls;
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = slowness.OwningProcess( naturalIndex );
         recvIndices[++offsets[proc]] = naturalIndex;
     }
-    std::vector<int> sendIndices( maxSize*commSize );
-    mpi::AllToAll( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
+    std::vector<int> sendIndices( totalSendCount );
+    mpi::AllToAll
+    ( &recvIndices[0], &recvCounts[0], &recvDispls[0], 
+      &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
 
     // Pack and send our slowness data.
-    std::vector<R> sendSlowness( maxSize*commSize );
+    std::vector<R> sendSlowness( totalSendCount );
     const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
-        R* send = &sendSlowness[proc*maxSize];
-        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
+        R* procSlowness = &sendSlowness[sendDispls[proc]];
+        const int* procIndices = &sendIndices[sendDispls[proc]];
+        for( int iLocal=0; iLocal<sendCounts[proc]; ++iLocal )
         {
-            const int naturalIndex = sendIndices[iLocal];
+            const int naturalIndex = procIndices[iLocal];
             const int localIndex = slowness.LocalIndex( naturalIndex );
-            send[iLocal] = localSlowness[localIndex];
+            procSlowness[iLocal] = localSlowness[localIndex];
         }
     }
     sendIndices.clear();
-    myGlobalSlowness.resize( maxSize*commSize );
+
+    myGlobalSlowness.resize( totalRecvCount );
     mpi::AllToAll
-    ( &sendSlowness[0], maxSize, &myGlobalSlowness[0], maxSize, comm_ );
+    ( &sendSlowness[0],     &sendCounts[0], &sendDispls[0],
+      &myGlobalSlowness[0], &recvCounts[0], &recvDispls[0], comm_ );
 
     // Reset the offsets
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
+    offsets = recvDispls;
 }
 
 template<typename R>
@@ -668,7 +672,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     //
 
     // Send the amount of data that we need to recv from each process.
-    std::vector<int> recvPairs( 2*commSize, 0 );
+    std::vector<int> recvCounts( commSize, 0 );
     const int numLocalSupernodes = fact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
     {
@@ -684,7 +688,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            ++recvPairs[2*proc];
+            ++recvCounts[proc];
         }
     }
     const int numDistSupernodes = fact.dist.supernodes.size();
@@ -709,29 +713,29 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            ++recvPairs[2*proc];
+            ++recvCounts[proc];
         }
     }
-    int maxSize = 0;
+    std::vector<int> sendCounts( commSize );
+    mpi::AllToAll
+    ( &recvCounts[0], 1,
+      &sendCounts[0], 1, comm_ );
+
+    // Build the send and recv displacements and count the totals send and
+    // recv sizes.
+    int totalSendCount=0, totalRecvCount=0;
+    std::vector<int> sendDispls( commSize ), recvDispls( commSize );
     for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(recvPairs[2*proc],maxSize);
-    for( int proc=0; proc<commSize; ++proc )
-        recvPairs[2*proc+1] = maxSize;
-    std::vector<int> sendPairs( 2*commSize );
-    mpi::AllToAll( &recvPairs[0], 2, &sendPairs[0], 2, comm_ );
-    recvPairs.clear();
+    {
+        sendDispls[proc] = totalSendCount;
+        recvDispls[proc] = totalRecvCount;
+        totalSendCount += sendCounts[proc];
+        totalRecvCount += recvCounts[proc];
+    }
 
     // Send the indices that we need to recv from each process.
-    for( int proc=0; proc<commSize; ++proc )
-        maxSize = std::max(sendPairs[2*proc+1],maxSize);
-    std::vector<int> actualSendSizes( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        actualSendSizes[proc] = sendPairs[2*proc];
-    sendPairs.clear();
-    std::vector<int> recvIndices( maxSize*commSize );
-    offsets.resize( commSize );
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
+    offsets = recvDispls;
+    std::vector<int> recvIndices( totalRecvCount );
     for( int t=0; t<numLocalSupernodes; ++t )
     {
         const clique::symbolic::LocalSymmFactSupernode& sn = 
@@ -773,37 +777,39 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             recvIndices[++offsets[proc]] = naturalIndex;
         }
     }
-    std::vector<int> sendIndices( maxSize*commSize );
+    std::vector<int> sendIndices( totalSendCount );
     mpi::AllToAll
-    ( &recvIndices[0], maxSize, &sendIndices[0], maxSize, comm_ );
+    ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
+      &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
 
     // Pack and send our slowness data.
-    std::vector<R> sendSlowness( maxSize*commSize );
+    std::vector<R> sendSlowness( totalSendCount );
     const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
-        R* send = &sendSlowness[proc*maxSize];
-        for( int iLocal=0; iLocal<actualSendSizes[proc]; ++iLocal )
+        R* procSlowness = &sendSlowness[sendDispls[proc]];
+        const int* procIndices = &sendIndices[sendDispls[proc]];
+        for( int iLocal=0; iLocal<sendCounts[proc]; ++iLocal )
         {
-            const int naturalIndex = sendIndices[iLocal];
+            const int naturalIndex = procIndices[iLocal];
             const int x = naturalIndex % nx;
             const int y = (naturalIndex/nx) % ny;
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int localIndex = slowness.LocalIndex( x, y, z );
-            send[iLocal] = localSlowness[localIndex];
+            procSlowness[iLocal] = localSlowness[localIndex];
         }
     }
     sendIndices.clear();
-    myPanelSlowness.resize( maxSize*commSize );
+    myPanelSlowness.resize( totalRecvCount );
     mpi::AllToAll
-    ( &sendSlowness[0], maxSize, &myPanelSlowness[0], maxSize, comm_ );
+    ( &sendSlowness[0],    &sendCounts[0], &sendDispls[0],
+      &myPanelSlowness[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendSlowness.clear();
 
     // Reset the offsets
-    for( int proc=0; proc<commSize; ++proc )
-        offsets[proc] = maxSize*proc;
+    offsets = recvDispls;
 }
 
 template<typename R>        
