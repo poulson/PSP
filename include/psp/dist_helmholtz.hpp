@@ -96,10 +96,11 @@ private:
     //
 
     // Information about the bottom (and full inner) panels
-    int bottomDepth_;       // including the original PML
-    int localBottomHeight_; // our process's local height of the bottom panel
-    int innerDepth_;           // total physical inner depth
-    int numFullInnerPanels_;   // number of full inner panels we need
+    int bottomDepth_;        // including the original PML
+    int localBottomHeight_;  // our process's local height of the bottom panel
+    int innerDepth_;         // total physical inner depth
+    int numFullInnerPanels_; // number of full inner panels we need
+    int numPanels_;          // total number of panels
 
     // Information about the leftover inner panel
     bool haveLeftover_;
@@ -130,8 +131,8 @@ private:
     int localHeight_;
     std::vector<int> localToNaturalMap_;
     std::vector<int> localRowOffsets_;
-    std::vector<C> localEntries_;
     std::vector<int> owningProcesses_;
+    std::vector<C> localEntries_;
 
     // Global sparse matrix communication information
     std::vector<int> globalSendCounts_, globalRecvCounts_; 
@@ -179,6 +180,7 @@ private:
 
     int PanelPadding( int whichPanel ) const;
     int PanelDepth( int whichPanel ) const;
+    int WhichPanel( int v ) const;
     int PanelV( int whichPanel ) const;
     int LocalV( int v ) const;
     int LocalPanelOffset( int whichPanel ) const;
@@ -217,6 +219,7 @@ private:
       std::vector<int>& localConnections, int& localOffset );
 
     int OwningProcess( int naturalIndex ) const;
+    int OwningProcess( int x, int y, int v ) const;
     static void OwningProcessRecursion
     ( int x, int y, int vLocal, int xSize, int ySize, 
       unsigned depthTilSerial, int& process );

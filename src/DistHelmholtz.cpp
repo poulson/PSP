@@ -45,6 +45,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
         ++log2CommSize_;
 
     // Decide if the domain is sufficiently deep to warrant sweeping
+    const int nx = control.nx;
+    const int ny = control.ny;
     const int nz = control.nz;
     const int numPlanesPerPanel = control.numPlanesPerPanel;
     const int bzCeil = bzCeil_;
@@ -59,17 +61,18 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // Compute the depths of each interior panel class and the number of 
     // full inner panels.
     //
-    //    -----------
-    //   | Top       |
-    //   | Leftover? |
-    //       ...     
-    //   | Inner     |
-    //   | Bottom    |
+    //    -----------   sweep dir
+    //   | Top       |      /\
+    //   | Leftover? |      ||
+    //       ...            ||
+    //   | Inner     |      ||
+    //   | Bottom    |      ||
     //    -----------
     innerDepth_ = nz-(bottomDepth_+topOrigDepth_);
     leftoverInnerDepth_ = innerDepth_ % numPlanesPerPanel;
     haveLeftover_ = ( leftoverInnerDepth_ != 0 );
     numFullInnerPanels_ = innerDepth_ / numPlanesPerPanel;
+    numPanels_ = 1 + numFullInnerPanels_ + haveLeftover_ + 1;
 
     //
     // Set up the symbolic description of the global sparse matrix
@@ -192,7 +195,49 @@ psp::DistHelmholtz<R>::DistHelmholtz
             procIndices[i] = naturalToLocalMap[procIndices[i]];
     }
 
-    // TODO: Set up the subdiagonal and superdiagonal redistribution information
+    // Count the number of indices that we need to recv from each process 
+    // during the subdiagonal and superdiagonal block sparse matrix 
+    // multiplications.
+    //
+    // TODO: Simplify by splitting into three different classes of panels.
+    subdiagRecvCounts_.resize( numPanels_*commSize, 0 );
+    supdiagRecvCounts_.resize( numPanels_*commSize, 0 );
+    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    {
+        // Get our natural coordinates
+        const int rowOffset = localRowOffsets_[iLocal];
+        const int naturalIndex = localToNaturalMap_[iLocal];
+        const int x = naturalIndex % nx;
+        const int y = (naturalIndex/nx) % ny;
+        const int z = naturalIndex/(nx*ny);
+        const int v = (nz-1) - z;
+
+        // If there is a v connection which spans panels, count it here.
+        const int localV = LocalV( v );
+        const int whichPanel = WhichPanel( v );
+        const int panelDepth = PanelDepth( whichPanel );
+        const int panelPadding = PanelPadding( whichPanel );
+        if( localV == panelPadding && whichPanel != 0 )
+        {
+            // Handle connection to previous panel
+            // TODO: Compute owning process
+        }
+        if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
+        {
+            // Handle connection to next panel
+            // TODO: Compute owning process
+        }
+    }
+    subdiagSendCounts_.resize( numPanels_*commSize );
+    supdiagSendCounts_.resize( numPanels_*commSize );
+    mpi::AllToAll
+    ( &subdiagRecvCounts_[0], numPanels_,
+      &subdiagSendCounts_[0], numPanels_, comm );
+    mpi::AllToAll
+    ( &supdiagRecvCounts_[0], numPanels_,
+      &supdiagSendCounts_[0], numPanels_, comm );
+
+    // TODO: Finish computing subdiag and supdiag redistribution information
 
     //
     // Form the symbolic factorizations of the three prototypical panels
@@ -503,26 +548,27 @@ psp::DistHelmholtz<R>::PanelDepth( int whichPanel ) const
 }
 
 template<typename R>
+int
+psp::DistHelmholtz<R>::WhichPanel( int v ) const
+{
+    if( v < bottomDepth_ )
+        return 0;
+    else if( v < bottomDepth_ + innerDepth_ )
+        return (v-bottomDepth_)/control_.numPlanesPerPanel + 1;
+    else
+        return numPanels_ - 1;
+}
+
+template<typename R>
 int 
 psp::DistHelmholtz<R>::LocalV( int v ) const
 {
     if( v < bottomDepth_ )
-    {
         return v;
-    }
     else if( v < bottomDepth_ + innerDepth_ )
-    {
         return ((v-bottomDepth_) % control_.numPlanesPerPanel) + bzCeil_;
-    }
     else // v in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
-    {
-#ifndef RELEASE
-        if( v < bottomDepth_+innerDepth_ || 
-            v >= bottomDepth_+innerDepth_+topOrigDepth_ )
-            throw std::logic_error("v is out of bounds");
-#endif
         return (v - (bottomDepth_+innerDepth_)) + bzCeil_;
-    }
 }
 
 // Return the lowest v index of the specified panel
@@ -994,8 +1040,20 @@ psp::DistHelmholtz<R>::OwningProcess( int naturalIndex ) const
     const int vLocal = LocalV( v );
 
     int proc = 0;
-    OwningProcessRecursion
-    ( x, y, vLocal, control_.nx, control_.ny, log2CommSize_, proc );
+    OwningProcessRecursion( x, y, vLocal, nx, ny, log2CommSize_, proc );
+    return proc;
+}
+
+template<typename R>
+int
+psp::DistHelmholtz<R>::OwningProcess( int x, int y, int v ) const
+{
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int vLocal = LocalV( v );
+
+    int proc = 0;
+    OwningProcessRecursion( x, y, vLocal, nx, ny, log2CommSize_, proc );
     return proc;
 }
 
