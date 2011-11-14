@@ -251,10 +251,10 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
     const int commSize = mpi::CommSize( comm_ );
 
     // Modify the basic send/recv information for the number of right-hand sides
-    std::vector<int> sendCounts = sparseSendCounts_;
-    std::vector<int> sendDispls = sparseSendDispls_;
-    std::vector<int> recvCounts = sparseRecvCounts_;
-    std::vector<int> recvDispls = sparseRecvDispls_;
+    std::vector<int> sendCounts = globalSendCounts_;
+    std::vector<int> sendDispls = globalSendDispls_;
+    std::vector<int> recvCounts = globalRecvCounts_;
+    std::vector<int> recvDispls = globalRecvDispls_;
     for( int proc=0; proc<commSize; ++proc )
     {
         sendCounts[proc] *= numRhs;
@@ -269,9 +269,10 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
     std::vector<C> sendRhs( totalSendCount );
     for( int proc=0; proc<commSize; ++proc )
     {
+        const int sendSize = globalSendCounts_[proc];
         C* procRhs = &sendRhs[sendDispls[proc]];
-        const int* procIndices = &sendIndices_[sparseSendDispls_[proc]];
-        for( int s=0; s<sparseSendCounts_[proc]; ++s )
+        const int* procIndices = &globalSendIndices_[globalSendDispls_[proc]];
+        for( int s=0; s<sendSize; ++s )
         {
             const int iLocal = procIndices[s];
             for( int k=0; k<numRhs; ++k )
@@ -525,7 +526,7 @@ void
 psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
 {
     // TODO:
-    //   1) Gather the necessary pieces of A_{i,i+1}
+    //   1) Gather the necessary pieces of B_{i+1}
     //   2) Perform the local multiply
 }
 

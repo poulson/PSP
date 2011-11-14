@@ -71,6 +71,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
     haveLeftover_ = ( leftoverInnerDepth_ != 0 );
     numFullInnerPanels_ = innerDepth_ / numPlanesPerPanel;
 
+    //
+    // Set up the symbolic description of the global sparse matrix
+    //
+
     // Compute the number of rows we own of the sparse distributed matrix
     localBottomHeight_ = LocalPanelHeight( bottomDepth_, 0, commRank );
     localLeftoverInnerHeight_ = 
@@ -80,13 +84,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
                    localLeftoverInnerHeight_ + 
                    localTopHeight_;
 
-    // Compute the natural indices of our local indices and fill in the offsets
-    // for the store of each local rows indices.
-    //
-    // Since we are sweeping from z=nz-1 (the bottom) to z=0 (the top), it is 
-    // convenient to work with the variable v=(nz-1)-z so that we are sweeping
-    // from v=0 to v=nz-1.
-    //
+    // Compute the natural indices of the rows of the global sparse matrix 
+    // that are owned by our process. Also, set up the offsets for the 
+    // (soon-to-be-computed) packed storage of the connectivity of our local 
+    // rows.
     localToNaturalMap_.resize( localHeight_ );
     localRowOffsets_.resize( localHeight_+1 );
     localRowOffsets_[0] = 0;
@@ -100,7 +101,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
         ( leftoverInnerDepth_, bzCeil_, commRank, whichPanel++ );
     MapLocalPanelIndices( topOrigDepth_, bzCeil_, commRank, whichPanel++ );
 
-    // Fill in the natural connection indices
+    // Fill in the natural indices of the connections to our local rows of the
+    // global sparse matrix.
     std::vector<int> localConnections( localRowOffsets_.back() );
     whichPanel = 0;
     MapLocalConnectionIndices
@@ -116,8 +118,9 @@ psp::DistHelmholtz<R>::DistHelmholtz
     MapLocalConnectionIndices
     ( topOrigDepth_, bzCeil_, commRank, localConnections, whichPanel++ );
 
-    // Count the number of indices that we will need to recv from each process.
-    sparseRecvCounts_.resize( commSize, 0 );
+    // Count the number of indices that we need to recv from each process 
+    // during the global sparse matrix multiplication.
+    globalRecvCounts_.resize( commSize, 0 );
     owningProcesses_.resize( localRowOffsets_.back() );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -132,28 +135,28 @@ psp::DistHelmholtz<R>::DistHelmholtz
             const int naturalCol = localConnections[rowOffset+jLocal];
             const int proc = OwningProcess( naturalCol );
             owningProcesses_[rowOffset+jLocal] = proc;
-            ++sparseRecvCounts_[proc];
+            ++globalRecvCounts_[proc];
         }
     }
-    sparseSendCounts_.resize( commSize );
+    globalSendCounts_.resize( commSize );
     mpi::AllToAll
-    ( &sparseRecvCounts_[0], 1,
-      &sparseSendCounts_[0], 1, comm );
+    ( &globalRecvCounts_[0], 1,
+      &globalSendCounts_[0], 1, comm );
 
     // Compute the send and recv offsets and total sizes
     int totalSendCount=0, totalRecvCount=0;
-    sparseSendDispls_.resize( commSize );
-    sparseRecvDispls_.resize( commSize );
+    globalSendDispls_.resize( commSize );
+    globalRecvDispls_.resize( commSize );
     for( int proc=0; proc<commSize; ++proc )
     {
-        sparseSendDispls_[proc] = totalSendCount;
-        sparseRecvDispls_[proc] = totalRecvCount;
-        totalSendCount += sparseSendCounts_[proc];
-        totalRecvCount += sparseRecvCounts_[proc];
+        globalSendDispls_[proc] = totalSendCount;
+        globalRecvDispls_[proc] = totalRecvCount;
+        totalSendCount += globalSendCounts_[proc];
+        totalRecvCount += globalRecvCounts_[proc];
     }
 
     // Pack and send the list of indices that we will need from each process
-    std::vector<int> offsets = sparseRecvDispls_;
+    std::vector<int> offsets = globalRecvDispls_;
     std::vector<int> recvIndices( totalRecvCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
@@ -168,10 +171,11 @@ psp::DistHelmholtz<R>::DistHelmholtz
         }
     }
     offsets.clear();
-    sendIndices_.resize( totalSendCount );
+    globalSendIndices_.resize( totalSendCount );
     clique::mpi::AllToAll
-    ( &recvIndices[0],  &sparseRecvCounts_[0], &sparseRecvDispls_[0],
-      &sendIndices_[0], &sparseSendCounts_[0], &sparseSendDispls_[0], comm );
+    ( &recvIndices[0],        &globalRecvCounts_[0], &globalRecvDispls_[0],
+      &globalSendIndices_[0], &globalSendCounts_[0], &globalSendDispls_[0], 
+      comm );
     recvIndices.clear();
 
     // Invert the local to natural map
@@ -179,35 +183,35 @@ psp::DistHelmholtz<R>::DistHelmholtz
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
         naturalToLocalMap[localToNaturalMap_[iLocal]] = iLocal;
 
-    // Convert the indices in place
+    // Convert the natural indices to their local indices in place
     for( int proc=0; proc<commSize; ++proc )
     {
-        const int sendSize = sparseSendCounts_[proc];
-        int* procIndices = &sendIndices_[sparseSendDispls_[proc]];
+        const int sendSize = globalSendCounts_[proc];
+        int* procIndices = &globalSendIndices_[globalSendDispls_[proc]];
         for( int i=0; i<sendSize; ++i )
             procIndices[i] = naturalToLocalMap[procIndices[i]];
     }
 
-    // Count the number of local supernodes in each panel
-    const int numLocalSupernodes = NumLocalSupernodes( commRank );
+    // TODO: Set up the subdiagonal and superdiagonal redistribution information
+
+    //
+    // Form the symbolic factorizations of the three prototypical panels
+    //
 
     // Create space for the original structures of the panel classes
-    clique::symbolic::SymmOrig 
-        bottomSymbolicOrig, 
-        leftoverInnerSymbolicOrig, 
-        topSymbolicOrig;
+    const int numLocalSupernodes = NumLocalSupernodes( commRank );
+    const int numDistSupernodes = log2CommSize_+1;
+    clique::symbolic::SymmOrig bottomSymbolicOrig, 
+                               leftoverInnerSymbolicOrig, 
+                               topSymbolicOrig;
     bottomSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    bottomSymbolicOrig.dist.supernodes.resize( log2CommSize_ );
+    bottomSymbolicOrig.dist.supernodes.resize( numDistSupernodes );
     leftoverInnerSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    leftoverInnerSymbolicOrig.dist.supernodes.resize( log2CommSize_ );
+    leftoverInnerSymbolicOrig.dist.supernodes.resize( numDistSupernodes );
     topSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    topSymbolicOrig.dist.supernodes.resize( log2CommSize_ );
+    topSymbolicOrig.dist.supernodes.resize( numDistSupernodes );
 
     // Fill the original structures (in the nested-dissection ordering)
-    //
-    // In order to minimize the number of symbolic factorizations that have to 
-    // be performed, and to simplify distribution issues, the leading PML region
-    // on each inner panel will always be ordered _LAST_ within that panel.
     FillOrigPanelStruct( bottomDepth_, bottomSymbolicOrig );
     if( haveLeftover_ )
         FillOrigPanelStruct

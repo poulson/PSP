@@ -133,11 +133,20 @@ private:
     std::vector<C> localEntries_;
     std::vector<int> owningProcesses_;
 
-    // Sparse matrix communication information
-    int allToAllSize_;
-    std::vector<int> sparseSendCounts_, sparseRecvCounts_; // length p
-    std::vector<int> sparseSendDispls_, sparseRecvDispls_; // length p
-    std::vector<int> sendIndices_; 
+    // Global sparse matrix communication information
+    std::vector<int> globalSendCounts_, globalRecvCounts_; 
+    std::vector<int> globalSendDispls_, globalRecvDispls_; 
+    std::vector<int> globalSendIndices_; 
+
+    // For redistributing pieces of B_i to form A_{i+1,i} B_i
+    std::vector<int> subdiagSendCounts_, subdiagRecvCounts_;
+    std::vector<int> subdiagSendDispls_, subdiagRecvDispls_;
+    std::vector<int> subdiagSendIndices_;
+
+    // For redistributing pieces of B_{i+1} to form A_{i,i+1} B_{i+1}
+    std::vector<int> supdiagSendCounts_, supdiagRecvCounts_;
+    std::vector<int> supdiagSendDispls_, supdiagRecvDispls_;
+    std::vector<int> supdiagSendIndices_;
 
     //
     // General helper routines 
