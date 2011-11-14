@@ -115,11 +115,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
           whichPanel++ );
     MapLocalConnectionIndices
     ( topOrigDepth_, bzCeil_, commRank, localConnections, whichPanel++ );
-#ifndef RELEASE
-    const int numLocalConnections = localConnections.size();
-    if( numLocalConnections != localOffset )
-        throw std::logic_error("Invalid connection count");
-#endif
 
     // Count the number of indices that we will need to recv from each process.
     sparseRecvCounts_.resize( commSize, 0 );
