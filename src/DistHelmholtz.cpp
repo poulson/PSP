@@ -195,12 +195,11 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // multiplications.
     //
     // TODO: Simplify by splitting into three different classes of panels.
-    std::vector<int> subdiagRecvCountsPerm( numPanels_*commSize, 0 );
-    std::vector<int> supdiagRecvCountsPerm( numPanels_*commSize, 0 );
+    std::vector<int> subdiagRecvCountsPerm( (numPanels_-1)*commSize, 0 );
+    std::vector<int> supdiagRecvCountsPerm( (numPanels_-1)*commSize, 0 );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         // Get our natural coordinates
-        const int rowOffset = localRowOffsets_[iLocal];
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int x = naturalIndex % nx;
         const int y = (naturalIndex/nx) % ny;
@@ -217,7 +216,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
             // Handle connection to previous panel, which is relevant to the
             // computation of A_{i+1,i} B_i
             const int proc = OwningProcess( x, y, v-1 );
-            ++subdiagRecvCountsPerm[proc*numPanels_+whichPanel];
+            ++subdiagRecvCountsPerm[proc*(numPanels_-1)+(whichPanel-1)];
         }
         if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
         {
@@ -227,27 +226,27 @@ psp::DistHelmholtz<R>::DistHelmholtz
             ++supdiagRecvCountsPerm[proc*numPanels_+whichPanel];
         }
     }
-    std::vector<int> subdiagSendCountsPerm( numPanels_*commSize );
-    std::vector<int> supdiagSendCountsPerm( numPanels_*commSize );
+    std::vector<int> subdiagSendCountsPerm( (numPanels_-1)*commSize );
+    std::vector<int> supdiagSendCountsPerm( (numPanels_-1)*commSize );
     mpi::AllToAll
-    ( &subdiagRecvCountsPerm[0], numPanels_,
-      &subdiagSendCountsPerm[0], numPanels_, comm );
+    ( &subdiagRecvCountsPerm[0], numPanels_-1,
+      &subdiagSendCountsPerm[0], numPanels_-1, comm );
     mpi::AllToAll
-    ( &supdiagRecvCountsPerm[0], numPanels_,
-      &supdiagSendCountsPerm[0], numPanels_, comm );
+    ( &supdiagRecvCountsPerm[0], numPanels_-1,
+      &supdiagSendCountsPerm[0], numPanels_-1, comm );
 
     // Reorganize the send and recv counts into an appropriately ordered buffer
     // for per-panel communication
-    subdiagSendCounts_.resize( numPanels_*commSize );
-    subdiagRecvCounts_.resize( numPanels_*commSize );
-    supdiagSendCounts_.resize( numPanels_*commSize );
-    supdiagRecvCounts_.resize( numPanels_*commSize );
+    subdiagSendCounts_.resize( (numPanels_-1)*commSize );
+    subdiagRecvCounts_.resize( (numPanels_-1)*commSize );
+    supdiagSendCounts_.resize( (numPanels_-1)*commSize );
+    supdiagRecvCounts_.resize( (numPanels_-1)*commSize );
     for( int proc=0; proc<commSize; ++proc )
     {
-        for( int i=0; i<numPanels_; ++i )
+        for( int i=0; i<numPanels_-1; ++i )
         {
-            const int oldIndex = proc*numPanels_ + i;
-            const int newIndex = i*commSize      + proc;
+            const int oldIndex = proc*(numPanels_-1) + i;
+            const int newIndex = i*commSize + proc;
             subdiagSendCounts_[newIndex] = subdiagSendCountsPerm[oldIndex];
             subdiagRecvCounts_[newIndex] = subdiagRecvCountsPerm[oldIndex];
             supdiagSendCounts_[newIndex] = supdiagSendCountsPerm[oldIndex];
@@ -262,40 +261,40 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // Compute the send and recv offsets and total sizes
     int subdiagTotalSendCount=0, subdiagTotalRecvCount=0,
         supdiagTotalSendCount=0, supdiagTotalRecvCount=0;
-    std::vector<int> subdiagPanelSendCounts( numPanels_, 0 ), 
-                     subdiagPanelRecvCounts( numPanels_, 0 ),
-                     supdiagPanelSendCounts( numPanels_, 0 ),
-                     supdiagPanelRecvCounts( numPanels_, 0 );
-    std::vector<int> subdiagPanelRecvDispls( numPanels_ ),
-                     supdiagPanelRecvDispls( numPanels_ );
-    subdiagSendDispls_.resize( numPanels_*commSize );
-    subdiagRecvDispls_.resize( numPanels_*commSize );
-    supdiagSendDispls_.resize( numPanels_*commSize );
-    supdiagRecvDispls_.resize( numPanels_*commSize );
-    subdiagPanelSendDispls_.resize( numPanels_ );
-    supdiagPanelSendDispls_.resize( numPanels_ );
-    for( int i=0; i<numPanels_; ++i )
+    subdiagSendDispls_.resize( (numPanels_-1)*commSize );
+    subdiagRecvDispls_.resize( (numPanels_-1)*commSize );
+    supdiagSendDispls_.resize( (numPanels_-1)*commSize );
+    supdiagRecvDispls_.resize( (numPanels_-1)*commSize );
+    subdiagPanelSendCounts_.resize( numPanels_-1, 0 );
+    supdiagPanelSendCounts_.resize( numPanels_-1, 0 );
+    subdiagPanelRecvCounts_.resize( numPanels_-1, 0 );
+    supdiagPanelRecvCounts_.resize( numPanels_-1, 0 );
+    subdiagPanelSendDispls_.resize( numPanels_-1 );
+    supdiagPanelSendDispls_.resize( numPanels_-1 );
+    subdiagPanelRecvDispls_.resize( numPanels_-1 );
+    supdiagPanelRecvDispls_.resize( numPanels_-1 );
+    for( int i=0; i<numPanels_-1; ++i )
     {
         for( int proc=0; proc<commSize; ++proc )
         {
             const int index = i*commSize + proc;
-            subdiagSendDispls_[proc] = subdiagPanelSendCounts[i];
-            subdiagRecvDispls_[proc] = subdiagPanelRecvCounts[i];
-            supdiagSendDispls_[proc] = supdiagPanelSendCounts[i];
-            supdiagRecvDispls_[proc] = supdiagPanelRecvCounts[i];
-            subdiagPanelSendCounts[i] += subdiagSendCounts_[index];
-            subdiagPanelRecvCounts[i] += subdiagRecvCounts_[index];
-            supdiagPanelSendCounts[i] += supdiagSendCounts_[index];
-            supdiagPanelRecvCounts[i] += supdiagRecvCounts_[index];
+            subdiagSendDispls_[proc] = subdiagPanelSendCounts_[i];
+            supdiagSendDispls_[proc] = supdiagPanelSendCounts_[i];
+            subdiagRecvDispls_[proc] = subdiagPanelRecvCounts_[i];
+            supdiagRecvDispls_[proc] = supdiagPanelRecvCounts_[i];
+            subdiagPanelSendCounts_[i] += subdiagSendCounts_[index];
+            supdiagPanelSendCounts_[i] += supdiagSendCounts_[index];
+            subdiagPanelRecvCounts_[i] += subdiagRecvCounts_[index];
+            supdiagPanelRecvCounts_[i] += supdiagRecvCounts_[index];
         }
         subdiagPanelSendDispls_[i] = subdiagTotalSendCount;
         supdiagPanelSendDispls_[i] = supdiagTotalSendCount;
-        subdiagPanelRecvDispls[i] = subdiagTotalRecvCount;
-        supdiagPanelRecvDispls[i] = supdiagTotalRecvCount;
-        subdiagTotalSendCount += subdiagPanelSendCounts[i];
-        subdiagTotalRecvCount += subdiagPanelRecvCounts[i];
-        supdiagTotalSendCount += supdiagPanelSendCounts[i];
-        supdiagTotalRecvCount += supdiagPanelRecvCounts[i];
+        subdiagPanelRecvDispls_[i] = subdiagTotalRecvCount;
+        supdiagPanelRecvDispls_[i] = supdiagTotalRecvCount;
+        subdiagTotalSendCount += subdiagPanelSendCounts_[i];
+        supdiagTotalSendCount += supdiagPanelSendCounts_[i];
+        subdiagTotalRecvCount += subdiagPanelRecvCounts_[i];
+        supdiagTotalRecvCount += supdiagPanelRecvCounts_[i];
     }
 
     // Pack and send the lists of indices that we will need from each 
@@ -304,16 +303,20 @@ psp::DistHelmholtz<R>::DistHelmholtz
     std::vector<int> supdiagOffsets = supdiagRecvDispls_;
     std::vector<int> subdiagRecvIndices( subdiagTotalRecvCount );
     std::vector<int> supdiagRecvIndices( supdiagTotalRecvCount );
+    subdiagRecvLocalIndices_.resize( subdiagTotalRecvCount );
+    supdiagRecvLocalIndices_.resize( supdiagTotalRecvCount );
+    subdiagRecvLocalRows_.resize( subdiagTotalRecvCount );
+    supdiagRecvLocalRows_.resize( supdiagTotalRecvCount );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         // Get our natural coordinates
         const int rowOffset = localRowOffsets_[iLocal];
+        const int rowSize = localRowOffsets_[iLocal+1] - rowOffset;
         const int naturalRow = localToNaturalMap_[iLocal];
         const int x = naturalRow % nx;
         const int y = (naturalRow/nx) % ny;
         const int z = naturalRow/(nx*ny);
         const int v = (nz-1) - z;
-
 
         // If there is a v connection which spans panels, count it here.
         const int localV = LocalV( v );
@@ -327,7 +330,28 @@ psp::DistHelmholtz<R>::DistHelmholtz
             const int naturalCol = x + y*nx + (z+1)*nx*ny;
             const int proc = OwningProcess( x, y, v-1 );
             const int index = whichPanel*commSize + proc;
-            subdiagRecvIndices[subdiagOffsets[index]++] = naturalCol;
+            const int offset = subdiagOffsets[index];
+
+            // Search for the appropriate index in this row
+            int localIndex = -1;
+            for( int k=1; k<rowSize; ++k )
+            {
+                if( localConnections[rowOffset+k] == naturalCol )
+                {
+                    localIndex = rowOffset+k;
+                    break;
+                }
+            }
+#ifndef RELEASE
+            if( localIndex == -1 )
+                throw std::logic_error("Did not find subdiag connection");
+#endif
+
+            subdiagRecvIndices[offset] = naturalCol;
+            subdiagRecvLocalIndices_[offset] = localIndex;
+            subdiagRecvLocalRows_[offset] = iLocal;
+
+            ++subdiagOffsets[index];
         }
         if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
         {
@@ -336,7 +360,28 @@ psp::DistHelmholtz<R>::DistHelmholtz
             const int naturalCol = x + y*nx + (z-1)*nx*ny;
             const int proc = OwningProcess( x, y, v+1 );
             const int index = whichPanel*commSize + proc;
-            supdiagRecvIndices[supdiagOffsets[index]++] = naturalCol;
+            const int offset = supdiagOffsets[index];
+
+            // Search for the appropriate index in this row
+            int localIndex = -1;
+            for( int k=1; k<rowSize; ++k )
+            {
+                if( localConnections[rowOffset+k] == naturalCol )
+                {
+                    localIndex = rowOffset+k;
+                    break;
+                }
+            }
+#ifndef RELEASE
+            if( localIndex == -1 )
+                throw std::logic_error("Did not find supdiag connection");
+#endif
+
+            supdiagRecvIndices[offset] = naturalCol;
+            supdiagRecvLocalIndices_[offset] = localIndex;
+            supdiagRecvLocalRows_[offset] = iLocal;
+
+            ++supdiagOffsets[index];
         }
     }
     subdiagOffsets.clear();
@@ -344,10 +389,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
     subdiagSendIndices_.resize( subdiagTotalSendCount );
     supdiagSendIndices_.resize( supdiagTotalSendCount );
     // TODO: Think about reducing to a single AllToAll?
-    for( int i=0; i<numPanels_; ++i )
+    for( int i=0; i<numPanels_-1; ++i )
     {
         mpi::AllToAll
-        ( &subdiagRecvIndices[subdiagPanelRecvDispls[i]], 
+        ( &subdiagRecvIndices[subdiagPanelRecvDispls_[i]], 
           &subdiagRecvCounts_[i*commSize],
           &subdiagRecvDispls_[i*commSize],
           &subdiagSendIndices_[subdiagPanelSendDispls_[i]],
@@ -355,7 +400,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
           &subdiagSendDispls_[i*commSize],
           comm );
         mpi::AllToAll
-        ( &supdiagRecvIndices[supdiagPanelRecvDispls[i]], 
+        ( &supdiagRecvIndices[supdiagPanelRecvDispls_[i]], 
           &supdiagRecvCounts_[i*commSize], 
           &supdiagRecvDispls_[i*commSize],
           &supdiagSendIndices_[supdiagPanelSendDispls_[i]],

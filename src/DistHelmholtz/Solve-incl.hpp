@@ -497,9 +497,65 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SubdiagonalUpdate( std::vector<C>& B, int i ) const
 {
-    // TODO:
-    //   1) Gather the necessary pieces of B_i
-    //   2) Perform the local multiply
+    const int commSize = mpi::CommSize( comm_ );
+    const int numRhs = B.size() / localHeight_;
+    const int panelSendCount = subdiagPanelSendCounts_[i];
+    const int panelRecvCount = subdiagPanelRecvCounts_[i];
+    const int panelSendOffset = subdiagPanelSendDispls_[i];
+    const int panelRecvOffset = subdiagPanelRecvDispls_[i];
+
+    // Pack and alltoall the local d.o.f. at the back of B_i
+    std::vector<C> sendBuffer( panelSendCount*numRhs );
+    for( int s=0; s<panelSendCount; ++s )
+    {
+        const int localRow = subdiagSendIndices_[panelSendOffset+s];
+        for( int k=0; k<numRhs; ++k ) 
+            sendBuffer[s*numRhs+k] = B[localRow+k*localHeight_];
+    }
+
+    // Prepare the send and recv information
+    std::vector<int> sendCounts( commSize ), sendDispls( commSize ),
+                     recvCounts( commSize ), recvDispls( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        const int index = i*commSize + proc;
+        sendCounts[proc] = subdiagSendCounts_[index]*numRhs;
+        sendDispls[proc] = subdiagSendDispls_[index]*numRhs;
+        recvCounts[proc] = subdiagRecvCounts_[index]*numRhs;
+        recvDispls[proc] = subdiagRecvDispls_[index]*numRhs;
+    }
+
+    std::vector<C> recvBuffer( panelRecvCount*numRhs );
+    mpi::AllToAll
+    ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
+      &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
+    sendBuffer.clear();
+    sendCounts.clear();
+    sendDispls.clear();
+
+    // Perform the local update
+    const int* recvLocalRows = &subdiagRecvLocalRows_[panelRecvOffset];
+    const int* recvLocalIndices = &subdiagRecvLocalIndices_[panelRecvOffset];
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        const int procSize = recvCounts[proc]/numRhs;
+        const int procOffset = recvDispls[proc]/numRhs;
+
+        const C* procValues = &recvBuffer[recvDispls[proc]];
+        const int* procLocalRows = &recvLocalRows[procOffset];
+        const int* procLocalIndices = &recvLocalIndices[procOffset];
+        for( int s=0; s<procSize; ++s )
+        {
+            const int iLocal = procLocalRows[s];
+            const int localIndex = procLocalIndices[s];
+            const C alpha = localEntries_[localIndex];
+            for( int k=0; k<numRhs; ++k )
+            {
+                const C beta = procValues[s*numRhs+k];
+                B[iLocal+k*localHeight_] -= alpha*beta;
+            }
+        }
+    }
 }
 
 // Z := B_i
@@ -524,9 +580,65 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
 {
-    // TODO:
-    //   1) Gather the necessary pieces of B_{i+1}
-    //   2) Perform the local multiply
+    const int commSize = mpi::CommSize( comm_ );
+    const int numRhs = B.size() / localHeight_;
+    const int panelSendCount = supdiagPanelSendCounts_[i];
+    const int panelRecvCount = supdiagPanelRecvCounts_[i];
+    const int panelSendOffset = supdiagPanelSendDispls_[i];
+    const int panelRecvOffset = supdiagPanelRecvDispls_[i];
+
+    // Pack and alltoall the local d.o.f. at the front of B_{i+1}
+    std::vector<C> sendBuffer( panelSendCount*numRhs );
+    for( int s=0; s<panelSendCount; ++s )
+    {
+        const int localRow = supdiagSendIndices_[panelSendOffset+s];
+        for( int k=0; k<numRhs; ++k ) 
+            sendBuffer[s*numRhs+k] = B[localRow+k*localHeight_];
+    }
+
+    // Prepare the send and recv information
+    std::vector<int> sendCounts( commSize ), sendDispls( commSize ),
+                     recvCounts( commSize ), recvDispls( commSize );
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        const int index = i*commSize + proc;
+        sendCounts[proc] = supdiagSendCounts_[index]*numRhs;
+        sendDispls[proc] = supdiagSendDispls_[index]*numRhs;
+        recvCounts[proc] = supdiagRecvCounts_[index]*numRhs;
+        recvDispls[proc] = supdiagRecvDispls_[index]*numRhs;
+    }
+
+    std::vector<C> recvBuffer( panelRecvCount*numRhs );
+    mpi::AllToAll
+    ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
+      &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
+    sendBuffer.clear();
+    sendCounts.clear();
+    sendDispls.clear();
+
+    // Perform the local multiply
+    const int* recvLocalRows = &supdiagRecvLocalRows_[panelRecvOffset];
+    const int* recvLocalIndices = &supdiagRecvLocalIndices_[panelRecvOffset];
+    for( int proc=0; proc<commSize; ++proc )
+    {
+        const int procSize = recvCounts[proc]/numRhs;
+        const int procOffset = recvDispls[proc]/numRhs;
+
+        const C* procValues = &recvBuffer[recvDispls[proc]];
+        const int* procLocalRows = &recvLocalRows[procOffset];
+        const int* procLocalIndices = &recvLocalIndices[procOffset];
+        for( int s=0; s<procSize; ++s )
+        {
+            const int iLocal = procLocalRows[s];
+            const int localIndex = procLocalIndices[s];
+            const C alpha = localEntries_[localIndex];
+            for( int k=0; k<numRhs; ++k )
+            {
+                const C beta = procValues[s*numRhs+k];
+                B[iLocal+k*localHeight_] = -alpha*beta;
+            }
+        }
+    }
 }
 
 // B_i := B_i + Z

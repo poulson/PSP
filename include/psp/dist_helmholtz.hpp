@@ -142,14 +142,20 @@ private:
     // For redistributing pieces of B_i to form A_{i+1,i} B_i
     std::vector<int> subdiagSendCounts_, subdiagRecvCounts_;
     std::vector<int> subdiagSendDispls_, subdiagRecvDispls_;
-    std::vector<int> subdiagPanelSendDispls_;
+    std::vector<int> subdiagPanelSendCounts_, subdiagPanelRecvCounts_;
+    std::vector<int> subdiagPanelSendDispls_, subdiagPanelRecvDispls_;
     std::vector<int> subdiagSendIndices_;
+    std::vector<int> subdiagRecvLocalIndices_, 
+                     subdiagRecvLocalRows_;
 
     // For redistributing pieces of B_{i+1} to form A_{i,i+1} B_{i+1}
     std::vector<int> supdiagSendCounts_, supdiagRecvCounts_;
     std::vector<int> supdiagSendDispls_, supdiagRecvDispls_;
-    std::vector<int> supdiagPanelSendDispls_;
+    std::vector<int> supdiagPanelSendCounts_, supdiagPanelRecvCounts_;
+    std::vector<int> supdiagPanelSendDispls_, supdiagPanelRecvDispls_;
     std::vector<int> supdiagSendIndices_;
+    std::vector<int> supdiagRecvLocalIndices_,
+                     supdiagRecvLocalRows_;
 
     //
     // General helper routines 
