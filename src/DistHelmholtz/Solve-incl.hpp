@@ -341,18 +341,17 @@ psp::DistHelmholtz<R>::Precondition( std::vector<C>& B ) const
     //
 
     // Solve against L D
-    const int numPanels = 1 + numFullInnerPanels_ + (haveLeftover_) + 1;
-    for( int i=0; i<numPanels-1; ++i )
+    for( int i=0; i<numPanels_-1; ++i )
     {
         SolvePanel( B, i );
         SubdiagonalUpdate( B, i );
     }
-    SolvePanel( B, numPanels-1 );
+    SolvePanel( B, numPanels_-1 );
 
     // Solve against L^T
     std::vector<C> Z;
     const int numRhs = B.size() / localHeight_;
-    for( int i=numPanels-2; i>=0; --i )
+    for( int i=numPanels_-2; i>=0; --i )
     {
         ExtractPanel( B, i, Z );
         MultiplySuperdiagonal( B, i );    
