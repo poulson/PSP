@@ -21,30 +21,31 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Solve( GridData<C>& B, Solver solver ) const
+psp::DistHelmholtz<R>::Solve
+( GridData<C>& gridB, Solver solver, int maxIterations ) const
 {
-    if( !elemental::mpi::CongruentComms( comm_, B.Comm() ) )
+    if( !elemental::mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
 
     // Convert B into custom nested-dissection based ordering
-    std::vector<C> redistB;
-    PullRightHandSides( B, redistB );
+    elemental::Matrix<C> B;
+    PullRightHandSides( gridB, B );
 
     // Solve the systems of equations
     switch( solver )
     {
-    case GMRES: SolveWithGMRES( redistB ); break;
-    case QMR:   SolveWithQMR( redistB );   break;
+    case GMRES: SolveWithGMRES( B, maxIterations ); break;
+    case QMR:   SolveWithQMR( B, maxIterations );   break;
     }
 
     // Restore the solutions back into the GridData form
-    PushRightHandSides( B, redistB );
+    PushRightHandSides( gridB, B );
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::PullRightHandSides
-( const GridData<C>& B, std::vector<C>& redistB ) const
+( const GridData<C>& gridB, elemental::Matrix<C>& B ) const
 {
     const int commSize = mpi::CommSize( comm_ );
 
@@ -53,7 +54,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int proc = B.OwningProcess( naturalIndex );
+        const int proc = gridB.OwningProcess( naturalIndex );
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
@@ -78,7 +79,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int proc = B.OwningProcess( naturalIndex );
+        const int proc = gridB.OwningProcess( naturalIndex );
         recvIndices[++offsets[proc]] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
@@ -88,7 +89,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     recvIndices.clear();
 
     // Scale the send and recv counts to make up for their being several RHS
-    const int numRhs = B.NumScalars();
+    const int numRhs = gridB.NumScalars();
     for( int proc=0; proc<commSize; ++proc )
     {
         sendCounts[proc] *= numRhs;
@@ -101,7 +102,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
 
     // Pack and send our right-hand side data.
     std::vector<C> sendB( totalSendCount );
-    const C* BBuffer = B.LockedLocalBuffer();
+    const C* gridBBuffer = gridB.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         C* procB = &sendB[sendDispls[proc]];
@@ -110,9 +111,9 @@ psp::DistHelmholtz<R>::PullRightHandSides
         for( int s=0; s<numLocalIndices; ++s )
         {
             const int naturalIndex = procIndices[s];
-            const int localIndex = B.LocalIndex( naturalIndex );
+            const int localIndex = gridB.LocalIndex( naturalIndex );
             for( int k=0; k<numRhs; ++k )
-                procB[s*numRhs+k] = BBuffer[localIndex+k];
+                procB[s*numRhs+k] = gridBBuffer[localIndex+k];
         }
     }
     sendIndices.clear();
@@ -124,13 +125,13 @@ psp::DistHelmholtz<R>::PullRightHandSides
 
     // Unpack the received right-hand side data
     offsets = recvDispls;
-    redistB.resize( localHeight_*numRhs );
+    B.ResizeTo( localHeight_, numRhs, localHeight_ );
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int proc = B.OwningProcess( naturalIndex );
+        const int proc = gridB.OwningProcess( naturalIndex );
         for( int k=0; k<numRhs; ++k )
-            redistB[iLocal+k*localHeight_] = recvB[offsets[proc]+k];
+            B.Set( iLocal, k, recvB[offsets[proc]+k] );
         offsets[proc] += numRhs;
     }
 }
@@ -138,9 +139,9 @@ psp::DistHelmholtz<R>::PullRightHandSides
 template<typename R>
 void
 psp::DistHelmholtz<R>::PushRightHandSides
-( GridData<C>& B, const std::vector<C>& redistB ) const
+( GridData<C>& gridB, const elemental::Matrix<C>& B ) const
 {
-    const int numRhs = B.NumScalars();
+    const int numRhs = gridB.NumScalars();
     const int commSize = mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we will need to send.
@@ -148,7 +149,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int proc = B.OwningProcess( naturalIndex );
+        const int proc = gridB.OwningProcess( naturalIndex );
         ++sendCounts[proc];
     }
     std::vector<int> recvCounts( commSize );
@@ -174,7 +175,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
-        const int proc = B.OwningProcess( naturalIndex );
+        const int proc = gridB.OwningProcess( naturalIndex );
         sendIndices[++offsets[proc]] = naturalIndex;
     }
     std::vector<int> recvIndices( totalRecvCount );
@@ -200,9 +201,9 @@ psp::DistHelmholtz<R>::PushRightHandSides
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal]; 
-        const int proc = B.OwningProcess( naturalIndex );
+        const int proc = gridB.OwningProcess( naturalIndex );
         for( int k=0; k<numRhs; ++k )
-            sendB[offsets[proc]+k] = redistB[iLocal+k*localHeight_];
+            sendB[offsets[proc]+k] = B.Get( iLocal, k );
         offsets[proc] += numRhs;
     }
     std::vector<C> recvB( totalRecvCount );
@@ -212,7 +213,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
     sendB.clear();
 
     // Unpack the right-hand side data
-    C* BBuffer = B.LocalBuffer();
+    C* gridBBuffer = gridB.LocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         const C* procB = &recvB[recvDispls[proc]];
@@ -221,33 +222,195 @@ psp::DistHelmholtz<R>::PushRightHandSides
         for( int s=0; s<numLocalIndices; ++s )
         {
             const int naturalIndex = procIndices[s];
-            const int localIndex = B.LocalIndex( naturalIndex );
+            const int localIndex = gridB.LocalIndex( naturalIndex );
             for( int k=0; k<numRhs; ++k )
-                BBuffer[localIndex+k] = procB[s*numRhs+k];
+                gridBBuffer[localIndex+k] = procB[s*numRhs+k];
         }
     }
 }
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithGMRES( std::vector<C>& redistB ) const
+psp::DistHelmholtz<R>::SolveWithGMRES
+( elemental::Matrix<C>& B, int maxIterations ) const
 {
     throw std::logic_error("GMRES not yet implemented");
 }
 
+// Based on Algorithm 8.1 from the paper 
+// "An implementation of the QMR method based on coupled two-term recurrences",
+// by R. Freund and N. Nachtigal.
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithQMR( std::vector<C>& redistB ) const
+psp::DistHelmholtz<R>::SolveWithQMR
+( elemental::Matrix<C>& B, int maxIterations ) const
 {
-    // TODO: Implement QMR in terms of Multiply and Precondition
+    const int commSize = mpi::CommSize( comm_ );
+    const int commRank = mpi::CommRank( comm_ );
+    const int localHeight = B.Height();
+    const int numRhs = B.Width();
+
+    // Set aside the memory necessary for QMR
+    elemental::Matrix<C> Z( localHeight, numRhs );
+    elemental::Matrix<C> V( localHeight, numRhs );
+    elemental::Matrix<C> D( localHeight, numRhs );
+    elemental::Matrix<C> P( localHeight, numRhs );
+    std::vector<R> rhoLasts( numRhs ), cLasts( numRhs ), thetaLasts( numRhs ),
+                   rhos( numRhs ), cs( numRhs ), thetas( numRhs );
+    std::vector<C> epsilonLasts( numRhs ), etaLasts( numRhs ),
+                   deltas( numRhs ), epsilons( numRhs ), betas( numRhs ),
+                   etas( numRhs );
+
+    // Bootstrap QMR
+    Z = B;
+    Precondition( Z );
+    Norms( Z, rhoLasts );
+    DivideColumns( Z, rhoLasts );
+    V = B;
+    DivideColumns( V, rhoLasts );
+    B.SetToZero();
+    D.SetToZero();
+    P.SetToZero();
+    if( commRank == 0 )
+    {
+        for( int j=0; j<numRhs; ++j )
+        {
+            D.Set( 0, j, rhoLasts[j] );
+            P.Set( 0, j, rhoLasts[j] );
+        }
+    }
+    for( int j=0; j<numRhs; ++j )
+    {
+        cLasts[j] = 1;
+        thetaLasts[j] = 0;
+        epsilonLasts[j] = 1;
+        etaLasts[j] = -1;
+    }
+
+    // Loop until convergence (or too many iterations)
+    for( int it=0; it<maxIterations; ++it )
+    {
+        // Step 1 (we already have each inv(M) v_n sitting in Z)
+        bool zeroEpsilonLast = false;
+        for( int j=0; j<numRhs; ++j )
+        {
+            if( epsilonLasts[j] == (C)0 )
+            {
+                if( commRank == 0 )
+                    std::cerr << "epsilonLast[" << j << "] was zero on "
+                              << "iteration " << it << std::endl;
+                zeroEpsilonLast = true;
+            }
+        }
+        if( zeroEpsilonLast )
+            break;
+        PseudoInnerProducts( V, Z, deltas );
+        bool zeroDelta = false;
+        for( int j=0; j<numRhs; ++j )
+        {
+            if( deltas[j] == (C)0 ) 
+            {
+                if( commRank == 0 )
+                    std::cerr << "delta[" << j << "] was zero on "
+                              << "iteration " << it << std::endl;
+                zeroDelta = true;
+            }
+        }
+        if( zeroDelta )
+            break;
+
+        // Step 2
+        // HERE
+
+        rhoLasts = rhos;
+        cLasts = cs;
+        thetaLasts = thetas;
+        epsilonLasts = epsilons;
+        etaLasts = etas;
+        if( it == maxIterations-1 && commRank == 0 )
+            std::cerr << "QMR did not converge in " << maxIterations 
+                      << " iterations" << std::endl;
+    }
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::Norms
+( const elemental::Matrix<C>& X, std::vector<R>& norms ) const
+{
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    const int commSize = mpi::CommSize( comm_ );
+    std::vector<R> localNorms( numCols );
+    for( int j=0; j<numCols; ++j )
+        localNorms[j] = 
+            elemental::blas::Nrm2( localHeight, X.LockedBuffer(0,j), 1 );
+    std::vector<R> allLocalNorms( numCols*commSize );
+    mpi::AllGather
+    ( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm_ );
+    norms.resize( numCols );
+    for( int j=0; j<numCols; ++j )
+        norms[j] = 
+            elemental::blas::Nrm2( commSize, &allLocalNorms[j], numCols );
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::PseudoInnerProducts
+( const elemental::Matrix<C>& X, const elemental::Matrix<C>& Y,
+  std::vector<C>& alphas ) const
+{
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    std::vector<C> localAlphas( numCols );
+    for( int j=0; j<numCols; ++j )
+        localAlphas[j] = 
+            elemental::blas::Dotu
+            ( localHeight, X.LockedBuffer(0,j), 1,
+                           Y.LockedBuffer(0,j), 1 );
+    alphas.resize( numCols );
+    mpi::AllReduce( &localAlphas[0], &alphas[0], numCols, MPI_SUM, comm_ );
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::DivideColumns
+( elemental::Matrix<C>& X, const std::vector<R>& d ) const
+{
+    const R one = 1;
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    for( int j=0; j<numCols; ++j )
+    {
+        const R invDelta = one/d[j];
+        C* XCol = X.Buffer(0,j);
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+            XCol[iLocal] *= invDelta;
+    }
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::ScaleColumns
+( elemental::Matrix<C>& X, const std::vector<C>& d ) const
+{
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    for( int j=0;j<numCols; ++j )
+    {
+        const C delta = d[j];
+        C* XCol = X.Buffer(0,j);
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+            XCol[iLocal] *= delta;
+    }
 }
 
 // B := A B
 template<typename R>
 void
-psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
+psp::DistHelmholtz<R>::Multiply( elemental::Matrix<C>& B ) const
 {
-    const int numRhs = redistB.size() / localHeight_;
+    const int numRhs = B.Width();
     const int commSize = mpi::CommSize( comm_ );
 
     // Modify the basic send/recv information for the number of right-hand sides
@@ -276,7 +439,7 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
         {
             const int iLocal = procIndices[s];
             for( int k=0; k<numRhs; ++k )
-                procRhs[s*numRhs+k] = redistB[iLocal+k*localHeight_];
+                procRhs[s*numRhs+k] = B.Get( iLocal, k );
         }
     }
     std::vector<C> recvRhs( totalRecvCount );
@@ -287,13 +450,14 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
 
     // Run the local multiplies to form the result
     std::vector<int> offsets = recvDispls;
+    C* BBuffer = B.Buffer();
     for( int iLocal=0; iLocal<localHeight_; ++iLocal )
     {
         // Multiply by the diagonal value
         const int rowOffset = localRowOffsets_[iLocal];
         const C diagVal = localEntries_[rowOffset];
         for( int k=0; k<numRhs; ++k )
-            redistB[iLocal+k*localHeight_] *= diagVal;
+            BBuffer[iLocal+k*localHeight_] *= diagVal;
 
         // Multiply by the off-diagonal values
         const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
@@ -302,7 +466,7 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
             const int proc = owningProcesses_[rowOffset+jLocal];
             const C offDiagVal = localEntries_[rowOffset+jLocal];
             for( int k=0; k<numRhs; ++k )
-                redistB[iLocal+k*localHeight_] += 
+                BBuffer[iLocal+k*localHeight_] +=
                     offDiagVal*recvRhs[offsets[proc]+k];
             offsets[proc] += numRhs;
         }
@@ -311,7 +475,7 @@ psp::DistHelmholtz<R>::Multiply( std::vector<C>& redistB ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Precondition( std::vector<C>& B ) const
+psp::DistHelmholtz<R>::Precondition( elemental::Matrix<C>& B ) const
 {
     // Apply the sweeping preconditioner
     //
@@ -349,8 +513,7 @@ psp::DistHelmholtz<R>::Precondition( std::vector<C>& B ) const
     SolvePanel( B, numPanels_-1 );
 
     // Solve against L^T
-    std::vector<C> Z;
-    const int numRhs = B.size() / localHeight_;
+    elemental::Matrix<C> Z;
     for( int i=numPanels_-2; i>=0; --i )
     {
         ExtractPanel( B, i, Z );
@@ -363,9 +526,9 @@ psp::DistHelmholtz<R>::Precondition( std::vector<C>& B ) const
 // B_i := T_i B_i
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
+psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
 {
-    const int numRhs = B.size() / localHeight_;
+    const int numRhs = B.Width();
     const int panelPadding = PanelPadding( i );
     const int panelDepth = PanelDepth( i );
     const int localPanelOffset = LocalPanelOffset( i );
@@ -397,7 +560,7 @@ psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
         for( int k=0; k<numRhs; ++k )
             std::memcpy
             ( localPanelB.Buffer(myOffset+paddingSize,k), 
-              &B[BOffset+k*localHeight_], 
+              B.LockedBuffer(BOffset,k),
               remainingSize*sizeof(C) );
         BOffset += remainingSize;
     }
@@ -427,7 +590,7 @@ psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
         for( int k=0; k<numRhs; ++k )
             std::memcpy
             ( localPanelB.Buffer(localOffset1d+localPaddingSize,k),
-              &B[BOffset+k*localHeight_],
+              B.LockedBuffer(BOffset,k),
               localRemainingSize*sizeof(C) );
         BOffset += localRemainingSize;
     }
@@ -456,7 +619,7 @@ psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
 
         for( int k=0; k<numRhs; ++k )
             std::memcpy
-            ( &B[BOffset+k*localHeight_],
+            ( B.Buffer(BOffset,k),
               localPanelB.LockedBuffer(myOffset+paddingSize,k), 
               remainingSize*sizeof(C) );
         BOffset += remainingSize;
@@ -485,7 +648,7 @@ psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
 
         for( int k=0; k<numRhs; ++k )
             std::memcpy
-            ( &B[BOffset+k*localHeight_],
+            ( B.Buffer(BOffset,k),
               localPanelB.LockedBuffer(localOffset1d+localPaddingSize,k),
               localRemainingSize*sizeof(C) );
         BOffset += localRemainingSize;
@@ -495,10 +658,10 @@ psp::DistHelmholtz<R>::SolvePanel( std::vector<C>& B, int i ) const
 // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
 template<typename R>
 void
-psp::DistHelmholtz<R>::SubdiagonalUpdate( std::vector<C>& B, int i ) const
+psp::DistHelmholtz<R>::SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const
 {
     const int commSize = mpi::CommSize( comm_ );
-    const int numRhs = B.size() / localHeight_;
+    const int numRhs = B.Width();
     const int panelSendCount = subdiagPanelSendCounts_[i];
     const int panelRecvCount = subdiagPanelRecvCounts_[i];
     const int panelSendOffset = subdiagPanelSendDispls_[i];
@@ -508,9 +671,9 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( std::vector<C>& B, int i ) const
     std::vector<C> sendBuffer( panelSendCount*numRhs );
     for( int s=0; s<panelSendCount; ++s )
     {
-        const int localRow = subdiagSendIndices_[panelSendOffset+s];
+        const int iLocal = subdiagSendIndices_[panelSendOffset+s];
         for( int k=0; k<numRhs; ++k ) 
-            sendBuffer[s*numRhs+k] = B[localRow+k*localHeight_];
+            sendBuffer[s*numRhs+k] = B.Get( iLocal, k );
     }
 
     // Prepare the send and recv information
@@ -552,7 +715,7 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( std::vector<C>& B, int i ) const
             for( int k=0; k<numRhs; ++k )
             {
                 const C beta = procValues[s*numRhs+k];
-                B[iLocal+k*localHeight_] -= alpha*beta;
+                B.Update( iLocal, k, -alpha*beta );
             }
         }
     }
@@ -562,26 +725,27 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( std::vector<C>& B, int i ) const
 template<typename R>
 void
 psp::DistHelmholtz<R>::ExtractPanel
-( const std::vector<C>& B, int i, std::vector<C>& Z ) const
+( const elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
     const int localPanelHeight = LocalPanelHeight( i );
-    const int numRhs = B.size() / localHeight_;
-    Z.resize( localPanelHeight*numRhs );
+    const int numRhs = B.Width();
+    Z.ResizeTo( localPanelHeight, numRhs );
 
     for( int k=0; k<numRhs; ++k )
         std::memcpy
-        ( &Z[k*localPanelHeight], &B[localPanelOffset+k*localHeight_],
+        ( Z.Buffer(0,k), B.LockedBuffer(localPanelOffset,k),
           localPanelHeight*sizeof(C) );
 }
 
 // B_i := -A_{i,i+1} B_{i+1}
 template<typename R>
 void
-psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
+psp::DistHelmholtz<R>::MultiplySuperdiagonal
+( elemental::Matrix<C>& B, int i ) const
 {
     const int commSize = mpi::CommSize( comm_ );
-    const int numRhs = B.size() / localHeight_;
+    const int numRhs = B.Width();
     const int panelSendCount = supdiagPanelSendCounts_[i];
     const int panelRecvCount = supdiagPanelRecvCounts_[i];
     const int panelSendOffset = supdiagPanelSendDispls_[i];
@@ -591,9 +755,9 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
     std::vector<C> sendBuffer( panelSendCount*numRhs );
     for( int s=0; s<panelSendCount; ++s )
     {
-        const int localRow = supdiagSendIndices_[panelSendOffset+s];
+        const int iLocal = supdiagSendIndices_[panelSendOffset+s];
         for( int k=0; k<numRhs; ++k ) 
-            sendBuffer[s*numRhs+k] = B[localRow+k*localHeight_];
+            sendBuffer[s*numRhs+k] = B.Get( iLocal, k );
     }
 
     // Prepare the send and recv information
@@ -635,7 +799,7 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
             for( int k=0; k<numRhs; ++k )
             {
                 const C beta = procValues[s*numRhs+k];
-                B[iLocal+k*localHeight_] = -alpha*beta;
+                B.Set( iLocal, k, -alpha*beta );
             }
         }
     }
@@ -645,13 +809,13 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal( std::vector<C>& B, int i ) const
 template<typename R>
 void
 psp::DistHelmholtz<R>::UpdatePanel
-( std::vector<C>& B, int i, const std::vector<C>& Z ) const
+( elemental::Matrix<C>& B, int i, const elemental::Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
     const int localPanelHeight = LocalPanelHeight( i );
-    const int numRhs = Z.size() / localPanelHeight;
+    const int numRhs = Z.Width();
     for( int k=0; k<numRhs; ++k )
         for( int s=0; s<localPanelHeight; ++s )
-            B[localPanelOffset+s+k*localHeight_] += Z[s+k*localPanelHeight];
+            B.Update( localPanelOffset+s, k, Z.Get(s,k) );
 }
 

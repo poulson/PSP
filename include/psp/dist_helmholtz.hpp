@@ -43,7 +43,7 @@ public:
     void Initialize( const GridData<R>& slowness );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
-    void Solve( GridData<C>& B, Solver solver=QMR ) const;
+    void Solve( GridData<C>& B, Solver solver=QMR, int maxIterations=50 ) const;
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
@@ -69,27 +69,39 @@ private:
     //
 
     void PullRightHandSides
-    ( const GridData<C>& B, std::vector<C>& redistB ) const;
+    ( const GridData<C>& gridB, elemental::Matrix<C>& B ) const;
     void PushRightHandSides
-    ( GridData<C>& B, const std::vector<C>& redistB ) const;
+    ( GridData<C>& gridB, const elemental::Matrix<C>& B ) const;
 
-    void SolveWithGMRES( std::vector<C>& redistB ) const;
-    void SolveWithQMR( std::vector<C>& redistB ) const;
+    void SolveWithGMRES( elemental::Matrix<C>& B, int maxIterations=50 ) const;
+    void SolveWithQMR( elemental::Matrix<C>& B, int maxIterations=50 ) const;
 
-    void Multiply( std::vector<C>& redistB ) const;
-    void Precondition( std::vector<C>& redistB ) const;
+    void Norms
+    ( const elemental::Matrix<C>& X, std::vector<R>& norms ) const;
+    void PseudoInnerProducts
+    ( const elemental::Matrix<C>& X, const elemental::Matrix<C>& Y,
+      std::vector<C>& alphas ) const;
+
+    void DivideColumns
+    ( elemental::Matrix<C>& X, const std::vector<R>& d ) const;
+    void ScaleColumns
+    ( elemental::Matrix<C>& X, const std::vector<C>& d ) const;
+
+    void Multiply( elemental::Matrix<C>& B ) const;
+    void Precondition( elemental::Matrix<C>& B ) const;
 
     // B_i := T_i B_i
-    void SolvePanel( std::vector<C>& B, int i ) const;
+    void SolvePanel( elemental::Matrix<C>& B, int i ) const;
     // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
-    void SubdiagonalUpdate( std::vector<C>& B, int i ) const;
+    void SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const;
     // Z := B_i
     void ExtractPanel
-    ( const std::vector<C>& B, int i, std::vector<C>& Z ) const;
+    ( const elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const;
     // B_i := -A_{i,i+1} B_{i+1}
-    void MultiplySuperdiagonal( std::vector<C>& B, int i ) const;
+    void MultiplySuperdiagonal( elemental::Matrix<C>& B, int i ) const;
     // B_i := B_i + Z
-    void UpdatePanel( std::vector<C>& B, int i, const std::vector<C>& Z ) const;
+    void UpdatePanel
+    ( elemental::Matrix<C>& B, int i, const elemental::Matrix<C>& Z ) const;
 
     //
     // Information related to the decomposition of the domain into panels
