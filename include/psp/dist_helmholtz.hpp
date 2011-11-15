@@ -86,6 +86,9 @@ private:
     ( elemental::Matrix<C>& X, const std::vector<R>& d ) const;
     void ScaleColumns
     ( elemental::Matrix<C>& X, const std::vector<C>& d ) const;
+    void AddScaledColumns
+    ( const std::vector<C>& d,
+      const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const;
 
     void Multiply( elemental::Matrix<C>& B ) const;
     void Precondition( elemental::Matrix<C>& B ) const;

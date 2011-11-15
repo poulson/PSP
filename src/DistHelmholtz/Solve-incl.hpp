@@ -31,12 +31,25 @@ psp::DistHelmholtz<R>::Solve
     elemental::Matrix<C> B;
     PullRightHandSides( gridB, B );
 
+#ifndef RELEASE
+    elemental::Matrix<C> origB = B;
+#endif
+
     // Solve the systems of equations
     switch( solver )
     {
     case GMRES: SolveWithGMRES( B, maxIterations ); break;
     case QMR:   SolveWithQMR( B, maxIterations );   break;
     }
+
+#ifndef RELEASE
+    elemental::Matrix<C> Y = B;
+    Multiply( Y );
+    elemental::basic::Axpy( (C)-1, origB, Y );
+    const R norm = elemental::advanced::Norm( Y );
+    if( mpi::CommRank(comm_) == 0 )
+        std::cout << "||AB - origB||_F = " << norm << std::endl;
+#endif
 
     // Restore the solutions back into the GridData form
     PushRightHandSides( gridB, B );
@@ -245,6 +258,9 @@ void
 psp::DistHelmholtz<R>::SolveWithQMR
 ( elemental::Matrix<C>& B, int maxIterations ) const
 {
+    // TODO: Make this an easily changed parameter
+    const R exitRatio = 1e-16;
+
     const int commSize = mpi::CommSize( comm_ );
     const int commRank = mpi::CommRank( comm_ );
     const int localHeight = B.Height();
@@ -255,19 +271,20 @@ psp::DistHelmholtz<R>::SolveWithQMR
     elemental::Matrix<C> V( localHeight, numRhs );
     elemental::Matrix<C> D( localHeight, numRhs );
     elemental::Matrix<C> P( localHeight, numRhs );
-    std::vector<R> rhoLasts( numRhs ), cLasts( numRhs ), thetaLasts( numRhs ),
-                   rhos( numRhs ), cs( numRhs ), thetas( numRhs );
-    std::vector<C> epsilonLasts( numRhs ), etaLasts( numRhs ),
-                   deltas( numRhs ), epsilons( numRhs ), betas( numRhs ),
-                   etas( numRhs );
+    std::vector<R> origRho( numRhs );
+    std::vector<R> rhoLast( numRhs ), cLast( numRhs ), thetaLast( numRhs ),
+                   rho( numRhs ), c( numRhs ), theta( numRhs );
+    std::vector<C> epsilonLast( numRhs ), etaLast( numRhs ),
+                   delta( numRhs ), epsilon( numRhs ), negativeBeta( numRhs ),
+                   eta( numRhs ), tempScalar( numRhs );
 
     // Bootstrap QMR
     Z = B;
     Precondition( Z );
-    Norms( Z, rhoLasts );
-    DivideColumns( Z, rhoLasts );
+    Norms( Z, origRho );
+    DivideColumns( Z, origRho );
     V = B;
-    DivideColumns( V, rhoLasts );
+    DivideColumns( V, origRho );
     B.SetToZero();
     D.SetToZero();
     P.SetToZero();
@@ -275,26 +292,31 @@ psp::DistHelmholtz<R>::SolveWithQMR
     {
         for( int j=0; j<numRhs; ++j )
         {
-            D.Set( 0, j, rhoLasts[j] );
-            P.Set( 0, j, rhoLasts[j] );
+            D.Set( 0, j, origRho[j] );
+            P.Set( 0, j, origRho[j] );
         }
     }
+    rhoLast = origRho;
     for( int j=0; j<numRhs; ++j )
     {
-        cLasts[j] = 1;
-        thetaLasts[j] = 0;
-        epsilonLasts[j] = 1;
-        etaLasts[j] = -1;
+        cLast[j] = 1;
+        thetaLast[j] = 0;
+        epsilonLast[j] = 1;
+        etaLast[j] = -1;
     }
 
     // Loop until convergence (or too many iterations)
     for( int it=0; it<maxIterations; ++it )
     {
+        //
         // Step 1 (we already have each inv(M) v_n sitting in Z)
+        //
+
+        // Ensure that QMR hasn't broken down
         bool zeroEpsilonLast = false;
         for( int j=0; j<numRhs; ++j )
         {
-            if( epsilonLasts[j] == (C)0 )
+            if( epsilonLast[j] == (C)0 )
             {
                 if( commRank == 0 )
                     std::cerr << "epsilonLast[" << j << "] was zero on "
@@ -304,11 +326,15 @@ psp::DistHelmholtz<R>::SolveWithQMR
         }
         if( zeroEpsilonLast )
             break;
-        PseudoInnerProducts( V, Z, deltas );
+
+        // Compute delta_j = v_j^T z_j
+        PseudoInnerProducts( V, Z, delta );
+
+        // Ensure that QMR hasn't broken down
         bool zeroDelta = false;
         for( int j=0; j<numRhs; ++j )
         {
-            if( deltas[j] == (C)0 ) 
+            if( delta[j] == (C)0 ) 
             {
                 if( commRank == 0 )
                     std::cerr << "delta[" << j << "] was zero on "
@@ -319,17 +345,93 @@ psp::DistHelmholtz<R>::SolveWithQMR
         if( zeroDelta )
             break;
 
+        //
         // Step 2
-        // HERE
+        //
 
-        rhoLasts = rhos;
-        cLasts = cs;
-        thetaLasts = thetas;
-        epsilonLasts = epsilons;
-        etaLasts = etas;
-        if( it == maxIterations-1 && commRank == 0 )
-            std::cerr << "QMR did not converge in " << maxIterations 
-                      << " iterations" << std::endl;
+        for( int j=0; j<numRhs; ++j )
+            tempScalar[j] = -rhoLast[j]*delta[j]/epsilonLast[j];
+        ScaleColumns( P, tempScalar );
+        elemental::basic::Axpy( (C)1, Z, P );
+
+        //
+        // Step 3
+        //
+
+        Z = P;
+        Multiply( Z );
+        PseudoInnerProducts( P, Z, epsilon );
+        for( int j=0; j<numRhs; ++j )
+            negativeBeta[j] = -epsilon[j]/delta[j];
+        ScaleColumns( V, negativeBeta );
+        elemental::basic::Axpy( (C)1, Z, V );
+        Z = V;
+        Precondition( Z );
+        Norms( Z, rho );
+
+        //
+        // Step 4
+        //
+
+        const R one = 1;
+        for( int j=0; j<numRhs; ++j )
+        {
+            theta[j] = rho[j]/(cLast[j]*elemental::Abs(negativeBeta[j]));
+            c[j] = one/sqrt(1+theta[j]*theta[j]);
+            eta[j] = -etaLast[j]*rhoLast[j]*c[j]*c[j]/
+                      (-negativeBeta[j]*cLast[j]*cLast[j]);
+            const R temp = thetaLast[j]*c[j];
+            tempScalar[j] = temp*temp;
+        }
+        ScaleColumns( D, tempScalar );
+        AddScaledColumns( eta, P, D );
+        elemental::basic::Axpy( (C)1, D, B );
+
+        //
+        // Step 5 (modified to add a success condition)
+        //
+
+        // See if we have a sufficient solution
+        R maxRelRho = 0;
+        for( int j=0; j<numRhs; ++j )
+            maxRelRho = std::max(maxRelRho,rho[j]/origRho[j]);
+        if( maxRelRho < exitRatio )
+            break;
+
+        // Ensure that QMR hasn't broken down
+        bool zeroRho = false;
+        for( int j=0; j<numRhs; ++j )
+        {
+            if( rho[j] == (R)0 )
+            {
+                if( commRank == 0 )
+                    std::cerr << "rho[" << j << "] was zero on "
+                              << "iteration " << it << std::endl;
+                zeroRho = true;
+            }
+        }
+        if( zeroRho )
+            break;
+
+        // Normalize Z and V with the rho's
+        DivideColumns( Z, rho );
+        DivideColumns( V, rho );
+
+        //
+        // Set up for the next iteration (if there is one)
+        //
+        if( it == maxIterations-1 )
+        {
+            if( commRank == 0 )
+                std::cerr << "QMR did not converge in " << maxIterations 
+                          << " iterations" << std::endl;
+            break;
+        }
+        rhoLast = rho;
+        cLast = c;
+        thetaLast = theta;
+        epsilonLast = epsilon;
+        etaLast = eta;
     }
 }
 
@@ -402,6 +504,24 @@ psp::DistHelmholtz<R>::ScaleColumns
         C* XCol = X.Buffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
             XCol[iLocal] *= delta;
+    }
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::AddScaledColumns
+( const std::vector<C>& d, 
+  const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const
+{
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    for( int j=0; j<numCols; ++j )
+    {
+        const C delta = d[j];
+        C* YCol = Y.Buffer(0,j);
+        const C* XCol = X.LockedBuffer(0,j);
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+            YCol[j] += delta*XCol[j];
     }
 }
 
