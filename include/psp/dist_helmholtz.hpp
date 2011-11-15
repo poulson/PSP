@@ -109,11 +109,12 @@ private:
     //
 
     // Information about the bottom (and full inner) panels
-    int bottomDepth_;        // including the original PML
-    int localBottomHeight_;  // our process's local height of the bottom panel
-    int innerDepth_;         // total physical inner depth
-    int numFullInnerPanels_; // number of full inner panels we need
-    int numPanels_;          // total number of panels
+    int bottomDepth_;          // including the original PML
+    int localBottomHeight_;    // local height of the bottom panel
+    int localFullInnerHeight_; // local height of full inner panels
+    int innerDepth_;           // total physical inner depth
+    int numFullInnerPanels_;   // number of full inner panels we need
+    int numPanels_;            // total number of panels
 
     // Information about the leftover inner panel
     bool haveLeftover_;

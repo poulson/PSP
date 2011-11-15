@@ -74,18 +74,56 @@ psp::DistHelmholtz<R>::DistHelmholtz
     numFullInnerPanels_ = innerDepth_ / numPlanesPerPanel;
     numPanels_ = 1 + numFullInnerPanels_ + haveLeftover_ + 1;
 
+#ifndef RELEASE
+    if( commRank == 0 )
+    {
+        std::cout << "nx=" << nx << ", ny=" << ny << ", nz=" << nz << "\n"
+                  << "numPlanesPerPanel=" << numPlanesPerPanel << "\n"
+                  << "bzCeil=" << bzCeil << "\n"
+                  << "topHasPML=" << topHasPML << "\n"
+                  << "\n"
+                  << "bottomDepth_        = " << bottomDepth_ << "\n"
+                  << "topOrigDepth_       = " << topOrigDepth_ << "\n"
+                  << "innerDepth_         = " << innerDepth_ << "\n"
+                  << "leftoverInnerDepth_ = " << leftoverInnerDepth_ << "\n"
+                  << "\n"
+                  << "haveLeftover_       = " << haveLeftover_ << "\n"
+                  << "numFullInnerPanels_ = " << numFullInnerPanels_ << "\n"
+                  << "numPanels_          = " << numPanels_ << "\n"
+                  << std::endl;
+    }
+#endif
+
     //
     // Set up the symbolic description of the global sparse matrix
     //
 
     // Compute the number of rows we own of the sparse distributed matrix
     localBottomHeight_ = LocalPanelHeight( bottomDepth_, 0, commRank );
+    localFullInnerHeight_ = 
+        LocalPanelHeight( numPlanesPerPanel, bzCeil, commRank );
     localLeftoverInnerHeight_ = 
-        LocalPanelHeight( leftoverInnerDepth_, bzCeil_, commRank );
-    localTopHeight_ = LocalPanelHeight( topOrigDepth_, bzCeil_, commRank );
-    localHeight_ = (1+numFullInnerPanels_)*localBottomHeight_ +
+        LocalPanelHeight( leftoverInnerDepth_, bzCeil, commRank );
+    localTopHeight_ = LocalPanelHeight( topOrigDepth_, bzCeil, commRank );
+    localHeight_ = localBottomHeight_ +
+                   numFullInnerPanels_*localFullInnerHeight_ +
                    localLeftoverInnerHeight_ + 
                    localTopHeight_;
+
+#ifndef RELEASE
+    if( commRank == 0 )
+    {
+        std::cout << "localBottomHeight_        = " 
+                  << localBottomHeight_ << "\n"
+                  << "localFullInnerHeight_     = " 
+                  << localFullInnerHeight_ << "\n"
+                  << "localLeftoverInnerHeight_ = " 
+                  << localLeftoverInnerHeight_ << "\n"
+                  << "localTopHeight_           = " << localTopHeight_ << "\n"
+                  << "localHeight_              = " << localHeight_ << "\n"
+                  << std::endl;
+    }
+#endif
 
     // Compute the natural indices of the rows of the global sparse matrix 
     // that are owned by our process. Also, set up the offsets for the 
@@ -98,11 +136,11 @@ psp::DistHelmholtz<R>::DistHelmholtz
     MapLocalPanelIndices( bottomDepth_, 0, commRank, whichPanel++ );
     for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalPanelIndices
-        ( numPlanesPerPanel, bzCeil_, commRank, whichPanel++ );
+        ( numPlanesPerPanel, bzCeil, commRank, whichPanel++ );
     if( haveLeftover_ )
         MapLocalPanelIndices
-        ( leftoverInnerDepth_, bzCeil_, commRank, whichPanel++ );
-    MapLocalPanelIndices( topOrigDepth_, bzCeil_, commRank, whichPanel++ );
+        ( leftoverInnerDepth_, bzCeil, commRank, whichPanel++ );
+    MapLocalPanelIndices( topOrigDepth_, bzCeil, commRank, whichPanel++ );
 
     // Fill in the natural indices of the connections to our local rows of the
     // global sparse matrix.
@@ -112,14 +150,14 @@ psp::DistHelmholtz<R>::DistHelmholtz
     ( bottomDepth_, 0, commRank, localConnections, whichPanel++ );
     for( int i=0; i<numFullInnerPanels_; ++i )
         MapLocalConnectionIndices
-        ( numPlanesPerPanel, bzCeil_, commRank, localConnections, 
+        ( numPlanesPerPanel, bzCeil, commRank, localConnections, 
           whichPanel++ );
     if( haveLeftover_ )
         MapLocalConnectionIndices
-        ( leftoverInnerDepth_, bzCeil_, commRank, localConnections, 
+        ( leftoverInnerDepth_, bzCeil, commRank, localConnections, 
           whichPanel++ );
     MapLocalConnectionIndices
-    ( topOrigDepth_, bzCeil_, commRank, localConnections, whichPanel++ );
+    ( topOrigDepth_, bzCeil, commRank, localConnections, whichPanel++ );
 
     // Count the number of indices that we need to recv from each process 
     // during the global sparse matrix multiplication.
@@ -327,18 +365,15 @@ psp::DistHelmholtz<R>::DistHelmholtz
         {
             // Handle connection to previous panel, which is relevant to the
             // computation of A_{i+1,i} B_i
-            const int naturalCol = x + y*nx + (z+1)*nx*ny;
-            const int proc = OwningProcess( x, y, v-1 );
-            const int index = whichPanel*commSize + proc;
-            const int offset = subdiagOffsets[index];
 
             // Search for the appropriate index in this row
             int localIndex = -1;
-            for( int k=1; k<rowSize; ++k )
+            const int naturalCol = x + y*nx + (z+1)*nx*ny;
+            for( int jLocal=1; jLocal<rowSize; ++jLocal )
             {
-                if( localConnections[rowOffset+k] == naturalCol )
+                if( localConnections[rowOffset+jLocal] == naturalCol )
                 {
-                    localIndex = rowOffset+k;
+                    localIndex = rowOffset+jLocal;
                     break;
                 }
             }
@@ -347,6 +382,9 @@ psp::DistHelmholtz<R>::DistHelmholtz
                 throw std::logic_error("Did not find subdiag connection");
 #endif
 
+            const int proc = OwningProcess( x, y, v-1 );
+            const int index = whichPanel*commSize + proc;
+            const int offset = subdiagOffsets[index];
             subdiagRecvIndices[offset] = naturalCol;
             subdiagRecvLocalIndices_[offset] = localIndex;
             subdiagRecvLocalRows_[offset] = iLocal;
@@ -357,18 +395,15 @@ psp::DistHelmholtz<R>::DistHelmholtz
         {
             // Handle connection to next panel, which is relevant to the 
             // computation of A_{i,i+1} B_{i+1}
-            const int naturalCol = x + y*nx + (z-1)*nx*ny;
-            const int proc = OwningProcess( x, y, v+1 );
-            const int index = whichPanel*commSize + proc;
-            const int offset = supdiagOffsets[index];
 
             // Search for the appropriate index in this row
             int localIndex = -1;
-            for( int k=1; k<rowSize; ++k )
+            const int naturalCol = x + y*nx + (z-1)*nx*ny;
+            for( int jLocal=1; jLocal<rowSize; ++jLocal )
             {
-                if( localConnections[rowOffset+k] == naturalCol )
+                if( localConnections[rowOffset+jLocal] == naturalCol )
                 {
-                    localIndex = rowOffset+k;
+                    localIndex = rowOffset+jLocal;
                     break;
                 }
             }
@@ -377,6 +412,9 @@ psp::DistHelmholtz<R>::DistHelmholtz
                 throw std::logic_error("Did not find supdiag connection");
 #endif
 
+            const int proc = OwningProcess( x, y, v+1 );
+            const int index = whichPanel*commSize + proc;
+            const int offset = supdiagOffsets[index];
             supdiagRecvIndices[offset] = naturalCol;
             supdiagRecvLocalIndices_[offset] = localIndex;
             supdiagRecvLocalRows_[offset] = iLocal;
@@ -472,7 +510,7 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
     {
         // Add the leaf
-        localHeight += xSize*ySize;
+        localHeight += xSize*ySize*vSize;
     }
     else if( xSize >= ySize )
     {
@@ -775,11 +813,11 @@ psp::DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
     if( whichPanel == 0 )
         return 0;
     else if( whichPanel < numFullInnerPanels_+1 )
-        return localBottomHeight_*whichPanel;
+        return localBottomHeight_ + localFullInnerHeight_*(whichPanel-1);
     else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
-        return localBottomHeight_*(numFullInnerPanels_+1);
+        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_;
     else
-        return localBottomHeight_*(numFullInnerPanels_+1) +
+        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_ +
                localLeftoverInnerHeight_;
 }
 
@@ -787,8 +825,10 @@ template<typename R>
 int
 psp::DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 {
-    if( whichPanel < numFullInnerPanels_+1 )
+    if( whichPanel == 0 )
         return localBottomHeight_;
+    else if( whichPanel < numFullInnerPanels_+1 )
+        return localFullInnerHeight_;
     else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
         return localLeftoverInnerHeight_;
     else 
