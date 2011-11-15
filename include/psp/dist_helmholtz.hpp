@@ -48,8 +48,6 @@ public:
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
 
-    // TODO: Add ability to write parallel VTK files
-
 private:
     elemental::mpi::Comm comm_;
     unsigned log2CommSize_;

@@ -84,6 +84,8 @@ public:
     int ZLocalSize() const;
     GridDataOrder Order() const;
 
+    // TODO: Add the ability to visualize the data
+
 private:
     int numScalars_;
     int nx_, ny_, nz_;
