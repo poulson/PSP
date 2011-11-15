@@ -222,8 +222,7 @@ private:
 
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
-    void MapLocalPanelIndices
-    ( int vSize, int vPadding, unsigned commRank, int whichPanel );
+    void MapLocalPanelIndices( unsigned commRank, int whichPanel );
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
@@ -232,7 +231,7 @@ private:
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( int vSize, int vPadding, unsigned commRank,  
+    ( unsigned commRank, 
       std::vector<int>& localConnections, int whichPanel ) const;
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,

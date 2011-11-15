@@ -651,8 +651,6 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     const int numRhs = B.Width();
     const int panelPadding = PanelPadding( i );
     const int panelDepth = PanelDepth( i );
-    const int localPanelOffset = LocalPanelOffset( i );
-    const int localPanelHeight = LocalPanelHeight( i );
     const clique::symbolic::SymmFact& symbFact = 
         PanelSymbolicFactorization( i );
 
@@ -660,7 +658,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     localPanelB.SetToZero();
 
     // For each supernode, pull in each right-hand side with a memcpy
-    int BOffset = 0;
+    int BOffset = LocalPanelOffset( i );
     const int numLocalSupernodes = symbFact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
     {
@@ -714,6 +712,10 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
               localRemainingSize*sizeof(C) );
         BOffset += localRemainingSize;
     }
+#ifndef RELEASE
+    if( BOffset != LocalPanelOffset(i)+LocalPanelHeight(i) )
+        throw std::logic_error("Invalid BOffset usage in pull");
+#endif
 
     // Solve against the panel
     const clique::numeric::SymmFrontTree<C>& fact = 
@@ -721,7 +723,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     clique::numeric::LDLSolve( TRANSPOSE, symbFact, fact, localPanelB, true );
 
     // For each supernode, extract each right-hand side with memcpy
-    BOffset = 0;
+    BOffset = LocalPanelOffset( i );
     for( int t=0; t<numLocalSupernodes; ++t )
     {
         const clique::symbolic::LocalSymmFactSupernode& sn = 
@@ -773,6 +775,10 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
               localRemainingSize*sizeof(C) );
         BOffset += localRemainingSize;
     }
+#ifndef RELEASE
+    if( BOffset != LocalPanelOffset(i)+LocalPanelHeight(i) )
+        throw std::logic_error("Invalid BOffset usage in push");
+#endif
 }
 
 // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
