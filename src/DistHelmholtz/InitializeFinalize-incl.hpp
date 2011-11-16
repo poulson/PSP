@@ -31,6 +31,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     // Initialize and factor the top panel (first, since it is the largest)
     //
+    std::cout << "Initializing top panel..." << std::endl;
     {
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
@@ -38,27 +39,37 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         std::vector<R> myPanelSlowness;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
+        std::cout << "  Getting panel slowness..." << std::endl;
         GetPanelSlowness
         ( vOffset, vSize, topSymbolicFact_, slowness,
           myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
+        std::cout << "  Finished getting panel slowness." << std::endl;
 
         // Initialize the fronts with the original sparse matrix
+        std::cout << "  Filling panel fronts..." << std::endl;
         FillPanelFronts
         ( vOffset, vSize, topSymbolicFact_, topFact_,
           slowness, myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
+        std::cout << "  Finished filling panel fronts." << std::endl;
 
         // Compute the sparse-direct LDL^T factorization
+        std::cout << "  LDL^T factorization..." << std::endl;
         clique::numeric::LDL( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
+        std::cout << "  Finished LDL^T factorization." << std::endl;
 
         // Redistribute the LDL^T factorization for faster solves
+        std::cout << "  Changing solve mode..." << std::endl;
         clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
+        std::cout << "  Finished changing solve mode." << std::endl;
     }
+    std::cout << "Finished initializing top panel." << std::endl;
 
     //
     // Initialize and factor the bottom panel
     //
+    std::cout << "Initializing the bottom panel..." << std::endl;
     {
         // Retrieve the slowness for this panel
         const int vOffset = 0;
@@ -84,12 +95,15 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
     }
+    std::cout << "Finished initializing the bottom panel." << std::endl;
 
     //
     // Initialize and factor the full inner panels
     //
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
+        std::cout << "Initializing the " << k << " of " << numFullInnerPanels_
+                  << " inner panel." << std::endl;
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
         const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bzCeil_;
@@ -115,6 +129,9 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
+
+        std::cout << "Finished initializing the " << k << "'th inner panel."
+                  << std::endl;
     }
 
     //
@@ -122,6 +139,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     if( haveLeftover_ )
     {        
+        std::cout << "Initializing the leftover panel..." << std::endl;
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
                             leftoverInnerDepth_ - bzCeil_;
@@ -146,6 +164,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
+        std::cout << "Finished initializing the leftover panel." << std::endl;
     }
     
     //
@@ -155,7 +174,9 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     // Gather the slowness for the global sparse matrix
     std::vector<R> myGlobalSlowness;
     std::vector<int> offsets;
+    std::cout << "Getting global slowness..." << std::endl;
     GetGlobalSlowness( slowness, myGlobalSlowness, offsets );
+    std::cout << "Finished getting global slowness." << std::endl;
 
     // Now make use of the redistributed slowness data to form the global 
     // sparse matrix
@@ -407,162 +428,170 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     const int nx = control_.nx;
     const int ny = control_.ny;
 
-    // Fill in the connections
+    // Set up the memory
     std::vector<int>::const_iterator first;
+    frontIndices.reserve( 7 );
     frontIndices.resize( 1 );
+    values.reserve( 7 );
     values.resize( 1 );
+
     // Center term
     frontIndices[0] = j;
     values[0] = centerTerm;
+
     // Left connection
     if( x > 0 )
     {
-        const int naturalIndex = (x-1) + y*nx + vLocal*nx*ny;
-        if( panelNaturalToNested.count(naturalIndex) )
+        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        if( nestedIndex > offset+j )
         {
-            const int nestedIndex = panelNaturalToNested[naturalIndex];
-            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            if( nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset ); 
-                values.push_back( xTermL );
             }
             else
             {
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
-                {
-                    const int whichLower = int(first-origLowerStruct.begin());
-                    frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( xTermL );
-                }
+#ifndef RELEASE
+                if( first == origLowerStruct.end() )
+                    throw std::logic_error("Did not find original connection");
+#endif
+                const int whichLower = int(first-origLowerStruct.begin());
+                frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
+            values.push_back( xTermL );
         }
     }
+
+    // Right connection
     if( x+1 < nx )
     {
-        const int naturalIndex = (x+1) + y*nx + vLocal*nx*ny;
-        if( panelNaturalToNested.count(naturalIndex) )
+        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        if( nestedIndex > offset+j )
         {
-            const int nestedIndex = panelNaturalToNested[naturalIndex];
-            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            if( nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( xTermR );
             }
             else
             {
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
-                {
-                    const int whichLower = int(first-origLowerStruct.begin());
-                    frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( xTermR );
-                }
+#ifndef RELEASE
+                if( first == origLowerStruct.end() )
+                    throw std::logic_error("Did not find original connection");
+#endif
+                const int whichLower = int(first-origLowerStruct.begin());
+                frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
+            values.push_back( xTermR );
         }
     }
+
+    // Front connection
     if( y > 0 )
     {
-        const int naturalIndex = x + (y-1)*nx + vLocal*nx*ny;
-        if( panelNaturalToNested.count(naturalIndex) )
+        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        if( nestedIndex > offset+j )
         {
-            const int nestedIndex = panelNaturalToNested[naturalIndex];
-            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            if( nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( yTermL );
             }
             else
             {
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
-                {
-                    const int whichLower = int(first-origLowerStruct.begin());
-                    frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( yTermL );
-                }
+#ifndef RELEASE
+                if( first == origLowerStruct.end() )
+                    throw std::logic_error("Did not find original connection");
+#endif
+                const int whichLower = int(first-origLowerStruct.begin());
+                frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
+            values.push_back( yTermL );
         }
     }
+
+    // Back connection
     if( y+1 < ny )
     {
-        const int naturalIndex = x + (y+1)*nx + vLocal*nx*ny;
-        if( panelNaturalToNested.count(naturalIndex) )
+        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        if( nestedIndex > offset+j )
         {
-            const int nestedIndex = panelNaturalToNested[naturalIndex];
-            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            if( nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( yTermR );
             }
             else
             {
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
-                {
-                    const int whichLower = int(first-origLowerStruct.begin());
-                    frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( yTermR );
-                }
+#ifndef RELEASE
+                if( first == origLowerStruct.end() )
+                    throw std::logic_error("Did not find original connection");
+#endif
+                const int whichLower = int(first-origLowerStruct.begin());
+                frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
+            values.push_back( yTermR );
         }
     }
+
+    // Bottom connection
     if( vLocal > 0 )
     {
-        const int naturalIndex = x + y*nx + (vLocal-1)*nx*ny;
-        if( panelNaturalToNested.count(naturalIndex) )
+        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        if( nestedIndex > offset+j )
         {
-            const int nestedIndex = panelNaturalToNested[naturalIndex];
-            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            if( nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( vTermL );
             }
             else
             {
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
-                {
-                    const int whichLower = int(first-origLowerStruct.begin());
-                    frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( vTermL );
-                }
+#ifndef RELEASE
+                if( first == origLowerStruct.end() )
+                    throw std::logic_error("Did not find original connection");
+#endif
+                const int whichLower = int(first-origLowerStruct.begin());
+                frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
+            values.push_back( vTermL );
         }
     }
+
+    // Top connection
     if( vLocal+1 < vSize )
     {
-        const int naturalIndex = x + y*nx + (vLocal+1)*nx*ny;
-        if( panelNaturalToNested.count(naturalIndex) )
+        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        if( nestedIndex > offset+j )
         {
-            const int nestedIndex = panelNaturalToNested[naturalIndex];
-            if( nestedIndex > offset+j && nestedIndex < offset+size )
+            if( nestedIndex < offset+size )
             {
                 frontIndices.push_back( nestedIndex-offset );
-                values.push_back( vTermR );
             }
             else
             {
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-                if( first!=origLowerStruct.end() && !(nestedIndex<*first) )
-                {
-                    const int whichLower = int(first-origLowerStruct.begin());
-                    frontIndices.push_back( origLowerRelIndices[whichLower] );
-                    values.push_back( vTermR );
-                }
+#ifndef RELEASE
+                if( first == origLowerStruct.end() )
+                    throw std::logic_error("Did not find original connection");
+#endif
+                const int whichLower = int(first-origLowerStruct.begin());
+                frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
+            values.push_back( vTermR );
         }
     }
 }
@@ -661,17 +690,22 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     // local tree
     panelNestedToNatural.clear();
     panelNaturalToNested.clear();
+    std::cout << "    Computing local reordering..." << std::endl;
     LocalReordering( panelNestedToNatural, vSize );
+    std::cout << "    Finished computing local reordering." << std::endl;
+    std::cout << "    Inverting local reordering..." << std::endl;
     std::map<int,int>::const_iterator it;
     for( it=panelNestedToNatural.begin(); 
          it!=panelNestedToNatural.end(); ++it )
         panelNaturalToNested[it->second] = it->first;
+    std::cout << "    Finished inverting local reordering." << std::endl;
 
     //
     // Gather the slowness data using three AllToAlls
     //
 
     // Send the amount of data that we need to recv from each process.
+    std::cout << "    Beginning first AllToAll" << std::endl;
     std::vector<int> recvCounts( commSize, 0 );
     const int numLocalSupernodes = fact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
@@ -720,6 +754,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
+    std::cout << "    Finished first AllToAll." << std::endl;
 
     // Build the send and recv displacements and count the totals send and
     // recv sizes.
@@ -734,6 +769,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     }
 
     // Send the indices that we need to recv from each process.
+    std::cout << "    Beginning second AllToAll..." << std::endl;
     offsets = recvDispls;
     std::vector<int> recvIndices( totalRecvCount );
     for( int t=0; t<numLocalSupernodes; ++t )
@@ -782,8 +818,10 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
+    std::cout << "    Finished second AllToAll." << std::endl;
 
     // Pack and send our slowness data.
+    std::cout << "    Beginning third AllToAll..." << std::endl;
     std::vector<R> sendSlowness( totalSendCount );
     const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
@@ -807,9 +845,121 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     ( &sendSlowness[0],    &sendCounts[0], &sendDispls[0],
       &myPanelSlowness[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendSlowness.clear();
+    std::cout << "    Finished third AllToAll." << std::endl;
 
     // Reset the offsets
     offsets = recvDispls;
+}
+
+template<typename R>
+void psp::DistHelmholtz<R>::LocalReordering
+( std::map<int,int>& reordering, int vSize ) const
+{
+    int offset = 0;
+    LocalReorderingRecursion
+    ( reordering, offset,
+      0, 0, control_.nx, control_.ny, vSize, control_.nx, control_.ny,
+      log2CommSize_, control_.cutoff, mpi::CommRank(comm_) );
+}
+
+template<typename R>
+void psp::DistHelmholtz<R>::LocalReorderingRecursion
+( std::map<int,int>& reordering, int offset,
+  int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
+  int depthTilSerial, int cutoff, int commRank )
+{
+    const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
+    if( depthTilSerial == 0 && xSize*ySize <= cutoff )
+    {
+        for( int vDelta=0; vDelta<vSize; ++vDelta )
+        {
+            const int v = vDelta;
+            for( int yDelta=0; yDelta<ySize; ++yDelta )
+            {
+                const int y = yOffset + yDelta;
+                for( int xDelta=0; xDelta<xSize; ++xDelta )
+                {
+                    const int x = xOffset + xDelta;
+                    const int index = x + y*nx + v*nx*ny;
+                    reordering[offset++] = index;
+                }
+            }
+        }
+    }
+    else if( xSize >= ySize )
+    {
+        //
+        // Partition the X dimension
+        //
+        const int middle = (xSize-1)/2;
+
+        // Recurse on the left side
+        if( depthTilSerial == 0 || !(commRank&1) )
+            LocalReorderingRecursion
+            ( reordering, offset,
+              xOffset, yOffset, middle, ySize, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += middle*ySize*vSize;
+
+        // Recurse on the right side
+        if( depthTilSerial == 0 || commRank&1 )
+            LocalReorderingRecursion
+            ( reordering, offset,
+              xOffset+middle+1, yOffset,
+              std::max(xSize-middle-1,0), ySize, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += std::max(xSize-middle-1,0)*ySize*vSize;
+
+        // Store the separator
+        const int x = xOffset + middle;
+        for( int vDelta=0; vDelta<vSize; ++vDelta )
+        {
+            const int v = vDelta;
+            for( int yDelta=0; yDelta<ySize; ++yDelta )
+            {
+                const int y = yOffset + yDelta;
+                const int index = x + y*nx + v*nx*ny;
+                reordering[offset++] = index;
+            }
+        }
+    }
+    else
+    {
+        //
+        // Partition the Y dimension
+        //
+        const int middle = (ySize-1)/2;
+
+        // Recurse on the left side
+        if( depthTilSerial == 0 || !(commRank&1) )
+            LocalReorderingRecursion
+            ( reordering, offset,
+              xOffset, yOffset, xSize, middle, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += xSize*middle*vSize;
+
+        // Recurse on the right side
+        if( depthTilSerial == 0 || commRank&1 )
+            LocalReorderingRecursion
+            ( reordering, offset,
+              xOffset, yOffset+middle+1,
+              xSize, std::max(ySize-middle-1,0), vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank/2 );
+        offset += xSize*std::max(ySize-middle-1,0)*vSize;
+
+        // Store the separator
+        const int y = yOffset + middle;
+        for( int vDelta=0; vDelta<vSize; ++vDelta )
+        {
+            const int v = vDelta;
+            for( int xDelta=0; xDelta<xSize; ++xDelta )
+            {
+                const int x = xOffset + xDelta;
+                const int index = x + y*nx + v*nx*ny;
+                reordering[offset++] = index;
+            }
+        }
+    }
 }
 
 template<typename R>        
@@ -828,7 +978,8 @@ psp::DistHelmholtz<R>::FillPanelFronts
     const int ny = control_.ny;
     const int nz = control_.nz;
 
-    // Initialize the local part of the bottom panel
+    // Initialize the local portion of the panel
+    std::cout << "    Initializing local part of the panel..." << std::endl;
     std::vector<int> frontIndices;
     std::vector<C> values;
     const int numLocalSupernodes = symbFact.local.supernodes.size();
@@ -862,7 +1013,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
-            ( alpha, x, y, v, vOffset, vSize, size, offset, j,
+            ( alpha, x, y, v, vOffset, vSize, offset, size, j,
               symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
@@ -870,8 +1021,10 @@ psp::DistHelmholtz<R>::FillPanelFronts
                 front.frontL.Set( frontIndices[k], j, values[k] );
         }
     }
+    std::cout << "    Finished initializing local part." << std::endl;
 
-    // Initialize the distributed part of the bottom panel
+    // Initialize the distributed part of the panel
+    std::cout << "    Initializing dist part of the panel..." << std::endl;
     const int numDistSupernodes = symbFact.dist.supernodes.size();
     fact.dist.fronts.resize( numDistSupernodes );
     for( int t=0; t<numDistSupernodes; ++t )
@@ -913,7 +1066,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
-            ( alpha, x, y, v, vOffset, vSize, size, offset, j,
+            ( alpha, x, y, v, vOffset, vSize, offset, size, j,
               symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
@@ -929,5 +1082,6 @@ psp::DistHelmholtz<R>::FillPanelFronts
             }
         }
     }
+    std::cout << "    Finished initializing dist part of panel." << std::endl;
 }
 

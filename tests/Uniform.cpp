@@ -86,7 +86,9 @@ main( int argc, char* argv[] )
 
         // TODO: slowness.Visualize()???
 
+        std::cout << "Beginning to initialize..." << std::endl;
         helmholtz.Initialize( slowness );
+        std::cout << "Finished initialization." << std::endl;
 
         GridData<std::complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
