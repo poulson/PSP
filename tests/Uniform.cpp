@@ -31,11 +31,11 @@ main( int argc, char* argv[] )
     
     FiniteDiffControl<double> control;
     control.stencil = SEVEN_POINT;
-    control.nx = 50;
-    control.ny = 50;
+    control.nx = 30;
+    control.ny = 30;
     control.nz = 50;
-    control.wx = 10;
-    control.wy = 10;
+    control.wx = 6;
+    control.wy = 6;
     control.wz = 10;
     control.omega = 5;
     control.Cx = 1.5*(2*M_PI);
@@ -98,7 +98,9 @@ main( int argc, char* argv[] )
 
         // TODO: B.Visualize()???
 
+        std::cout << "Beginning solve..." << std::endl;
         helmholtz.Solve( B );
+        std::cout << "Finished solve." << std::endl;
 
         // TODO: B.Visualize()???
 

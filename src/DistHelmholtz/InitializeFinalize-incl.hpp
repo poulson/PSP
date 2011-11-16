@@ -31,7 +31,8 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     // Initialize and factor the top panel (first, since it is the largest)
     //
-    std::cout << "Initializing top panel..." << std::endl;
+    std::cout << "Initializing top panel...";
+    std::cout.flush();
     {
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
@@ -39,37 +40,30 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         std::vector<R> myPanelSlowness;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
-        std::cout << "  Getting panel slowness..." << std::endl;
         GetPanelSlowness
         ( vOffset, vSize, topSymbolicFact_, slowness,
           myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        std::cout << "  Finished getting panel slowness." << std::endl;
 
         // Initialize the fronts with the original sparse matrix
-        std::cout << "  Filling panel fronts..." << std::endl;
         FillPanelFronts
         ( vOffset, vSize, topSymbolicFact_, topFact_,
           slowness, myPanelSlowness, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        std::cout << "  Finished filling panel fronts." << std::endl;
 
         // Compute the sparse-direct LDL^T factorization
-        std::cout << "  LDL^T factorization..." << std::endl;
         clique::numeric::LDL( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
-        std::cout << "  Finished LDL^T factorization." << std::endl;
 
         // Redistribute the LDL^T factorization for faster solves
-        std::cout << "  Changing solve mode..." << std::endl;
         clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
-        std::cout << "  Finished changing solve mode." << std::endl;
     }
-    std::cout << "Finished initializing top panel." << std::endl;
+    std::cout << "done" << std::endl;
 
     //
     // Initialize and factor the bottom panel
     //
-    std::cout << "Initializing the bottom panel..." << std::endl;
+    std::cout << "Initializing bottom panel...";
+    std::cout.flush();
     {
         // Retrieve the slowness for this panel
         const int vOffset = 0;
@@ -95,15 +89,18 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
     }
-    std::cout << "Finished initializing the bottom panel." << std::endl;
+    std::cout << "done" << std::endl;
 
     //
     // Initialize and factor the full inner panels
     //
+    fullInnerFacts_.resize( numFullInnerPanels_ );
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
-        std::cout << "Initializing the " << k << " of " << numFullInnerPanels_
-                  << " inner panel." << std::endl;
+        std::cout << "Initializing the " << k << "'th of " 
+                  << numFullInnerPanels_ << " inner panel...";
+        std::cout.flush();
+
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
         const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bzCeil_;
@@ -117,6 +114,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
           panelNestedToNatural, panelNaturalToNested );
 
         // Initialize the fronts with the original sparse matrix
+        fullInnerFacts_[k] = new clique::numeric::SymmFrontTree<C>;
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
         FillPanelFronts
         ( vOffset, vSize, bottomSymbolicFact_, fullInnerFact,
@@ -130,8 +128,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
 
-        std::cout << "Finished initializing the " << k << "'th inner panel."
-                  << std::endl;
+        std::cout << "done" << std::endl;
     }
 
     //
@@ -139,7 +136,9 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     if( haveLeftover_ )
     {        
-        std::cout << "Initializing the leftover panel..." << std::endl;
+        std::cout << "Initializing the leftover panel...";
+        std::cout.flush();
+
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
                             leftoverInnerDepth_ - bzCeil_;
@@ -164,19 +163,21 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
-        std::cout << "Finished initializing the leftover panel." << std::endl;
+
+        std::cout << "done" << std::endl;
     }
     
     //
     // Initialize the global sparse matrix
     //
 
+    std::cout << "Initializing global sparse matrix...";
+    std::cout.flush();
+
     // Gather the slowness for the global sparse matrix
     std::vector<R> myGlobalSlowness;
     std::vector<int> offsets;
-    std::cout << "Getting global slowness..." << std::endl;
     GetGlobalSlowness( slowness, myGlobalSlowness, offsets );
-    std::cout << "Finished getting global slowness." << std::endl;
 
     // Now make use of the redistributed slowness data to form the global 
     // sparse matrix
@@ -197,6 +198,8 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int v = (nz-1) - z;
         FormGlobalRow( alpha, x, y, v, rowOffset );
     }
+
+    std::cout << "done" << std::endl;
 }
 
 template<typename R>
@@ -690,22 +693,17 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     // local tree
     panelNestedToNatural.clear();
     panelNaturalToNested.clear();
-    std::cout << "    Computing local reordering..." << std::endl;
     LocalReordering( panelNestedToNatural, vSize );
-    std::cout << "    Finished computing local reordering." << std::endl;
-    std::cout << "    Inverting local reordering..." << std::endl;
     std::map<int,int>::const_iterator it;
     for( it=panelNestedToNatural.begin(); 
          it!=panelNestedToNatural.end(); ++it )
         panelNaturalToNested[it->second] = it->first;
-    std::cout << "    Finished inverting local reordering." << std::endl;
 
     //
     // Gather the slowness data using three AllToAlls
     //
 
     // Send the amount of data that we need to recv from each process.
-    std::cout << "    Beginning first AllToAll" << std::endl;
     std::vector<int> recvCounts( commSize, 0 );
     const int numLocalSupernodes = fact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
@@ -754,7 +752,6 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
-    std::cout << "    Finished first AllToAll." << std::endl;
 
     // Build the send and recv displacements and count the totals send and
     // recv sizes.
@@ -769,7 +766,6 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     }
 
     // Send the indices that we need to recv from each process.
-    std::cout << "    Beginning second AllToAll..." << std::endl;
     offsets = recvDispls;
     std::vector<int> recvIndices( totalRecvCount );
     for( int t=0; t<numLocalSupernodes; ++t )
@@ -818,10 +814,8 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
-    std::cout << "    Finished second AllToAll." << std::endl;
 
     // Pack and send our slowness data.
-    std::cout << "    Beginning third AllToAll..." << std::endl;
     std::vector<R> sendSlowness( totalSendCount );
     const R* localSlowness = slowness.LockedLocalBuffer();
     for( int proc=0; proc<commSize; ++proc )
@@ -845,7 +839,6 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     ( &sendSlowness[0],    &sendCounts[0], &sendDispls[0],
       &myPanelSlowness[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendSlowness.clear();
-    std::cout << "    Finished third AllToAll." << std::endl;
 
     // Reset the offsets
     offsets = recvDispls;
@@ -979,7 +972,6 @@ psp::DistHelmholtz<R>::FillPanelFronts
     const int nz = control_.nz;
 
     // Initialize the local portion of the panel
-    std::cout << "    Initializing local part of the panel..." << std::endl;
     std::vector<int> frontIndices;
     std::vector<C> values;
     const int numLocalSupernodes = symbFact.local.supernodes.size();
@@ -1021,10 +1013,8 @@ psp::DistHelmholtz<R>::FillPanelFronts
                 front.frontL.Set( frontIndices[k], j, values[k] );
         }
     }
-    std::cout << "    Finished initializing local part." << std::endl;
 
     // Initialize the distributed part of the panel
-    std::cout << "    Initializing dist part of the panel..." << std::endl;
     const int numDistSupernodes = symbFact.dist.supernodes.size();
     fact.dist.fronts.resize( numDistSupernodes );
     for( int t=0; t<numDistSupernodes; ++t )
@@ -1082,6 +1072,5 @@ psp::DistHelmholtz<R>::FillPanelFronts
             }
         }
     }
-    std::cout << "    Finished initializing dist part of panel." << std::endl;
 }
 

@@ -29,7 +29,10 @@ psp::DistHelmholtz<R>::Solve
 
     // Convert B into custom nested-dissection based ordering
     elemental::Matrix<C> B;
+    std::cout << "Pulling right-hand sides...";
+    std::cout.flush();
     PullRightHandSides( gridB, B );
+    std::cout << "done" << std::endl;
 
 #ifndef RELEASE
     elemental::Matrix<C> origB = B;
@@ -43,6 +46,8 @@ psp::DistHelmholtz<R>::Solve
     }
 
 #ifndef RELEASE
+    std::cout << "Checking error...";
+    std::cout.flush();
     elemental::Matrix<C> Y = B;
     Multiply( Y );
     elemental::basic::Axpy( (C)-1, origB, Y );
@@ -52,7 +57,10 @@ psp::DistHelmholtz<R>::Solve
 #endif
 
     // Restore the solutions back into the GridData form
+    std::cout << "Pushing right-hand sides...";
+    std::cout.flush();
     PushRightHandSides( gridB, B );
+    std::cout << "done" << std::endl;
 }
 
 template<typename R>
@@ -308,6 +316,9 @@ psp::DistHelmholtz<R>::SolveWithQMR
     // Loop until convergence (or too many iterations)
     for( int it=0; it<maxIterations; ++it )
     {
+#ifndef RELEASE
+        std::cout << "  Iteration " << it << " of QMR." << std::endl;
+#endif
         //
         // Step 1 (we already have each inv(M) v_n sitting in Z)
         //
@@ -397,6 +408,9 @@ psp::DistHelmholtz<R>::SolveWithQMR
             maxRelRho = std::max(maxRelRho,rho[j]/origRho[j]);
         if( maxRelRho < exitRatio )
             break;
+#ifndef RELEASE
+        std::cout << "  maxRelRho=" << maxRelRho << std::endl;
+#endif
 
         // Ensure that QMR hasn't broken down
         bool zeroRho = false;
