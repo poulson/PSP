@@ -552,19 +552,26 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
             ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff, 0, 0, 
               localHeight );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            LocalPanelHeightRecursion
-            ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff,
-              commRank/2, depthTilSerial-1, localHeight );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            LocalPanelHeightRecursion
-            ( xLeftSize, ySize, vSize, vPadding, cutoff,
-              commRank/2, depthTilSerial-1, localHeight );
+            const int powerOfTwo = 1u << (depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                LocalPanelHeightRecursion
+                ( xLeftSize, ySize, vSize, vPadding, cutoff,
+                  newCommRank, depthTilSerial-1, localHeight );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                LocalPanelHeightRecursion
+                ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff,
+                  newCommRank, depthTilSerial-1, localHeight );
+            }
         }
     }
     else
@@ -592,19 +599,26 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
             ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 0, 0, 
               localHeight );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            LocalPanelHeightRecursion
-            ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 
-              commRank/2, depthTilSerial-1, localHeight );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            LocalPanelHeightRecursion
-            ( xSize, yLeftSize, vSize, vPadding, cutoff,
-              commRank/2, depthTilSerial-1, localHeight );
+            const int powerOfTwo = 1u << (depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                LocalPanelHeightRecursion
+                ( xSize, yLeftSize, vSize, vPadding, cutoff,
+                  newCommRank, depthTilSerial-1, localHeight );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                LocalPanelHeightRecursion
+                ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 
+                  newCommRank, depthTilSerial-1, localHeight );
+            }
         }
     }
 }
@@ -635,35 +649,42 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
         //
         // Cut the x dimension
         //
+        const int xLeftSize = (xSize-1) / 2;
 
         // Add our local portion of the partition
         if( depthTilSerial == 0 )
+        {
+            // Add the separator
             ++numLocal;
 
-        // Add the left and/or right sides
-        const int xLeftSize = (xSize-1) / 2;
-        if( depthTilSerial  == 0 )
-        {
             // Add the left side
             NumLocalSupernodesRecursion
             ( xLeftSize, ySize, cutoff, 0, 0, numLocal );
+
             // Add the right side
             NumLocalSupernodesRecursion
             ( xSize-(xLeftSize+1), ySize, cutoff, 0, 0, numLocal );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            NumLocalSupernodesRecursion
-            ( xSize-(xLeftSize+1), ySize, cutoff, commRank/2, depthTilSerial-1, 
-              numLocal );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            NumLocalSupernodesRecursion
-            ( xLeftSize, ySize, cutoff, commRank/2, depthTilSerial-1, 
-              numLocal );
+            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                NumLocalSupernodesRecursion
+                ( xLeftSize, ySize, cutoff, newCommRank, depthTilSerial-1, 
+                  numLocal );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                NumLocalSupernodesRecursion
+                ( xSize-(xLeftSize+1), ySize, cutoff, newCommRank, 
+                  depthTilSerial-1, numLocal );
+            }
         }
     }
     else
@@ -671,15 +692,14 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
         //
         // Cut the y dimension 
         //
+        const int yLeftSize = (ySize-1) / 2;
 
         // Add our local portion of the partition
         if( depthTilSerial == 0 )
+        {
+            // Add the separator
             ++numLocal;
 
-        // Add the left and/or right sides
-        const int yLeftSize = (ySize-1) / 2;
-        if( depthTilSerial == 0 )
-        {
             // Add the left side
             NumLocalSupernodesRecursion
             ( xSize, yLeftSize, cutoff, 0, 0, numLocal );
@@ -687,19 +707,26 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
             NumLocalSupernodesRecursion
             ( xSize, ySize-(yLeftSize+1), cutoff, 0, 0, numLocal );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            NumLocalSupernodesRecursion
-            ( xSize, ySize-(yLeftSize+1), cutoff, commRank/2, depthTilSerial-1, 
-              numLocal );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            NumLocalSupernodesRecursion
-            ( xSize, yLeftSize, cutoff, commRank/2, depthTilSerial-1, 
-              numLocal );
+            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                NumLocalSupernodesRecursion
+                ( xSize, yLeftSize, cutoff, newCommRank, depthTilSerial-1, 
+                  numLocal );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                NumLocalSupernodesRecursion
+                ( xSize, ySize-(yLeftSize+1), cutoff, newCommRank, 
+                  depthTilSerial-1, numLocal );
+            }
         }
     }
 }
@@ -937,22 +964,30 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
               xOffset+(xLeftSize+1), yOffset, vOffset, cutoff, 
               0, 0, localToNaturalMap, localRowOffsets, localOffset );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
-              xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
-              commRank/2, depthTilSerial-1, localToNaturalMap, localRowOffsets, 
-              localOffset );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, commRank/2, depthTilSerial-1, 
-              localToNaturalMap, localRowOffsets, localOffset );
+            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                MapLocalPanelIndicesRecursion
+                ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
+                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  depthTilSerial-1, localToNaturalMap, localRowOffsets, 
+                  localOffset );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                MapLocalPanelIndicesRecursion
+                ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
+                  xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
+                  newCommRank, depthTilSerial-1, localToNaturalMap, 
+                  localRowOffsets, localOffset );
+            }
         }
         
         // Add our local portion of the partition
@@ -1015,22 +1050,30 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
               xOffset, yOffset+(yLeftSize+1), vOffset, cutoff, 
               0, 0, localToNaturalMap, localRowOffsets, localOffset );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
-              xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
-              commRank/2, depthTilSerial-1, localToNaturalMap, 
-              localRowOffsets, localOffset );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            MapLocalPanelIndicesRecursion
-            ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, commRank/2, depthTilSerial-1, 
-              localToNaturalMap, localRowOffsets, localOffset );
+            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                MapLocalPanelIndicesRecursion
+                ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
+                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  depthTilSerial-1, localToNaturalMap, localRowOffsets, 
+                  localOffset );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                MapLocalPanelIndicesRecursion
+                ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
+                  xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
+                  newCommRank, depthTilSerial-1, localToNaturalMap, 
+                  localRowOffsets, localOffset );
+            }
         }
         
         // Add our local portion of the partition
@@ -1150,21 +1193,29 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
               xOffset+(xLeftSize+1), yOffset, vOffset, cutoff, 
               0, 0, localConnections, localOffset );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
-              xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
-              commRank/2, depthTilSerial-1, localConnections, localOffset );
-        }
-        else // depthTilSerial != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, commRank/2, depthTilSerial-1, 
-              localConnections, localOffset );
+            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                MapLocalConnectionIndicesRecursion
+                ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
+                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  depthTilSerial-1, localConnections, localOffset );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                MapLocalConnectionIndicesRecursion
+                ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
+                  xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
+                  newCommRank, depthTilSerial-1, localConnections, 
+                  localOffset );
+            }
         }
         
         // Add our local portion of the partition
@@ -1219,21 +1270,29 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
               xOffset, yOffset+(yLeftSize+1), vOffset, cutoff, 
               0, 0, localConnections, localOffset );
         }
-        else if( commRank & 1 )
+        else
         {
-            // Add the right side
-            MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
-              xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
-              commRank/2, depthTilSerial-1, localConnections, localOffset );
-        }
-        else // log2CommSize != 0 && commRank & 1 == 0
-        {
-            // Add the left side
-            MapLocalConnectionIndicesRecursion
-            ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, commRank/2, depthTilSerial-1, 
-              localConnections, localOffset );
+            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (commRank & powerOfTwo) == 0;
+            if( onLeft )
+            {
+                // Add the left side
+                const int newCommRank = commRank;
+                MapLocalConnectionIndicesRecursion
+                ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
+                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  depthTilSerial-1, localConnections, localOffset );
+            }
+            else
+            {
+                // Add the right side
+                const int newCommRank = commRank ^ powerOfTwo;
+                MapLocalConnectionIndicesRecursion
+                ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
+                  xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
+                  newCommRank, depthTilSerial-1, localConnections, 
+                  localOffset );
+            }
         }
         
         // Add our local portion of the partition
@@ -1463,7 +1522,7 @@ psp::DistHelmholtz<R>::FillDistOrigPanelStruct
     {
         clique::symbolic::DistSymmOrigSupernode& sn = S.dist.supernodes[s];
         const int powerOfTwo = 1u<<(s-1);
-        const bool onLeft = (commRank&powerOfTwo) == 0;
+        const bool onLeft = (commRank & powerOfTwo) == 0;
         if( nxSub >= nySub )
         {
             // Form the structure of a partition of the X dimension

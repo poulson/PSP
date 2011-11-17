@@ -86,9 +86,11 @@ main( int argc, char* argv[] )
 
         // TODO: slowness.Visualize()???
 
-        std::cout << "Beginning to initialize..." << std::endl;
+        if( commRank == 0 )
+            std::cout << "Beginning to initialize..." << std::endl;
         helmholtz.Initialize( slowness );
-        std::cout << "Finished initialization." << std::endl;
+        if( commRank == 0 )
+            std::cout << "Finished initialization." << std::endl;
 
         GridData<std::complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
@@ -98,9 +100,11 @@ main( int argc, char* argv[] )
 
         // TODO: B.Visualize()???
 
-        std::cout << "Beginning solve..." << std::endl;
+        if( commRank == 0 )
+            std::cout << "Beginning solve..." << std::endl;
         helmholtz.Solve( B );
-        std::cout << "Finished solve." << std::endl;
+        if( commRank == 0 )
+            std::cout << "Finished solve." << std::endl;
 
         // TODO: B.Visualize()???
 

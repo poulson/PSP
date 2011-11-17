@@ -29,12 +29,18 @@ psp::DistHelmholtz<R>::Solve
 
     // Convert B into custom nested-dissection based ordering
     elemental::Matrix<C> B;
-    std::cout << "Pulling right-hand sides...";
-    std::cout.flush();
-    PullRightHandSides( gridB, B );
-    std::cout << "done" << std::endl;
-
 #ifndef RELEASE
+    const int commRank = elemental::mpi::CommRank( comm_ );
+    if( commRank == 0 )
+    {
+        std::cout << "Pulling right-hand sides...";
+        std::cout.flush();
+    }
+#endif
+    PullRightHandSides( gridB, B );
+#ifndef RELEASE
+    if( commRank == 0 )
+        std::cout << "done" << std::endl;
     elemental::Matrix<C> origB = B;
 #endif
 
@@ -46,21 +52,32 @@ psp::DistHelmholtz<R>::Solve
     }
 
 #ifndef RELEASE
-    std::cout << "Checking error...";
-    std::cout.flush();
+    if( commRank == 0 )
+    {
+        std::cout << "Checking error...";
+        std::cout.flush();
+    }
     elemental::Matrix<C> Y = B;
     Multiply( Y );
     elemental::basic::Axpy( (C)-1, origB, Y );
     const R norm = elemental::advanced::Norm( Y );
-    if( mpi::CommRank(comm_) == 0 )
+    if( commRank == 0 )
         std::cout << "||AB - origB||_F = " << norm << std::endl;
 #endif
 
     // Restore the solutions back into the GridData form
-    std::cout << "Pushing right-hand sides...";
-    std::cout.flush();
+#ifndef RELEASE
+    if( commRank == 0 )
+    {
+        std::cout << "Pushing right-hand sides...";
+        std::cout.flush();
+    }
+#endif
     PushRightHandSides( gridB, B );
-    std::cout << "done" << std::endl;
+#ifndef RELEASE
+    if( commRank == 0 )
+        std::cout << "done" << std::endl;
+#endif
 }
 
 template<typename R>
@@ -296,14 +313,20 @@ psp::DistHelmholtz<R>::SolveWithQMR
     B.SetToZero();
     D.SetToZero();
     P.SetToZero();
+    R maxOrigRho = 0;
     if( commRank == 0 )
     {
         for( int j=0; j<numRhs; ++j )
         {
+            maxOrigRho = std::max(maxOrigRho,origRho[j]);
             D.Set( 0, j, origRho[j] );
             P.Set( 0, j, origRho[j] );
         }
     }
+#ifndef RELEASE
+    if( commRank == 0 )
+        std::cout << "Max orig rho: " << maxOrigRho << std::endl;
+#endif
     rhoLast = origRho;
     for( int j=0; j<numRhs; ++j )
     {
@@ -317,7 +340,8 @@ psp::DistHelmholtz<R>::SolveWithQMR
     for( int it=0; it<maxIterations; ++it )
     {
 #ifndef RELEASE
-        std::cout << "  Iteration " << it << " of QMR." << std::endl;
+        if( commRank == 0 )
+            std::cout << "  Iteration " << it << " of QMR." << std::endl;
 #endif
         //
         // Step 1 (we already have each inv(M) v_n sitting in Z)
@@ -409,7 +433,8 @@ psp::DistHelmholtz<R>::SolveWithQMR
         if( maxRelRho < exitRatio )
             break;
 #ifndef RELEASE
-        std::cout << "  maxRelRho=" << maxRelRho << std::endl;
+        if( commRank == 0 )
+            std::cout << "  maxRelRho=" << maxRelRho << std::endl;
 #endif
 
         // Ensure that QMR hasn't broken down
@@ -687,7 +712,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
-        const int remainingSize = size - paddingSize;
+        const int remainingSize = xySize*panelDepth;
 
         for( int k=0; k<numRhs; ++k )
             std::memcpy
@@ -697,7 +722,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
         BOffset += remainingSize;
     }
     const int numDistSupernodes = symbFact.dist.supernodes.size();
-    for( int t=0; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistSupernodes; ++t )
     {
         const clique::symbolic::DistSymmFactSupernode& sn = 
             symbFact.dist.supernodes[t];
@@ -728,7 +753,12 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     }
 #ifndef RELEASE
     if( BOffset != LocalPanelOffset(i)+LocalPanelHeight(i) )
+    {
+        std::cout << "BOffset=" << BOffset << "\n"
+                  << "LocalPanelOffset(i)+LocalPanelHeight(i)="
+                  << LocalPanelOffset(i)+LocalPanelHeight(i) << std::endl;
         throw std::logic_error("Invalid BOffset usage in pull");
+    }
 #endif
 
     // Solve against the panel
@@ -760,7 +790,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
               remainingSize*sizeof(C) );
         BOffset += remainingSize;
     }
-    for( int t=0; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistSupernodes; ++t )
     {
         const clique::symbolic::DistSymmFactSupernode& sn = 
             symbFact.dist.supernodes[t];

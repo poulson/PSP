@@ -31,8 +31,14 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     // Initialize and factor the top panel (first, since it is the largest)
     //
-    std::cout << "Initializing top panel...";
-    std::cout.flush();
+#ifndef RELEASE
+    const int commRank = elemental::mpi::CommRank( comm_ );
+    if( commRank == 0 )
+    {
+        std::cout << "Initializing top panel...";
+        std::cout.flush();
+    }
+#endif
     {
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
@@ -57,13 +63,21 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
     }
-    std::cout << "done" << std::endl;
+#ifndef RELEASE
+    if( commRank == 0 )
+        std::cout << "done" << std::endl;
+#endif
 
     //
     // Initialize and factor the bottom panel
     //
-    std::cout << "Initializing bottom panel...";
-    std::cout.flush();
+#ifndef RELEASE
+    if( commRank == 0 )
+    {
+        std::cout << "Initializing bottom panel...";
+        std::cout.flush();
+    }
+#endif
     {
         // Retrieve the slowness for this panel
         const int vOffset = 0;
@@ -89,7 +103,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
     }
-    std::cout << "done" << std::endl;
+#ifndef RELEASE
+    if( commRank == 0 )
+        std::cout << "done" << std::endl;
+#endif
 
     //
     // Initialize and factor the full inner panels
@@ -97,9 +114,14 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     fullInnerFacts_.resize( numFullInnerPanels_ );
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
-        std::cout << "Initializing the " << k << "'th of " 
-                  << numFullInnerPanels_ << " inner panel...";
-        std::cout.flush();
+#ifndef RELEASE
+        if( commRank == 0 )
+        {
+            std::cout << "Initializing inner panel " << k << " of " 
+                      << numFullInnerPanels_ << "...";
+            std::cout.flush();
+        }
+#endif
 
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
@@ -128,7 +150,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
 
-        std::cout << "done" << std::endl;
+#ifndef RELEASE
+        if( commRank == 0 )
+            std::cout << "done" << std::endl;
+#endif
     }
 
     //
@@ -136,8 +161,13 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     if( haveLeftover_ )
     {        
-        std::cout << "Initializing the leftover panel...";
-        std::cout.flush();
+#ifndef RELEASE
+        if( commRank == 0 )
+        {
+            std::cout << "Initializing the leftover panel...";
+            std::cout.flush();
+        }
+#endif
 
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
@@ -164,15 +194,23 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
 
-        std::cout << "done" << std::endl;
+#ifndef RELEASE
+        if( commRank == 0 )
+            std::cout << "done" << std::endl;
+#endif
     }
     
     //
     // Initialize the global sparse matrix
     //
 
-    std::cout << "Initializing global sparse matrix...";
-    std::cout.flush();
+#ifndef RELEASE
+    if( commRank == 0 )
+    {
+        std::cout << "Initializing global sparse matrix...";
+        std::cout.flush();
+    }
+#endif
 
     // Gather the slowness for the global sparse matrix
     std::vector<R> myGlobalSlowness;
@@ -199,7 +237,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         FormGlobalRow( alpha, x, y, v, rowOffset );
     }
 
-    std::cout << "done" << std::endl;
+#ifndef RELEASE
+    if( commRank == 0 )
+        std::cout << "done" << std::endl;
+#endif
 }
 
 template<typename R>
@@ -724,7 +765,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
         }
     }
     const int numDistSupernodes = fact.dist.supernodes.size();
-    for( int t=0; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistSupernodes; ++t )
     {
         const clique::symbolic::DistSymmFactSupernode& sn = 
             fact.dist.supernodes[t];
@@ -785,7 +826,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             recvIndices[++offsets[proc]] = naturalIndex;
         }
     }
-    for( int t=0; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistSupernodes; ++t )
     {
         const clique::symbolic::DistSymmFactSupernode& sn = 
             fact.dist.supernodes[t];
@@ -885,9 +926,17 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         // Partition the X dimension
         //
         const int middle = (xSize-1)/2;
+        const bool onLeft = 
+            ( depthTilSerial==0 ? 
+              true :
+              (commRank&(1u<<(depthTilSerial-1)))==0 );
+        const bool onRight =
+            ( depthTilSerial==0 ?
+              true :
+              (commRank&(1u<<(depthTilSerial-1)))!=0 );
 
         // Recurse on the left side
-        if( depthTilSerial == 0 || !(commRank&1) )
+        if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, middle, ySize, vSize, nx, ny,
@@ -895,7 +944,7 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         offset += middle*ySize*vSize;
 
         // Recurse on the right side
-        if( depthTilSerial == 0 || commRank&1 )
+        if( onRight )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset+middle+1, yOffset,
@@ -921,10 +970,18 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the Y dimension
         //
-        const int middle = (ySize-1)/2;
+        const int middle = (ySize-1)/2; 
+        const bool onLeft = 
+            ( depthTilSerial==0 ? 
+              true :
+              (commRank&(1u<<(depthTilSerial-1)))==0 );
+        const bool onRight =
+            ( depthTilSerial==0 ?
+              true :
+              (commRank&(1u<<(depthTilSerial-1)))!=0 );
 
         // Recurse on the left side
-        if( depthTilSerial == 0 || !(commRank&1) )
+        if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, xSize, middle, vSize, nx, ny,
@@ -932,7 +989,7 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         offset += xSize*middle*vSize;
 
         // Recurse on the right side
-        if( depthTilSerial == 0 || commRank&1 )
+        if( onRight )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset+middle+1,
@@ -1017,7 +1074,8 @@ psp::DistHelmholtz<R>::FillPanelFronts
     // Initialize the distributed part of the panel
     const int numDistSupernodes = symbFact.dist.supernodes.size();
     fact.dist.fronts.resize( numDistSupernodes );
-    for( int t=0; t<numDistSupernodes; ++t )
+    clique::numeric::InitializeDistLeaf( symbFact, fact );
+    for( int t=1; t<numDistSupernodes; ++t )
     {
         clique::numeric::DistSymmFront<C>& front = fact.dist.fronts[t];
         const clique::symbolic::DistSymmFactSupernode& symbSN = 
