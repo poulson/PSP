@@ -243,7 +243,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
             // Handle connection to next panel, which is relevant to the 
             // computation of A_{i,i+1} B_{i+1}
             const int proc = OwningProcess( x, y, v+1 );
-            ++supdiagRecvCountsPerm[proc*numPanels_+whichPanel];
+            ++supdiagRecvCountsPerm[proc*(numPanels_-1)+whichPanel];
         }
     }
     std::vector<int> subdiagSendCountsPerm( (numPanels_-1)*commSize );
@@ -298,10 +298,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
         for( int proc=0; proc<commSize; ++proc )
         {
             const int index = i*commSize + proc;
-            subdiagSendDispls_[proc] = subdiagPanelSendCounts_[i];
-            supdiagSendDispls_[proc] = supdiagPanelSendCounts_[i];
-            subdiagRecvDispls_[proc] = subdiagPanelRecvCounts_[i];
-            supdiagRecvDispls_[proc] = supdiagPanelRecvCounts_[i];
+            subdiagSendDispls_[index] = subdiagPanelSendCounts_[i];
+            supdiagSendDispls_[index] = supdiagPanelSendCounts_[i];
+            subdiagRecvDispls_[index] = subdiagPanelRecvCounts_[i];
+            supdiagRecvDispls_[index] = supdiagPanelRecvCounts_[i];
             subdiagPanelSendCounts_[i] += subdiagSendCounts_[index];
             supdiagPanelSendCounts_[i] += supdiagSendCounts_[index];
             subdiagPanelRecvCounts_[i] += subdiagRecvCounts_[index];
@@ -382,7 +382,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
 #endif
 
             const int proc = OwningProcess( x, y, v-1 );
-            const int index = whichPanel*commSize + proc;
+            const int index = (whichPanel-1)*commSize + proc;
             const int offset = subdiagOffsets[index];
             subdiagRecvIndices[offset] = naturalCol;
             subdiagRecvLocalIndices_[offset] = localIndex;

@@ -231,7 +231,7 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         const int z = naturalIndex/(nx*ny);
         const int proc = slowness.OwningProcess( x, y, z );
 
-        const R alpha = myGlobalSlowness[++offsets[proc]];
+        const R alpha = myGlobalSlowness[offsets[proc]++];
         const int rowOffset = localRowOffsets_[iLocal];
         const int v = (nz-1) - z;
         FormGlobalRow( alpha, x, y, v, rowOffset );
@@ -681,7 +681,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = slowness.OwningProcess( naturalIndex );
-        recvIndices[++offsets[proc]] = naturalIndex;
+        recvIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
     mpi::AllToAll
@@ -823,7 +823,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            recvIndices[++offsets[proc]] = naturalIndex;
+            recvIndices[offsets[proc]++] = naturalIndex;
         }
     }
     for( int t=1; t<numDistSupernodes; ++t )
@@ -847,7 +847,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
             const int v = vOffset + naturalIndex/(nx*ny);
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            recvIndices[++offsets[proc]] = naturalIndex;
+            recvIndices[offsets[proc]++] = naturalIndex;
         }
     }
     std::vector<int> sendIndices( totalSendCount );
@@ -1058,7 +1058,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            const R alpha = myPanelSlowness[++offsets[proc]];
+            const R alpha = myPanelSlowness[offsets[proc]++];
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode
@@ -1110,7 +1110,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = slowness.OwningProcess( x, y, z );
-            const R alpha = myPanelSlowness[++offsets[proc]];
+            const R alpha = myPanelSlowness[offsets[proc]++];
 
             // Form the j'th lower column of this supernode
             FormLowerColumnOfSupernode

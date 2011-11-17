@@ -31,9 +31,9 @@ main( int argc, char* argv[] )
     
     FiniteDiffControl<double> control;
     control.stencil = SEVEN_POINT;
-    control.nx = 30;
-    control.ny = 30;
-    control.nz = 50;
+    control.nx = 6;
+    control.ny = 6;
+    control.nz = 10;
     control.wx = 6;
     control.wy = 6;
     control.wz = 10;
@@ -45,8 +45,8 @@ main( int argc, char* argv[] )
     control.etay = 1.1;
     control.etaz = 1.1;
     control.imagShift = 1;
-    control.cutoff = 96;
-    control.numPlanesPerPanel = 5;
+    control.cutoff = 4;
+    control.numPlanesPerPanel = 1;
     control.frontBC = PML;
     control.rightBC = PML;
     control.backBC = PML;
