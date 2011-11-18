@@ -44,6 +44,8 @@ psp::DistHelmholtz<R>::Solve
     elemental::Matrix<C> origB = B;
 #endif
 
+    // TODO: Check correctness of the subdiagonal multiplies
+
     // Solve the systems of equations
     switch( solver )
     {
@@ -314,9 +316,11 @@ psp::DistHelmholtz<R>::SolveWithQMR
     // t := inv(M) v 
     // tau := sqrt(t^T t)
     T = V;
+    /*
     if( commRank == 0 )
         std::cout << "Skipping preconditioner for now..." << std::endl;
-    //Precondition( T );
+    */
+    Precondition( T );
     PseudoNorms( T, tau );
 
     // q := t
@@ -360,9 +364,11 @@ psp::DistHelmholtz<R>::SolveWithQMR
         // p         := c^2 thetaLast^2 p + c^2 alpha q
         // x         := x + p
         T = V;
+        /*
         if( commRank == 0 )
             std::cout << "Skipping preconditioner for now..." << std::endl;
-        //Precondition( T );
+        */
+        Precondition( T );
         thetaLast = theta;
         PseudoNorms( T, theta );
         for( int k=0; k<numRhs; ++k )
@@ -643,27 +649,32 @@ psp::DistHelmholtz<R>::Precondition( elemental::Matrix<C>& B ) const
     //
     // Simple algorithm:
     //   // Solve against L
-    //   for i=1,...,m-1
+    //   for i=0,...,m-2
     //     B_{i+1} := B_{i+1} - A_{i+1,i} T_i B_i
+    //   end
     //   // Solve against D 
-    //   for i=1,...,m
+    //   for i=0,...,m-1
     //     B_i := T_i B_i
+    //   end
     //   // Solve against L^T
-    //   for i=m-1,...,1
+    //   for i=m-2,...,0
     //     B_i := B_i - T_i A_{i,i+1} B_{i+1}
+    //   end
     //
     // Practical algorithm:
     //   // Solve against L D
-    //   for i=1,...,m-1
+    //   for i=0,...,m-2
     //     B_i := T_i B_i
     //     B_{i+1} := B_{i+1} - A_{i+1,i} B_i
-    //   B_m := T_m B_m
+    //   end
+    //   B_{m-1} := T_{m-1} B_{m-1}
     //   // Solve against L^T
-    //   for i=m-1,...,1
+    //   for i=m-2,...,0
     //     Z := B_i
     //     B_i := -A_{i,i+1} B_{i+1}
     //     B_i := T_i B_i
     //     B_i := B_i + Z
+    //   end
     //
 
     // Solve against L D
@@ -690,13 +701,16 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
 {
+    const clique::symbolic::SymmFact& symbFact = 
+        PanelSymbolicFactorization( i );
     const int numRhs = B.Width();
     const int panelPadding = PanelPadding( i );
     const int panelDepth = PanelDepth( i );
-    const clique::symbolic::SymmFact& symbFact = 
-        PanelSymbolicFactorization( i );
+    const int localHeight1d = 
+        symbFact.dist.supernodes.back().localOffset1d + 
+        symbFact.dist.supernodes.back().localSize1d;
 
-    elemental::Matrix<C> localPanelB( localHeight_, numRhs );
+    elemental::Matrix<C> localPanelB( localHeight1d, numRhs );
     localPanelB.SetToZero();
 
     // For each supernode, pull in each right-hand side with a memcpy
@@ -890,10 +904,11 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const
 }
 
 // Z := B_i
+// B_i := 0
 template<typename R>
 void
 psp::DistHelmholtz<R>::ExtractPanel
-( const elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const
+( elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
     const int localPanelHeight = LocalPanelHeight( i );
@@ -901,9 +916,13 @@ psp::DistHelmholtz<R>::ExtractPanel
     Z.ResizeTo( localPanelHeight, numRhs );
 
     for( int k=0; k<numRhs; ++k )
+    {
         std::memcpy
         ( Z.Buffer(0,k), B.LockedBuffer(localPanelOffset,k),
           localPanelHeight*sizeof(C) );
+        std::memset
+        ( B.Buffer(localPanelOffset,k), 0, localPanelHeight*sizeof(C) );
+    }
 }
 
 // B_i := -A_{i,i+1} B_{i+1}
@@ -924,6 +943,23 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal
     for( int s=0; s<panelSendCount; ++s )
     {
         const int iLocal = supdiagSendIndices_[panelSendOffset+s];
+#ifndef RELEASE
+        if( iLocal < LocalPanelOffset( i+1 ) )
+        {
+            std::cout << "s=" << s << "\n"
+                      << "offset i+1=" << LocalPanelOffset(i+1) << ", \n"
+                      << "iLocal=" << iLocal << std::endl;
+            throw std::logic_error("Send index was too small");
+        }
+        if( iLocal >= LocalPanelOffset(i+1)+LocalPanelHeight(i+1) )
+        {
+            std::cout << "s=" << s << "\n"
+                      << "offset i+1=" << LocalPanelOffset(i+1) << ", \n"
+                      << "height i+1=" << LocalPanelHeight(i+1) << ", \n"
+                      << "iLocal    =" << iLocal << std::endl;
+            throw std::logic_error("Send index was too big");
+        }
+#endif
         for( int k=0; k<numRhs; ++k ) 
             sendBuffer[s*numRhs+k] = B.Get( iLocal, k );
     }

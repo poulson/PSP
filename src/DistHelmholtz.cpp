@@ -319,10 +319,21 @@ psp::DistHelmholtz<R>::DistHelmholtz
 
     // Pack and send the lists of indices that we will need from each 
     // process.
-    std::vector<int> subdiagOffsets = subdiagRecvDispls_;
-    std::vector<int> supdiagOffsets = supdiagRecvDispls_;
-    std::vector<int> subdiagRecvIndices( subdiagTotalRecvCount );
-    std::vector<int> supdiagRecvIndices( supdiagTotalRecvCount );
+    std::vector<int> subdiagOffsets( (numPanels_-1)*commSize ),
+                     supdiagOffsets( (numPanels_-1)*commSize );
+    for( int i=0; i<numPanels_-1; ++i )
+    {
+        const int subdiagOffset = subdiagPanelRecvDispls_[i];
+        const int supdiagOffset = supdiagPanelRecvDispls_[i];
+        for( int proc=0; proc<commSize; ++proc ) 
+        {
+            const int index = i*commSize + proc;
+            subdiagOffsets[index] = subdiagRecvDispls_[index]+subdiagOffset;
+            supdiagOffsets[index] = supdiagRecvDispls_[index]+supdiagOffset;
+        }
+    }
+    std::vector<int> subdiagRecvIndices( subdiagTotalRecvCount ),
+                     supdiagRecvIndices( supdiagTotalRecvCount );
     subdiagRecvLocalIndices_.resize( subdiagTotalRecvCount );
     supdiagRecvLocalIndices_.resize( supdiagTotalRecvCount );
     subdiagRecvLocalRows_.resize( subdiagTotalRecvCount );
@@ -361,24 +372,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
             }
 #ifndef RELEASE
             if( localIndex == -1 )
-            {
-                std::cout << "naturalRow = " << naturalRow << "\n"
-                          << "naturalCol = " << naturalCol << "\n"
-                          << " x = " << x << "\n"
-                          << " y = " << y << "\n"
-                          << " z+1 = " << z+1 << "\n"
-                          << " rowSize = " << rowSize << "\n"
-                          << " rowOffset = " << rowOffset << "\n\n";
-                for( int jLocal=0; jLocal<rowSize; ++jLocal )
-                {
-                    const int connection = localConnections[rowOffset+jLocal];
-                    std::cout << "  (" << connection%nx << ","
-                              << (connection/nx)%ny << ","
-                              << connection/(nx*ny) << ")\n";
-                }
-                std::cout << std::endl;
                 throw std::logic_error("Did not find subdiag connection");
-            }
 #endif
 
             const int proc = OwningProcess( x, y, v-1 );
@@ -408,23 +402,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
             }
 #ifndef RELEASE
             if( localIndex == -1 )
-            {
-                std::cout << "naturalRow = " << naturalRow << "\n"
-                          << "naturalCol = " << naturalCol << "\n"
-                          << " x = " << x << "\n"
-                          << " y = " << y << "\n"
-                          << " z-1 = " << z-1 << "\n"
-                          << " rowSize = " << rowSize << "\n"
-                          << " rowOffset = " << rowOffset << "\n\n";
-                for( int jLocal=0; jLocal<rowSize; ++jLocal )
-                {
-                    const int connection = localConnections[rowOffset+jLocal];
-                    std::cout << "  (" << connection%nx << ","
-                              << (connection/nx)%ny << ","
-                              << connection/(nx*ny) << ")\n";
-                }
                 throw std::logic_error("Did not find supdiag connection");
-            }
 #endif
 
             const int proc = OwningProcess( x, y, v+1 );

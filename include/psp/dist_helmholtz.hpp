@@ -102,9 +102,9 @@ private:
     void SolvePanel( elemental::Matrix<C>& B, int i ) const;
     // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
     void SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const;
-    // Z := B_i
+    // Z := B_i, B_i := 0
     void ExtractPanel
-    ( const elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const;
+    ( elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const;
     // B_i := -A_{i,i+1} B_{i+1}
     void MultiplySuperdiagonal( elemental::Matrix<C>& B, int i ) const;
     // B_i := B_i + Z
