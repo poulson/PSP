@@ -31,13 +31,13 @@ main( int argc, char* argv[] )
     
     FiniteDiffControl<double> control;
     control.stencil = SEVEN_POINT;
-    control.nx = 30;
-    control.ny = 30;
-    control.nz = 30;
+    control.nx = 15;
+    control.ny = 15;
+    control.nz = 10;
     control.wx = 1;
     control.wy = 1;
     control.wz = 1;
-    control.omega = 10;
+    control.omega = 3;
     control.Cx = 1.5*(2*M_PI);
     control.Cy = 1.5*(2*M_PI);
     control.Cz = 1.5*(2*M_PI);
@@ -46,7 +46,7 @@ main( int argc, char* argv[] )
     control.etaz = 1./6.;
     control.imagShift = 1;
     control.cutoff = 16;
-    control.numPlanesPerPanel = 4;
+    control.numPlanesPerPanel = 1;
     control.frontBC = PML;
     control.rightBC = PML;
     control.backBC = PML;
@@ -92,21 +92,74 @@ main( int argc, char* argv[] )
         if( commRank == 0 )
             std::cout << "Finished initialization." << std::endl;
 
+        /*
         GridData<std::complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
         std::complex<double>* localB = B.LocalBuffer();
-        for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
-            localB[i] = 1;
+        std::memset
+        ( localB, 0, 
+          xLocalSize*yLocalSize*zLocalSize*sizeof(std::complex<double>) );
+        const int xSource = control.nx/2;
+        const int ySource = control.ny/2;
+        const int zSource = control.nz/2;
+        if( commRank == B.OwningProcess( xSource, ySource, zSource ) )
+        {
+            const int localIndex = B.LocalIndex( xSource, ySource, zSource ); 
+            localB[localIndex] = 1;
+        }
+        */
+        // TODO: REMOVE ME AFTER FINISHING DEBUGGING
+        const int N = control.nx*control.ny*control.nz;
+        const int localN = xLocalSize*yLocalSize*zLocalSize;
+        GridData<std::complex<double> > B
+        ( N, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
+        std::complex<double>* localB = B.LocalBuffer();
+        std::memset( localB, 0, N*localN*sizeof(std::complex<double>) );
+        const int xShift = B.XShift();
+        const int yShift = B.YShift();
+        const int zShift = B.ZShift();
+        for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+        {
+            for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+            {
+                for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                {
+                    const int x = xShift + xLocal*px;
+                    const int y = yShift + yLocal*py;
+                    const int z = zShift + zLocal*pz;
+                    const int natural = x + y*control.nx + 
+                                        z*control.nx*control.ny;
+                    const int localIndex = B.LocalIndex( x, y, z );
+                    localB[localIndex+natural] = 1;
+                }
+            }
+        }
+        double localNorm = elemental::blas::Nrm2( N*localN, localB, 1 );
+        double localNormSquared = localNorm*localNorm;
+        double normSquared;
+        elemental::mpi::AllReduce
+        ( &localNormSquared, &normSquared, 1, elemental::mpi::SUM, comm );
+        if( commRank == 0 )
+            std::cout << "Frobenius norm: " << sqrt(normSquared) << std::endl;
 
         // TODO: B.Visualize()???
 
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
-        helmholtz.Solve( B );
+        const int maxIterations = 500;
+        helmholtz.Solve( B, QMR, maxIterations );
         if( commRank == 0 )
             std::cout << "Finished solve." << std::endl;
 
         // TODO: B.Visualize()???
+
+        // TODO: REMOVE ME AFTER FINISHING DEBUGGING
+        localNorm = elemental::blas::Nrm2( N*localN, localB, 1 );
+        localNormSquared = localNorm*localNorm;
+        elemental::mpi::AllReduce
+        ( &localNormSquared, &normSquared, 1, elemental::mpi::SUM, comm );
+        if( commRank == 0 )
+            std::cout << "Frobenius norm: " << sqrt(normSquared) << std::endl;
 
         helmholtz.Finalize();
     }

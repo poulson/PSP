@@ -125,7 +125,7 @@ inline GridData<T>::GridData
     xLocalSize_ = elemental::LocalLength( nx, xShift_, px );
     yLocalSize_ = elemental::LocalLength( ny, yShift_, py );
     zLocalSize_ = elemental::LocalLength( nz, zShift_, pz );
-    localData_.resize( xLocalSize_*yLocalSize_*zLocalSize_ );
+    localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
 
 template<typename T>

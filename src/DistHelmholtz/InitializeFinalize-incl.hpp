@@ -512,7 +512,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Right connection
     if( x+1 < nx )
     {
-        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        const int nestedIndex = ReorderedIndex( x+1, y, vLocal, vSize );
         if( nestedIndex > offset+j )
         {
             if( nestedIndex < offset+size )
@@ -538,7 +538,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Front connection
     if( y > 0 )
     {
-        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        const int nestedIndex = ReorderedIndex( x, y-1, vLocal, vSize );
         if( nestedIndex > offset+j )
         {
             if( nestedIndex < offset+size )
@@ -564,7 +564,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Back connection
     if( y+1 < ny )
     {
-        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        const int nestedIndex = ReorderedIndex( x, y+1, vLocal, vSize );
         if( nestedIndex > offset+j )
         {
             if( nestedIndex < offset+size )
@@ -590,7 +590,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Bottom connection
     if( vLocal > 0 )
     {
-        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        const int nestedIndex = ReorderedIndex( x, y, vLocal-1, vSize );
         if( nestedIndex > offset+j )
         {
             if( nestedIndex < offset+size )
@@ -616,7 +616,7 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     // Top connection
     if( vLocal+1 < vSize )
     {
-        const int nestedIndex = ReorderedIndex( x-1, y, vLocal, vSize );
+        const int nestedIndex = ReorderedIndex( x, y, vLocal+1, vSize );
         if( nestedIndex > offset+j )
         {
             if( nestedIndex < offset+size )
@@ -1073,6 +1073,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
     // Initialize the distributed part of the panel
     const int numDistSupernodes = symbFact.dist.supernodes.size();
+    fact.dist.mode = clique::MANY_RHS;
     fact.dist.fronts.resize( numDistSupernodes );
     clique::numeric::InitializeDistLeaf( symbFact, fact );
     for( int t=1; t<numDistSupernodes; ++t )

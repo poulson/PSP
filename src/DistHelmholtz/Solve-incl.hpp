@@ -47,6 +47,10 @@ psp::DistHelmholtz<R>::Solve
     // TODO: Check correctness of the subdiagonal multiplies
 
     // Solve the systems of equations
+    if( commRank == 0 )
+        std::cout << "Skipping Solve and instead testing a panel solve"
+                  << std::endl;
+    /*
     switch( solver )
     {
     case GMRES: SolveWithGMRES( B, maxIterations ); break;
@@ -66,6 +70,9 @@ psp::DistHelmholtz<R>::Solve
     if( commRank == 0 )
         std::cout << "||AB - origB||_F = " << norm << std::endl;
 #endif
+    */
+    //Precondition( B );
+    SolvePanel( B, 0 );
 
     // Restore the solutions back into the GridData form
 #ifndef RELEASE
@@ -316,10 +323,6 @@ psp::DistHelmholtz<R>::SolveWithQMR
     // t := inv(M) v 
     // tau := sqrt(t^T t)
     T = V;
-    /*
-    if( commRank == 0 )
-        std::cout << "Skipping preconditioner for now..." << std::endl;
-    */
     Precondition( T );
     PseudoNorms( T, tau );
 
@@ -364,10 +367,6 @@ psp::DistHelmholtz<R>::SolveWithQMR
         // p         := c^2 thetaLast^2 p + c^2 alpha q
         // x         := x + p
         T = V;
-        /*
-        if( commRank == 0 )
-            std::cout << "Skipping preconditioner for now..." << std::endl;
-        */
         Precondition( T );
         thetaLast = theta;
         PseudoNorms( T, theta );
@@ -773,10 +772,32 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
         throw std::logic_error("Invalid BOffset usage in pull");
 #endif
 
+    // TODO: REMOVE ME
+    const int commRank = elemental::mpi::CommRank( comm_ );
+    R localNorm = elemental::blas::Nrm2
+    ( localHeight1d*numRhs, localPanelB.Buffer(), 1 );
+    R localNormSquared = localNorm*localNorm;
+    R normSquared;
+    elemental::mpi::AllReduce
+    ( &localNormSquared, &normSquared, 1, elemental::mpi::SUM, comm_ );
+    if( commRank == 0 )
+        std::cout << "Frobenius norm before solve of panel " << i << ": " 
+                  << sqrt(normSquared) << std::endl;
+
     // Solve against the panel
     const clique::numeric::SymmFrontTree<C>& fact = 
         PanelNumericFactorization( i );
     clique::numeric::LDLSolve( TRANSPOSE, symbFact, fact, localPanelB, true );
+
+    // TODO: REMOVE ME
+    localNorm = elemental::blas::Nrm2
+    ( localHeight1d*numRhs, localPanelB.Buffer(), 1 );
+    localNormSquared = localNorm*localNorm;
+    elemental::mpi::AllReduce
+    ( &localNormSquared, &normSquared, 1, elemental::mpi::SUM, comm_ );
+    if( commRank == 0 )
+        std::cout << "Frobenius norm after solve of panel " << i << ": " 
+                  << sqrt(normSquared) << std::endl;
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );
