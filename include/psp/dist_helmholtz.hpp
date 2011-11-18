@@ -74,17 +74,24 @@ private:
     void SolveWithGMRES( elemental::Matrix<C>& B, int maxIterations=50 ) const;
     void SolveWithQMR( elemental::Matrix<C>& B, int maxIterations=50 ) const;
 
+    bool CheckForZeros( const std::vector<C>& alpha ) const;
+
     void Norms
-    ( const elemental::Matrix<C>& X, std::vector<R>& norms ) const;
+    ( const elemental::Matrix<C>& X, std::vector<R>& norm ) const;
+    void PseudoNorms
+    ( const elemental::Matrix<C>& X, std::vector<C>& pseudoNorm ) const;
     void PseudoInnerProducts
     ( const elemental::Matrix<C>& X, const elemental::Matrix<C>& Y,
-      std::vector<C>& alphas ) const;
+      std::vector<C>& alpha ) const;
 
+    void MultiplyColumns
+    ( elemental::Matrix<C>& X, const std::vector<C>& d ) const;
     void DivideColumns
     ( elemental::Matrix<C>& X, const std::vector<R>& d ) const;
-    void ScaleColumns
-    ( elemental::Matrix<C>& X, const std::vector<C>& d ) const;
     void AddScaledColumns
+    ( const std::vector<C>& d,
+      const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const;
+    void SubtractScaledColumns
     ( const std::vector<C>& d,
       const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const;
 

@@ -275,21 +275,175 @@ psp::DistHelmholtz<R>::SolveWithGMRES
     throw std::logic_error("GMRES not yet implemented");
 }
 
-// Based on Algorithm 8.1 from the paper 
-// "An implementation of the QMR method based on coupled two-term recurrences",
-// by R. Freund and N. Nachtigal.
+// Based on several different papers from R. Freund et al. on preconditioned QMR 
+// for complex symmetric matrices.
 template<typename R>
 void
 psp::DistHelmholtz<R>::SolveWithQMR
 ( elemental::Matrix<C>& B, int maxIterations ) const
 {
-    // HERE
+    const R bcgRelTol = 1e-6;
+    const int localHeight = B.Height();
+    const int numRhs = B.Width();
+    const int commRank = mpi::CommRank( comm_ );
+    const R one = 1;
+
+    elemental::Matrix<C> V( localHeight, numRhs ),
+                         T( localHeight, numRhs ),
+                         Q( localHeight, numRhs ),
+                         P( localHeight, numRhs );
+    std::vector<C> c( numRhs ),
+                   tau( numRhs ),
+                   rho( numRhs ),
+                   beta( numRhs ),
+                   theta( numRhs ),
+                   alpha( numRhs ),
+                   sigma( numRhs ),
+                   rhoLast( numRhs ),
+                   thetaLast( numRhs ),
+                   tempScalars( numRhs );
+    std::vector<R> origResidNorm( numRhs ), 
+                   bcgResidNorm( numRhs ),
+                   relBcgResidNorm( numRhs );
+
+    // v := b
+    // origResidNorm := ||v||_2
+    V = B;
+    Norms( V, origResidNorm );
+
+    // t := inv(M) v 
+    // tau := sqrt(t^T t)
+    T = V;
+    if( commRank == 0 )
+        std::cout << "Skipping preconditioner for now..." << std::endl;
+    //Precondition( T );
+    PseudoNorms( T, tau );
+
+    // q := t
+    // x := 0 (use the B matrix for storing the x vectors)
+    // p := 0
+    // theta := 0
+    // rho := v^T q
+    Q = T;
+    B.SetToZero();
+    P.SetToZero();
+    for( int k=0; k<numRhs; ++k )
+        theta[k] = 0;
+    PseudoInnerProducts( V, Q, rho );
+
+    for( int it=0; it<maxIterations; ++it )
+    {
+        // t := A q
+        T = Q; 
+        Multiply( T );
+
+        // sigma := q^T t
+        // alpha := rho / sigma
+        // v := v - alpha t
+        PseudoInnerProducts( Q, T, sigma );
+        const bool zeroSigma = CheckForZeros( sigma );
+        if( zeroSigma )
+        {
+            if( commRank == 0 ) 
+                std::cout << "QMR stopped due to a zero sigma" << std::endl;
+            break;
+        }
+        for( int k=0; k<numRhs; ++k )
+            alpha[k] = rho[k] / sigma[k];
+        SubtractScaledColumns( alpha, T, V );
+
+        // t         := inv(M) v
+        // thetaLast := theta
+        // theta     := sqrt(t^T t) / tau
+        // c         := 1 / sqrt(1+theta^2)
+        // tau       := tau theta c
+        // p         := c^2 thetaLast^2 p + c^2 alpha q
+        // x         := x + p
+        T = V;
+        if( commRank == 0 )
+            std::cout << "Skipping preconditioner for now..." << std::endl;
+        //Precondition( T );
+        thetaLast = theta;
+        PseudoNorms( T, theta );
+        for( int k=0; k<numRhs; ++k )
+        {
+            theta[k] /= tau[k];
+            c[k]      = one/sqrt(one+theta[k]*theta[k]);
+            tau[k]    = tau[k]*theta[k]*c[k];
+        }
+        for( int k=0; k<numRhs; ++k ) 
+            tempScalars[k] = c[k]*c[k]*thetaLast[k]*thetaLast[k];
+        MultiplyColumns( P, tempScalars );
+        for( int k=0; k<numRhs; ++k )
+            tempScalars[k] = c[k]*c[k]*alpha[k];
+        AddScaledColumns( tempScalars, Q, P );
+        elemental::basic::Axpy( (C)1, P, B );
+        const bool zeroTheta = CheckForZeros( theta );
+        if( zeroTheta )
+        {
+            if( commRank == 0 )
+                std::cout << "QMR stopped due to a zero theta" << std::endl;
+            break;
+        }
+
+        // Residual checks
+        Norms( V, bcgResidNorm );
+        for( int k=0; k<numRhs; ++k )
+            relBcgResidNorm[k] = bcgResidNorm[k]/origResidNorm[k];
+        R maxRelBcgResidNorm = 0;
+        for( int k=0; k<numRhs; ++k )
+            maxRelBcgResidNorm = 
+                std::max(maxRelBcgResidNorm,relBcgResidNorm[k]);
+        if( maxRelBcgResidNorm < bcgRelTol )
+        {
+            if( commRank == 0 )
+                std::cout << "Converged with BCG relative tolerance: " 
+                          << maxRelBcgResidNorm << std::endl;
+            break;
+        }
+        else
+        {
+            if( commRank == 0 )
+                std::cout << "  finished iteration " << it << " with "
+                          << "maxRelBcgResidNorm=" << maxRelBcgResidNorm 
+                          << std::endl;
+        }
+
+        // rhoLast := rho
+        // rho     := v^T t
+        // beta    := rho / rhoLast
+        // q       := t + beta q
+        const bool zeroRho = CheckForZeros( rho );
+        if( zeroRho )
+        {
+            if( commRank == 0 ) 
+                std::cout << "QMR stopped due to a zero rho" << std::endl;
+            break;
+        }
+        rhoLast = rho;
+        PseudoInnerProducts( V, T, rho );
+        for( int k=0; k<numRhs; ++k )
+            beta[k] = rho[k] / rhoLast[k];
+        MultiplyColumns( Q, beta );
+        elemental::basic::Axpy( (C)1, T, Q );
+    }
+}
+
+template<typename R>
+bool
+psp::DistHelmholtz<R>::CheckForZeros( const std::vector<C>& alpha ) const
+{
+    bool foundZero = false;
+    for( int k=0; k<alpha.size(); ++k )
+        if( alpha[k] == (C)0 ) // think about using a tolerance instead
+            foundZero = true;
+    return foundZero;
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::Norms
-( const elemental::Matrix<C>& X, std::vector<R>& norms ) const
+( const elemental::Matrix<C>& X, std::vector<R>& norm ) const
 {
     const int localHeight = X.Height();
     const int numCols = X.Width();
@@ -301,28 +455,47 @@ psp::DistHelmholtz<R>::Norms
     std::vector<R> allLocalNorms( numCols*commSize );
     mpi::AllGather
     ( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm_ );
-    norms.resize( numCols );
+    norm.resize( numCols );
     for( int j=0; j<numCols; ++j )
-        norms[j] = 
-            elemental::blas::Nrm2( commSize, &allLocalNorms[j], numCols );
+        norm[j] = elemental::blas::Nrm2( commSize, &allLocalNorms[j], numCols );
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::PseudoNorms
+( const elemental::Matrix<C>& X, std::vector<C>& alpha ) const
+{
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    std::vector<C> localAlpha( numCols );
+    for( int j=0; j<numCols; ++j )
+        localAlpha[j] = 
+            elemental::blas::Dotu
+            ( localHeight, X.LockedBuffer(0,j), 1,
+                           X.LockedBuffer(0,j), 1 );
+    alpha.resize( numCols );
+    // TODO: Think about avoiding overflow?
+    mpi::AllReduce( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
+    for( int j=0; j<numCols; ++j )
+        alpha[j] = sqrt(alpha[j]);
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::PseudoInnerProducts
 ( const elemental::Matrix<C>& X, const elemental::Matrix<C>& Y,
-  std::vector<C>& alphas ) const
+  std::vector<C>& alpha ) const
 {
     const int localHeight = X.Height();
     const int numCols = X.Width();
-    std::vector<C> localAlphas( numCols );
+    std::vector<C> localAlpha( numCols );
     for( int j=0; j<numCols; ++j )
-        localAlphas[j] = 
+        localAlpha[j] = 
             elemental::blas::Dotu
             ( localHeight, X.LockedBuffer(0,j), 1,
                            Y.LockedBuffer(0,j), 1 );
-    alphas.resize( numCols );
-    mpi::AllReduce( &localAlphas[0], &alphas[0], numCols, MPI_SUM, comm_ );
+    alpha.resize( numCols );
+    mpi::AllReduce( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
 }
 
 template<typename R>
@@ -344,7 +517,7 @@ psp::DistHelmholtz<R>::DivideColumns
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::ScaleColumns
+psp::DistHelmholtz<R>::MultiplyColumns
 ( elemental::Matrix<C>& X, const std::vector<C>& d ) const
 {
     const int localHeight = X.Height();
@@ -372,7 +545,25 @@ psp::DistHelmholtz<R>::AddScaledColumns
         C* YCol = Y.Buffer(0,j);
         const C* XCol = X.LockedBuffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            YCol[j] += delta*XCol[j];
+            YCol[iLocal] += delta*XCol[iLocal];
+    }
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::SubtractScaledColumns
+( const std::vector<C>& d, 
+  const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const
+{
+    const int localHeight = X.Height();
+    const int numCols = X.Width();
+    for( int j=0; j<numCols; ++j )
+    {
+        const C delta = d[j];
+        C* YCol = Y.Buffer(0,j);
+        const C* XCol = X.LockedBuffer(0,j);
+        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+            YCol[iLocal] -= delta*XCol[iLocal];
     }
 }
 
