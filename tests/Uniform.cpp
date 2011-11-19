@@ -31,22 +31,22 @@ main( int argc, char* argv[] )
     
     FiniteDiffControl<double> control;
     control.stencil = SEVEN_POINT;
-    control.nx = 30;
-    control.ny = 30;
-    control.nz = 15;
+    control.nx = 500;
+    control.ny = 500;
+    control.nz = 500;
     control.wx = 1;
     control.wy = 1;
     control.wz = 1;
-    control.omega = 5;
+    control.omega = 10;
     control.Cx = 1.5*(2*M_PI);
     control.Cy = 1.5*(2*M_PI);
     control.Cz = 1.5*(2*M_PI);
-    control.etax = 1./6.;
-    control.etay = 1./6.;
-    control.etaz = 1./6.;
+    control.etax = 5.0/control.nx;
+    control.etay = 5.0/control.ny;
+    control.etaz = 5.0/control.nz;
     control.imagShift = 1;
     control.cutoff = 96;
-    control.numPlanesPerPanel = 2;
+    control.numPlanesPerPanel = 5;
     control.frontBC = PML;
     control.rightBC = PML;
     control.backBC = PML;
@@ -88,9 +88,15 @@ main( int argc, char* argv[] )
 
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
+        clique::mpi::Barrier( comm );
+        const double initialStartTime = clique::mpi::Time(); 
         helmholtz.Initialize( slowness );
+        clique::mpi::Barrier( comm );
+        const double initialStopTime = clique::mpi::Time();
+        const double initialTime = initialStopTime - initialStartTime;
         if( commRank == 0 )
-            std::cout << "Finished initialization." << std::endl;
+            std::cout << "Finished initialization: " << initialTime << " seconds."
+                      << std::endl;
 
         GridData<std::complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
@@ -111,10 +117,16 @@ main( int argc, char* argv[] )
 
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
+        clique::mpi::Barrier( comm );
+        const double solveStartTime = clique::mpi::Time();
         const int maxIterations = 500;
         helmholtz.Solve( B, QMR, maxIterations );
+        clique::mpi::Barrier( comm );
+        const double solveStopTime = clique::mpi::Time();
+        const double solveTime = solveStopTime - solveStartTime;
         if( commRank == 0 )
-            std::cout << "Finished solve." << std::endl;
+            std::cout << "Finished solve: " << solveTime << " seconds." 
+                      << std::endl;
 
         // TODO: B.Visualize()???
 

@@ -41,7 +41,6 @@ psp::DistHelmholtz<R>::Solve
 #ifndef RELEASE
     if( commRank == 0 )
         std::cout << "done" << std::endl;
-    elemental::Matrix<C> origB = B;
 #endif
 
     // Solve the systems of equations
@@ -50,20 +49,6 @@ psp::DistHelmholtz<R>::Solve
     case GMRES: SolveWithGMRES( B, maxIterations ); break;
     case QMR:   SolveWithQMR( B, maxIterations );   break;
     }
-
-#ifndef RELEASE
-    if( commRank == 0 )
-    {
-        std::cout << "Checking error...";
-        std::cout.flush();
-    }
-    elemental::Matrix<C> Y = B;
-    Multiply( Y );
-    elemental::basic::Axpy( (C)-1, origB, Y );
-    const R norm = elemental::advanced::Norm( Y );
-    if( commRank == 0 )
-        std::cout << "||AB - origB||_F = " << norm << std::endl;
-#endif
 
     // Restore the solutions back into the GridData form
 #ifndef RELEASE
