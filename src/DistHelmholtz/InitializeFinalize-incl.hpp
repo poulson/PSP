@@ -926,21 +926,19 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         // Partition the X dimension
         //
         const int middle = (xSize-1)/2;
+        const int powerOfTwo = 1u << (depthTilSerial-1);
         const bool onLeft = 
-            ( depthTilSerial==0 ? 
-              true :
-              (commRank&(1u<<(depthTilSerial-1)))==0 );
+            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)==0 );
         const bool onRight =
-            ( depthTilSerial==0 ?
-              true :
-              (commRank&(1u<<(depthTilSerial-1)))!=0 );
+            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)!=0 );
+        const bool newCommRank = ( onLeft ? commRank : commRank^powerOfTwo );
 
         // Recurse on the left side
         if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, middle, ySize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank/2 );
+              nextDepthTilSerial, cutoff, newCommRank );
         offset += middle*ySize*vSize;
 
         // Recurse on the right side
@@ -949,7 +947,7 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
             ( reordering, offset,
               xOffset+middle+1, yOffset,
               std::max(xSize-middle-1,0), ySize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank/2 );
+              nextDepthTilSerial, cutoff, newCommRank );
         offset += std::max(xSize-middle-1,0)*ySize*vSize;
 
         // Store the separator
@@ -971,21 +969,19 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         // Partition the Y dimension
         //
         const int middle = (ySize-1)/2; 
+        const int powerOfTwo = 1u << (depthTilSerial-1);
         const bool onLeft = 
-            ( depthTilSerial==0 ? 
-              true :
-              (commRank&(1u<<(depthTilSerial-1)))==0 );
+            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)==0 );
         const bool onRight =
-            ( depthTilSerial==0 ?
-              true :
-              (commRank&(1u<<(depthTilSerial-1)))!=0 );
+            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)!=0 );
+        const bool newCommRank = ( onLeft ? commRank : commRank^powerOfTwo );
 
         // Recurse on the left side
         if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, xSize, middle, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank/2 );
+              nextDepthTilSerial, cutoff, newCommRank );
         offset += xSize*middle*vSize;
 
         // Recurse on the right side
@@ -994,7 +990,7 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset+middle+1,
               xSize, std::max(ySize-middle-1,0), vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank/2 );
+              nextDepthTilSerial, cutoff, newCommRank );
         offset += xSize*std::max(ySize-middle-1,0)*vSize;
 
         // Store the separator

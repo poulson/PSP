@@ -45,7 +45,7 @@ main( int argc, char* argv[] )
     control.etay = 1./6.;
     control.etaz = 1./6.;
     control.imagShift = 1;
-    control.cutoff = 16;
+    control.cutoff = 4;
     control.numPlanesPerPanel = 1;
     control.frontBC = PML;
     control.rightBC = PML;
