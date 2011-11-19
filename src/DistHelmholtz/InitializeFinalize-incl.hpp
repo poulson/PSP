@@ -900,7 +900,7 @@ template<typename R>
 void psp::DistHelmholtz<R>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-  int depthTilSerial, int cutoff, int commRank )
+  int depthTilSerial, int cutoff, unsigned commRank )
 {
     const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
@@ -925,33 +925,32 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the X dimension
         //
-        const int middle = (xSize-1)/2;
-        const int powerOfTwo = 1u << (depthTilSerial-1);
+        const int xLeftSize = (xSize-1)/2;
+        const int xRightSize = std::max(xSize-xLeftSize-1,0);
+        const unsigned powerOfTwo = 1u << (depthTilSerial-1);
         const bool onLeft = 
             ( depthTilSerial==0 ? true : (commRank&powerOfTwo)==0 );
         const bool onRight =
             ( depthTilSerial==0 ? true : (commRank&powerOfTwo)!=0 );
-        const bool newCommRank = ( onLeft ? commRank : commRank^powerOfTwo );
 
         // Recurse on the left side
         if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
-              xOffset, yOffset, middle, ySize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, newCommRank );
-        offset += middle*ySize*vSize;
+              xOffset, yOffset, xLeftSize, ySize, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank );
+        offset += xLeftSize*ySize*vSize;
 
         // Recurse on the right side
         if( onRight )
             LocalReorderingRecursion
             ( reordering, offset,
-              xOffset+middle+1, yOffset,
-              std::max(xSize-middle-1,0), ySize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, newCommRank );
-        offset += std::max(xSize-middle-1,0)*ySize*vSize;
+              xOffset+xLeftSize+1, yOffset, xRightSize, ySize, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank );
+        offset += xRightSize*ySize*vSize;
 
         // Store the separator
-        const int x = xOffset + middle;
+        const int x = xOffset + xLeftSize;
         for( int vDelta=0; vDelta<vSize; ++vDelta )
         {
             const int v = vDelta;
@@ -968,33 +967,32 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the Y dimension
         //
-        const int middle = (ySize-1)/2; 
-        const int powerOfTwo = 1u << (depthTilSerial-1);
+        const int yLeftSize = (ySize-1)/2;
+        const int yRightSize = std::max(ySize-yLeftSize-1,0);
+        const unsigned powerOfTwo = 1u << (depthTilSerial-1);
         const bool onLeft = 
             ( depthTilSerial==0 ? true : (commRank&powerOfTwo)==0 );
         const bool onRight =
             ( depthTilSerial==0 ? true : (commRank&powerOfTwo)!=0 );
-        const bool newCommRank = ( onLeft ? commRank : commRank^powerOfTwo );
 
         // Recurse on the left side
         if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
-              xOffset, yOffset, xSize, middle, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, newCommRank );
-        offset += xSize*middle*vSize;
+              xOffset, yOffset, xSize, yLeftSize, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank );
+        offset += xSize*yLeftSize*vSize;
 
         // Recurse on the right side
         if( onRight )
             LocalReorderingRecursion
             ( reordering, offset,
-              xOffset, yOffset+middle+1,
-              xSize, std::max(ySize-middle-1,0), vSize, nx, ny,
-              nextDepthTilSerial, cutoff, newCommRank );
-        offset += xSize*std::max(ySize-middle-1,0)*vSize;
+              xOffset, yOffset+yLeftSize+1, xSize, yRightSize, vSize, nx, ny,
+              nextDepthTilSerial, cutoff, commRank );
+        offset += xSize*yRightSize*vSize;
 
         // Store the separator
-        const int y = yOffset + middle;
+        const int y = yOffset + yLeftSize;
         for( int vDelta=0; vDelta<vSize; ++vDelta )
         {
             const int v = vDelta;

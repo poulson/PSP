@@ -225,7 +225,7 @@ private:
     int LocalPanelHeight( int vSize, int vPadding, unsigned commRank ) const;
     static void LocalPanelHeightRecursion
     ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
-      unsigned commRank, unsigned depthTilSerial, int& localHeight );
+      unsigned teamRank, unsigned depthTilSerial, int& localHeight );
 
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
@@ -233,7 +233,7 @@ private:
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
-      unsigned commRank, unsigned depthTilSerial,
+      unsigned teamRank, unsigned depthTilSerial,
       std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
       int& localOffset );
 
@@ -243,7 +243,7 @@ private:
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
-      unsigned commRank, unsigned depthTilSerial,
+      unsigned teamRank, unsigned depthTilSerial,
       std::vector<int>& localConnections, int& localOffset );
 
     int OwningProcess( int naturalIndex ) const;
@@ -287,7 +287,7 @@ private:
     static void LocalReorderingRecursion
     ( std::map<int,int>& reordering, int offset, 
       int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-      int depthTilSerial, int cutoff, int commRank );
+      int depthTilSerial, int cutoff, unsigned commRank );
 
     int ReorderedIndex( int x, int y, int vLocal, int vSize ) const;
     static int ReorderedIndexRecursion

@@ -498,7 +498,7 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::LocalPanelHeightRecursion
 ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
-  unsigned commRank, unsigned depthTilSerial, int& localHeight ) 
+  unsigned teamRank, unsigned depthTilSerial, int& localHeight ) 
 {
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
     {
@@ -512,11 +512,11 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         //
 
         // Add our local portion of the partition
-        const int commSize = 1u<<depthTilSerial;
-        const int alignment = (ySize*vPadding) % commSize;
-        const int colShift = elemental::Shift( commRank, alignment, commSize );
+        const int teamSize = 1u<<depthTilSerial;
+        const int alignment = (ySize*vPadding) % teamSize;
+        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
         localHeight += 
-            elemental::LocalLength( ySize*vSize, colShift, commSize );
+            elemental::LocalLength( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSize = (xSize-1) / 2;
@@ -532,23 +532,22 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         }
         else
         {
-            const int powerOfTwo = 1u << (depthTilSerial-1);
-            const bool onLeft = (commRank & powerOfTwo) == 0;
+            const unsigned powerOfTwo = 1u << (depthTilSerial-1);
+            const bool onLeft = (teamRank & powerOfTwo) == 0;
+            const unsigned newTeamRank = teamRank & ~powerOfTwo;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 LocalPanelHeightRecursion
                 ( xLeftSize, ySize, vSize, vPadding, cutoff,
-                  newCommRank, depthTilSerial-1, localHeight );
+                  newTeamRank, depthTilSerial-1, localHeight );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 LocalPanelHeightRecursion
                 ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff,
-                  newCommRank, depthTilSerial-1, localHeight );
+                  newTeamRank, depthTilSerial-1, localHeight );
             }
         }
     }
@@ -559,11 +558,11 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         //
 
         // Add our local portion of the partition
-        const int commSize = 1u<<depthTilSerial;
-        const int alignment = (xSize*vPadding) % commSize;
-        const int colShift = elemental::Shift( commRank, alignment, commSize );
+        const int teamSize = 1u<<depthTilSerial;
+        const int alignment = (xSize*vPadding) % teamSize;
+        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
         localHeight +=
-            elemental::LocalLength( xSize*vSize, colShift, commSize );
+            elemental::LocalLength( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSize = (ySize-1) / 2;
@@ -579,23 +578,22 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         }
         else
         {
-            const int powerOfTwo = 1u << (depthTilSerial-1);
-            const bool onLeft = (commRank & powerOfTwo) == 0;
+            const unsigned powerOfTwo = 1u << (depthTilSerial-1);
+            const bool onLeft = (teamRank & powerOfTwo) == 0;
+            const unsigned newTeamRank = teamRank & ~powerOfTwo;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 LocalPanelHeightRecursion
                 ( xSize, yLeftSize, vSize, vPadding, cutoff,
-                  newCommRank, depthTilSerial-1, localHeight );
+                  newTeamRank, depthTilSerial-1, localHeight );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 LocalPanelHeightRecursion
                 ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 
-                  newCommRank, depthTilSerial-1, localHeight );
+                  newTeamRank, depthTilSerial-1, localHeight );
             }
         }
     }
@@ -645,22 +643,20 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
         }
         else
         {
-            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const unsigned powerOfTwo = 1u<<(depthTilSerial-1);
             const bool onLeft = (commRank & powerOfTwo) == 0;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 NumLocalSupernodesRecursion
-                ( xLeftSize, ySize, cutoff, newCommRank, depthTilSerial-1, 
+                ( xLeftSize, ySize, cutoff, commRank, depthTilSerial-1, 
                   numLocal );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 NumLocalSupernodesRecursion
-                ( xSize-(xLeftSize+1), ySize, cutoff, newCommRank, 
+                ( xSize-(xLeftSize+1), ySize, cutoff, commRank, 
                   depthTilSerial-1, numLocal );
             }
         }
@@ -687,22 +683,20 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
         }
         else
         {
-            const int powerOfTwo = 1u<<(depthTilSerial-1);
+            const unsigned powerOfTwo = 1u<<(depthTilSerial-1);
             const bool onLeft = (commRank & powerOfTwo) == 0;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 NumLocalSupernodesRecursion
-                ( xSize, yLeftSize, cutoff, newCommRank, depthTilSerial-1, 
+                ( xSize, yLeftSize, cutoff, commRank, depthTilSerial-1, 
                   numLocal );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 NumLocalSupernodesRecursion
-                ( xSize, ySize-(yLeftSize+1), cutoff, newCommRank, 
+                ( xSize, ySize-(yLeftSize+1), cutoff, commRank, 
                   depthTilSerial-1, numLocal );
             }
         }
@@ -877,7 +871,7 @@ void
 psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
   int xOffset, int yOffset, int vOffset, int cutoff, 
-  unsigned commRank, unsigned depthTilSerial,
+  unsigned teamRank, unsigned depthTilSerial,
   std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
   int& localOffset )
 {
@@ -927,7 +921,6 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int commSize = 1u<<depthTilSerial;
         const int xLeftSize = (xSize-1) / 2;
         if( depthTilSerial == 0 )
         {
@@ -944,38 +937,38 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         }
         else
         {
-            const int powerOfTwo = 1u<<(depthTilSerial-1);
-            const bool onLeft = (commRank & powerOfTwo) == 0;
+            const unsigned powerOfTwo = 1u << (depthTilSerial-1);
+            const bool onLeft = (teamRank & powerOfTwo) == 0;
+            const unsigned newTeamRank = teamRank & ~powerOfTwo;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  xOffset, yOffset, vOffset, cutoff, newTeamRank,
                   depthTilSerial-1, localToNaturalMap, localRowOffsets, 
                   localOffset );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
                   xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
-                  newCommRank, depthTilSerial-1, localToNaturalMap, 
+                  newTeamRank, depthTilSerial-1, localToNaturalMap, 
                   localRowOffsets, localOffset );
             }
         }
         
         // Add our local portion of the partition
-        const int alignment = (ySize*vPadding) % commSize;
-        const int colShift = elemental::Shift( commRank, alignment, commSize );
+        const int teamSize = 1u<<depthTilSerial;
+        const int alignment = (ySize*vPadding) % teamSize;
+        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( ySize*vSize, colShift, commSize );
+            elemental::LocalLength( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = colShift + iLocal*commSize;
+            const int i = colShift + iLocal*teamSize;
             const int yDelta = i % ySize;
             const int vDelta = i / ySize;
             const int x = xOffset + xLeftSize;
@@ -1013,7 +1006,6 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int commSize = 1u<<depthTilSerial;
         const int yLeftSize = (ySize-1) / 2;
         if( depthTilSerial == 0 )
         {
@@ -1030,38 +1022,38 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         }
         else
         {
-            const int powerOfTwo = 1u<<(depthTilSerial-1);
-            const bool onLeft = (commRank & powerOfTwo) == 0;
+            const unsigned powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (teamRank & powerOfTwo) == 0;
+            const unsigned newTeamRank = teamRank & ~powerOfTwo;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  xOffset, yOffset, vOffset, cutoff, newTeamRank, 
                   depthTilSerial-1, localToNaturalMap, localRowOffsets, 
                   localOffset );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
                   xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
-                  newCommRank, depthTilSerial-1, localToNaturalMap, 
+                  newTeamRank, depthTilSerial-1, localToNaturalMap, 
                   localRowOffsets, localOffset );
             }
         }
         
         // Add our local portion of the partition
-        const int alignment = (xSize*vPadding) % commSize;
-        const int colShift = elemental::Shift( commRank, alignment, commSize );
+        const int teamSize = 1u<<depthTilSerial;
+        const int alignment = (xSize*vPadding) % teamSize;
+        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( xSize*vSize, colShift, commSize );
+            elemental::LocalLength( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = colShift + iLocal*commSize;
+            const int i = colShift + iLocal*teamSize;
             const int xDelta = i % xSize;
             const int vDelta = i / xSize;
             const int x = xOffset + xDelta;
@@ -1115,7 +1107,7 @@ void
 psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
   int xOffset, int yOffset, int vOffset, int cutoff, 
-  unsigned commRank, unsigned depthTilSerial,
+  unsigned teamRank, unsigned depthTilSerial,
   std::vector<int>& localConnections, int& localOffset )
 {
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
@@ -1156,7 +1148,6 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int commSize = 1u<<depthTilSerial;
         const int xLeftSize = (xSize-1) / 2;
         if( depthTilSerial == 0 )
         {
@@ -1173,37 +1164,37 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         }
         else
         {
-            const int powerOfTwo = 1u<<(depthTilSerial-1);
-            const bool onLeft = (commRank & powerOfTwo) == 0;
+            const unsigned powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (teamRank & powerOfTwo) == 0;
+            const unsigned newTeamRank = teamRank & ~powerOfTwo;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  xOffset, yOffset, vOffset, cutoff, newTeamRank, 
                   depthTilSerial-1, localConnections, localOffset );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
                   xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
-                  newCommRank, depthTilSerial-1, localConnections, 
+                  newTeamRank, depthTilSerial-1, localConnections, 
                   localOffset );
             }
         }
         
         // Add our local portion of the partition
-        const int alignment = (ySize*vPadding) % commSize;
-        const int colShift = elemental::Shift( commRank, alignment, commSize );
+        const int teamSize = 1u<<depthTilSerial;
+        const int alignment = (ySize*vPadding) % teamSize;
+        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( ySize*vSize, colShift, commSize );
+            elemental::LocalLength( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = colShift + iLocal*commSize;
+            const int i = colShift + iLocal*teamSize;
             const int yDelta = i % ySize;
             const int vDelta = i / ySize;
             const int x = xOffset + xLeftSize;
@@ -1233,7 +1224,6 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int commSize = 1u<<depthTilSerial;
         const int yLeftSize = (ySize-1) / 2;
         if( depthTilSerial == 0 )
         {
@@ -1250,37 +1240,37 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         }
         else
         {
-            const int powerOfTwo = 1u<<(depthTilSerial-1);
-            const bool onLeft = (commRank & powerOfTwo) == 0;
+            const unsigned powerOfTwo = 1u<<(depthTilSerial-1);
+            const bool onLeft = (teamRank & powerOfTwo) == 0;
+            const unsigned newTeamRank = teamRank & ~powerOfTwo;
             if( onLeft )
             {
                 // Add the left side
-                const int newCommRank = commRank;
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newCommRank, 
+                  xOffset, yOffset, vOffset, cutoff, newTeamRank, 
                   depthTilSerial-1, localConnections, localOffset );
             }
             else
             {
                 // Add the right side
-                const int newCommRank = commRank ^ powerOfTwo;
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
                   xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
-                  newCommRank, depthTilSerial-1, localConnections, 
+                  newTeamRank, depthTilSerial-1, localConnections, 
                   localOffset );
             }
         }
         
         // Add our local portion of the partition
-        const int alignment = (xSize*vPadding) % commSize;
-        const int colShift = elemental::Shift( commRank, alignment, commSize );
+        const int teamSize = 1u<<depthTilSerial;
+        const int alignment = (xSize*vPadding) % teamSize;
+        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( xSize*vSize, colShift, commSize );
+            elemental::LocalLength( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
-            const int i = colShift + iLocal*commSize;
+            const int i = colShift + iLocal*teamSize;
             const int xDelta = i % xSize;
             const int vDelta = i / xSize;
             const int x = xOffset + xDelta;
@@ -1304,6 +1294,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         }
     }
 }
+// HERE
 
 template<typename R>
 int
@@ -1499,7 +1490,7 @@ psp::DistHelmholtz<R>::FillDistOrigPanelStruct
     for( int s=log2CommSize_; s>0; --s )
     {
         clique::symbolic::DistSymmOrigSupernode& sn = S.dist.supernodes[s];
-        const int powerOfTwo = 1u<<(s-1);
+        const unsigned powerOfTwo = 1u<<(s-1);
         const bool onLeft = (commRank & powerOfTwo) == 0;
         if( nxSub >= nySub )
         {
