@@ -21,6 +21,18 @@
 #include "psp.hpp"
 using namespace psp;
 
+void Usage()
+{
+    std::cout << "Uniform <nx> <ny> <nz> <omega> <numPlanesPerPanel> <viz?>\n" 
+              << "  <nx>: Size of grid in x dimension\n"
+              << "  <ny>: Size of grid in y dimension\n"
+              << "  <nz>: Size of grid in z dimension\n"
+              << "  <omega>: Frequency (in rad/sec) of problem\n"
+              << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
+              << "  <viz?>:  Visualize iff != 0\n"
+              << std::endl;
+}
+
 int
 main( int argc, char* argv[] )
 {
@@ -28,16 +40,38 @@ main( int argc, char* argv[] )
     clique::mpi::Comm comm = clique::mpi::COMM_WORLD;
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
+
+    if( argc < 7 )
+    {
+        if( commRank == 0 )
+            Usage();
+        clique::Finalize();
+        return 0;
+    }
+    const int nx = atoi( argv[1] );
+    const int ny = atoi( argv[2] );
+    const int nz = atoi( argv[3] );
+    const double omega = atof( argv[4] );
+    const int numPlanesPerPanel = atoi( argv[5] );
+    const bool visualize = atoi( argv[6] );
+
+    if( commRank == 0 )
+    {
+        std::cout << "Running with (nx,ny,nz)=("
+                  << nx << "," << ny << "," << nz << "), omega=" 
+                  << omega << ", and numPlanesPerPanel=" << numPlanesPerPanel
+                  << std::endl;
+    }
     
     FiniteDiffControl<double> control;
     control.stencil = SEVEN_POINT;
-    control.nx = 500;
-    control.ny = 500;
-    control.nz = 500;
+    control.nx = nx;
+    control.ny = ny;
+    control.nz = nz;
     control.wx = 1;
     control.wy = 1;
     control.wz = 1;
-    control.omega = 10;
+    control.omega = omega;
     control.Cx = 1.5*(2*M_PI);
     control.Cy = 1.5*(2*M_PI);
     control.Cz = 1.5*(2*M_PI);
@@ -46,7 +80,7 @@ main( int argc, char* argv[] )
     control.etaz = 5.0/control.nz;
     control.imagShift = 1;
     control.cutoff = 96;
-    control.numPlanesPerPanel = 5;
+    control.numPlanesPerPanel = numPlanesPerPanel;
     control.frontBC = PML;
     control.rightBC = PML;
     control.backBC = PML;
@@ -84,7 +118,19 @@ main( int argc, char* argv[] )
         for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
             localSlowness[i] = 1;
 
-        // TODO: slowness.Visualize()???
+        if( visualize )
+        {
+            if( commRank == 0 )
+            {
+                std::cout << "Writing slowness data...";
+                std::cout.flush();
+            }
+            slowness.WriteVtkFiles("slowness");
+            sleep(1);
+            elemental::mpi::Barrier( comm );
+            if( commRank == 0 )
+                std::cout << "done" << std::endl;
+        }
 
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
@@ -95,8 +141,8 @@ main( int argc, char* argv[] )
         const double initialStopTime = clique::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;
         if( commRank == 0 )
-            std::cout << "Finished initialization: " << initialTime << " seconds."
-                      << std::endl;
+            std::cout << "Finished initialization: " << initialTime 
+                      << " seconds." << std::endl;
 
         GridData<std::complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
@@ -113,7 +159,17 @@ main( int argc, char* argv[] )
             localB[localIndex] = 1;
         }
 
-        // TODO: B.Visualize()???
+        if( visualize )
+        {
+            if( commRank == 0 )
+            {
+                std::cout << "Writing source data...";
+                std::cout.flush();
+            }
+            B.WriteVtkFiles("source");
+            if( commRank == 0 )
+                std::cout << "done" << std::endl;
+        }
 
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
@@ -128,7 +184,17 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        // TODO: B.Visualize()???
+        if( visualize )
+        {
+            if( commRank == 0 )
+            {
+                std::cout << "Writing solution data...";
+                std::cout.flush();
+            }
+            B.WriteVtkFiles("solution");
+            if( commRank == 0 )
+                std::cout << std::endl;
+        }
 
         helmholtz.Finalize();
     }
