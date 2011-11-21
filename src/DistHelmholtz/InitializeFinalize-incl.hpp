@@ -31,14 +31,12 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     // Initialize and factor the top panel (first, since it is the largest)
     //
-#ifndef RELEASE
     const int commRank = elemental::mpi::CommRank( comm_ );
     if( commRank == 0 )
     {
         std::cout << "Initializing top panel...";
         std::cout.flush();
     }
-#endif
     {
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
@@ -63,21 +61,17 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
     }
-#ifndef RELEASE
     if( commRank == 0 )
         std::cout << "done" << std::endl;
-#endif
 
     //
     // Initialize and factor the bottom panel
     //
-#ifndef RELEASE
     if( commRank == 0 )
     {
         std::cout << "Initializing bottom panel...";
         std::cout.flush();
     }
-#endif
     {
         // Retrieve the slowness for this panel
         const int vOffset = 0;
@@ -103,10 +97,8 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
     }
-#ifndef RELEASE
     if( commRank == 0 )
         std::cout << "done" << std::endl;
-#endif
 
     //
     // Initialize and factor the full inner panels
@@ -114,14 +106,12 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     fullInnerFacts_.resize( numFullInnerPanels_ );
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
-#ifndef RELEASE
         if( commRank == 0 )
         {
             std::cout << "Initializing inner panel " << k << " of " 
                       << numFullInnerPanels_ << "...";
             std::cout.flush();
         }
-#endif
 
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
@@ -150,10 +140,8 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
 
-#ifndef RELEASE
         if( commRank == 0 )
             std::cout << "done" << std::endl;
-#endif
     }
 
     //
@@ -161,13 +149,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     //
     if( haveLeftover_ )
     {        
-#ifndef RELEASE
         if( commRank == 0 )
         {
             std::cout << "Initializing the leftover panel...";
             std::cout.flush();
         }
-#endif
 
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
@@ -194,23 +180,19 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
 
-#ifndef RELEASE
         if( commRank == 0 )
             std::cout << "done" << std::endl;
-#endif
     }
     
     //
     // Initialize the global sparse matrix
     //
 
-#ifndef RELEASE
     if( commRank == 0 )
     {
         std::cout << "Initializing global sparse matrix...";
         std::cout.flush();
     }
-#endif
 
     // Gather the slowness for the global sparse matrix
     std::vector<R> myGlobalSlowness;
@@ -237,10 +219,8 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         FormGlobalRow( alpha, x, y, v, rowOffset );
     }
 
-#ifndef RELEASE
     if( commRank == 0 )
         std::cout << "done" << std::endl;
-#endif
 }
 
 template<typename R>
