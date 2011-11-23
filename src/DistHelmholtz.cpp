@@ -37,12 +37,14 @@ psp::DistHelmholtz<R>::DistHelmholtz
   initialized_(false)
 {
     // Pull out some information about our communicator
-    const int commRank = elemental::mpi::CommRank( comm );
-    const int commSize = elemental::mpi::CommSize( comm );
+    const unsigned commRank = elemental::mpi::CommRank( comm );
+    const unsigned commSize = elemental::mpi::CommSize( comm );
     unsigned temp = commSize;
     log2CommSize_ = 0;
     while( temp >>= 1 )
         ++log2CommSize_;
+    if( 1u<<log2CommSize_ != commSize )
+        throw std::logic_error("Must use a power of two number of processes");
 
     // Decide if the domain is sufficiently deep to warrant sweeping
     const int nx = control.nx;

@@ -23,7 +23,7 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "EngquistYing <N> <omega> <numPlanesPerPanel> <velocity> "
+    std::cout << "EngquistYing <N> <omega> <velocity> <numPlanesPerPanel> "
                  "<viz?>\n" 
               << "  <N>: Size of grid in each dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
