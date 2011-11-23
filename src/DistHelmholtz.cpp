@@ -514,9 +514,10 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
+        const int colShift = 
+            elemental::Shift<int>( teamRank, alignment, teamSize );
         localHeight += 
-            elemental::LocalLength( ySize*vSize, colShift, teamSize );
+            elemental::LocalLength<int>( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSize = (xSize-1) / 2;
@@ -560,9 +561,10 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
+        const int colShift = 
+            elemental::Shift<int>( teamRank, alignment, teamSize );
         localHeight +=
-            elemental::LocalLength( xSize*vSize, colShift, teamSize );
+            elemental::LocalLength<int>( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSize = (ySize-1) / 2;
@@ -963,9 +965,10 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
+        const int colShift = 
+            elemental::Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( ySize*vSize, colShift, teamSize );
+            elemental::LocalLength<int>( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1048,9 +1051,10 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
+        const int colShift = 
+            elemental::Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( xSize*vSize, colShift, teamSize );
+            elemental::LocalLength<int>( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1189,9 +1193,10 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
+        const int colShift = 
+            elemental::Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( ySize*vSize, colShift, teamSize );
+            elemental::LocalLength<int>( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1265,9 +1270,10 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = elemental::Shift( teamRank, alignment, teamSize );
+        const int colShift = 
+            elemental::Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elemental::LocalLength( xSize*vSize, colShift, teamSize );
+            elemental::LocalLength<int>( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1294,7 +1300,6 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         }
     }
 }
-// HERE
 
 template<typename R>
 int
