@@ -120,7 +120,7 @@ main( int argc, char* argv[] )
         const int yLocalSize = slowness.YLocalSize();
         const int zLocalSize = slowness.ZLocalSize();
         for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
-            localSlowness[i] = 1;
+            localSlowness[i] = 1+amplitude*plcg::ParallelUniform<double>();
 
         if( visualize )
         {
@@ -130,7 +130,6 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             slowness.WriteVtkFiles("slowness");
-            sleep(1);
             elemental::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
@@ -160,7 +159,7 @@ main( int argc, char* argv[] )
         if( commRank == B.OwningProcess( xSource, ySource, zSource ) )
         {
             const int localIndex = B.LocalIndex( xSource, ySource, zSource ); 
-            localB[localIndex] = 1+amplitude*plcg::ParallelUniform<double>();
+            localB[localIndex] = 1;
         }
 
         if( visualize )

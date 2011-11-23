@@ -126,7 +126,6 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             slowness.WriteVtkFiles("slowness");
-            sleep(1);
             elemental::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
