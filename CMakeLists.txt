@@ -79,7 +79,7 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 # Build the test drivers if necessary
 if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(TESTS Uniform)
+  set(TESTS Random Uniform)
 
   # Build the tests
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/tests")

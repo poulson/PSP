@@ -162,7 +162,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
         }
     }
     globalSendCounts_.resize( commSize );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &globalRecvCounts_[0], 1,
       &globalSendCounts_[0], 1, comm );
 
@@ -195,7 +195,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     }
     offsets.clear();
     globalSendIndices_.resize( totalSendCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvIndices[0],        &globalRecvCounts_[0], &globalRecvDispls_[0],
       &globalSendIndices_[0], &globalSendCounts_[0], &globalSendDispls_[0], 
       comm );
@@ -248,10 +248,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
     }
     std::vector<int> subdiagSendCountsPerm( (numPanels_-1)*commSize );
     std::vector<int> supdiagSendCountsPerm( (numPanels_-1)*commSize );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &subdiagRecvCountsPerm[0], numPanels_-1,
       &subdiagSendCountsPerm[0], numPanels_-1, comm );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &supdiagRecvCountsPerm[0], numPanels_-1,
       &supdiagSendCountsPerm[0], numPanels_-1, comm );
 
@@ -422,7 +422,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // TODO: Think about reducing to a single AllToAll?
     for( int i=0; i<numPanels_-1; ++i )
     {
-        mpi::AllToAll
+        elemental::mpi::AllToAll
         ( &subdiagRecvIndices[subdiagPanelRecvDispls_[i]], 
           &subdiagRecvCounts_[i*commSize],
           &subdiagRecvDispls_[i*commSize],
@@ -430,7 +430,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
           &subdiagSendCounts_[i*commSize], 
           &subdiagSendDispls_[i*commSize],
           comm );
-        mpi::AllToAll
+        elemental::mpi::AllToAll
         ( &supdiagRecvIndices[supdiagPanelRecvDispls_[i]], 
           &supdiagRecvCounts_[i*commSize], 
           &supdiagRecvDispls_[i*commSize],
@@ -1484,7 +1484,7 @@ psp::DistHelmholtz<R>::FillDistOrigPanelStruct
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int cutoff = control_.cutoff;
-    const unsigned commRank = mpi::CommRank( comm_ );
+    const unsigned commRank = elemental::mpi::CommRank( comm_ );
     S.dist.comm = comm_;
     // Fill the distributed nodes
     for( int s=log2CommSize_; s>0; --s )

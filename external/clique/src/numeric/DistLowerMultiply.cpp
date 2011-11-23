@@ -216,9 +216,6 @@ void clique::numeric::DistLowerMultiplyTranspose
     }
 
     // Directly operate on the root separator's portion of the right-hand sides
-    std::cout << "S.dist.supernodes.size()=" << S.dist.supernodes.size() 
-              << std::endl;
-    std::cout << "L.dist.fronts.size()=" << L.dist.fronts.size() << std::endl;
     const DistSymmFactSupernode& rootSN = S.dist.supernodes.back();
     const DistSymmFront<F>& rootFront = L.dist.fronts.back();
     const Grid& rootGrid = rootFront.front1dL.Grid();
@@ -227,8 +224,6 @@ void clique::numeric::DistLowerMultiplyTranspose
     ( rootSN.size, width, 0,
       localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
     rootFront.work1d = XRoot; // store the RHS for use by the children
-    rootFront.front1dL.Print("rootFront.front1dL");
-    rootFront.work1d.Print("rootFront.work1d");
     DistFrontLowerMultiply
     ( orientation, diag, diagOffset, rootFront.front1dL, XRoot );
 
@@ -367,9 +362,6 @@ void clique::numeric::DistLowerMultiplyTranspose
         DistMatrix<F,VC,STAR> XNode( front.work1d );
 
         // Perform the multiply for this front
-        std::cout << "s=" << s << std::endl;
-        front.front1dL.Print("front.front1dL");
-        XNode.Print("XNode");
         DistFrontLowerMultiply
         ( orientation, diag, diagOffset, front.front1dL, XNode );
 

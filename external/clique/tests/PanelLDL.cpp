@@ -21,12 +21,15 @@
 
 void Usage()
 {
-    std::cout << "PanelLDL <numPanels> <nx> <ny> <nz> <cutoff> <write info?>\n"
+    std::cout << "PanelLDL <numPanels> <nx> <ny> <nz> <cutoff> <fact blocksize>"
+                 " <solve blocksize> <write info?>\n"
               << "<numPanels>: number of panels to factor in memory\n"
               << "<nx>: size of panel in x direction\n"
               << "<ny>: size of panel in y direction\n"
               << "<nz>: size of panel in z direction\n"
               << "<cutoff>: minimum required leaf size\n" 
+              << "<fact blocksize>: algorithmic blocksize for factorization\n"
+              << "<solve blocksize>: algorithm blocksize for solve\n"
               << "<write info?>: write basic local info to file? [0/1]\n"
               << "<prefix>: prefix for each process's info file\n"
               << std::endl;
@@ -44,12 +47,12 @@ void CountLocalTreeSize
 ( int nxSub, int nySub, int nz, int cutoff, int& numSupernodes );
 
 void FillOrigStruct
-( int nx, int ny, int nz, int cutoff, mpi::Comm comm, int log2CommSize,
+( int nx, int ny, int nz, int cutoff, clique::mpi::Comm comm, int log2CommSize,
   clique::symbolic::SymmOrig& S );
 
 void FillDistOrigStruct
 ( int nx, int ny, int nz, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-  int cutoff, mpi::Comm comm, int log2CommSize,
+  int cutoff, clique::mpi::Comm comm, int log2CommSize,
   clique::symbolic::SymmOrig& S );
 
 void FillLocalOrigStruct
@@ -61,9 +64,9 @@ int
 main( int argc, char* argv[] )
 {
     clique::Initialize( argc, argv );
-    mpi::Comm comm = mpi::COMM_WORLD;
-    const int commRank = mpi::CommRank( comm );
-    const int commSize = mpi::CommSize( comm );
+    clique::mpi::Comm comm = clique::mpi::COMM_WORLD;
+    const int commRank = clique::mpi::CommRank( comm );
+    const int commSize = clique::mpi::CommSize( comm );
     typedef std::complex<double> F;
 
     // Ensure that we have a power of two number of processes
@@ -82,7 +85,7 @@ main( int argc, char* argv[] )
         return 0;
     }
 
-    if( argc < 7 )
+    if( argc < 9 )
     {
         if( commRank == 0 )        
             Usage();
@@ -96,8 +99,10 @@ main( int argc, char* argv[] )
     const int ny = atoi( argv[argNum++] );
     const int nz = atoi( argv[argNum++] );
     const int cutoff = atoi( argv[argNum++] );
+    const int factBlocksize = atoi( argv[argNum++] );
+    const int solveBlocksize = atoi( argv[argNum++] );
     const bool writeInfo = atoi( argv[argNum++] );
-    if( writeInfo && argc == 7 )
+    if( writeInfo && argc == 9 )
     {
         if( commRank == 0 )
             Usage();
@@ -108,7 +113,9 @@ main( int argc, char* argv[] )
     if( commRank == 0 )
         std::cout << "numPanels=" << numPanels << "\n"
                   << "(nx,ny,nz)=(" << nx << "," << ny << "," << nz << ")\n"
-                  << "cutoff=" << cutoff << std::endl;
+                  << "cutoff=" << cutoff << "\n"
+                  << "factBlocksize=" << factBlocksize << "\n"
+                  << "solveBlocksize=" << solveBlocksize << std::endl;
 
     try
     {
@@ -121,13 +128,13 @@ main( int argc, char* argv[] )
         }
 
         // Fill the distributed portion of the original structure
-        mpi::Barrier( comm );
-        const double initStartTime = mpi::Time();
+        clique::mpi::Barrier( comm );
+        const double initStartTime = clique::mpi::Time();
         clique::symbolic::SymmOrig SOrig;
         FillOrigStruct
         ( nx, ny, nz, cutoff, comm, log2CommSize, SOrig );
-        mpi::Barrier( comm );
-        const double initStopTime = mpi::Time();
+        clique::mpi::Barrier( comm );
+        const double initStopTime = clique::mpi::Time();
         if( commRank == 0 )
             std::cout << "Init time: " << initStopTime-initStartTime << " secs"
                       << std::endl;
@@ -154,11 +161,11 @@ main( int argc, char* argv[] )
         }
 
         // Call the symbolic factorization routine
-        const double symbFactStartTime = mpi::Time();
+        const double symbFactStartTime = clique::mpi::Time();
         clique::symbolic::SymmFact S;
         clique::symbolic::SymmetricFactorization( SOrig, S, true );
-        mpi::Barrier( comm );
-        const double symbFactStopTime = mpi::Time();
+        clique::mpi::Barrier( comm );
+        const double symbFactStopTime = clique::mpi::Time();
         if( commRank == 0 )
             std::cout << "Symbolic factorization time: " 
                       << symbFactStopTime-symbFactStartTime << " secs"
@@ -200,7 +207,7 @@ main( int argc, char* argv[] )
                          << std::endl;
             // Directly initialize the frontal matrices with the original 
             // sparse matrix (for now, use an original matrix equal to identity)
-            const double fillStartTime = mpi::Time();
+            const double fillStartTime = clique::mpi::Time();
             symmFrontTrees.push_back( new clique::numeric::SymmFrontTree<F> );
             clique::numeric::SymmFrontTree<F>& L = *symmFrontTrees.back();
             L.local.fronts.resize( S.local.supernodes.size() );
@@ -208,7 +215,7 @@ main( int argc, char* argv[] )
             {
                 const clique::symbolic::LocalSymmFactSupernode& sn =
                     S.local.supernodes[s];
-                Matrix<F>& frontL = L.local.fronts[s].frontL;
+                elemental::Matrix<F>& frontL = L.local.fronts[s].frontL;
 
                 const int frontSize = sn.size+sn.lowerStruct.size();
                 frontL.ResizeTo( frontSize, sn.size );
@@ -223,7 +230,8 @@ main( int argc, char* argv[] )
             {
                 const clique::symbolic::DistSymmFactSupernode& sn = 
                     S.dist.supernodes[s];
-                DistMatrix<F,MC,MR>& front2dL = L.dist.fronts[s].front2dL;
+                elemental::DistMatrix<F,elemental::MC,elemental::MR>& front2dL =
+                    L.dist.fronts[s].front2dL;
 
                 front2dL.SetGrid( *sn.grid );
                 const int frontSize = sn.size+sn.lowerStruct.size();
@@ -233,8 +241,8 @@ main( int argc, char* argv[] )
                 if( writeInfo )
                     front2dL.Print( infoFile, "frontL dist" );
             }
-            mpi::Barrier( comm );
-            const double fillStopTime = mpi::Time();
+            clique::mpi::Barrier( comm );
+            const double fillStopTime = clique::mpi::Time();
             if( commRank == 0 )
                 std::cout << "Fill time: " << fillStopTime-fillStartTime
                           << " secs" << std::endl;
@@ -242,24 +250,24 @@ main( int argc, char* argv[] )
             // Generate a random RHS, multiply it by our matrix, and then 
             // compare the original RHS against the solution.
             const int NUM_RHS = 1;
-            const double makeRhsStartTime = mpi::Time();
+            const double makeRhsStartTime = clique::mpi::Time();
             const int localHeight1d = 
                 S.dist.supernodes.back().localOffset1d + 
                 S.dist.supernodes.back().localSize1d;
-            Matrix<F> localX( localHeight1d, NUM_RHS );
+            elemental::Matrix<F> localX( localHeight1d, NUM_RHS );
             localX.SetToRandom();
-            Matrix<F> localYLower = localX;
+            elemental::Matrix<F> localYLower = localX;
             clique::numeric::SetSolveMode( L, clique::FEW_RHS );
             clique::numeric::LowerMultiply
-            ( NORMAL, NON_UNIT, -1, S, L, localYLower );
-            Matrix<F> localY = localX;
+            ( elemental::NORMAL, elemental::NON_UNIT, -1, S, L, localYLower );
+            elemental::Matrix<F> localY = localX;
             clique::numeric::LowerMultiply
-            ( TRANSPOSE, NON_UNIT, 0, S, L, localY );
+            ( elemental::TRANSPOSE, elemental::NON_UNIT, 0, S, L, localY );
             elemental::basic::Axpy( (F)1, localYLower, localY );
             localYLower.Empty();
             clique::numeric::SetSolveMode( L, clique::MANY_RHS );
-            mpi::Barrier( comm );
-            const double makeRhsStopTime = mpi::Time();
+            clique::mpi::Barrier( comm );
+            const double makeRhsStopTime = clique::mpi::Time();
             if( commRank == 0 )
                 std::cout << "Make RHS time: " 
                           << makeRhsStopTime-makeRhsStartTime
@@ -271,34 +279,37 @@ main( int argc, char* argv[] )
             }
             const double myYNorm = elemental::advanced::Norm( localY );
             double YNorm;
-            mpi::Reduce( &myYNorm, &YNorm, 1, mpi::SUM, 0, comm );
+            clique::mpi::Reduce
+            ( &myYNorm, &YNorm, 1, clique::mpi::SUM, 0, comm );
 
             // Call the numerical factorization routine
-            const double factStartTime = mpi::Time();
-            clique::numeric::LDL( TRANSPOSE, S, L );
-            mpi::Barrier( comm );
-            const double factStopTime = mpi::Time();
+            elemental::SetBlocksize( factBlocksize );
+            const double factStartTime = clique::mpi::Time();
+            clique::numeric::LDL( elemental::TRANSPOSE, S, L );
+            clique::mpi::Barrier( comm );
+            const double factStopTime = clique::mpi::Time();
             if( commRank == 0 )
                 std::cout << "Factorization time: " 
                           << factStopTime-factStartTime
                           << " secs" << std::endl;
 
             // Redistribute to 1d for fast solves with few right-hand sides
-            const double redistStartTime = mpi::Time();
+            const double redistStartTime = clique::mpi::Time();
             clique::numeric::SetSolveMode( L, clique::FEW_RHS );
-            mpi::Barrier( comm );
-            const double redistStopTime = mpi::Time();
+            clique::mpi::Barrier( comm );
+            const double redistStopTime = clique::mpi::Time();
             if( commRank == 0 )
                 std::cout << "Redistribution time: " 
                           << redistStopTime-redistStartTime 
                           << " secs" << std::endl;
 
             // Solve
-            mpi::Barrier( comm );
-            const double solveStartTime = mpi::Time();
-            clique::numeric::LDLSolve( TRANSPOSE, S, L, localY, true );
-            mpi::Barrier( comm );
-            const double solveStopTime = mpi::Time();
+            elemental::SetBlocksize( solveBlocksize );
+            clique::mpi::Barrier( comm );
+            const double solveStartTime = clique::mpi::Time();
+            clique::numeric::LDLSolve( clique::TRANSPOSE, S, L, localY, true );
+            clique::mpi::Barrier( comm );
+            const double solveStopTime = clique::mpi::Time();
             if( commRank == 0 )
                 std::cout << "Solve time: " << solveStopTime-solveStartTime
                           << " secs" << std::endl;
@@ -308,7 +319,8 @@ main( int argc, char* argv[] )
             elemental::basic::Axpy( (F)-1, localX, localY );
             const double myErrorNorm = elemental::advanced::Norm( localY );
             double errorNorm;
-            mpi::Reduce( &myErrorNorm, &errorNorm, 1, mpi::SUM, 0, comm );
+            clique::mpi::Reduce
+            ( &myErrorNorm, &errorNorm, 1, clique::mpi::SUM, 0, comm );
             if( commRank == 0 )
             {
                 std::cout << "||y||_2: " << YNorm << "\n"
@@ -410,7 +422,7 @@ int ReorderedIndex
 }
 
 void FillOrigStruct
-( int nx, int ny, int nz, int cutoff, mpi::Comm comm, int log2CommSize,
+( int nx, int ny, int nz, int cutoff, clique::mpi::Comm comm, int log2CommSize,
   clique::symbolic::SymmOrig& SOrig )
 {
 #ifndef RELEASE
@@ -430,13 +442,13 @@ void FillOrigStruct
   
 void FillDistOrigStruct
 ( int nx, int ny, int nz, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-  int cutoff, mpi::Comm comm, int log2CommSize, 
+  int cutoff, clique::mpi::Comm comm, int log2CommSize, 
   clique::symbolic::SymmOrig& S )
 {
 #ifndef RELEASE
     clique::PushCallStack("FillDistOrigStruct");
 #endif
-    const int commRank = mpi::CommRank( comm );
+    const int commRank = clique::mpi::CommRank( comm );
     S.dist.comm = comm;
     S.dist.supernodes.resize( log2CommSize+1 );
     // Fill the distributed nodes

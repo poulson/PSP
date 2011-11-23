@@ -627,7 +627,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         std::vector<R>& myGlobalSlowness,
         std::vector<int>& offsets ) const
 {
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we need to recv from each process.
     std::vector<int> recvCounts( commSize, 0 );
@@ -638,7 +638,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvCounts[0], 1, 
       &sendCounts[0], 1, comm_ );
 
@@ -664,7 +664,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
         recvIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0], 
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -686,7 +686,7 @@ psp::DistHelmholtz<R>::GetGlobalSlowness
     sendIndices.clear();
 
     myGlobalSlowness.resize( totalRecvCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendSlowness[0],     &sendCounts[0], &sendDispls[0],
       &myGlobalSlowness[0], &recvCounts[0], &recvDispls[0], comm_ );
 
@@ -708,7 +708,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
 
     // Compute the reorderings for the indices in the supernodes in our 
     // local tree
@@ -770,7 +770,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
         }
     }
     std::vector<int> sendCounts( commSize );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
 
@@ -831,7 +831,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
         }
     }
     std::vector<int> sendIndices( totalSendCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -856,7 +856,7 @@ psp::DistHelmholtz<R>::GetPanelSlowness
     }
     sendIndices.clear();
     myPanelSlowness.resize( totalRecvCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendSlowness[0],    &sendCounts[0], &sendDispls[0],
       &myPanelSlowness[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendSlowness.clear();
@@ -873,7 +873,7 @@ void psp::DistHelmholtz<R>::LocalReordering
     LocalReorderingRecursion
     ( reordering, offset,
       0, 0, control_.nx, control_.ny, vSize, control_.nx, control_.ny,
-      log2CommSize_, control_.cutoff, mpi::CommRank(comm_) );
+      log2CommSize_, control_.cutoff, elemental::mpi::CommRank(comm_) );
 }
 
 template<typename R>
@@ -1057,7 +1057,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             symbFact.dist.supernodes[t];
 
         // Initialize this front
-        Grid& grid = *symbSN.grid;
+        elemental::Grid& grid = *symbSN.grid;
         const int gridHeight = grid.Height();
         const int gridWidth = grid.Width();
         const int gridRow = grid.MCRank();

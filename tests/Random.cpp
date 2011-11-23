@@ -23,12 +23,14 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "Uniform <nx> <ny> <nz> <omega> <numPlanesPerPanel> <viz?>\n" 
+    std::cout << "Random <nx> <ny> <nz> <omega> <amp> <numPlanesPerPanel> "
+                 "<viz?>\n" 
               << "  <nx>: Size of grid in x dimension\n"
               << "  <ny>: Size of grid in y dimension\n"
               << "  <nz>: Size of grid in z dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
-              << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
+              << "  <amp>: Amplitude of random perturbation from unit slowness"
+              << "  <numPlanesPerPanel>: Depth of sparse-direct solves\n"
               << "  <viz?>:  Visualize iff != 0\n"
               << std::endl;
 }
@@ -41,7 +43,7 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 7 )
+    if( argc < 8 )
     {
         if( commRank == 0 )
             Usage();
@@ -52,14 +54,16 @@ main( int argc, char* argv[] )
     const int ny = atoi( argv[2] );
     const int nz = atoi( argv[3] );
     const double omega = atof( argv[4] );
-    const int numPlanesPerPanel = atoi( argv[5] );
-    const bool visualize = atoi( argv[6] );
+    const double amplitude = atof( argv[5] );
+    const int numPlanesPerPanel = atoi( argv[6] );
+    const bool visualize = atoi( argv[7] );
 
     if( commRank == 0 )
     {
         std::cout << "Running with (nx,ny,nz)=("
                   << nx << "," << ny << "," << nz << "), omega=" 
-                  << omega << ", and numPlanesPerPanel=" << numPlanesPerPanel
+                  << omega << ", amp=" << amplitude 
+                  << ", and numPlanesPerPanel=" << numPlanesPerPanel
                   << std::endl;
     }
     
@@ -156,7 +160,7 @@ main( int argc, char* argv[] )
         if( commRank == B.OwningProcess( xSource, ySource, zSource ) )
         {
             const int localIndex = B.LocalIndex( xSource, ySource, zSource ); 
-            localB[localIndex] = 1;
+            localB[localIndex] = 1+amplitude*plcg::ParallelUniform<double>();
         }
 
         if( visualize )

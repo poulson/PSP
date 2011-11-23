@@ -70,7 +70,7 @@ void
 psp::DistHelmholtz<R>::PullRightHandSides
 ( const GridData<C>& gridB, elemental::Matrix<C>& B ) const
 {
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we will need to recv
     std::vector<int> recvCounts( commSize, 0 );
@@ -81,7 +81,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
 
@@ -106,7 +106,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
         recvIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -141,7 +141,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     }
     sendIndices.clear();
     std::vector<C> recvB( totalRecvCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendB[0], &sendCounts[0], &sendDispls[0], 
       &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendB.clear();
@@ -165,7 +165,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
 ( GridData<C>& gridB, const elemental::Matrix<C>& B ) const
 {
     const int numRhs = gridB.NumScalars();
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we will need to send.
     std::vector<int> sendCounts( commSize, 0 );
@@ -176,7 +176,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
         ++sendCounts[proc];
     }
     std::vector<int> recvCounts( commSize );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendCounts[0], 1, 
       &recvCounts[0], 1, comm_ );
 
@@ -202,7 +202,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
         sendIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> recvIndices( totalRecvCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendIndices[0], &sendCounts[0], &sendDispls[0], 
       &recvIndices[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendIndices.clear();
@@ -230,7 +230,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
         offsets[proc] += numRhs;
     }
     std::vector<C> recvB( totalRecvCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendB[0], &sendCounts[0], &sendDispls[0],
       &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendB.clear();
@@ -270,7 +270,7 @@ psp::DistHelmholtz<R>::SolveWithQMR
     const R bcgRelTol = 1e-6;
     const int localHeight = B.Height();
     const int numRhs = B.Width();
-    const int commRank = mpi::CommRank( comm_ );
+    const int commRank = elemental::mpi::CommRank( comm_ );
     const R one = 1;
 
     elemental::Matrix<C> V( localHeight, numRhs ),
@@ -428,13 +428,13 @@ psp::DistHelmholtz<R>::Norms
 {
     const int localHeight = X.Height();
     const int numCols = X.Width();
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
     std::vector<R> localNorms( numCols );
     for( int j=0; j<numCols; ++j )
         localNorms[j] = 
             elemental::blas::Nrm2( localHeight, X.LockedBuffer(0,j), 1 );
     std::vector<R> allLocalNorms( numCols*commSize );
-    mpi::AllGather
+    elemental::mpi::AllGather
     ( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm_ );
     norm.resize( numCols );
     for( int j=0; j<numCols; ++j )
@@ -456,7 +456,8 @@ psp::DistHelmholtz<R>::PseudoNorms
                            X.LockedBuffer(0,j), 1 );
     alpha.resize( numCols );
     // TODO: Think about avoiding overflow?
-    mpi::AllReduce( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
+    elemental::mpi::AllReduce
+    ( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
     for( int j=0; j<numCols; ++j )
         alpha[j] = sqrt(alpha[j]);
 }
@@ -476,7 +477,8 @@ psp::DistHelmholtz<R>::PseudoInnerProducts
             ( localHeight, X.LockedBuffer(0,j), 1,
                            Y.LockedBuffer(0,j), 1 );
     alpha.resize( numCols );
-    mpi::AllReduce( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
+    elemental::mpi::AllReduce
+    ( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
 }
 
 template<typename R>
@@ -554,7 +556,7 @@ void
 psp::DistHelmholtz<R>::Multiply( elemental::Matrix<C>& B ) const
 {
     const int numRhs = B.Width();
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
 
     // Modify the basic send/recv information for the number of right-hand sides
     std::vector<int> sendCounts = globalSendCounts_;
@@ -586,7 +588,7 @@ psp::DistHelmholtz<R>::Multiply( elemental::Matrix<C>& B ) const
         }
     }
     std::vector<C> recvRhs( totalRecvCount );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendRhs[0], &sendCounts[0], &sendDispls[0], 
       &recvRhs[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendRhs.clear();
@@ -751,7 +753,8 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     // Solve against the panel
     const clique::numeric::SymmFrontTree<C>& fact = 
         PanelNumericFactorization( i );
-    clique::numeric::LDLSolve( TRANSPOSE, symbFact, fact, localPanelB, true );
+    clique::numeric::LDLSolve
+    ( elemental::TRANSPOSE, symbFact, fact, localPanelB, true );
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );
@@ -817,7 +820,7 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const
 {
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
     const int numRhs = B.Width();
     const int panelSendCount = subdiagPanelSendCounts_[i];
     const int panelRecvCount = subdiagPanelRecvCounts_[i];
@@ -846,7 +849,7 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const
     }
 
     std::vector<C> recvBuffer( panelRecvCount*numRhs );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendBuffer.clear();
@@ -906,7 +909,7 @@ void
 psp::DistHelmholtz<R>::MultiplySuperdiagonal
 ( elemental::Matrix<C>& B, int i ) const
 {
-    const int commSize = mpi::CommSize( comm_ );
+    const int commSize = elemental::mpi::CommSize( comm_ );
     const int numRhs = B.Width();
     const int panelSendCount = supdiagPanelSendCounts_[i];
     const int panelRecvCount = supdiagPanelRecvCounts_[i];
@@ -949,7 +952,7 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal
         recvDispls[proc] = supdiagRecvDispls_[index]*numRhs;
     }
     std::vector<C> recvBuffer( panelRecvCount*numRhs );
-    mpi::AllToAll
+    elemental::mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendBuffer.clear();
