@@ -1019,9 +1019,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
         const int updateSize = symbSN.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.frontL.ResizeTo( frontSize, size );
-        front.frontR.ResizeTo( frontSize, updateSize );
         front.frontL.SetToZero();
-        front.frontR.SetToZero();
         for( int j=0; j<size; ++j )
         {
             // Extract the slowness from the recv buffer
@@ -1067,11 +1065,8 @@ psp::DistHelmholtz<R>::FillPanelFronts
         const int updateSize = symbSN.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.front2dL.SetGrid( grid );
-        front.front2dR.SetGrid( grid );
         front.front2dL.ResizeTo( frontSize, size );
-        front.front2dR.ResizeTo( frontSize, updateSize );
         front.front2dL.SetToZero();
-        front.front2dR.SetToZero();
         const int localSize = front.front2dL.LocalWidth();
         for( int jLocal=0; jLocal<localSize; ++jLocal )
         {
