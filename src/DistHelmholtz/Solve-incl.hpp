@@ -26,22 +26,24 @@ psp::DistHelmholtz<R>::Solve
 {
     if( !elemental::mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
+    const int commRank = elemental::mpi::CommRank( comm_ );
 
     // Convert B into custom nested-dissection based ordering
     elemental::Matrix<C> B;
-#ifndef RELEASE
-    const int commRank = elemental::mpi::CommRank( comm_ );
-    if( commRank == 0 )
     {
-        std::cout << "Pulling right-hand sides...";
-        std::cout.flush();
+        if( commRank == 0 )
+        {
+            std::cout << "  pulling right-hand sides...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
+        PullRightHandSides( gridB, B );
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
-#endif
-    PullRightHandSides( gridB, B );
-#ifndef RELEASE
-    if( commRank == 0 )
-        std::cout << "done" << std::endl;
-#endif
 
     // Solve the systems of equations
     switch( solver )
@@ -51,18 +53,20 @@ psp::DistHelmholtz<R>::Solve
     }
 
     // Restore the solutions back into the GridData form
-#ifndef RELEASE
-    if( commRank == 0 )
     {
-        std::cout << "Pushing right-hand sides...";
-        std::cout.flush();
+        if( commRank == 0 )
+        {
+            std::cout << "  pushing right-hand sides...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
+        PushRightHandSides( gridB, B );
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
-#endif
-    PushRightHandSides( gridB, B );
-#ifndef RELEASE
-    if( commRank == 0 )
-        std::cout << "done" << std::endl;
-#endif
 }
 
 template<typename R>
@@ -71,6 +75,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
 ( const GridData<C>& gridB, elemental::Matrix<C>& B ) const
 {
     const int commSize = elemental::mpi::CommSize( comm_ );
+    const int commRank = elemental::mpi::CommRank( comm_ );
 
     // Pack and send the amount of data that we will need to recv
     std::vector<int> recvCounts( commSize, 0 );
@@ -166,6 +171,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
 {
     const int numRhs = gridB.NumScalars();
     const int commSize = elemental::mpi::CommSize( comm_ );
+    const int commRank = elemental::mpi::CommRank( comm_ );
 
     // Pack and send the amount of data that we will need to send.
     std::vector<int> sendCounts( commSize, 0 );
@@ -299,7 +305,18 @@ psp::DistHelmholtz<R>::SolveWithQMR
     // t := inv(M) v 
     // tau := sqrt(t^T t)
     T = V;
-    Precondition( T );
+    {
+        if( commRank == 0 )
+        {
+            std::cout << "  initial preconditioner application...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+        Precondition( T );
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
+    }
     PseudoNorms( T, tau );
 
     // q := t
@@ -316,9 +333,22 @@ psp::DistHelmholtz<R>::SolveWithQMR
 
     for( int it=0; it<maxIterations; ++it )
     {
+        if( commRank == 0 )
+            std::cout << "  starting iteration " << it << "..." << std::endl;
         // t := A q
         T = Q; 
-        Multiply( T );
+        {
+            if( commRank == 0 )
+            {
+                std::cout << "    multiply...";
+                std::cout.flush();
+            }
+            const double startTime = elemental::mpi::Time();
+            Multiply( T );
+            const double stopTime = elemental::mpi::Time();
+            if( commRank == 0 )
+                std::cout << stopTime-startTime << " secs" << std::endl;
+        }
 
         // sigma := q^T t
         // alpha := rho / sigma
@@ -343,7 +373,18 @@ psp::DistHelmholtz<R>::SolveWithQMR
         // p         := c^2 thetaLast^2 p + c^2 alpha q
         // x         := x + p
         T = V;
-        Precondition( T );
+        {
+            if( commRank == 0 )
+            {
+                std::cout << "    precondition...";
+                std::cout.flush();
+            }
+            const double startTime = elemental::mpi::Time();
+            Precondition( T );
+            const double stopTime = elemental::mpi::Time();
+            if( commRank == 0 )
+                std::cout << stopTime-startTime << " secs" << std::endl;
+        }
         thetaLast = theta;
         PseudoNorms( T, theta );
         for( int k=0; k<numRhs; ++k )
@@ -378,7 +419,7 @@ psp::DistHelmholtz<R>::SolveWithQMR
         if( maxRelBcgResidNorm < bcgRelTol )
         {
             if( commRank == 0 )
-                std::cout << "Converged with BCG relative tolerance: " 
+                std::cout << "  converged with BCG relative tolerance: " 
                           << maxRelBcgResidNorm << std::endl;
             break;
         }
@@ -754,7 +795,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     const clique::numeric::SymmFrontTree<C>& fact = 
         PanelNumericFactorization( i );
     clique::numeric::LDLSolve
-    ( elemental::TRANSPOSE, symbFact, fact, localPanelB, true );
+    ( elemental::TRANSPOSE, symbFact, fact, localPanelB, true, true );
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );

@@ -24,13 +24,15 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Random <nx> <ny> <nz> <omega> <amp> <numPlanesPerPanel> "
-                 "<viz?>\n" 
+                 "<fact blocksize> <solve blocksize> <viz?>\n" 
               << "  <nx>: Size of grid in x dimension\n"
               << "  <ny>: Size of grid in y dimension\n"
               << "  <nz>: Size of grid in z dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
               << "  <amp>: Amplitude of random perturbation from unit slowness"
               << "  <numPlanesPerPanel>: Depth of sparse-direct solves\n"
+              << "  <fact blocksize>: factorization algorithmic blocksize\n"
+              << "  <solve blocksize>: solve algorithmic blocksize\n"
               << "  <viz?>:  Visualize iff != 0\n"
               << std::endl;
 }
@@ -43,7 +45,7 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 8 )
+    if( argc < 10 )
     {
         if( commRank == 0 )
             Usage();
@@ -56,7 +58,9 @@ main( int argc, char* argv[] )
     const double omega = atof( argv[4] );
     const double amplitude = atof( argv[5] );
     const int numPlanesPerPanel = atoi( argv[6] );
-    const bool visualize = atoi( argv[7] );
+    const int factBlocksize = atoi( argv[7] );
+    const int solveBlocksize = atoi( argv[8] );
+    const bool visualize = atoi( argv[9] );
 
     if( commRank == 0 )
     {
@@ -135,6 +139,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
+        elemental::SetBlocksize( factBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
         clique::mpi::Barrier( comm );
@@ -174,6 +179,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
+        elemental::SetBlocksize( solveBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
         clique::mpi::Barrier( comm );

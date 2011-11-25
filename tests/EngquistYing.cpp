@@ -24,11 +24,13 @@ using namespace psp;
 void Usage()
 {
     std::cout << "EngquistYing <N> <omega> <velocity> <numPlanesPerPanel> "
-                 "<viz?>\n" 
+                 "<fact blocksize> <solve blocksize> <viz?>\n"
               << "  <N>: Size of grid in each dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
               << "  <velocity>: Which velocity field to use, {1,2}\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
+              << "  <fact blocksize>: factorization algorithmic blocksize\n"
+              << "  <solve blocksize>: solve algorithmic blocksize\n"
               << "  <viz?>:  Visualize iff != 0\n"
               << "\n"
               << "Please see \"Sweeping preconditioner for the Helmholtz "
@@ -44,7 +46,7 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 6 )
+    if( argc < 8 )
     {
         if( commRank == 0 )
             Usage();
@@ -55,7 +57,9 @@ main( int argc, char* argv[] )
     const double omega = atof( argv[2] );
     const int velocityModel = atoi( argv[3] );
     const int numPlanesPerPanel = atoi( argv[4] );
-    const bool visualize = atoi( argv[5] );
+    const int factBlocksize = atoi( argv[5] );
+    const int solveBlocksize = atoi( argv[6] );
+    const bool visualize = atoi( argv[7] );
 
     if( velocityModel < 1 || velocityModel > 2 )
     {
@@ -198,6 +202,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
+        elemental::SetBlocksize( factBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
         clique::mpi::Barrier( comm );
@@ -259,6 +264,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
+        elemental::SetBlocksize( solveBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
         clique::mpi::Barrier( comm );

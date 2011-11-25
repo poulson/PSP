@@ -27,17 +27,19 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         throw std::logic_error("Slowness does not have a congruent comm");
     if( slowness.NumScalars() != 1 )
         throw std::logic_error("Slowness grid should have one entry per point");
+    const int commRank = elemental::mpi::CommRank( comm_ );
 
     //
     // Initialize and factor the top panel (first, since it is the largest)
     //
-    const int commRank = elemental::mpi::CommRank( comm_ );
-    if( commRank == 0 )
     {
-        std::cout << "Initializing top panel...";
-        std::cout.flush();
-    }
-    {
+        if( commRank == 0 )
+        {
+            std::cout << "  initializing top panel...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
         const int vSize = topOrigDepth_ + bzCeil_;
@@ -60,19 +62,23 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
-    if( commRank == 0 )
-        std::cout << "done" << std::endl;
 
     //
     // Initialize and factor the bottom panel
     //
-    if( commRank == 0 )
     {
-        std::cout << "Initializing bottom panel...";
-        std::cout.flush();
-    }
-    {
+        if( commRank == 0 )
+        {
+            std::cout << "  initializing bottom panel...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
         // Retrieve the slowness for this panel
         const int vOffset = 0;
         const int vSize = bottomDepth_;
@@ -96,9 +102,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
 
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
-    if( commRank == 0 )
-        std::cout << "done" << std::endl;
 
     //
     // Initialize and factor the full inner panels
@@ -108,10 +116,11 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     {
         if( commRank == 0 )
         {
-            std::cout << "Initializing inner panel " << k << " of " 
+            std::cout << "  initializing inner panel " << k << " of " 
                       << numFullInnerPanels_ << "...";
             std::cout.flush();
         }
+        const double startTime = elemental::mpi::Time();
 
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
@@ -140,8 +149,9 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
 
+        const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
-            std::cout << "done" << std::endl;
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
 
     //
@@ -151,9 +161,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
     {        
         if( commRank == 0 )
         {
-            std::cout << "Initializing the leftover panel...";
+            std::cout << "  initializing the leftover panel...";
             std::cout.flush();
         }
+        const double startTime = elemental::mpi::Time();
 
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
@@ -180,47 +191,51 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         // Redistribute the LDL^T factorization for faster solves
         clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
 
+        const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
-            std::cout << "done" << std::endl;
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
     
     //
     // Initialize the global sparse matrix
     //
-
-    if( commRank == 0 )
     {
-        std::cout << "Initializing global sparse matrix...";
-        std::cout.flush();
+        if( commRank == 0 )
+        {
+            std::cout << "  initializing global sparse matrix...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
+        // Gather the slowness for the global sparse matrix
+        std::vector<R> myGlobalSlowness;
+        std::vector<int> offsets;
+        GetGlobalSlowness( slowness, myGlobalSlowness, offsets );
+
+        // Now make use of the redistributed slowness data to form the global 
+        // sparse matrix
+        const int nx = control_.nx;
+        const int ny = control_.ny;
+        const int nz = control_.nz;
+        localEntries_.resize( localRowOffsets_.back() );
+        for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+        {
+            const int naturalIndex = localToNaturalMap_[iLocal];
+            const int x = naturalIndex % nx;
+            const int y = (naturalIndex/nx) % ny;
+            const int z = naturalIndex/(nx*ny);
+            const int proc = slowness.OwningProcess( x, y, z );
+
+            const R alpha = myGlobalSlowness[offsets[proc]++];
+            const int rowOffset = localRowOffsets_[iLocal];
+            const int v = (nz-1) - z;
+            FormGlobalRow( alpha, x, y, v, rowOffset );
+        }
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
-
-    // Gather the slowness for the global sparse matrix
-    std::vector<R> myGlobalSlowness;
-    std::vector<int> offsets;
-    GetGlobalSlowness( slowness, myGlobalSlowness, offsets );
-
-    // Now make use of the redistributed slowness data to form the global 
-    // sparse matrix
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
-    localEntries_.resize( localRowOffsets_.back() );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
-    {
-        const int naturalIndex = localToNaturalMap_[iLocal];
-        const int x = naturalIndex % nx;
-        const int y = (naturalIndex/nx) % ny;
-        const int z = naturalIndex/(nx*ny);
-        const int proc = slowness.OwningProcess( x, y, z );
-
-        const R alpha = myGlobalSlowness[offsets[proc]++];
-        const int rowOffset = localRowOffsets_[iLocal];
-        const int v = (nz-1) - z;
-        FormGlobalRow( alpha, x, y, v, rowOffset );
-    }
-
-    if( commRank == 0 )
-        std::cout << "done" << std::endl;
 }
 
 template<typename R>
