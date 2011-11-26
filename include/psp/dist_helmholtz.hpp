@@ -185,7 +185,7 @@ private:
     C s1Inv( int x ) const;
     C s2Inv( int y ) const;
     C s3Inv( int v ) const;
-    C s3InvArtificial( int v, int vOffset, R sizeOfPML ) const;
+    C s3InvArtificial( int v, int vOffset ) const;
 
     int NumLocalSupernodes( unsigned commRank ) const;
     static void NumLocalSupernodesRecursion

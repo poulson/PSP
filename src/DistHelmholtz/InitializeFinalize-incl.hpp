@@ -266,7 +266,8 @@ psp::DistHelmholtz<R>::s1Inv( int x ) const
         const R delta = bx_ - (x+1);
         const R realPart = 1;
         const R imagPart = 
-            control_.Cx*delta*delta/(bx_*bx_*bx_*hx_*control_.omega);
+            (control_.Cx/control_.etax)*(delta/bx_)*(delta/bx_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else if( x > (control_.nx-bx_) && control_.backBC==PML )
@@ -274,7 +275,8 @@ psp::DistHelmholtz<R>::s1Inv( int x ) const
         const R delta = x-(control_.nx-bx_);
         const R realPart = 1;
         const R imagPart =
-            control_.Cx*delta*delta/(bx_*bx_*bx_*hx_*control_.omega);
+            (control_.Cx/control_.etax)*(delta/bx_)*(delta/bx_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -290,7 +292,8 @@ psp::DistHelmholtz<R>::s2Inv( int y ) const
         const R delta = by_ - (y+1);
         const R realPart = 1;
         const R imagPart = 
-            control_.Cy*delta*delta/(by_*by_*by_*hy_*control_.omega);
+            (control_.Cy/control_.etay)*(delta/by_)*(delta/by_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else if( y > (control_.ny-by_) && control_.rightBC==PML )
@@ -298,7 +301,8 @@ psp::DistHelmholtz<R>::s2Inv( int y ) const
         const R delta = y-(control_.ny-by_);
         const R realPart = 1;
         const R imagPart =
-            control_.Cy*delta*delta/(by_*by_*by_*hy_*control_.omega);
+            (control_.Cy/control_.etay)*(delta/by_)*(delta/by_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -314,7 +318,8 @@ psp::DistHelmholtz<R>::s3Inv( int v ) const
         const R delta = bz_ - (v+1);
         const R realPart = 1;
         const R imagPart = 
-            control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
+            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else if( v > (control_.nz-bz_) && control_.topBC==PML )
@@ -322,7 +327,8 @@ psp::DistHelmholtz<R>::s3Inv( int v ) const
         const R delta = v - (control_.nz-bz_);
         const R realPart = 1;
         const R imagPart = 
-            control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
+            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -331,15 +337,15 @@ psp::DistHelmholtz<R>::s3Inv( int v ) const
 
 template<typename R>
 std::complex<R>
-psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset, R sizeOfPML ) const
+psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
-    if( v+1 < vOffset+sizeOfPML )
+    if( v+1 < vOffset+bz_ )
     {
-        const R delta = vOffset + sizeOfPML - (v+1);
+        const R delta = vOffset + bz_ - (v+1);
         const R realPart = 1;
         const R imagPart = 
-            control_.Cz*delta*delta/
-            (sizeOfPML*sizeOfPML*sizeOfPML*hz_*control_.omega);
+            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else if( v > (control_.nz-bz_) && control_.topBC==PML )
@@ -347,7 +353,8 @@ psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset, R sizeOfPML ) const
         const R delta = v - (control_.nz-bz_);
         const R realPart = 1;
         const R imagPart = 
-            control_.Cz*delta*delta/(bz_*bz_*bz_*hz_*control_.omega);
+            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -425,8 +432,6 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
         std::vector<int>& frontIndices, 
         std::vector<C>& values ) const
 {
-    const R pmlSize = bzCeil_;
-
     // Evaluate all of the inverse s functions
     const C s1InvL = s1Inv( x-1 );
     const C s1InvM = s1Inv( x   );
@@ -434,9 +439,9 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     const C s2InvL = s2Inv( y-1 );
     const C s2InvM = s2Inv( y   );
     const C s2InvR = s2Inv( y+1 );
-    const C s3InvL = s3InvArtificial( v-1, vOffset, pmlSize );
-    const C s3InvM = s3InvArtificial( v,   vOffset, pmlSize );
-    const C s3InvR = s3InvArtificial( v+1, vOffset, pmlSize );
+    const C s3InvL = s3InvArtificial( v-1, vOffset );
+    const C s3InvM = s3InvArtificial( v,   vOffset );
+    const C s3InvR = s3InvArtificial( v+1, vOffset );
 
     // Compute all of the x-shifted terms
     const C xTempL = s2InvM*s3InvM/s1InvL;
@@ -460,9 +465,9 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
     const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 
     // Compute the center term
+    const C shiftedOmega = C(control_.omega,control_.imagShift);
     const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
-        (control_.omega*alpha)*(control_.omega*alpha)*s1InvM*s2InvM*s3InvM + 
-        C(0,control_.imagShift);
+        (shiftedOmega*alpha)*(shiftedOmega*alpha)*s1InvM*s2InvM*s3InvM;
     const int vLocal = v - vOffset;
     const int nx = control_.nx;
     const int ny = control_.ny;

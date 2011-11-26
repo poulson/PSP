@@ -80,13 +80,13 @@ main( int argc, char* argv[] )
     control.wy = 1;
     control.wz = 1;
     control.omega = omega;
-    control.Cx = 1.5*(2*M_PI);
-    control.Cy = 1.5*(2*M_PI);
-    control.Cz = 1.5*(2*M_PI);
+    control.Cx = 1.5;
+    control.Cy = 1.5;
+    control.Cz = 1.5;
     control.etax = 5.0/control.nx;
     control.etay = 5.0/control.ny;
     control.etaz = 5.0/control.nz;
-    control.imagShift = 1;
+    control.imagShift = 2*M_PI;
     control.cutoff = 96;
     control.numPlanesPerPanel = numPlanesPerPanel;
     control.frontBC = PML;
