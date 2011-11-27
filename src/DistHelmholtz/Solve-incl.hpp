@@ -795,7 +795,7 @@ psp::DistHelmholtz<R>::SolvePanel( elemental::Matrix<C>& B, int i ) const
     const clique::numeric::SymmFrontTree<C>& fact = 
         PanelNumericFactorization( i );
     clique::numeric::LDLSolve
-    ( elemental::TRANSPOSE, symbFact, fact, localPanelB, true, true );
+    ( elemental::TRANSPOSE, symbFact, fact, localPanelB );
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );

@@ -21,7 +21,7 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
+psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness, bool accelerate )
 {
     if( !elemental::mpi::CongruentComms( comm_, slowness.Comm() ) )
         throw std::logic_error("Slowness does not have a congruent comm");
@@ -61,7 +61,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         clique::numeric::LDL( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
 
         // Redistribute the LDL^T factorization for faster solves
-        clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
+        if( accelerate )
+            clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS_FAST_LDL );
+        else
+            clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
 
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
@@ -101,7 +104,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
 
         // Redistribute the LDL^T factorization for faster solves
-        clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
+        if( accelerate )
+            clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS_FAST_LDL );
+        else
+            clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
 
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
@@ -147,7 +153,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         ( clique::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
 
         // Redistribute the LDL^T factorization for faster solves
-        clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
+        if( accelerate )
+            clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS_FAST_LDL );
+        else
+            clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
 
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
@@ -189,7 +198,10 @@ psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness )
         ( clique::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
 
         // Redistribute the LDL^T factorization for faster solves
-        clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
+        if( accelerate )
+            clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS_FAST_LDL );
+        else
+            clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
 
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )

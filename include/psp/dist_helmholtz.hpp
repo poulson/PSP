@@ -40,7 +40,7 @@ public:
     ~DistHelmholtz();
 
     // Build the sparse matrix and the preconditioner
-    void Initialize( const GridData<R>& slowness );
+    void Initialize( const GridData<R>& slowness, bool accelerate=true );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
     void Solve( GridData<C>& B, Solver solver=QMR, int maxIterations=50 ) const;
