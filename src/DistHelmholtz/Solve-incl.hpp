@@ -382,7 +382,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             {
                 if( commRank == 0 )
                 {
-                    std::cout << "    preconditioning...";
+                    std::cout << "  preconditioning...";
                     std::cout.flush();
                 }
                 const double startTime = elemental::mpi::Time();
@@ -401,7 +401,6 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 InnerProducts( viList, wList, alphaList );
                 for( int k=0; k<numRhs; ++k )
                     HList.Set(i,j+k*m,alphaList[k]);
-                // HERE
 
                 // w := w - H(i,j) v_i
                 SubtractScaledColumns( alphaList, viList, wList );
@@ -620,7 +619,7 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         {
             if( commRank == 0 )
             {
-                std::cout << "    preconditioning...";
+                std::cout << "  preconditioning...";
                 std::cout.flush();
             }
             const double startTime = elemental::mpi::Time();

@@ -21,8 +21,13 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Initialize( const GridData<R>& slowness, bool accelerate )
+psp::DistHelmholtz<R>::Initialize
+( const GridData<R>& slowness, bool accelerate )
 {
+    if( control_.nx != slowness.XSize() ||
+        control_.ny != slowness.YSize() ||
+        control_.nz != slowness.ZSize() )
+        throw std::logic_error("Slowness grid is incorrect");
     if( !elemental::mpi::CongruentComms( comm_, slowness.Comm() ) )
         throw std::logic_error("Slowness does not have a congruent comm");
     if( slowness.NumScalars() != 1 )

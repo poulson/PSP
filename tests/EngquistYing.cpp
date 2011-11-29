@@ -23,11 +23,12 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "EngquistYing <N> <omega> <velocity> <numPlanesPerPanel> "
-                 "<fact blocksize> <solve blocksize> <accelerate?> <SQMR?> "
-                 "<viz?>\n"
+    std::cout << "EngquistYing <N> <omega> <imagShift> <velocity> "
+                 "<numPlanesPerPanel> <fact blocksize> <solve blocksize> "
+                 "<accelerate?> <SQMR?> <viz?>\n"
               << "  <N>: Size of grid in each dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
+              << "  <imagShift>: imaginary shift [2 pi is standard]\n"
               << "  <velocity>: Which velocity field to use, {1,2}\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
@@ -49,22 +50,24 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 10 )
+    if( argc < 11 )
     {
         if( commRank == 0 )
             Usage();
         clique::Finalize();
         return 0;
     }
-    const int N = atoi( argv[1] );
-    const double omega = atof( argv[2] );
-    const int velocityModel = atoi( argv[3] );
-    const int numPlanesPerPanel = atoi( argv[4] );
-    const int factBlocksize = atoi( argv[5] );
-    const int solveBlocksize = atoi( argv[6] );
-    const bool accelerate = atoi( argv[7] );
-    const bool useSQMR = atoi( argv[8] );
-    const bool visualize = atoi( argv[9] );
+    int argNum=1;
+    const int N = atoi( argv[argNum++] );
+    const double omega = atof( argv[argNum++] );
+    const double imagShift = atof( argv[argNum++] );
+    const int velocityModel = atoi( argv[argNum++] );
+    const int numPlanesPerPanel = atoi( argv[argNum++] );
+    const int factBlocksize = atoi( argv[argNum++] );
+    const int solveBlocksize = atoi( argv[argNum++] );
+    const bool accelerate = atoi( argv[argNum++] );
+    const bool useSQMR = atoi( argv[argNum++] );
+    const bool visualize = atoi( argv[argNum++] );
 
     if( velocityModel < 1 || velocityModel > 2 )
     {
@@ -99,7 +102,7 @@ main( int argc, char* argv[] )
     control.etax = 6.0/(N+1);
     control.etay = 6.0/(N+1);
     control.etaz = 6.0/(N+1);
-    control.imagShift = 2*M_PI;
+    control.imagShift = imagShift;
     control.cutoff = 96;
     control.numPlanesPerPanel = numPlanesPerPanel;
     control.frontBC = PML;

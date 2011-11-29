@@ -23,13 +23,14 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "Uniform <nx> <ny> <nz> <omega> <numPlanesPerPanel> "
-                 "<fact blocksize> <solve blocksize> <accelerate?> <SQMR?> "
-                 "<viz?>\n" 
+    std::cout << "Uniform <nx> <ny> <nz> <omega> <imagShift> "
+                 "<numPlanesPerPanel> <fact blocksize> <solve blocksize> "
+                 "<accelerate?> <SQMR?> <viz?>\n"
               << "  <nx>: Size of grid in x dimension\n"
               << "  <ny>: Size of grid in y dimension\n"
               << "  <nz>: Size of grid in z dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
+              << "  <imagShift>: imaginary shift [2 pi is standard]\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
@@ -47,23 +48,25 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 11 )
+    if( argc < 12 )
     {
         if( commRank == 0 )
             Usage();
         clique::Finalize();
         return 0;
     }
-    const int nx = atoi( argv[1] );
-    const int ny = atoi( argv[2] );
-    const int nz = atoi( argv[3] );
-    const double omega = atof( argv[4] );
-    const int numPlanesPerPanel = atoi( argv[5] );
-    const int factBlocksize = atoi( argv[6] );
-    const int solveBlocksize = atoi( argv[7] );
-    const bool accelerate = atoi( argv[8] );
-    const bool useSQMR = atoi( argv[9] );
-    const bool visualize = atoi( argv[10] );
+    int argNum = 1;
+    const int nx = atoi( argv[argNum++] );
+    const int ny = atoi( argv[argNum++] );
+    const int nz = atoi( argv[argNum++] );
+    const double omega = atof( argv[argNum++] );
+    const double imagShift = atof( argv[argNum++] );
+    const int numPlanesPerPanel = atoi( argv[argNum++] );
+    const int factBlocksize = atoi( argv[argNum++] );
+    const int solveBlocksize = atoi( argv[argNum++] );
+    const bool accelerate = atoi( argv[argNum++] );
+    const bool useSQMR = atoi( argv[argNum++] );
+    const bool visualize = atoi( argv[argNum++] );
 
     if( commRank == 0 )
     {

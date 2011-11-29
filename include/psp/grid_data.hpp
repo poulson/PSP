@@ -63,6 +63,9 @@ public:
       int nx, int ny,int nz, GridDataOrder order,
       int px, int py, int pz, elemental::mpi::Comm comm );
 
+    int XSize() const;
+    int YSize() const;
+    int ZSize() const;
     elemental::mpi::Comm Comm() const;
     int OwningProcess( int naturalIndex ) const;
     int OwningProcess( int x, int y, int z ) const;
@@ -144,6 +147,18 @@ inline GridData<T>::GridData
     zLocalSize_ = elemental::LocalLength( nz, zShift_, pz );
     localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
+
+template<typename T>
+inline int GridData<T>::XSize() const
+{ return nx_; }
+
+template<typename T>
+inline int GridData<T>::YSize() const
+{ return ny_; }
+
+template<typename T>
+inline int GridData<T>::ZSize() const
+{ return nz_; }
 
 template<typename T>
 inline elemental::mpi::Comm GridData<T>::Comm() const
