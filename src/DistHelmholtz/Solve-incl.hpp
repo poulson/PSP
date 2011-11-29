@@ -21,8 +21,7 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Solve
-( GridData<C>& gridB, Solver solver, int maxIterations ) const
+psp::DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m ) const
 {
     if( !elemental::mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
@@ -46,11 +45,52 @@ psp::DistHelmholtz<R>::Solve
     }
 
     // Solve the systems of equations
-    switch( solver )
+    InternalSolveWithGMRES( B, m );
+
+    // Restore the solutions back into the GridData form
     {
-    case GMRES: SolveWithGMRES( B, maxIterations ); break;
-    case QMR:   SolveWithQMR( B, maxIterations );   break;
+        if( commRank == 0 )
+        {
+            std::cout << "  pushing right-hand sides...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
+        PushRightHandSides( gridB, B );
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
     }
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB ) const
+{
+    if( !elemental::mpi::CongruentComms( comm_, gridB.Comm() ) )
+        throw std::logic_error("B does not have a congruent comm");
+    const int commRank = elemental::mpi::CommRank( comm_ );
+
+    // Convert B into custom nested-dissection based ordering
+    elemental::Matrix<C> B;
+    {
+        if( commRank == 0 )
+        {
+            std::cout << "  pulling right-hand sides...";
+            std::cout.flush();
+        }
+        const double startTime = elemental::mpi::Time();
+
+        PullRightHandSides( gridB, B );
+
+        const double stopTime = elemental::mpi::Time();
+        if( commRank == 0 )
+            std::cout << stopTime-startTime << " secs" << std::endl;
+    }
+
+    // Solve the systems of equations
+    InternalSolveWithSQMR( B );
 
     // Restore the solutions back into the GridData form
     {
@@ -260,51 +300,265 @@ psp::DistHelmholtz<R>::PushRightHandSides
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithGMRES
-( elemental::Matrix<C>& B, int maxIterations ) const
+psp::DistHelmholtz<R>::InternalSolveWithGMRES
+( elemental::Matrix<C>& bList, int m ) const
 {
-    throw std::logic_error("GMRES not yet implemented");
+    const R relTol = 1e-6;
+    const int numRhs = bList.Width();
+    const int localHeight = bList.Height();
+    const int commRank = elemental::mpi::CommRank( comm_ );
+
+    elemental::Matrix<C> VInter( localHeight, numRhs*m ), // interwoven
+                         x0List( localHeight, numRhs   ), // contiguous
+                         xList(  localHeight, numRhs   ), // contiguous
+                         wList(  localHeight, numRhs   ), // contiguous
+                         zList(  m+1,         numRhs   ), // contiguous
+                         HList(  m,           m*numRhs ); // contiguous
+
+    // For storing Givens rotations
+    elemental::Matrix<R> csList( m, numRhs );
+    elemental::Matrix<C> snList( m, numRhs );
+
+    // Various scalars
+    std::vector<C> alphaList( numRhs );
+    std::vector<R> betaList( numRhs ), deltaList( numRhs );
+    std::vector<R> origResidNormList( numRhs ), residNormList( numRhs ), 
+                   relResidNormList( numRhs );
+
+    // x := 0
+    xList.SetToZero();
+
+    // w := b (= b - A x_0)
+    // origResidNorm := ||w||_2
+    wList = bList;
+    Norms( wList, origResidNormList );
+
+    int it=0;
+    bool converged=false;
+    while( !converged )
+    {
+        if( commRank == 0 )
+            std::cout << "  starting iteration " << it << "..." << std::endl;
+
+        // x0 := x
+        x0List = xList;
+
+        // w := inv(M) w
+        // beta := ||w||_2
+        {
+            if( commRank == 0 )
+            {
+                std::cout << "  startup preconditioner application...";
+                std::cout.flush();
+            }
+            const double startTime = elemental::mpi::Time();
+            Precondition( wList );
+            const double stopTime = elemental::mpi::Time();
+            if( commRank == 0 )
+                std::cout << stopTime-startTime << " secs" << std::endl;
+        }
+        Norms( wList, betaList );
+
+        // v0 := w / beta
+        elemental::Matrix<C> v0List;
+        v0List.View( VInter, 0, 0, localHeight, numRhs );
+        v0List = wList;
+        DivideColumns( v0List, betaList );
+
+        // z := beta e1
+        zList.SetToZero();
+        for( int k=0; k<numRhs; ++k )
+            zList.Set(0,k,betaList[k]);
+
+        for( int j=0; j<m; ++j )
+        {
+            // w := A v_j
+            elemental::Matrix<C> vjList;
+            vjList.LockedView( VInter, 0, j*numRhs, localHeight, numRhs );
+            wList = vjList;
+            Multiply( wList );
+
+            // w := inv(M) w
+            {
+                if( commRank == 0 )
+                {
+                    std::cout << "    preconditioning...";
+                    std::cout.flush();
+                }
+                const double startTime = elemental::mpi::Time();
+                Precondition( wList );
+                const double stopTime = elemental::mpi::Time();
+                if( commRank == 0 )
+                    std::cout << stopTime-startTime << " secs" << std::endl;
+            }
+
+            // Run the j'th step of Arnoldi
+            for( int i=0; i<=j; ++i )
+            {
+                // H(i,j) := v_i' w
+                elemental::Matrix<C> viList;
+                viList.LockedView( VInter, 0, i*numRhs, localHeight, numRhs );
+                InnerProducts( viList, wList, alphaList );
+                for( int k=0; k<numRhs; ++k )
+                    HList.Set(i,j+k*m,alphaList[k]);
+                // HERE
+
+                // w := w - H(i,j) v_i
+                SubtractScaledColumns( alphaList, viList, wList );
+            }
+            Norms( wList, deltaList );
+            // TODO: Handle "lucky breakdown" much more carefully
+            const bool zeroDelta = CheckForZeros( deltaList );
+            if( zeroDelta )
+            {
+                if( commRank == 0 ) 
+                    std::cout << "GMRES halted due to a (usually) lucky "
+                                 "breakdown, but this is trickier for multiple "
+                                 "right-hand sides." << std::endl;
+                return;
+            }
+            if( j+1 != m )
+            {
+                elemental::Matrix<C> vjp1List;
+                vjp1List.View( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
+                vjp1List = wList;
+                DivideColumns( vjp1List, deltaList );
+            }
+
+            // Apply the previous rotations to the new column of each H
+            for( int k=0; k<numRhs; ++k )
+            {
+                elemental::Matrix<C> H;
+                H.View( HList, 0, k*m, j+1, j+1 );
+                for( int i=0; i<j; ++i )
+                {
+                    const R c = csList.Get(i,k);
+                    const C s = snList.Get(i,k);
+                    const C eta_i_j = H.Get(i,j);
+                    const C eta_ip1_j = H.Get(i+1,j);
+                    H.Set( i,   j, c                  *eta_i_j + s*eta_ip1_j );
+                    H.Set( i+1, j, -elemental::Conj(s)*eta_i_j + c*eta_ip1_j );
+                }
+            }
+
+            // Generate the new rotation and apply it to our current column
+            // and to z, the rotated beta*e1, then solve for the residual 
+            // minimizer
+            for( int k=0; k<numRhs; ++k )
+            {
+                // Apply the rotation to the new column of H
+                elemental::Matrix<C> H;
+                H.View( HList, 0, k*m, j+1, j+1 );
+                const C eta_j_j = H.Get(j,j);
+                const C eta_jp1_j = deltaList[k];
+                R c;
+                C s, rho;
+                elemental::lapack::ComputeGivens
+                ( eta_j_j, eta_jp1_j, &c, &s, &rho );
+                H.Set(j,j,rho);
+                csList.Set(j,k,c);
+                snList.Set(j,k,s);
+
+                // Apply the rotation to z
+                const C zeta_j = zList.Get(j,k);
+                const C zeta_jp1 = zList.Get(j+1,k);
+                zList.Set( j,   k, c                  *zeta_j + s*zeta_jp1 );
+                zList.Set( j+1, k, -elemental::Conj(s)*zeta_j + c*zeta_jp1 );
+
+                // Minimize the residual
+                elemental::Matrix<C> y, z;
+                z.LockedView( zList, 0, k, j+1, 1 );
+                y = z;
+                elemental::basic::Trsv
+                ( elemental::UPPER, elemental::NORMAL, elemental::NON_UNIT,
+                  H, y );
+
+                // x := x0 + Vj y
+                elemental::Matrix<C> x, x0, vi;
+                x.View(         xList, 0, k, localHeight, 1 );
+                x0.LockedView( x0List, 0, k, localHeight, 1 );
+                x = x0;
+                for( int i=0; i<=j; ++i )
+                {
+                    const C eta_i = y.Get(i,0);
+                    vi.LockedView( VInter, 0, i*numRhs+k, localHeight, 1 );
+                    elemental::basic::Axpy( eta_i, vi, x );
+                }
+            }
+
+            // w := b - A x
+            wList = xList; 
+            elemental::basic::Scal( (C)-1, wList );
+            Multiply( wList );
+            elemental::basic::Axpy( (C)1, bList, wList );
+
+            // Residual checks
+            Norms( wList, residNormList );
+            for( int k=0; k<numRhs; ++k )
+                relResidNormList[k] = residNormList[k]/origResidNormList[k];
+            R maxRelResidNorm = 0;
+            for( int k=0; k<numRhs; ++k )
+                maxRelResidNorm = std::max(maxRelResidNorm,relResidNormList[k]);
+            if( maxRelResidNorm < relTol )
+            {
+                if( commRank == 0 )
+                    std::cout << "  converged with relative tolerance: " 
+                              << maxRelResidNorm << std::endl;
+                converged = true;
+                break;
+            }
+            else
+            {
+                if( commRank == 0 )
+                    std::cout << "  finished iteration " << it << " with "
+                              << "maxRelResidNorm=" << maxRelResidNorm 
+                              << std::endl;
+            }
+            ++it;
+        }
+    }
+    bList = xList;
 }
 
-// Based on several different papers from R. Freund et al. on preconditioned QMR 
+// Based on several different papers from R. Freund et al. on preconditioned QMR
 // for complex symmetric matrices.
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithQMR
-( elemental::Matrix<C>& B, int maxIterations ) const
+psp::DistHelmholtz<R>::InternalSolveWithSQMR
+( elemental::Matrix<C>& bList ) const
 {
-    const R bcgRelTol = 1e-6;
-    const int localHeight = B.Height();
-    const int numRhs = B.Width();
-    const int commRank = elemental::mpi::CommRank( comm_ );
     const R one = 1;
+    const R bcgRelTol = 1e-6;
+    const int numRhs = bList.Width();
+    const int localHeight = bList.Height();
+    const int commRank = elemental::mpi::CommRank( comm_ );
 
-    elemental::Matrix<C> V( localHeight, numRhs ),
-                         T( localHeight, numRhs ),
-                         Q( localHeight, numRhs ),
-                         P( localHeight, numRhs );
-    std::vector<C> c( numRhs ),
-                   tau( numRhs ),
-                   rho( numRhs ),
-                   beta( numRhs ),
-                   theta( numRhs ),
-                   alpha( numRhs ),
-                   sigma( numRhs ),
-                   rhoLast( numRhs ),
-                   thetaLast( numRhs ),
-                   tempScalars( numRhs );
-    std::vector<R> origResidNorm( numRhs ), 
-                   bcgResidNorm( numRhs ),
-                   relBcgResidNorm( numRhs );
+    elemental::Matrix<C> vList( localHeight, numRhs ),
+                         tList( localHeight, numRhs ),
+                         qList( localHeight, numRhs ),
+                         pList( localHeight, numRhs );
+    std::vector<C> cList( numRhs ),
+                   tauList( numRhs ),
+                   rhoList( numRhs ),
+                   betaList( numRhs ),
+                   thetaList( numRhs ),
+                   alphaList( numRhs ),
+                   sigmaList( numRhs ),
+                   rhoLastList( numRhs ),
+                   thetaLastList( numRhs ),
+                   tempList( numRhs );
+    std::vector<R> origResidNormList( numRhs ), 
+                   bcgResidNormList( numRhs ),
+                   relBcgResidNormList( numRhs );
 
     // v := b
     // origResidNorm := ||v||_2
-    V = B;
-    Norms( V, origResidNorm );
+    vList = bList;
+    Norms( vList, origResidNormList );
 
     // t := inv(M) v 
     // tau := sqrt(t^T t)
-    T = V;
+    tList = vList;
     {
         if( commRank == 0 )
         {
@@ -312,58 +566,48 @@ psp::DistHelmholtz<R>::SolveWithQMR
             std::cout.flush();
         }
         const double startTime = elemental::mpi::Time();
-        Precondition( T );
+        Precondition( tList );
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
-    PseudoNorms( T, tau );
+    PseudoNorms( tList, tauList );
 
     // q := t
     // x := 0 (use the B matrix for storing the x vectors)
     // p := 0
     // theta := 0
     // rho := v^T q
-    Q = T;
-    B.SetToZero();
-    P.SetToZero();
+    qList = tList;
+    bList.SetToZero();
+    pList.SetToZero();
     for( int k=0; k<numRhs; ++k )
-        theta[k] = 0;
-    PseudoInnerProducts( V, Q, rho );
+        thetaList[k] = 0;
+    PseudoInnerProducts( vList, qList, rhoList );
 
-    for( int it=0; it<maxIterations; ++it )
+    int it=0;
+    while( true )
     {
         if( commRank == 0 )
             std::cout << "  starting iteration " << it << "..." << std::endl;
         // t := A q
-        T = Q; 
-        {
-            if( commRank == 0 )
-            {
-                std::cout << "    multiply...";
-                std::cout.flush();
-            }
-            const double startTime = elemental::mpi::Time();
-            Multiply( T );
-            const double stopTime = elemental::mpi::Time();
-            if( commRank == 0 )
-                std::cout << stopTime-startTime << " secs" << std::endl;
-        }
+        tList = qList;
+        Multiply( tList );
 
         // sigma := q^T t
         // alpha := rho / sigma
         // v := v - alpha t
-        PseudoInnerProducts( Q, T, sigma );
-        const bool zeroSigma = CheckForZeros( sigma );
+        PseudoInnerProducts( qList, tList, sigmaList );
+        const bool zeroSigma = CheckForZeros( sigmaList );
         if( zeroSigma )
         {
             if( commRank == 0 ) 
-                std::cout << "QMR stopped due to a zero sigma" << std::endl;
+                std::cout << "SQMR stopped due to a zero sigma" << std::endl;
             break;
         }
         for( int k=0; k<numRhs; ++k )
-            alpha[k] = rho[k] / sigma[k];
-        SubtractScaledColumns( alpha, T, V );
+            alphaList[k] = rhoList[k] / sigmaList[k];
+        SubtractScaledColumns( alphaList, tList, vList );
 
         // t         := inv(M) v
         // thetaLast := theta
@@ -372,50 +616,51 @@ psp::DistHelmholtz<R>::SolveWithQMR
         // tau       := tau theta c
         // p         := c^2 thetaLast^2 p + c^2 alpha q
         // x         := x + p
-        T = V;
+        tList = vList;
         {
             if( commRank == 0 )
             {
-                std::cout << "    precondition...";
+                std::cout << "    preconditioning...";
                 std::cout.flush();
             }
             const double startTime = elemental::mpi::Time();
-            Precondition( T );
+            Precondition( tList );
             const double stopTime = elemental::mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
         }
-        thetaLast = theta;
-        PseudoNorms( T, theta );
+        thetaLastList = thetaList;
+        PseudoNorms( tList, thetaList );
         for( int k=0; k<numRhs; ++k )
         {
-            theta[k] /= tau[k];
-            c[k]      = one/sqrt(one+theta[k]*theta[k]);
-            tau[k]    = tau[k]*theta[k]*c[k];
+            thetaList[k] /= tauList[k];
+            cList[k]      = one/sqrt(one+thetaList[k]*thetaList[k]);
+            tauList[k]    = tauList[k]*thetaList[k]*cList[k];
         }
         for( int k=0; k<numRhs; ++k ) 
-            tempScalars[k] = c[k]*c[k]*thetaLast[k]*thetaLast[k];
-        MultiplyColumns( P, tempScalars );
+            tempList[k] = cList[k]*cList[k]*thetaLastList[k]*thetaLastList[k];
+        MultiplyColumns( pList, tempList );
         for( int k=0; k<numRhs; ++k )
-            tempScalars[k] = c[k]*c[k]*alpha[k];
-        AddScaledColumns( tempScalars, Q, P );
-        elemental::basic::Axpy( (C)1, P, B );
-        const bool zeroTheta = CheckForZeros( theta );
+            tempList[k] = cList[k]*cList[k]*alphaList[k];
+        AddScaledColumns( tempList, qList, pList );
+        elemental::basic::Axpy( (C)1, pList, bList );
+        const bool zeroTheta = CheckForZeros( thetaList );
         if( zeroTheta )
         {
             if( commRank == 0 )
-                std::cout << "QMR stopped due to a zero theta" << std::endl;
+                std::cout << "SQMR stopped due to a zero theta" << std::endl;
             break;
         }
 
         // Residual checks
-        Norms( V, bcgResidNorm );
+        Norms( vList, bcgResidNormList );
         for( int k=0; k<numRhs; ++k )
-            relBcgResidNorm[k] = bcgResidNorm[k]/origResidNorm[k];
+            relBcgResidNormList[k] = 
+                bcgResidNormList[k]/origResidNormList[k];
         R maxRelBcgResidNorm = 0;
         for( int k=0; k<numRhs; ++k )
             maxRelBcgResidNorm = 
-                std::max(maxRelBcgResidNorm,relBcgResidNorm[k]);
+                std::max(maxRelBcgResidNorm,relBcgResidNormList[k]);
         if( maxRelBcgResidNorm < bcgRelTol )
         {
             if( commRank == 0 )
@@ -435,29 +680,42 @@ psp::DistHelmholtz<R>::SolveWithQMR
         // rho     := v^T t
         // beta    := rho / rhoLast
         // q       := t + beta q
-        const bool zeroRho = CheckForZeros( rho );
+        const bool zeroRho = CheckForZeros( rhoList );
         if( zeroRho )
         {
             if( commRank == 0 ) 
-                std::cout << "QMR stopped due to a zero rho" << std::endl;
+                std::cout << "SQMR stopped due to a zero rho" << std::endl;
             break;
         }
-        rhoLast = rho;
-        PseudoInnerProducts( V, T, rho );
+        rhoLastList = rhoList;
+        PseudoInnerProducts( vList, tList, rhoList );
         for( int k=0; k<numRhs; ++k )
-            beta[k] = rho[k] / rhoLast[k];
-        MultiplyColumns( Q, beta );
-        elemental::basic::Axpy( (C)1, T, Q );
+            betaList[k] = rhoList[k] / rhoLastList[k];
+        MultiplyColumns( qList, betaList );
+        elemental::basic::Axpy( (C)1, tList, qList );
+
+        ++it;
     }
 }
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForZeros( const std::vector<C>& alpha ) const
+psp::DistHelmholtz<R>::CheckForZeros( const std::vector<R>& alphaList ) const
 {
     bool foundZero = false;
-    for( int k=0; k<alpha.size(); ++k )
-        if( alpha[k] == (C)0 ) // think about using a tolerance instead
+    for( int k=0; k<alphaList.size(); ++k )
+        if( alphaList[k] == (C)0 ) // think about using a tolerance instead
+            foundZero = true;
+    return foundZero;
+}
+
+template<typename R>
+bool
+psp::DistHelmholtz<R>::CheckForZeros( const std::vector<C>& alphaList ) const
+{
+    bool foundZero = false;
+    for( int k=0; k<alphaList.size(); ++k )
+        if( alphaList[k] == (C)0 ) // think about using a tolerance instead
             foundZero = true;
     return foundZero;
 }
@@ -465,129 +723,149 @@ psp::DistHelmholtz<R>::CheckForZeros( const std::vector<C>& alpha ) const
 template<typename R>
 void
 psp::DistHelmholtz<R>::Norms
-( const elemental::Matrix<C>& X, std::vector<R>& norm ) const
+( const elemental::Matrix<C>& xList, std::vector<R>& normList ) const
 {
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
     const int commSize = elemental::mpi::CommSize( comm_ );
     std::vector<R> localNorms( numCols );
     for( int j=0; j<numCols; ++j )
         localNorms[j] = 
-            elemental::blas::Nrm2( localHeight, X.LockedBuffer(0,j), 1 );
+            elemental::blas::Nrm2( localHeight, xList.LockedBuffer(0,j), 1 );
     std::vector<R> allLocalNorms( numCols*commSize );
     elemental::mpi::AllGather
     ( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm_ );
-    norm.resize( numCols );
+    normList.resize( numCols );
     for( int j=0; j<numCols; ++j )
-        norm[j] = elemental::blas::Nrm2( commSize, &allLocalNorms[j], numCols );
+        normList[j] = 
+            elemental::blas::Nrm2( commSize, &allLocalNorms[j], numCols );
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::PseudoNorms
-( const elemental::Matrix<C>& X, std::vector<C>& alpha ) const
+( const elemental::Matrix<C>& xList, std::vector<C>& alphaList ) const
 {
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
-    std::vector<C> localAlpha( numCols );
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
+    std::vector<C> localAlphaList( numCols );
     for( int j=0; j<numCols; ++j )
-        localAlpha[j] = 
+        localAlphaList[j] = 
             elemental::blas::Dotu
-            ( localHeight, X.LockedBuffer(0,j), 1,
-                           X.LockedBuffer(0,j), 1 );
-    alpha.resize( numCols );
+            ( localHeight, xList.LockedBuffer(0,j), 1,
+                           xList.LockedBuffer(0,j), 1 );
+    alphaList.resize( numCols );
     // TODO: Think about avoiding overflow?
     elemental::mpi::AllReduce
-    ( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
+    ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
     for( int j=0; j<numCols; ++j )
-        alpha[j] = sqrt(alpha[j]);
+        alphaList[j] = sqrt(alphaList[j]);
+}
+
+template<typename R>
+void
+psp::DistHelmholtz<R>::InnerProducts
+( const elemental::Matrix<C>& xList, const elemental::Matrix<C>& yList,
+  std::vector<C>& alphaList ) const
+{
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
+    std::vector<C> localAlphaList( numCols );
+    for( int j=0; j<numCols; ++j )
+        localAlphaList[j] = 
+            elemental::blas::Dot
+            ( localHeight, xList.LockedBuffer(0,j), 1,
+                           yList.LockedBuffer(0,j), 1 );
+    alphaList.resize( numCols );
+    elemental::mpi::AllReduce
+    ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::PseudoInnerProducts
-( const elemental::Matrix<C>& X, const elemental::Matrix<C>& Y,
-  std::vector<C>& alpha ) const
+( const elemental::Matrix<C>& xList, const elemental::Matrix<C>& yList,
+  std::vector<C>& alphaList ) const
 {
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
-    std::vector<C> localAlpha( numCols );
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
+    std::vector<C> localAlphaList( numCols );
     for( int j=0; j<numCols; ++j )
-        localAlpha[j] = 
+        localAlphaList[j] = 
             elemental::blas::Dotu
-            ( localHeight, X.LockedBuffer(0,j), 1,
-                           Y.LockedBuffer(0,j), 1 );
-    alpha.resize( numCols );
+            ( localHeight, xList.LockedBuffer(0,j), 1,
+                           yList.LockedBuffer(0,j), 1 );
+    alphaList.resize( numCols );
     elemental::mpi::AllReduce
-    ( &localAlpha[0], &alpha[0], numCols, MPI_SUM, comm_ );
+    ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::DivideColumns
-( elemental::Matrix<C>& X, const std::vector<R>& d ) const
+( elemental::Matrix<C>& xList, const std::vector<R>& deltaList ) const
 {
     const R one = 1;
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
     for( int j=0; j<numCols; ++j )
     {
-        const R invDelta = one/d[j];
-        C* XCol = X.Buffer(0,j);
+        const R invDelta = one/deltaList[j];
+        C* x = xList.Buffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            XCol[iLocal] *= invDelta;
+            x[iLocal] *= invDelta;
     }
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::MultiplyColumns
-( elemental::Matrix<C>& X, const std::vector<C>& d ) const
+( elemental::Matrix<C>& xList, const std::vector<C>& deltaList ) const
 {
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
     for( int j=0;j<numCols; ++j )
     {
-        const C delta = d[j];
-        C* XCol = X.Buffer(0,j);
+        const C delta = deltaList[j];
+        C* x = xList.Buffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            XCol[iLocal] *= delta;
+            x[iLocal] *= delta;
     }
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::AddScaledColumns
-( const std::vector<C>& d, 
-  const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const
+( const std::vector<C>& deltaList, 
+  const elemental::Matrix<C>& xList, elemental::Matrix<C>& yList ) const
 {
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
     for( int j=0; j<numCols; ++j )
     {
-        const C delta = d[j];
-        C* YCol = Y.Buffer(0,j);
-        const C* XCol = X.LockedBuffer(0,j);
+        const C delta = deltaList[j];
+        const C* x = xList.LockedBuffer(0,j);
+        C* y = yList.Buffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            YCol[iLocal] += delta*XCol[iLocal];
+            y[iLocal] += delta*x[iLocal];
     }
 }
 
 template<typename R>
 void
 psp::DistHelmholtz<R>::SubtractScaledColumns
-( const std::vector<C>& d, 
-  const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const
+( const std::vector<C>& deltaList, 
+  const elemental::Matrix<C>& xList, elemental::Matrix<C>& yList ) const
 {
-    const int localHeight = X.Height();
-    const int numCols = X.Width();
+    const int numCols = xList.Width();
+    const int localHeight = xList.Height();
     for( int j=0; j<numCols; ++j )
     {
-        const C delta = d[j];
-        C* YCol = Y.Buffer(0,j);
-        const C* XCol = X.LockedBuffer(0,j);
+        const C delta = deltaList[j];
+        const C* x = xList.LockedBuffer(0,j);
+        C* y = yList.Buffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            YCol[iLocal] -= delta*XCol[iLocal];
+            y[iLocal] -= delta*x[iLocal];
     }
 }
 

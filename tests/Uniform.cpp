@@ -24,7 +24,8 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Uniform <nx> <ny> <nz> <omega> <numPlanesPerPanel> "
-                 "<fact blocksize> <solve blocksize> <accelerate?> <viz?>\n" 
+                 "<fact blocksize> <solve blocksize> <accelerate?> <SQMR?> "
+                 "<viz?>\n" 
               << "  <nx>: Size of grid in x dimension\n"
               << "  <ny>: Size of grid in y dimension\n"
               << "  <nz>: Size of grid in z dimension\n"
@@ -33,6 +34,7 @@ void Usage()
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
               << "  <accelerate?>: accelerate solves iff !=0\n"
+              << "  <SQMR?>: use GMRES iff 0, otherwise SQMR\n"
               << "  <viz?>:  Visualize iff != 0\n"
               << std::endl;
 }
@@ -45,7 +47,7 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 10 )
+    if( argc < 11 )
     {
         if( commRank == 0 )
             Usage();
@@ -60,7 +62,8 @@ main( int argc, char* argv[] )
     const int factBlocksize = atoi( argv[6] );
     const int solveBlocksize = atoi( argv[7] );
     const bool accelerate = atoi( argv[8] );
-    const bool visualize = atoi( argv[9] );
+    const bool useSQMR = atoi( argv[9] );
+    const bool visualize = atoi( argv[10] );
 
     if( commRank == 0 )
     {
@@ -183,8 +186,10 @@ main( int argc, char* argv[] )
             std::cout << "Beginning solve..." << std::endl;
         clique::mpi::Barrier( comm );
         const double solveStartTime = clique::mpi::Time();
-        const int maxIterations = 500;
-        helmholtz.Solve( B, QMR, maxIterations );
+        if( useSQMR )
+            helmholtz.SolveWithSQMR( B );
+        else
+            helmholtz.SolveWithGMRES( B );
         clique::mpi::Barrier( comm );
         const double solveStopTime = clique::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;

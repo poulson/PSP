@@ -23,11 +23,6 @@
 
 namespace psp {
 
-enum Solver {
-    GMRES,
-    QMR
-};
-
 template<typename R>
 class DistHelmholtz
 {
@@ -43,7 +38,8 @@ public:
     void Initialize( const GridData<R>& slowness, bool accelerate=true );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
-    void Solve( GridData<C>& B, Solver solver=QMR, int maxIterations=50 ) const;
+    void SolveWithSQMR( GridData<C>& B ) const;
+    void SolveWithGMRES( GridData<C>& B, int m=20 ) const;
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
@@ -71,42 +67,51 @@ private:
     void PushRightHandSides
     ( GridData<C>& gridB, const elemental::Matrix<C>& B ) const;
 
-    void SolveWithGMRES( elemental::Matrix<C>& B, int maxIterations=50 ) const;
-    void SolveWithQMR( elemental::Matrix<C>& B, int maxIterations=50 ) const;
+    void InternalSolveWithGMRES( elemental::Matrix<C>& B, int m ) const;
+    void InternalSolveWithSQMR( elemental::Matrix<C>& B ) const;
 
+    bool CheckForZeros( const std::vector<R>& alpha ) const;
     bool CheckForZeros( const std::vector<C>& alpha ) const;
 
     void Norms
-    ( const elemental::Matrix<C>& X, std::vector<R>& norm ) const;
+    ( const elemental::Matrix<C>& xList, std::vector<R>& normList ) const;
+    void InnerProducts
+    ( const elemental::Matrix<C>& xList, const elemental::Matrix<C>& yList,
+      std::vector<C>& alphaList ) const;
+
     void PseudoNorms
-    ( const elemental::Matrix<C>& X, std::vector<C>& pseudoNorm ) const;
+    ( const elemental::Matrix<C>& xList, std::vector<C>& pseudoNormList ) const;
     void PseudoInnerProducts
-    ( const elemental::Matrix<C>& X, const elemental::Matrix<C>& Y,
-      std::vector<C>& alpha ) const;
+    ( const elemental::Matrix<C>& xList, const elemental::Matrix<C>& yList,
+      std::vector<C>& alphaList ) const;
 
     void MultiplyColumns
-    ( elemental::Matrix<C>& X, const std::vector<C>& d ) const;
+    ( elemental::Matrix<C>& xList, const std::vector<C>& deltaList ) const;
     void DivideColumns
-    ( elemental::Matrix<C>& X, const std::vector<R>& d ) const;
+    ( elemental::Matrix<C>& xList, const std::vector<R>& deltaList ) const;
     void AddScaledColumns
-    ( const std::vector<C>& d,
-      const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const;
+    ( const std::vector<C>& deltaList,
+      const elemental::Matrix<C>& xList, elemental::Matrix<C>& yList ) const;
     void SubtractScaledColumns
-    ( const std::vector<C>& d,
-      const elemental::Matrix<C>& X, elemental::Matrix<C>& Y ) const;
+    ( const std::vector<C>& deltaList,
+      const elemental::Matrix<C>& xList, elemental::Matrix<C>& yList ) const;
 
     void Multiply( elemental::Matrix<C>& B ) const;
     void Precondition( elemental::Matrix<C>& B ) const;
 
     // B_i := T_i B_i
     void SolvePanel( elemental::Matrix<C>& B, int i ) const;
+
     // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
     void SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const;
+
     // Z := B_i, B_i := 0
     void ExtractPanel
     ( elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const;
+
     // B_i := -A_{i,i+1} B_{i+1}
     void MultiplySuperdiagonal( elemental::Matrix<C>& B, int i ) const;
+
     // B_i := B_i + Z
     void UpdatePanel
     ( elemental::Matrix<C>& B, int i, const elemental::Matrix<C>& Z ) const;
