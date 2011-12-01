@@ -388,7 +388,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 #endif
                 if( commRank == 0 )
                 {
-                    std::cout << "  multiplying...";
+                    std::cout << "    multiplying...";
                     std::cout.flush();
                 }
                 const double startTime = elemental::mpi::Time();
@@ -403,12 +403,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 
             // w := inv(M) w
             {
-#ifndef RELEASE
-                elemental::mpi::Barrier( comm_ );
-#endif
                 if( commRank == 0 )
                 {
-                    std::cout << "  preconditioning...";
+                    std::cout << "    preconditioning...";
                     std::cout.flush();
                 }
                 const double startTime = elemental::mpi::Time();
@@ -422,96 +419,138 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             }
 
             // Run the j'th step of Arnoldi
-            for( int i=0; i<=j; ++i )
             {
-                // H(i,j) := v_i' w
-                elemental::Matrix<C> viList;
-                viList.LockedView( VInter, 0, i*numRhs, localHeight, numRhs );
-                InnerProducts( viList, wList, alphaList );
-                for( int k=0; k<numRhs; ++k )
-                    HList.Set(i,j+k*m,alphaList[k]);
+                if( commRank == 0 )
+                {
+                    std::cout << "    Arnoldi step...";
+                    std::cout.flush();
+                }
+                const double startTime = elemental::mpi::Time();
+                for( int i=0; i<=j; ++i )
+                {
+                    // H(i,j) := v_i' w
+                    elemental::Matrix<C> viList;
+                    viList.LockedView( VInter, 0, i*numRhs, localHeight, numRhs );
+                    InnerProducts( viList, wList, alphaList );
+                    for( int k=0; k<numRhs; ++k )
+                        HList.Set(i,j+k*m,alphaList[k]);
 
-                // w := w - H(i,j) v_i
-                SubtractScaledColumns( alphaList, viList, wList );
-            }
-            Norms( wList, deltaList );
-            // TODO: Handle "lucky breakdown" much more carefully
-            const bool zeroDelta = CheckForZeros( deltaList );
-            if( zeroDelta )
-            {
-                if( commRank == 0 ) 
-                    std::cout << "GMRES halted due to a (usually) lucky "
-                                 "breakdown, but this is trickier for multiple "
-                                 "right-hand sides." << std::endl;
-                return;
-            }
-            if( j+1 != m )
-            {
-                elemental::Matrix<C> vjp1List;
-                vjp1List.View( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
-                vjp1List = wList;
-                DivideColumns( vjp1List, deltaList );
+                    // w := w - H(i,j) v_i
+                    SubtractScaledColumns( alphaList, viList, wList );
+                }
+                Norms( wList, deltaList );
+                // TODO: Handle "lucky breakdown" much more carefully
+                const bool zeroDelta = CheckForZeros( deltaList );
+                if( zeroDelta )
+                {
+                    if( commRank == 0 ) 
+                        std::cout << "GMRES halted due to a (usually) lucky "
+                                     "breakdown, but this is trickier for multiple "
+                                     "right-hand sides." << std::endl;
+                    return;
+                }
+                if( j+1 != m )
+                {
+                    elemental::Matrix<C> vjp1List;
+                    vjp1List.View( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
+                    vjp1List = wList;
+                    DivideColumns( vjp1List, deltaList );
+                }
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                const double stopTime = elemental::mpi::Time();
+                if( commRank == 0 )
+                    std::cout << stopTime-startTime << " secs" << std::endl;
             }
 
             // Apply the previous rotations to the new column of each H
-            for( int k=0; k<numRhs; ++k )
             {
-                elemental::Matrix<C> H;
-                H.View( HList, 0, k*m, j+1, j+1 );
-                for( int i=0; i<j; ++i )
+                if( commRank == 0 )
                 {
-                    const R c = csList.Get(i,k);
-                    const C s = snList.Get(i,k);
-                    const C eta_i_j = H.Get(i,j);
-                    const C eta_ip1_j = H.Get(i+1,j);
-                    H.Set( i,   j, c                  *eta_i_j + s*eta_ip1_j );
-                    H.Set( i+1, j, -elemental::Conj(s)*eta_i_j + c*eta_ip1_j );
+                    std::cout << "    applying previous rotations...";
+                    std::cout.flush();
                 }
+                const double startTime = elemental::mpi::Time();
+                for( int k=0; k<numRhs; ++k )
+                {
+                    elemental::Matrix<C> H;
+                    H.View( HList, 0, k*m, j+1, j+1 );
+                    for( int i=0; i<j; ++i )
+                    {
+                        const R c = csList.Get(i,k);
+                        const C s = snList.Get(i,k);
+                        const C eta_i_j = H.Get(i,j);
+                        const C eta_ip1_j = H.Get(i+1,j);
+                        H.Set( i,   j, c                  *eta_i_j + s*eta_ip1_j );
+                        H.Set( i+1, j, -elemental::Conj(s)*eta_i_j + c*eta_ip1_j );
+                    }
+                }
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                const double stopTime = elemental::mpi::Time();
+                if( commRank == 0 )
+                    std::cout << stopTime-startTime << " secs" << std::endl;
             }
 
             // Generate the new rotation and apply it to our current column
             // and to z, the rotated beta*e1, then solve for the residual 
             // minimizer
-            for( int k=0; k<numRhs; ++k )
             {
-                // Apply the rotation to the new column of H
-                elemental::Matrix<C> H;
-                H.View( HList, 0, k*m, j+1, j+1 );
-                const C eta_j_j = H.Get(j,j);
-                const C eta_jp1_j = deltaList[k];
-                R c;
-                C s, rho;
-                elemental::lapack::ComputeGivens
-                ( eta_j_j, eta_jp1_j, &c, &s, &rho );
-                H.Set(j,j,rho);
-                csList.Set(j,k,c);
-                snList.Set(j,k,s);
-
-                // Apply the rotation to z
-                const C zeta_j = zList.Get(j,k);
-                const C zeta_jp1 = zList.Get(j+1,k);
-                zList.Set( j,   k, c                  *zeta_j + s*zeta_jp1 );
-                zList.Set( j+1, k, -elemental::Conj(s)*zeta_j + c*zeta_jp1 );
-
-                // Minimize the residual
-                elemental::Matrix<C> y, z;
-                z.LockedView( zList, 0, k, j+1, 1 );
-                y = z;
-                elemental::basic::Trsv
-                ( elemental::UPPER, elemental::NORMAL, elemental::NON_UNIT,
-                  H, y );
-
-                // x := x0 + Vj y
-                elemental::Matrix<C> x, x0, vi;
-                x.View(         xList, 0, k, localHeight, 1 );
-                x0.LockedView( x0List, 0, k, localHeight, 1 );
-                x = x0;
-                for( int i=0; i<=j; ++i )
+                if( commRank == 0 )
                 {
-                    const C eta_i = y.Get(i,0);
-                    vi.LockedView( VInter, 0, i*numRhs+k, localHeight, 1 );
-                    elemental::basic::Axpy( eta_i, vi, x );
+                    std::cout << "    rotating and minimizing residual...";
+                    std::cout.flush();
                 }
+                const double startTime = elemental::mpi::Time();
+                for( int k=0; k<numRhs; ++k )
+                {
+                    // Apply the rotation to the new column of H
+                    elemental::Matrix<C> H;
+                    H.View( HList, 0, k*m, j+1, j+1 );
+                    const C eta_j_j = H.Get(j,j);
+                    const C eta_jp1_j = deltaList[k];
+                    R c;
+                    C s, rho;
+                    elemental::lapack::ComputeGivens
+                    ( eta_j_j, eta_jp1_j, &c, &s, &rho );
+                    H.Set(j,j,rho);
+                    csList.Set(j,k,c);
+                    snList.Set(j,k,s);
+
+                    // Apply the rotation to z
+                    const C zeta_j = zList.Get(j,k);
+                    const C zeta_jp1 = zList.Get(j+1,k);
+                    zList.Set( j,   k, c                  *zeta_j + s*zeta_jp1 );
+                    zList.Set( j+1, k, -elemental::Conj(s)*zeta_j + c*zeta_jp1 );
+
+                    // Minimize the residual
+                    elemental::Matrix<C> y, z;
+                    z.LockedView( zList, 0, k, j+1, 1 );
+                    y = z;
+                    elemental::basic::Trsv
+                    ( elemental::UPPER, elemental::NORMAL, elemental::NON_UNIT,
+                      H, y );
+
+                    // x := x0 + Vj y
+                    elemental::Matrix<C> x, x0, vi;
+                    x.View(         xList, 0, k, localHeight, 1 );
+                    x0.LockedView( x0List, 0, k, localHeight, 1 );
+                    x = x0;
+                    for( int i=0; i<=j; ++i )
+                    {
+                        const C eta_i = y.Get(i,0);
+                        vi.LockedView( VInter, 0, i*numRhs+k, localHeight, 1 );
+                        elemental::basic::Axpy( eta_i, vi, x );
+                    }
+                }
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                const double stopTime = elemental::mpi::Time();
+                if( commRank == 0 )
+                    std::cout << stopTime-startTime << " secs" << std::endl;
             }
 
             // w := b - A x
@@ -523,7 +562,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 #endif
                 if( commRank == 0 )
                 {
-                    std::cout << "  residual multiply...";
+                    std::cout << "    residual multiply...";
                     std::cout.flush();
                 }
                 const double startTime = elemental::mpi::Time();
