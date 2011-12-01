@@ -404,6 +404,12 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
+#ifndef RELEASE
+            Norms( wList, deltaList );
+            const bool multiplyHasNaN = CheckForNaN( deltaList );
+            if( deltaListHasNaN )
+                throw std::runtime_error("multiply had a NaN");
+#endif
 
             // w := inv(M) w
             {
@@ -421,6 +427,12 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
+#ifndef RELEASE
+            Norms( wList, deltaList );
+            const bool preconditionHasNaN = CheckForNaN( deltaList );
+            if( deltaListHasNaN )
+                throw std::runtime_error("precondition had a NaN");
+#endif
 
             // Run the j'th step of Arnoldi
             {
