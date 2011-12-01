@@ -330,6 +330,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
     // origResidNorm := ||w||_2
     wList = bList;
     Norms( wList, origResidNormList );
+    const bool origResidHasNaN = CheckForNaN( origResidNormList );
+    if( origResidHasNaN )
+        throw std::runtime_error("Original residual norms had a NaN");
 
     int it=0;
     bool converged=false;
@@ -362,6 +365,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 std::cout << stopTime-startTime << " secs" << std::endl;
         }
         Norms( wList, betaList );
+        const bool betaListHasNaN = CheckForNaN( betaList );
+        if( betaListHasNaN )
+            throw std::runtime_error("beta list had a NaN");
 
         // v0 := w / beta
         elemental::Matrix<C> v0List;
@@ -428,7 +434,8 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 {
                     // H(i,j) := v_i' w
                     elemental::Matrix<C> viList;
-                    viList.LockedView( VInter, 0, i*numRhs, localHeight, numRhs );
+                    viList.LockedView
+                    ( VInter, 0, i*numRhs, localHeight, numRhs );
                     InnerProducts( viList, wList, alphaList );
                     for( int k=0; k<numRhs; ++k )
                         HList.Set(i,j+k*m,alphaList[k]);
@@ -437,20 +444,25 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     SubtractScaledColumns( alphaList, viList, wList );
                 }
                 Norms( wList, deltaList );
+                const bool deltaListHasNaN = CheckForNaN( deltaList );
+                if( deltaListHasNaN )
+                    throw std::runtime_error("delta list had a NaN");
                 // TODO: Handle "lucky breakdown" much more carefully
-                const bool zeroDelta = CheckForZeros( deltaList );
+                const bool zeroDelta = CheckForZero( deltaList );
                 if( zeroDelta )
                 {
                     if( commRank == 0 ) 
-                        std::cout << "GMRES halted due to a (usually) lucky "
-                                     "breakdown, but this is trickier for multiple "
-                                     "right-hand sides." << std::endl;
+                        std::cout 
+                            << "GMRES halted due to a (usually) lucky "
+                               "breakdown, but this is trickier for multiple "
+                               "right-hand sides." << std::endl;
                     return;
                 }
                 if( j+1 != m )
                 {
                     elemental::Matrix<C> vjp1List;
-                    vjp1List.View( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
+                    vjp1List.View
+                    ( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
                 }
@@ -478,10 +490,11 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     {
                         const R c = csList.Get(i,k);
                         const C s = snList.Get(i,k);
+                        const C sConj = elemental::Conj(s);
                         const C eta_i_j = H.Get(i,j);
                         const C eta_ip1_j = H.Get(i+1,j);
-                        H.Set( i,   j, c                  *eta_i_j + s*eta_ip1_j );
-                        H.Set( i+1, j, -elemental::Conj(s)*eta_i_j + c*eta_ip1_j );
+                        H.Set( i,   j,  c    *eta_i_j + s*eta_ip1_j );
+                        H.Set( i+1, j, -sConj*eta_i_j + c*eta_ip1_j );
                     }
                 }
 #ifndef RELEASE
@@ -509,19 +522,30 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     H.View( HList, 0, k*m, j+1, j+1 );
                     const C eta_j_j = H.Get(j,j);
                     const C eta_jp1_j = deltaList[k];
+                    if( CheckForNaN(eta_j_j) )
+                        throw std::runtime_error("H(j,j) was NaN");
+                    if( CheckForNaN(eta_jp1_j) )
+                        throw std::runtime_error("H(j+1,j) was NaN");
                     R c;
                     C s, rho;
                     elemental::lapack::ComputeGivens
                     ( eta_j_j, eta_jp1_j, &c, &s, &rho );
+                    if( CheckForNaN(c) )
+                        throw std::runtime_error("c in Givens was NaN");
+                    if( CheckForNaN(s) )
+                        throw std::runtime_error("s in Givens was NaN");
+                    if( CheckForNaN(rho) )
+                        throw std::runtime_error("rho in Givens was NaN");
                     H.Set(j,j,rho);
                     csList.Set(j,k,c);
                     snList.Set(j,k,s);
 
                     // Apply the rotation to z
+                    const C sConj = elemental::Conj(s);
                     const C zeta_j = zList.Get(j,k);
                     const C zeta_jp1 = zList.Get(j+1,k);
-                    zList.Set( j,   k, c                  *zeta_j + s*zeta_jp1 );
-                    zList.Set( j+1, k, -elemental::Conj(s)*zeta_j + c*zeta_jp1 );
+                    zList.Set( j,   k,  c    *zeta_j + s*zeta_jp1 );
+                    zList.Set( j+1, k, -sConj*zeta_j + c*zeta_jp1 );
 
                     // Minimize the residual
                     elemental::Matrix<C> y, z;
@@ -576,6 +600,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 
             // Residual checks
             Norms( wList, residNormList );
+            const bool residNormListHasNaN = CheckForNaN( residNormList );
+            if( residNormListHasNaN )
+                throw std::runtime_error("resid norm list has NaN");
             for( int k=0; k<numRhs; ++k )
                 relResidNormList[k] = residNormList[k]/origResidNormList[k];
             R maxRelResidNorm = 0;
@@ -637,6 +664,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
     // origResidNorm := ||v||_2
     vList = bList;
     Norms( vList, origResidNormList );
+    const bool origResidHasNaN = CheckForNaN( origResidNormList );
+    if( origResidHasNaN )
+        throw std::runtime_error("Original resid has NaN");
 
     // t := inv(M) v 
     // tau := sqrt(t^T t)
@@ -660,6 +690,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
     PseudoNorms( tList, tauList );
+    const bool tauListHasNaN = CheckForNaN( tauList );
+    if( tauListHasNaN )
+        throw std::runtime_error("tau list has NaN");
 
     // q := t
     // x := 0 (use the B matrix for storing the x vectors)
@@ -672,6 +705,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
     for( int k=0; k<numRhs; ++k )
         thetaList[k] = 0;
     PseudoInnerProducts( vList, qList, rhoList );
+    const bool rhoListHasNaN = CheckForNaN( rhoList );
+    if( rhoListHasNaN )
+        throw std::runtime_error("rho list has NaN");
 
     int it=0;
     while( true )
@@ -703,7 +739,10 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         // alpha := rho / sigma
         // v := v - alpha t
         PseudoInnerProducts( qList, tList, sigmaList );
-        const bool zeroSigma = CheckForZeros( sigmaList );
+        const bool sigmaListHasNaN = CheckForNaN( sigmaList );
+        if( sigmaListHasNaN )
+            throw std::runtime_error("sigma list has NaN");
+        const bool zeroSigma = CheckForZero( sigmaList );
         if( zeroSigma )
         {
             if( commRank == 0 ) 
@@ -712,6 +751,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         }
         for( int k=0; k<numRhs; ++k )
             alphaList[k] = rhoList[k] / sigmaList[k];
+        const bool alphaListHasNaN = CheckForNaN( alphaList );
+        if( alphaListHasNaN )
+            throw std::runtime_error("alpha list has NaN");
         SubtractScaledColumns( alphaList, tList, vList );
 
         // t         := inv(M) v
@@ -755,7 +797,10 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
             tempList[k] = cList[k]*cList[k]*alphaList[k];
         AddScaledColumns( tempList, qList, pList );
         elemental::basic::Axpy( (C)1, pList, bList );
-        const bool zeroTheta = CheckForZeros( thetaList );
+        const bool thetaListHasNaN = CheckForNaN( thetaList );
+        if( thetaListHasNaN )
+            throw std::runtime_error("theta list has NaN");
+        const bool zeroTheta = CheckForZero( thetaList );
         if( zeroTheta )
         {
             if( commRank == 0 )
@@ -765,6 +810,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
 
         // Residual checks
         Norms( vList, bcgResidNormList );
+        const bool bcgResidHasNaN = CheckForNaN( bcgResidNormList );
+        if( bcgResidHasNaN )
+            throw std::runtime_error("BCG residuals have NaN");
         for( int k=0; k<numRhs; ++k )
             relBcgResidNormList[k] = 
                 bcgResidNormList[k]/origResidNormList[k];
@@ -791,7 +839,7 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         // rho     := v^T t
         // beta    := rho / rhoLast
         // q       := t + beta q
-        const bool zeroRho = CheckForZeros( rhoList );
+        const bool zeroRho = CheckForZero( rhoList );
         if( zeroRho )
         {
             if( commRank == 0 ) 
@@ -811,7 +859,43 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForZeros( const std::vector<R>& alphaList ) const
+psp::DistHelmholtz<R>::CheckForNaN( R alpha ) const
+{
+    return alpha != alpha; // hopefully this is not optimized away
+}
+
+template<typename R>
+bool
+psp::DistHelmholtz<R>::CheckForNaN( C alpha ) const
+{
+    return alpha != alpha; // hopefully this is not optimized away
+}
+
+template<typename R>
+bool
+psp::DistHelmholtz<R>::CheckForNaN( const std::vector<R>& alphaList ) const
+{
+    bool foundNaN = false;
+    for( unsigned k=0; k<alphaList.size(); ++k )
+        if( CheckForNaN(alphaList[k]) )
+            foundNaN = true;
+    return foundNaN;
+}
+
+template<typename R>
+bool
+psp::DistHelmholtz<R>::CheckForNaN( const std::vector<C>& alphaList ) const
+{
+    bool foundNaN = false;
+    for( unsigned k=0; k<alphaList.size(); ++k )
+        if( CheckForNaN(alphaList[k]) )
+            foundNaN = true;
+    return foundNaN;
+}
+
+template<typename R>
+bool
+psp::DistHelmholtz<R>::CheckForZero( const std::vector<R>& alphaList ) const
 {
     bool foundZero = false;
     for( unsigned k=0; k<alphaList.size(); ++k )
@@ -822,7 +906,7 @@ psp::DistHelmholtz<R>::CheckForZeros( const std::vector<R>& alphaList ) const
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForZeros( const std::vector<C>& alphaList ) const
+psp::DistHelmholtz<R>::CheckForZero( const std::vector<C>& alphaList ) const
 {
     bool foundZero = false;
     for( unsigned k=0; k<alphaList.size(); ++k )

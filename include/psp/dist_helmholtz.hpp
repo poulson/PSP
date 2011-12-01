@@ -70,8 +70,12 @@ private:
     void InternalSolveWithGMRES( elemental::Matrix<C>& B, int m ) const;
     void InternalSolveWithSQMR( elemental::Matrix<C>& B ) const;
 
-    bool CheckForZeros( const std::vector<R>& alpha ) const;
-    bool CheckForZeros( const std::vector<C>& alpha ) const;
+    bool CheckForNaN( R alpha ) const;
+    bool CheckForNaN( C alpha ) const;
+    bool CheckForNaN( const std::vector<R>& alpha ) const;
+    bool CheckForNaN( const std::vector<C>& alpha ) const;
+    bool CheckForZero( const std::vector<R>& alpha ) const;
+    bool CheckForZero( const std::vector<C>& alpha ) const;
 
     void Norms
     ( const elemental::Matrix<C>& xList, std::vector<R>& normList ) const;
