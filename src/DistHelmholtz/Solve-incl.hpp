@@ -817,7 +817,7 @@ psp::DistHelmholtz<R>::CheckForZeros( const std::vector<R>& alphaList ) const
 {
     bool foundZero = false;
     for( int k=0; k<alphaList.size(); ++k )
-        if( alphaList[k] == (C)0 ) // think about using a tolerance instead
+        if( alphaList[k] == (R)0 ) // think about using a tolerance instead
             foundZero = true;
     return foundZero;
 }
