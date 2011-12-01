@@ -346,6 +346,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
         // w := inv(M) w
         // beta := ||w||_2
         {
+#ifndef RELEASE
+            elemental::mpi::Barrier( comm_ );
+#endif
             if( commRank == 0 )
             {
                 std::cout << "  startup preconditioner application...";
@@ -353,6 +356,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             }
             const double startTime = elemental::mpi::Time();
             Precondition( wList );
+#ifndef RELEASE
+            elemental::mpi::Barrier( comm_ );
+#endif
             const double stopTime = elemental::mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
@@ -376,10 +382,30 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             elemental::Matrix<C> vjList;
             vjList.LockedView( VInter, 0, j*numRhs, localHeight, numRhs );
             wList = vjList;
-            Multiply( wList );
+            {
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                if( commRank == 0 )
+                {
+                    std::cout << "  multiplying...";
+                    std::cout.flush();
+                }
+                const double startTime = elemental::mpi::Time();
+                Multiply( wList );
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                const double stopTime = elemental::mpi::Time();
+                if( commRank == 0 )
+                    std::cout << stopTime-startTime << " secs" << std::endl;
+            }
 
             // w := inv(M) w
             {
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
                 if( commRank == 0 )
                 {
                     std::cout << "  preconditioning...";
@@ -387,6 +413,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 }
                 const double startTime = elemental::mpi::Time();
                 Precondition( wList );
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
                 const double stopTime = elemental::mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
@@ -488,7 +517,24 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             // w := b - A x
             wList = xList; 
             elemental::basic::Scal( (C)-1, wList );
-            Multiply( wList );
+            {
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                if( commRank == 0 )
+                {
+                    std::cout << "  residual multiply...";
+                    std::cout.flush();
+                }
+                const double startTime = elemental::mpi::Time();
+                Multiply( wList );
+#ifndef RELEASE
+                elemental::mpi::Barrier( comm_ );
+#endif
+                const double stopTime = elemental::mpi::Time();
+                if( commRank == 0 )
+                    std::cout << stopTime-startTime << " secs" << std::endl;
+            }
             elemental::basic::Axpy( (C)1, bList, wList );
 
             // Residual checks
@@ -559,6 +605,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
     // tau := sqrt(t^T t)
     tList = vList;
     {
+#ifndef RELEASE
+        elemental::mpi::Barrier( comm_ );
+#endif
         if( commRank == 0 )
         {
             std::cout << "  initial preconditioner application...";
@@ -566,6 +615,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         }
         const double startTime = elemental::mpi::Time();
         Precondition( tList );
+#ifndef RELEASE
+        elemental::mpi::Barrier( comm_ );
+#endif
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
@@ -591,7 +643,24 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
             std::cout << "  starting iteration " << it << "..." << std::endl;
         // t := A q
         tList = qList;
-        Multiply( tList );
+        {
+#ifndef RELEASE
+            elemental::mpi::Barrier( comm_ );
+#endif
+            if( commRank == 0 )
+            {
+                std::cout << "  multiplying...";
+                std::cout.flush();
+            }
+            const double startTime = elemental::mpi::Time();
+            Multiply( tList );
+#ifndef RELEASE
+            elemental::mpi::Barrier( comm_ );
+#endif
+            const double stopTime = elemental::mpi::Time();
+            if( commRank == 0 )
+                std::cout << stopTime-startTime << " secs" << std::endl;
+        }
 
         // sigma := q^T t
         // alpha := rho / sigma
@@ -617,6 +686,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         // x         := x + p
         tList = vList;
         {
+#ifndef RELEASE
+            elemental::mpi::Barrier( comm_ );
+#endif
             if( commRank == 0 )
             {
                 std::cout << "  preconditioning...";
@@ -624,6 +696,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
             }
             const double startTime = elemental::mpi::Time();
             Precondition( tList );
+#ifndef RELEASE
+            elemental::mpi::Barrier( comm_ );
+#endif
             const double stopTime = elemental::mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
