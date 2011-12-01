@@ -457,6 +457,15 @@ inline void GridData<T>::WriteVtkFilesHelper<R>::Func
     const int yLeftoverSize = yMainSize + (ny % py);
     const int zLeftoverSize = zMainSize + (nz % pz);
 
+    // For display purposes, set the width of the box to one in the dimension
+    // with the largest number of grid points, and then scale the other 
+    // dimensions proportionally.
+    int maxPoints = std::max(nx,ny);
+    maxPoints = std::max(nz,maxPoints);
+    const R wx = (nx+1.0)/(maxPoints+1.0);
+    const R wy = (ny+1.0)/(maxPoints+1.0);
+    const R wz = (nz+1.0)/(maxPoints+1.0);
+
     // Form the local box
     std::vector<R> localBox;
     parent.RedistributeForVtk( localBox );
@@ -480,7 +489,9 @@ inline void GridData<T>::WriteVtkFilesHelper<R>::Func
            << "0 " << ny << " "
            << "0 " << nz << "\" "
            << "Origin=\"0 0 0\" "
-           << "Spacing=\"" << 1.0/nx << " " << 1.0/ny << " " << 1.0/nz << "\" "
+           << "Spacing=\"" << wx/(nx+1) << " " 
+                           << wy/(ny+1) << " " 
+                           << wz/(nz+1) << "\" "
            << "GhostLevel=\"0\">\n"
            << "  <PCellData Scalars=\"cell_scalars\">\n"
            << "    <PDataArray type=\"Float32\" Name=\"cell_scalars\"/>\n"
@@ -547,7 +558,9 @@ inline void GridData<T>::WriteVtkFilesHelper<R>::Func
        << " <ImageData WholeExtent=\""
        << "0 " << nx << " 0 " << ny << " 0 " << nz << "\" "
        << "Origin=\"0 0 0\" "
-       << "Spacing=\"" << 1.0/nx << " " << 1.0/ny << " " << 1.0/nz << "\">\n"
+       << "Spacing=\"" << wx/(nx+1.0) << " " 
+                       << wy/(ny+1.0) << " " 
+                       << wz/(nz+1.0) << "\">\n"
        << "  <Piece Extent=\"" 
        << xBoxStart << " " << xBoxStart+xBoxSize << " "
        << yBoxStart << " " << yBoxStart+yBoxSize << " "
@@ -603,7 +616,7 @@ GridData<T>::WriteVtkFilesHelper<std::complex<R> >::Func
     const int ny = parent.ny_;
     const int nz = parent.nz_;
     const int numScalars = parent.numScalars_;
-
+    
     // Compute our local box
     const int xMainSize = nx / px;
     const int yMainSize = ny / py;
@@ -611,6 +624,15 @@ GridData<T>::WriteVtkFilesHelper<std::complex<R> >::Func
     const int xLeftoverSize = xMainSize + (nx % px);
     const int yLeftoverSize = yMainSize + (ny % py);
     const int zLeftoverSize = zMainSize + (nz % pz);
+
+    // For display purposes, set the width of the box to one in the dimension
+    // with the largest number of grid points, and then scale the other 
+    // dimensions proportionally.
+    int maxPoints = std::max(nx,ny);
+    maxPoints = std::max(nz,maxPoints);
+    const R wx = (nx+1.0)/(maxPoints+1.0);
+    const R wy = (ny+1.0)/(maxPoints+1.0);
+    const R wz = (nz+1.0)/(maxPoints+1.0);
 
     // Form the local box
     std::vector<std::complex<R> > localBox;
@@ -644,9 +666,9 @@ GridData<T>::WriteVtkFilesHelper<std::complex<R> >::Func
            << "0 " << nz << "\" "
            << "Origin=\"0 0 0\" "
            << "Spacing=\""
-           << 1.0/nx << " "
-           << 1.0/ny << " "
-           << 1.0/nz << "\" "
+           << wx/(nx+1.0) << " "
+           << wy/(ny+1.0) << " "
+           << wz/(nz+1.0) << "\" "
            << "GhostLevel=\"0\">\n"
            << "  <PCellData Scalars=\"cell_scalars\">\n"
            << "    <PDataArray type=\"Float32\" Name=\"cell_scalars\"/>\n"
@@ -729,7 +751,9 @@ GridData<T>::WriteVtkFilesHelper<std::complex<R> >::Func
        << " <ImageData WholeExtent=\""
        << "0 " << nx << " 0 " << ny << " 0 " << nz << "\" "
        << "Origin=\"0 0 0\" "
-       << "Spacing=\"" << 1.0/nx << " " << 1.0/ny << " " << 1.0/nz << "\">\n"
+       << "Spacing=\"" << wx/(nx+1.0) << " " 
+                       << wy/(ny+1.0) << " " 
+                       << wz/(nz+1.0) << "\">\n"
        << "  <Piece Extent=\"" 
        << xBoxStart << " " << xBoxStart+xBoxSize << " "
        << yBoxStart << " " << yBoxStart+yBoxSize << " "
