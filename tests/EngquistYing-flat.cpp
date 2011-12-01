@@ -99,9 +99,14 @@ main( int argc, char* argv[] )
     control.Cx = 1.5;
     control.Cy = 1.5;
     control.Cz = 1.5;
-    control.etax = 6.0/(N+1);
-    control.etay = 6.0/(N+1);
-    control.etaz = 6.0/(N+1);
+    control.bx = 4;
+    control.by = 4;
+    control.bz = 4;
+    /*
+    control.bx = 6;
+    control.by = 6;
+    control.bz = 6;
+    */
     control.imagShift = imagShift;
     control.cutoff = 96;
     control.numPlanesPerPanel = numPlanesPerPanel;

@@ -30,10 +30,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
   hx_(control.wx/(control.nx+1)),
   hy_(control.wy/(control.ny+1)),
   hz_(control.wz/(control.nz+1)),
-  bx_(control.etax/hx_),
-  by_(control.etay/hy_),
-  bz_(control.etaz/hz_),
-  bzCeil_(std::ceil(control.etaz/hz_)),
   initialized_(false)
 {
     // Pull out some information about our communicator
@@ -50,11 +46,13 @@ psp::DistHelmholtz<R>::DistHelmholtz
     const int nx = control.nx;
     const int ny = control.ny;
     const int nz = control.nz;
+    const int bx = control.bx;
+    const int by = control.by;
+    const int bz = control.bz;
     const int numPlanesPerPanel = control.numPlanesPerPanel;
-    const int bzCeil = bzCeil_;
     const bool topHasPML = (control.topBC == PML);
-    bottomDepth_ = bzCeil+numPlanesPerPanel;
-    topOrigDepth_ = (topHasPML ? bzCeil+numPlanesPerPanel : numPlanesPerPanel );
+    bottomDepth_ = bz+numPlanesPerPanel;
+    topOrigDepth_ = (topHasPML ? bz+numPlanesPerPanel : numPlanesPerPanel );
     if( nz <= bottomDepth_+topOrigDepth_ )
         throw std::logic_error
         ("The domain is very shallow. Please run a sparse-direct factorization "
@@ -64,11 +62,11 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // full inner panels.
     //
     //    -----------   sweep dir
-    //   | Top       |     / \    
-    //   | Leftover? |     | |
-    //       ...           | |
-    //   | Inner     |     | |
-    //   | Bottom    |     | |
+    //   | Top       |     /\
+    //   | Leftover? |     ||
+    //       ...           ||
+    //   | Inner     |     ||
+    //   | Bottom    |     ||
     //    -----------
     innerDepth_ = nz-(bottomDepth_+topOrigDepth_);
     leftoverInnerDepth_ = innerDepth_ % numPlanesPerPanel;
@@ -80,8 +78,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
     if( commRank == 0 )
     {
         std::cout << "nx=" << nx << ", ny=" << ny << ", nz=" << nz << "\n"
+                  << "bx=" << bx << ", by=" << by << ", bz=" << bz << "\n"
                   << "numPlanesPerPanel=" << numPlanesPerPanel << "\n"
-                  << "bzCeil=" << bzCeil << "\n"
                   << "topHasPML=" << topHasPML << "\n"
                   << "\n"
                   << "bottomDepth_        = " << bottomDepth_ << "\n"
@@ -103,10 +101,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // Compute the number of rows we own of the sparse distributed matrix
     localBottomHeight_ = LocalPanelHeight( bottomDepth_, 0, commRank );
     localFullInnerHeight_ = 
-        LocalPanelHeight( numPlanesPerPanel, bzCeil, commRank );
+        LocalPanelHeight( numPlanesPerPanel, bz, commRank );
     localLeftoverInnerHeight_ = 
-        LocalPanelHeight( leftoverInnerDepth_, bzCeil, commRank );
-    localTopHeight_ = LocalPanelHeight( topOrigDepth_, bzCeil, commRank );
+        LocalPanelHeight( leftoverInnerDepth_, bz, commRank );
+    localTopHeight_ = LocalPanelHeight( topOrigDepth_, bz, commRank );
     localHeight_ = localBottomHeight_ +
                    numFullInnerPanels_*localFullInnerHeight_ +
                    localLeftoverInnerHeight_ + 
@@ -471,8 +469,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
     FillOrigPanelStruct( bottomDepth_, bottomSymbolicOrig );
     if( haveLeftover_ )
         FillOrigPanelStruct
-        ( leftoverInnerDepth_+bzCeil, leftoverInnerSymbolicOrig );
-    FillOrigPanelStruct( topOrigDepth_+bzCeil, topSymbolicOrig );
+        ( leftoverInnerDepth_+bz, leftoverInnerSymbolicOrig );
+    FillOrigPanelStruct( topOrigDepth_+bz, topSymbolicOrig );
 
     // Perform the parallel symbolic factorizations
     clique::symbolic::SymmetricFactorization
@@ -766,7 +764,7 @@ psp::DistHelmholtz<R>::PanelPadding( int whichPanel ) const
     if( whichPanel == 0 )
         return 0;
     else
-        return bzCeil_;
+        return control_.bz;
 }
 
 template<typename R>
@@ -802,9 +800,9 @@ psp::DistHelmholtz<R>::LocalV( int v ) const
     if( v < bottomDepth_ )
         return v;
     else if( v < bottomDepth_ + innerDepth_ )
-        return ((v-bottomDepth_) % control_.numPlanesPerPanel) + bzCeil_;
+        return ((v-bottomDepth_) % control_.numPlanesPerPanel) + control_.bz;
     else // v in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
-        return (v - (bottomDepth_+innerDepth_)) + bzCeil_;
+        return (v - (bottomDepth_+innerDepth_)) + control_.bz;
 }
 
 // Return the lowest v index of the specified panel

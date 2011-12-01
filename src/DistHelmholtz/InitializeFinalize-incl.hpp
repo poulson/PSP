@@ -46,8 +46,8 @@ psp::DistHelmholtz<R>::Initialize
         const double startTime = elemental::mpi::Time();
 
         // Retrieve the slowness for this panel
-        const int vOffset = bottomDepth_ + innerDepth_ - bzCeil_;
-        const int vSize = topOrigDepth_ + bzCeil_;
+        const int vOffset = bottomDepth_ + innerDepth_ - control_.bz;
+        const int vSize = topOrigDepth_ + control_.bz;
         std::vector<R> myPanelSlowness;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -135,8 +135,8 @@ psp::DistHelmholtz<R>::Initialize
 
         // Retrieve the slowness for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
-        const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bzCeil_;
-        const int vSize = numPlanesPerPanel + bzCeil_;
+        const int vOffset = bottomDepth_ + k*numPlanesPerPanel - control_.bz;
+        const int vSize = numPlanesPerPanel + control_.bz;
         std::vector<R> myPanelSlowness;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -182,8 +182,8 @@ psp::DistHelmholtz<R>::Initialize
 
         // Retrieve the slowness for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
-                            leftoverInnerDepth_ - bzCeil_;
-        const int vSize = leftoverInnerDepth_ + bzCeil_;
+                            leftoverInnerDepth_ - control_.bz;
+        const int vSize = leftoverInnerDepth_ + control_.bz;
         std::vector<R> myPanelSlowness;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -278,21 +278,23 @@ template<typename R>
 std::complex<R>
 psp::DistHelmholtz<R>::s1Inv( int x ) const
 {
-    if( x+1 < bx_ && control_.frontBC==PML )
+    const int bx = control_.bx;
+    const R etax = bx*hx_;
+    if( x+1 < bx && control_.frontBC==PML )
     {
-        const R delta = bx_ - (x+1);
+        const R delta = bx - (x+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cx/control_.etax)*(delta/bx_)*(delta/bx_)*
+            (control_.Cx/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
-    else if( x > (control_.nx-bx_) && control_.backBC==PML )
+    else if( x > (control_.nx-bx) && control_.backBC==PML )
     {
-        const R delta = x-(control_.nx-bx_);
+        const R delta = x-(control_.nx-bx);
         const R realPart = 1;
         const R imagPart =
-            (control_.Cx/control_.etax)*(delta/bx_)*(delta/bx_)*
+            (control_.Cx/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
@@ -304,21 +306,23 @@ template<typename R>
 std::complex<R>
 psp::DistHelmholtz<R>::s2Inv( int y ) const
 {
-    if( y+1 < by_ && control_.leftBC==PML )
+    const int by = control_.by;
+    const R etay = by*hy_;
+    if( y+1 < by && control_.leftBC==PML )
     {
-        const R delta = by_ - (y+1);
+        const R delta = by - (y+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cy/control_.etay)*(delta/by_)*(delta/by_)*
+            (control_.Cy/etay)*(delta/by)*(delta/by)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
-    else if( y > (control_.ny-by_) && control_.rightBC==PML )
+    else if( y > (control_.ny-by) && control_.rightBC==PML )
     {
-        const R delta = y-(control_.ny-by_);
+        const R delta = y-(control_.ny-by);
         const R realPart = 1;
         const R imagPart =
-            (control_.Cy/control_.etay)*(delta/by_)*(delta/by_)*
+            (control_.Cy/etay)*(delta/by)*(delta/by)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
@@ -330,21 +334,23 @@ template<typename R>
 std::complex<R>
 psp::DistHelmholtz<R>::s3Inv( int v ) const
 {
-    if( v+1 < bz_ )
+    const int bz = control_.bz;
+    const R etaz = bz*hz_;
+    if( v+1 < bz )
     {
-        const R delta = bz_ - (v+1);
+        const R delta = bz - (v+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (control_.nz-bz_) && control_.topBC==PML )
+    else if( v > (control_.nz-bz) && control_.topBC==PML )
     {
-        const R delta = v - (control_.nz-bz_);
+        const R delta = v - (control_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
@@ -356,21 +362,23 @@ template<typename R>
 std::complex<R>
 psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
-    if( v+1 < vOffset+bz_ )
+    const int bz = control_.bz;
+    const R etaz = bz*hz_;
+    if( v+1 < vOffset+bz )
     {
-        const R delta = vOffset + bz_ - (v+1);
+        const R delta = vOffset + bz - (v+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (control_.nz-bz_) && control_.topBC==PML )
+    else if( v > (control_.nz-bz) && control_.topBC==PML )
     {
-        const R delta = v - (control_.nz-bz_);
+        const R delta = v - (control_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/control_.etaz)*(delta/bz_)*(delta/bz_)*
+            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/control_.omega);
         return C(realPart,imagPart);
     }

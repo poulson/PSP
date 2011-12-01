@@ -56,10 +56,10 @@ struct FiniteDiffControl
     R wx, wy, wz;    // width of the PML-padded box in each direction
     R omega;         // frequency of problem
 
-    R Cx, Cy, Cz; // coefficient for PML in each direction
-    R etax, etay, etaz; // widths of PML in each direction
+    R Cx, Cy, Cz;   // coefficient for PML in each direction
+    int bx, by, bz; // number of grid points of PML in each direction
 
-    R imagShift; // stabilizing shift for preconditioner
+    R imagShift;           // stabilizing shift for preconditioner
     int cutoff;            // minimum acceptable leaf size (when depth=1)
     int numPlanesPerPanel; // number of xy planes to put into each panel
 

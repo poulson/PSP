@@ -48,11 +48,7 @@ private:
     elemental::mpi::Comm comm_;
     unsigned log2CommSize_;
     const FiniteDiffControl<R> control_;
-
-    // Frequently used extra grid constants
     const R hx_, hy_, hz_; // grid spacings
-    const R bx_, by_, bz_; // (PML width)/(grid spacings)
-    const int bzCeil_;     // ceil(bz)
 
     // Whether or not we have used slowness information to set up a 
     // preconditioner
