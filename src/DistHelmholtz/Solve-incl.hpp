@@ -115,7 +115,6 @@ psp::DistHelmholtz<R>::PullRightHandSides
 ( const GridData<C>& gridB, elemental::Matrix<C>& B ) const
 {
     const int commSize = elemental::mpi::CommSize( comm_ );
-    const int commRank = elemental::mpi::CommRank( comm_ );
 
     // Pack and send the amount of data that we will need to recv
     std::vector<int> recvCounts( commSize, 0 );
@@ -211,7 +210,6 @@ psp::DistHelmholtz<R>::PushRightHandSides
 {
     const int numRhs = gridB.NumScalars();
     const int commSize = elemental::mpi::CommSize( comm_ );
-    const int commRank = elemental::mpi::CommRank( comm_ );
 
     // Pack and send the amount of data that we will need to send.
     std::vector<int> sendCounts( commSize, 0 );
@@ -816,7 +814,7 @@ bool
 psp::DistHelmholtz<R>::CheckForZeros( const std::vector<R>& alphaList ) const
 {
     bool foundZero = false;
-    for( int k=0; k<alphaList.size(); ++k )
+    for( unsigned k=0; k<alphaList.size(); ++k )
         if( alphaList[k] == (R)0 ) // think about using a tolerance instead
             foundZero = true;
     return foundZero;
@@ -827,7 +825,7 @@ bool
 psp::DistHelmholtz<R>::CheckForZeros( const std::vector<C>& alphaList ) const
 {
     bool foundZero = false;
-    for( int k=0; k<alphaList.size(); ++k )
+    for( unsigned k=0; k<alphaList.size(); ++k )
         if( alphaList[k] == (C)0 ) // think about using a tolerance instead
             foundZero = true;
     return foundZero;

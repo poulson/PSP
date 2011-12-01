@@ -91,7 +91,7 @@ main( int argc, char* argv[] )
     control.etax = 5.0/control.nx;
     control.etay = 5.0/control.ny;
     control.etaz = 5.0/control.nz;
-    control.imagShift = 2*M_PI;
+    control.imagShift = imagShift;
     control.cutoff = 96;
     control.numPlanesPerPanel = numPlanesPerPanel;
     control.frontBC = PML;

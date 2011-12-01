@@ -64,11 +64,11 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // full inner panels.
     //
     //    -----------   sweep dir
-    //   | Top       |      /\
-    //   | Leftover? |      ||
-    //       ...            ||
-    //   | Inner     |      ||
-    //   | Bottom    |      ||
+    //   | Top       |     / \    
+    //   | Leftover? |     | |
+    //       ...           | |
+    //   | Inner     |     | |
+    //   | Bottom    |     | |
     //    -----------
     innerDepth_ = nz-(bottomDepth_+topOrigDepth_);
     leftoverInnerDepth_ = innerDepth_ % numPlanesPerPanel;
@@ -172,7 +172,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     int totalSendCount=0, totalRecvCount=0;
     globalSendDispls_.resize( commSize );
     globalRecvDispls_.resize( commSize );
-    for( int proc=0; proc<commSize; ++proc )
+    for( unsigned proc=0; proc<commSize; ++proc )
     {
         globalSendDispls_[proc] = totalSendCount;
         globalRecvDispls_[proc] = totalRecvCount;
@@ -263,7 +263,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     subdiagRecvCounts_.resize( (numPanels_-1)*commSize );
     supdiagSendCounts_.resize( (numPanels_-1)*commSize );
     supdiagRecvCounts_.resize( (numPanels_-1)*commSize );
-    for( int proc=0; proc<commSize; ++proc )
+    for( unsigned proc=0; proc<commSize; ++proc )
     {
         for( int i=0; i<numPanels_-1; ++i )
         {
@@ -297,7 +297,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     supdiagPanelRecvDispls_.resize( numPanels_-1 );
     for( int i=0; i<numPanels_-1; ++i )
     {
-        for( int proc=0; proc<commSize; ++proc )
+        for( unsigned proc=0; proc<commSize; ++proc )
         {
             const int index = i*commSize + proc;
             subdiagSendDispls_[index] = subdiagPanelSendCounts_[i];
@@ -327,7 +327,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     {
         const int subdiagOffset = subdiagPanelRecvDispls_[i];
         const int supdiagOffset = supdiagPanelRecvDispls_[i];
-        for( int proc=0; proc<commSize; ++proc ) 
+        for( unsigned proc=0; proc<commSize; ++proc ) 
         {
             const int index = i*commSize + proc;
             subdiagOffsets[index] = subdiagRecvDispls_[index]+subdiagOffset;

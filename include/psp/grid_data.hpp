@@ -246,7 +246,7 @@ inline int GridData<T>::LocalIndex( int x, int y, int z ) const
     const int yLocal = (y-yShift_) / py_;
     const int zLocal = (z-zShift_) / pz_;
 
-    int index;
+    int index=-1;
     switch( order_ )
     {
     case XYZ:
@@ -440,7 +440,6 @@ template<typename R>
 inline void GridData<T>::WriteVtkFilesHelper<R>::Func
 ( const GridData<R>& parent, const std::string baseName )
 {
-    const int commSize = elemental::mpi::CommSize( parent.comm_ );
     const int commRank = elemental::mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
@@ -596,7 +595,6 @@ inline void
 GridData<T>::WriteVtkFilesHelper<std::complex<R> >::Func
 ( const GridData<std::complex<R> >& parent, const std::string baseName )
 {
-    const int commSize = elemental::mpi::CommSize( parent.comm_ );
     const int commRank = elemental::mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
