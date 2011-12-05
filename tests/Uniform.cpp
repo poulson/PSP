@@ -36,7 +36,7 @@ void Usage()
               << "  <solve blocksize>: solve algorithmic blocksize\n"
               << "  <accelerate?>: accelerate solves iff !=0\n"
               << "  <SQMR?>: use GMRES iff 0, otherwise SQMR\n"
-              << "  <viz?>:  Visualize iff != 0\n"
+              << "  <full viz?>:  Full visualization iff != 0\n"
               << std::endl;
 }
 
@@ -66,7 +66,7 @@ main( int argc, char* argv[] )
     const int solveBlocksize = atoi( argv[argNum++] );
     const bool accelerate = atoi( argv[argNum++] );
     const bool useSQMR = atoi( argv[argNum++] );
-    const bool visualize = atoi( argv[argNum++] );
+    const bool fullVisualize = atoi( argv[argNum++] );
 
     if( commRank == 0 )
     {
@@ -131,14 +131,14 @@ main( int argc, char* argv[] )
         for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
             localSlowness[i] = 1;
 
-        if( visualize )
+        if( fullVisualize )
         {
             if( commRank == 0 )
             {
                 std::cout << "Writing slowness data...";
                 std::cout.flush();
             }
-            slowness.WriteVtkFiles("slowness");
+            slowness.WriteVolume("slowness");
             elemental::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
@@ -172,14 +172,14 @@ main( int argc, char* argv[] )
             localB[localIndex] = 1;
         }
 
-        if( visualize )
+        if( fullVisualize )
         {
             if( commRank == 0 )
             {
                 std::cout << "Writing source data...";
                 std::cout.flush();
             }
-            B.WriteVtkFiles("source");
+            B.WriteVolume("source");
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
         }
@@ -200,14 +200,15 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        if( visualize )
+        B.WritePlane( XY, nz/2, "middleXY" );
+        if( fullVisualize )
         {
             if( commRank == 0 )
             {
                 std::cout << "Writing solution data...";
                 std::cout.flush();
             }
-            B.WriteVtkFiles("solution");
+            B.WriteVolume("solution");
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
         }

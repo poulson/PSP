@@ -32,6 +32,12 @@ enum GridDataOrder {
     ZYX
 };
 
+enum PlaneType {
+  XY,
+  XZ,
+  YZ
+};
+
 // The control structure for passing in the distributed data on a 3d grid.
 // 
 //                 _______________ (wx,wy,0)
@@ -87,22 +93,39 @@ public:
     int ZLocalSize() const;
     GridDataOrder Order() const;
 
-    void WriteVtkFiles( const std::string baseName ) const;
-
+    void WritePlane
+    ( PlaneType planeType, int whichPlane, const std::string baseName ) const;
     template<typename R>
-    struct WriteVtkFilesHelper
+    struct WritePlaneHelper
+    {
+        static void Func
+        ( const GridData<R>& parent, 
+          PlaneType planeType, int whichPlane, const std::string baseName );
+    };
+    template<typename R>
+    struct WritePlaneHelper<std::complex<R> >
+    {
+        static void Func
+        ( const GridData<std::complex<R> >& parent, 
+          PlaneType planeType, int whichPlane, const std::string baseName );
+    };
+    template<typename R> friend struct WritePlaneHelper;
+
+    void WriteVolume( const std::string baseName ) const;
+    template<typename R>
+    struct WriteVolumeHelper
     {
         static void Func
         ( const GridData<R>& parent, const std::string baseName );
     };
     template<typename R>
-    struct WriteVtkFilesHelper<std::complex<R> >
+    struct WriteVolumeHelper<std::complex<R> >
     {
         static void Func
         ( const GridData<std::complex<R> >& parent, 
           const std::string baseName );
     };
-    template<typename R> friend struct WriteVtkFilesHelper;
+    template<typename R> friend struct WriteVolumeHelper;
 
 private:
     int numScalars_;
@@ -272,6 +295,394 @@ inline int GridData<T>::LocalIndex( int x, int y, int z ) const
 }
 
 template<typename T>
+inline void GridData<T>::WritePlane
+( PlaneType planeType, int whichPlane, const std::string baseName ) const
+{ return WritePlaneHelper<T>::Func( *this, planeType, whichPlane, baseName ); }
+
+template<typename T>
+template<typename R>
+inline void GridData<T>::WritePlaneHelper<R>::Func
+( const GridData<R>& parent, 
+  PlaneType planeType, int whichPlane, const std::string baseName )
+{
+    const int commRank = elemental::mpi::CommRank( parent.comm_ );
+    const int commSize = elemental::mpi::CommSize( parent.comm_ );
+    const int nx = parent.nx_;
+    const int ny = parent.ny_;
+    const int nz = parent.nz_;
+    const int px = parent.px_;
+    const int py = parent.py_;
+    const int pz = parent.pz_;
+    const int xLocalSize = parent.xLocalSize_;
+    const int yLocalSize = parent.yLocalSize_;
+    const int zLocalSize = parent.zLocalSize_;
+    const int numScalars = parent.numScalars_;
+
+    // TODO: Use a 2d subcommunicator to speed up the gather
+    if( planeType == XY )
+    {
+        if( whichPlane < 0 || whichPlane >= nz )
+            throw std::logic_error("Invalid plane");
+
+        // Compute the number of entries to send to the root
+        const int zProc = whichPlane % pz;
+        int sendCount = 
+            ( zProc==parent.zShift_ ? xLocalSize*yLocalSize*numScalars : 0 );
+
+        int totalRecvSize=0;
+        std::vector<int> recvCounts, recvDispls;
+        if( commRank == 0 )
+        {
+            // Compute the number of entries to receive from each process
+            recvCounts.resize( commSize, 0 );
+            for( int yProc=0; yProc<py; ++yProc )
+            {
+                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                for( int xProc=0; xProc<px; ++xProc )
+                {
+                    const int xLength = 
+                        elemental::LocalLength( nx, xProc, 0, px );
+                    const int proc = xProc + yProc*px + zProc*px*py;
+
+                    recvCounts[proc] += xLength*yLength*numScalars;
+                }
+            }
+
+            // Create the send and recv displacements, and the total sizes
+            recvDispls.resize( commSize );
+            for( int proc=0; proc<commSize; ++proc )
+            {
+                recvDispls[proc] = totalRecvSize;
+                totalRecvSize += recvCounts[proc];
+            }
+        }
+
+        // Pack the send buffer
+        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        if( sendCount != 0 )
+        {
+            int offset=0;
+            for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+            {
+                const int y = parent.yShift_ + yLocal*py;
+                for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                {
+                    const int x = parent.xShift_ + xLocal*px;
+                    const int localIndex = 
+                        parent.LocalIndex( x, y, whichPlane );
+                    for( int k=0; k<numScalars; ++k )
+                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                    offset += numScalars;
+                }
+            }
+        }
+
+        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        elemental::mpi::Gather
+        ( &sendBuffer[0], sendCount,
+          &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
+        sendBuffer.clear();
+
+        if( commRank == 0 )
+        {
+            // Unpack the data
+            std::vector<T> planes( totalRecvSize );
+            const int planeSize = nx*ny;
+            for( int yProc=0; yProc<py; ++yProc )
+            {
+                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                for( int xProc=0; xProc<px; ++xProc )
+                {
+                    const int xLength = 
+                        elemental::LocalLength( nx, xProc, 0, px );
+                    const int proc = xProc + yProc*px + zProc*px*py;
+
+                    for( int jLocal=0; jLocal<yLength; ++jLocal )
+                    {
+                        const int j = yProc + jLocal*py;
+                        for( int iLocal=0; iLocal<xLength; ++iLocal )
+                        {
+                            const int i = xProc + iLocal*px;
+                            for( int k=0; k<numScalars; ++k )
+                                planes[i+j*nx+k*planeSize] = 
+                                    recvBuffer[recvDispls[proc]++];
+                        }
+                    }
+                }
+            }
+            recvBuffer.clear();
+            
+            // Write the data to file
+            for( int k=0; k<numScalars; ++k )
+            {
+                const T* plane = &planes[k*planeSize];
+
+                // For writing raw ASCII data
+                /*
+                std::ostringstream os;
+                os << baseName << "_" << k << ".dat";
+                std::ofstream file( os.str().c_str(), std::ios::out );
+                for( int j=0; j<ny; ++j )       
+                {
+                    for( int i=0; i<nx; ++i )
+                        file << plane[i+j*nx] << " ";
+                    file << "\n";
+                }
+                file << std::endl;
+                file.close();
+                */
+                
+                // For writing a VTK file
+                const int maxPoints = std::max(nx,ny);
+                const R wx = (nx+1.0)/(maxPoints+1.0);
+                const R wy = (ny+1.0)/(maxPoints+1.0);
+                const R wz = 2.0/(maxPoints+1.0);
+                std::ostringstream os;
+                os << baseName << "_" << k << ".vti";
+                std::ofstream file( os.str().c_str(), std::ios::out );
+                os.clear(); os.str("");
+                os << "<?xml version=\"1.0\"?>\n"
+                   << "<VTKFile type=\"ImageData\" version=\"0.1\">\n"
+                   << " <ImageData WholeExtent=\""
+                   << "0 " << nx << " 0 " << ny << " 0 1\" "
+                   << "Origin=\"0 0 0\" "
+                   << "Spacing=\"" << wx/(nx+1.0) << " " 
+                                   << wy/(ny+1.0) << " " 
+                                   << wz/(nz+1.0) << "\">\n"
+                   << "  <Piece Extent=\"0 " << nx << " 0 " << ny << " 0 1"
+                   << "\">\n"
+                   << "    <CellData Scalars=\"cell_scalars\">\n"
+                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "format=\"ascii\">\n";
+                file << os.str();
+                for( int j=0; j<ny; ++j ) 
+                {
+                    for( int i=0; i<nx; ++i )
+                        file << plane[i+j*nx] << " ";
+                    file << "\n";
+                }
+                os.clear(); os.str("");
+                os << "    </DataArray>\n"
+                   << "   </CellData>\n"
+                   << "  </Piece>\n"
+                   << " </ImageData>\n"
+                   << "</VTKFile>" << std::endl;
+                file << os.str();
+            }
+        }
+    }
+    else if( planeType == XZ )
+    {
+        if( whichPlane < 0 || whichPlane >= ny )
+            throw std::logic_error("Invalid plane");
+        throw std::logic_error("Not yet written");
+    }
+    else if( planeType == YZ )
+    {
+        if( whichPlane < 0 || whichPlane >= nx )
+            throw std::logic_error("Invalid plane");
+        throw std::logic_error("Not yet written");
+    }
+}
+
+template<typename T>
+template<typename R>
+inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
+( const GridData<std::complex<R> >& parent, 
+  PlaneType planeType, int whichPlane, const std::string baseName )
+{
+    const int commRank = elemental::mpi::CommRank( parent.comm_ );
+    const int commSize = elemental::mpi::CommSize( parent.comm_ );
+    const int nx = parent.nx_;
+    const int ny = parent.ny_;
+    const int nz = parent.nz_;
+    const int px = parent.px_;
+    const int py = parent.py_;
+    const int pz = parent.pz_;
+    const int xLocalSize = parent.xLocalSize_;
+    const int yLocalSize = parent.yLocalSize_;
+    const int zLocalSize = parent.zLocalSize_;
+    const int numScalars = parent.numScalars_;
+
+    // TODO: Use a 2d subcommunicator to speed up the gather
+    if( planeType == XY )
+    {
+        if( whichPlane < 0 || whichPlane >= nz )
+            throw std::logic_error("Invalid plane");
+
+        // Compute the number of entries to send to the root
+        const int zProc = whichPlane % pz;
+        int sendCount = 
+            ( zProc==parent.zShift_ ? xLocalSize*yLocalSize*numScalars : 0 );
+
+        int totalRecvSize=0;
+        std::vector<int> recvCounts, recvDispls;
+        if( commRank == 0 )
+        {
+            // Compute the number of entries to receive from each process
+            recvCounts.resize( commSize, 0 );
+            for( int yProc=0; yProc<py; ++yProc )
+            {
+                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                for( int xProc=0; xProc<px; ++xProc )
+                {
+                    const int xLength = 
+                        elemental::LocalLength( nx, xProc, 0, px );
+                    const int proc = xProc + yProc*px + zProc*px*py;
+
+                    recvCounts[proc] += xLength*yLength*numScalars;
+                }
+            }
+
+            // Create the send and recv displacements, and the total sizes
+            recvDispls.resize( commSize );
+            for( int proc=0; proc<commSize; ++proc )
+            {
+                recvDispls[proc] = totalRecvSize;
+                totalRecvSize += recvCounts[proc];
+            }
+        }
+
+        // Pack the send buffer
+        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        if( sendCount != 0 )
+        {
+            int offset=0;
+            for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+            {
+                const int y = parent.yShift_ + yLocal*py;
+                for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                {
+                    const int x = parent.xShift_ + xLocal*px;
+                    const int localIndex = 
+                        parent.LocalIndex( x, y, whichPlane );
+                    for( int k=0; k<numScalars; ++k )
+                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                    offset += numScalars;
+                }
+            }
+        }
+
+        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        elemental::mpi::Gather
+        ( &sendBuffer[0], sendCount,
+          &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
+        sendBuffer.clear();
+
+        if( commRank == 0 )
+        {
+            // Unpack the data
+            std::vector<T> planes( totalRecvSize );
+            const int planeSize = nx*ny;
+            for( int yProc=0; yProc<py; ++yProc )
+            {
+                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                for( int xProc=0; xProc<px; ++xProc )
+                {
+                    const int xLength = 
+                        elemental::LocalLength( nx, xProc, 0, px );
+                    const int proc = xProc + yProc*px + zProc*px*py;
+
+                    for( int jLocal=0; jLocal<yLength; ++jLocal )
+                    {
+                        const int j = yProc + jLocal*py;
+                        for( int iLocal=0; iLocal<xLength; ++iLocal )
+                        {
+                            const int i = xProc + iLocal*px;
+                            for( int k=0; k<numScalars; ++k )
+                                planes[i+j*nx+k*planeSize] = 
+                                    recvBuffer[recvDispls[proc]++];
+                        }
+                    }
+                }
+            }
+            recvBuffer.clear();
+            
+            // Write the data to file
+            for( int k=0; k<numScalars; ++k )
+            {
+                const T* plane = &planes[k*planeSize];
+
+                // For writing raw ASCII data
+                /*
+                std::ostringstream os;
+                os << baseName << "_" << k << ".dat";
+                std::ofstream file( os.str().c_str(), std::ios::out );
+                for( int j=0; j<ny; ++j )       
+                {
+                    for( int i=0; i<nx; ++i )
+                        file << plane[i+j*nx] << " ";
+                    file << "\n";
+                }
+                file << std::endl;
+                file.close();
+                */
+                
+                // For writing a VTK file
+                const int maxPoints = std::max(nx,ny);
+                const R wx = (nx+1.0)/(maxPoints+1.0);
+                const R wy = (ny+1.0)/(maxPoints+1.0);
+                const R wz = 2.0/(maxPoints+1.0);
+                std::ostringstream os;
+                os << baseName << "_" << k << "_real.vti";
+                std::ofstream realFile( os.str().c_str(), std::ios::out );
+                os.clear(); os.str("");
+                os << baseName << "_" << k << "_imag.vti";
+                std::ofstream imagFile( os.str().c_str(), std::ios::out );
+                os.clear(); os.str("");
+                os << "<?xml version=\"1.0\"?>\n"
+                   << "<VTKFile type=\"ImageData\" version=\"0.1\">\n"
+                   << " <ImageData WholeExtent=\""
+                   << "0 " << nx << " 0 " << ny << " 0 1\" "
+                   << "Origin=\"0 0 0\" "
+                   << "Spacing=\"" << wx/(nx+1.0) << " " 
+                                   << wy/(ny+1.0) << " " 
+                                   << wz/(nz+1.0) << "\">\n"
+                   << "  <Piece Extent=\"0 " << nx << " 0 " << ny << " 0 1"
+                   << "\">\n"
+                   << "    <CellData Scalars=\"cell_scalars\">\n"
+                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "format=\"ascii\">\n";
+                realFile << os.str();
+                imagFile << os.str();
+                for( int j=0; j<ny; ++j ) 
+                {
+                    for( int i=0; i<nx; ++i )
+                        realFile << std::real(plane[i+j*nx]) << " ";
+                    realFile << "\n";
+                }
+                for( int j=0; j<ny; ++j )
+                {
+                    for( int i=0; i<nx; ++i )
+                        imagFile << std::imag(plane[i+j*nx]) << " ";
+                    imagFile << "\n";
+                }
+                os.clear(); os.str("");
+                os << "    </DataArray>\n"
+                   << "   </CellData>\n"
+                   << "  </Piece>\n"
+                   << " </ImageData>\n"
+                   << "</VTKFile>" << std::endl;
+                realFile << os.str();
+                imagFile << os.str();
+            }
+        }
+    }
+    else if( planeType == XZ )
+    {
+        if( whichPlane < 0 || whichPlane >= ny )
+            throw std::logic_error("Invalid plane");
+        throw std::logic_error("Not yet written");
+    }
+    else if( planeType == YZ )
+    {
+        if( whichPlane < 0 || whichPlane >= nx )
+            throw std::logic_error("Invalid plane");
+        throw std::logic_error("Not yet written");
+    }
+}
+
+template<typename T>
 inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 {
     const int commSize = elemental::mpi::CommSize( comm_ );
@@ -432,12 +843,12 @@ inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 }
 
 template<typename T>
-inline void GridData<T>::WriteVtkFiles( const std::string baseName ) const
-{ return WriteVtkFilesHelper<T>::Func( *this, baseName ); }
+inline void GridData<T>::WriteVolume( const std::string baseName ) const
+{ return WriteVolumeHelper<T>::Func( *this, baseName ); }
 
 template<typename T>
 template<typename R>
-inline void GridData<T>::WriteVtkFilesHelper<R>::Func
+inline void GridData<T>::WriteVolumeHelper<R>::Func
 ( const GridData<R>& parent, const std::string baseName )
 {
     const int commRank = elemental::mpi::CommRank( parent.comm_ );
@@ -605,7 +1016,7 @@ inline void GridData<T>::WriteVtkFilesHelper<R>::Func
 template<typename T>
 template<typename R>
 inline void 
-GridData<T>::WriteVtkFilesHelper<std::complex<R> >::Func
+GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
 ( const GridData<std::complex<R> >& parent, const std::string baseName )
 {
     const int commRank = elemental::mpi::CommRank( parent.comm_ );
