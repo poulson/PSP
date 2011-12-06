@@ -250,9 +250,9 @@ main( int argc, char* argv[] )
                         2*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
                     const std::complex<double> fOne = 
-                        std::exp(-N*N*(argX+argYOne+argZ));
+                        N*std::exp(-N*N*(argX+argYOne+argZ));
                     const std::complex<double> fTwo = 
-                        std::exp(-2*omega*(argX+argYTwo+argZ))*
+                        N*std::exp(-2*omega*(argX+argYTwo+argZ))*
                         std::exp(omega*imagOne*(X*dX+Y*dY+Z*dZ));
                     localB[localIndex+0] = fOne;
                     localB[localIndex+1] = fTwo;
@@ -289,6 +289,8 @@ main( int argc, char* argv[] )
                       << std::endl;
 
         B.WritePlane( XY, N/2, "middleXY" );
+        B.WritePlane( XZ, N/2, "middleXZ" );
+        B.WritePlane( YZ, N/2, "middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )

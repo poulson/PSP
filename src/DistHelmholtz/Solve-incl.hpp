@@ -301,7 +301,7 @@ void
 psp::DistHelmholtz<R>::InternalSolveWithGMRES
 ( elemental::Matrix<C>& bList, int m ) const
 {
-    const R relTol = 1e-6;
+    const R relTol = 1e-5;
     const int numRhs = bList.Width();
     const int localHeight = bList.Height();
     const int commRank = elemental::mpi::CommRank( comm_ );

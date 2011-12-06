@@ -172,7 +172,7 @@ main( int argc, char* argv[] )
         if( commRank == B.OwningProcess( xSource, ySource, zSource ) )
         {
             const int localIndex = B.LocalIndex( xSource, ySource, zSource ); 
-            localB[localIndex] = 1;
+            localB[localIndex] = control.nx;
         }
 
         if( fullVisualize )
@@ -204,6 +204,8 @@ main( int argc, char* argv[] )
                       << std::endl;
 
         B.WritePlane( XY, nz/2, "middleXY" );
+        B.WritePlane( XZ, ny/2, "middleXZ" );
+        B.WritePlane( YZ, nx/2, "middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
