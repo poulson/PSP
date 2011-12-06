@@ -131,6 +131,9 @@ main( int argc, char* argv[] )
         for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
             localSlowness[i] = 1;
 
+        slowness.WritePlane( XY, nz/2, "slowness-middleXY" );
+        slowness.WritePlane( XZ, ny/2, "slowness-middleXZ" );
+        slowness.WritePlane( YZ, nx/2, "slowness-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -172,6 +175,9 @@ main( int argc, char* argv[] )
             localB[localIndex] = control.nx;
         }
 
+        B.WritePlane( XY, nz/2, "source-middleXY" );
+        B.WritePlane( XZ, ny/2, "source-middleXZ" );
+        B.WritePlane( YZ, nx/2, "source-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -200,9 +206,9 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        B.WritePlane( XY, nz/2, "middleXY" );
-        B.WritePlane( XZ, ny/2, "middleXZ" );
-        B.WritePlane( YZ, nx/2, "middleYZ" );
+        B.WritePlane( XY, nz/2, "solution-middleXY" );
+        B.WritePlane( XZ, ny/2, "solution-middleXZ" );
+        B.WritePlane( YZ, nx/2, "solution-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )

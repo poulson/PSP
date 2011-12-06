@@ -448,13 +448,18 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                    << "  <Piece Extent=\"0 " << nx << " 0 " << ny << " 0 1"
                    << "\">\n"
                    << "    <CellData Scalars=\"cell_scalars\">\n"
-                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
                    << "format=\"ascii\">\n";
                 file << os.str();
                 for( int j=0; j<ny; ++j ) 
                 {
                     for( int i=0; i<nx; ++i )
-                        file << plane[i+j*nx] << " ";
+                    {
+                        double value = plane[i+j*nx];
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        file << value << " ";
+                    }
                     file << "\n";
                 }
                 os.clear(); os.str("");
@@ -595,13 +600,18 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                    << "Spacing=\"" << h << " " << h << " " << h << "\">\n"
                    << "  <Piece Extent=\"0 " << nx << " 0 1 0 " << nz << "\">\n"
                    << "    <CellData Scalars=\"cell_scalars\">\n"
-                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
                    << "format=\"ascii\">\n";
                 file << os.str();
                 for( int j=0; j<nz; ++j ) 
                 {
                     for( int i=0; i<nx; ++i )
-                        file << plane[i+j*nx] << " ";
+                    {
+                        double value = plane[i+j*nx];
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        file << value << " ";
+                    }
                     file << "\n";
                 }
                 os.clear(); os.str("");
@@ -742,13 +752,18 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                    << "Spacing=\"" << h << " " << h << " " << h << "\">\n"
                    << "  <Piece Extent=\"0 1 0 " << ny << " 0 " << nz << "\">\n"
                    << "    <CellData Scalars=\"cell_scalars\">\n"
-                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
                    << "format=\"ascii\">\n";
                 file << os.str();
                 for( int j=0; j<nz; ++j ) 
                 {
                     for( int i=0; i<ny; ++i )
-                        file << plane[i+j*ny] << " ";
+                    {
+                        double value = plane[i+j*ny];
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        file << value << " ";
+                    }
                     file << "\n";
                 }
                 os.clear(); os.str("");
@@ -916,20 +931,30 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                    << "  <Piece Extent=\"0 " << nx << " 0 " << ny << " 0 1"
                    << "\">\n"
                    << "    <CellData Scalars=\"cell_scalars\">\n"
-                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
                    << "format=\"ascii\">\n";
                 realFile << os.str();
                 imagFile << os.str();
                 for( int j=0; j<ny; ++j ) 
                 {
                     for( int i=0; i<nx; ++i )
-                        realFile << std::real(plane[i+j*nx]) << " ";
+                    {
+                        double value = std::real(plane[i+j*nx]);
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        realFile << value << " ";
+                    }
                     realFile << "\n";
                 }
                 for( int j=0; j<ny; ++j )
                 {
                     for( int i=0; i<nx; ++i )
-                        imagFile << std::imag(plane[i+j*nx]) << " ";
+                    {
+                        double value = std::imag(plane[i+j*nx]);
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        imagFile << value << " ";
+                    }
                     imagFile << "\n";
                 }
                 os.clear(); os.str("");
@@ -1074,20 +1099,30 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                    << "Spacing=\"" << h << " " << h << " " << h << "\">\n"
                    << "  <Piece Extent=\"0 " << nx << " 0 1 0 " << nz << "\">\n"
                    << "    <CellData Scalars=\"cell_scalars\">\n"
-                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
                    << "format=\"ascii\">\n";
                 realFile << os.str();
                 imagFile << os.str();
                 for( int j=0; j<nz; ++j ) 
                 {
                     for( int i=0; i<nx; ++i )
-                        realFile << std::real(plane[i+j*nx]) << " ";
+                    {
+                        double value = std::real(plane[i+j*nx]);
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        realFile << value << " ";
+                    }
                     realFile << "\n";
                 }
                 for( int j=0; j<nz; ++j ) 
                 {
                     for( int i=0; i<nx; ++i )
-                        imagFile << std::imag(plane[i+j*nx]) << " ";
+                    {
+                        double value = std::imag(plane[i+j*nx]);
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        imagFile << value << " ";
+                    }
                     imagFile << "\n";
                 }
                 os.clear(); os.str("");
@@ -1232,20 +1267,30 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                    << "Spacing=\"" << h << " " << h << " " << h << "\">\n"
                    << "  <Piece Extent=\"0 1 0 " << ny << " 0 " << nz << "\">\n"
                    << "    <CellData Scalars=\"cell_scalars\">\n"
-                   << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+                   << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
                    << "format=\"ascii\">\n";
                 realFile << os.str();
                 imagFile << os.str();
                 for( int j=0; j<nz; ++j ) 
                 {
                     for( int i=0; i<ny; ++i )
-                        realFile << std::real(plane[i+j*ny]) << " ";
+                    {
+                        double value = std::real(plane[i+j*ny]);
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        realFile << value << " ";
+                    }
                     realFile << "\n";
                 }
                 for( int j=0; j<nz; ++j ) 
                 {
                     for( int i=0; i<ny; ++i )
-                        imagFile << std::imag(plane[i+j*ny]) << " ";
+                    {
+                        double value = std::imag(plane[i+j*ny]);
+                        if( elemental::Abs(value) < 1.0e-300 )
+                            value = 0;
+                        imagFile << value << " ";
+                    }
                     imagFile << "\n";
                 }
                 os.clear(); os.str("");
@@ -1480,7 +1525,7 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
            << "Spacing=\"" << h << " " << h << " " << h << "\" "
            << "GhostLevel=\"0\">\n"
            << "  <PCellData Scalars=\"cell_scalars\">\n"
-           << "    <PDataArray type=\"Float32\" Name=\"cell_scalars\"/>\n"
+           << "    <PDataArray type=\"Float64\" Name=\"cell_scalars\"/>\n"
            << "  </PCellData>\n";
         for( int zProc=0; zProc<pz; ++zProc )
         {
@@ -1550,7 +1595,7 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
        << yBoxStart << " " << yBoxStart+yBoxSize << " "
        << zBoxStart << " " << zBoxStart+zBoxSize << "\">\n"
        << "    <CellData Scalars=\"cell_scalars\">\n"
-       << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+       << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
        << "format=\"ascii\">\n";
     for( int k=0; k<numScalars; ++k )
         *files[k] << os.str();
@@ -1565,7 +1610,9 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
                     xLocal + yLocal*xBoxSize + zLocal*xBoxSize*yBoxSize;
                 for( int k=0; k<numScalars; ++k )
                 {
-                    const float alpha = localBox[offset*numScalars+k];
+                    double alpha = localBox[offset*numScalars+k];
+                    if( elemental::Abs(alpha) < 1.0e-300 )
+                        alpha = 0;
                     *files[k] << alpha << " ";
                 }
             }
@@ -1650,7 +1697,7 @@ GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
            << "Spacing=\"" << h << " " << h << " " << h << "\" "
            << "GhostLevel=\"0\">\n"
            << "  <PCellData Scalars=\"cell_scalars\">\n"
-           << "    <PDataArray type=\"Float32\" Name=\"cell_scalars\"/>\n"
+           << "    <PDataArray type=\"Float64\" Name=\"cell_scalars\"/>\n"
            << "  </PCellData>\n";
         for( int zProc=0; zProc<pz; ++zProc )
         {
@@ -1736,7 +1783,7 @@ GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
        << yBoxStart << " " << yBoxStart+yBoxSize << " "
        << zBoxStart << " " << zBoxStart+zBoxSize << "\">\n"
        << "    <CellData Scalars=\"cell_scalars\">\n"
-       << "     <DataArray type=\"Float32\" Name=\"cell_scalars\" "
+       << "     <DataArray type=\"Float64\" Name=\"cell_scalars\" "
        << "format=\"ascii\">\n";
     for( int k=0; k<numScalars; ++k )
     {
@@ -1754,9 +1801,16 @@ GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
                     xLocal + yLocal*xBoxSize + zLocal*xBoxSize*yBoxSize;
                 for( int k=0; k<numScalars; ++k )
                 {
-                    std::complex<R> alpha = localBox[offset*numScalars+k];
-                    *realFiles[k] << (float)real(alpha) << " ";
-                    *imagFiles[k] << (float)imag(alpha) << " ";
+                    const std::complex<double> alpha = 
+                        localBox[offset*numScalars+k];
+                    double realAlpha = std::real(alpha);
+                    double imagAlpha = std::imag(alpha);
+                    if( elemental::Abs(realAlpha) < 1.0e-300 )
+                        realAlpha = 0;
+                    if( elemental::Abs(imagAlpha) < 1.0e-300 )
+                        imagAlpha = 0;
+                    *realFiles[k] << realAlpha << " ";
+                    *imagFiles[k] << imagAlpha << " ";
                 }
             }
             for( int k=0; k<numScalars; ++k )

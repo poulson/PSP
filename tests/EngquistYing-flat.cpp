@@ -202,6 +202,9 @@ main( int argc, char* argv[] )
             }
         }
 
+        slowness.WritePlane( XY, N/16, "slowness-middleXY" );
+        slowness.WritePlane( XZ, N/2,  "slowness-middleXZ" );
+        slowness.WritePlane( YZ, N/2,  "slowness-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -266,6 +269,9 @@ main( int argc, char* argv[] )
             }
         }
 
+        B.WritePlane( XY, N/16, "source-middleXY" );
+        B.WritePlane( XZ, N/2,  "source-middleXZ" );
+        B.WritePlane( YZ, N/2,  "source-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -294,9 +300,9 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        B.WritePlane( XY, N/16, "middleXY" );
-        B.WritePlane( XZ, N/2,  "middleXZ" );
-        B.WritePlane( YZ, N/2,  "middleYZ" );
+        B.WritePlane( XY, N/16, "solution-middleXY" );
+        B.WritePlane( XZ, N/2,  "solution-middleXZ" );
+        B.WritePlane( YZ, N/2,  "solution-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
