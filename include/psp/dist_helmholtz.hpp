@@ -35,7 +35,7 @@ public:
     ~DistHelmholtz();
 
     // Build the sparse matrix and the preconditioner
-    void Initialize( const GridData<R>& slowness, bool accelerate=true );
+    void Initialize( const GridData<R>& velocity, bool accelerate=true );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
     void SolveWithSQMR( GridData<C>& B ) const;
@@ -50,7 +50,7 @@ private:
     const FiniteDiffControl<R> control_;
     const R hx_, hy_, hz_; // grid spacings
 
-    // Whether or not we have used slowness information to set up a 
+    // Whether or not we have used velocity information to set up a 
     // preconditioner
     bool initialized_; 
 
@@ -220,9 +220,9 @@ private:
     int LocalPanelOffset( int whichPanel ) const;
     int LocalPanelHeight( int whichPanel ) const;
 
-    void GetGlobalSlowness
-    ( const GridData<R>& slowness,
-      std::vector<R>& myGlobalSlowness,
+    void GetGlobalVelocity
+    ( const GridData<R>& velocity,
+      std::vector<R>& myGlobalVelocity,
       std::vector<int>& offsets ) const;
 
     void FormGlobalRow( R alpha, int x, int y, int v, int row );
@@ -261,11 +261,11 @@ private:
     // Helpers for the PML-padded sparse-direct portion
     //
 
-    void GetPanelSlowness
+    void GetPanelVelocity
     ( int vOffset, int vSize, 
       const clique::symbolic::SymmFact& fact,
-      const GridData<R>& slowness,
-      std::vector<R>& myPanelSlowness,
+      const GridData<R>& velocity,
+      std::vector<R>& myPanelVelocity,
       std::vector<int>& offsets,
       std::map<int,int>& panelNestedToNatural, 
       std::map<int,int>& panelNaturalToNested ) const;
@@ -274,8 +274,8 @@ private:
     ( int vOffset, int vSize,
       const clique::symbolic::SymmFact& symbFact,
             clique::numeric::SymmFrontTree<C>& fact,
-      const GridData<R>& slowness,
-      const std::vector<R>& myPanelSlowness,
+      const GridData<R>& velocity,
+      const std::vector<R>& myPanelVelocity,
             std::vector<int>& offsets,
             std::map<int,int>& panelNestedToNatural,
             std::map<int,int>& panelNaturalToNested ) const;

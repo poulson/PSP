@@ -138,14 +138,14 @@ main( int argc, char* argv[] )
             std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
                       << std::endl;
 
-        GridData<double> slowness( 1, N, N, N/8, XYZ, px, py, pz, comm );
-        double* localSlowness = slowness.LocalBuffer();
-        const int xLocalSize = slowness.XLocalSize();
-        const int yLocalSize = slowness.YLocalSize();
-        const int zLocalSize = slowness.ZLocalSize();
-        const int xShift = slowness.XShift();
-        const int yShift = slowness.YShift();
-        const int zShift = slowness.ZShift();
+        GridData<double> velocity( 1, N, N, N/8, XYZ, px, py, pz, comm );
+        double* localVelocity = velocity.LocalBuffer();
+        const int xLocalSize = velocity.XLocalSize();
+        const int yLocalSize = velocity.YLocalSize();
+        const int zLocalSize = velocity.ZLocalSize();
+        const int xShift = velocity.XShift();
+        const int yShift = velocity.YShift();
+        const int zShift = velocity.ZShift();
         if( velocityModel == 1 )
         {
             // Converging lens
@@ -170,7 +170,7 @@ main( int argc, char* argv[] )
                             zLocal*xLocalSize*yLocalSize;
                         const double speed =
                             1.0 - 0.4*std::exp(-32.*(argX+argY+argZ));
-                        localSlowness[localIndex] = 0.8 / speed;
+                        localVelocity[localIndex] = speed / 0.8;
                     }
                 }
             }
@@ -196,23 +196,23 @@ main( int argc, char* argv[] )
                             zLocal*xLocalSize*yLocalSize;
                         const double speed =
                             1.0 - 0.4*std::exp(-32.*(argX+argY));
-                        localSlowness[localIndex] = 0.8 / speed;
+                        localVelocity[localIndex] = speed / 0.8;
                     }
                 }
             }
         }
 
-        slowness.WritePlane( XY, N/16, "slowness-middleXY" );
-        slowness.WritePlane( XZ, N/2,  "slowness-middleXZ" );
-        slowness.WritePlane( YZ, N/2,  "slowness-middleYZ" );
+        velocity.WritePlane( XY, N/16, "velocity-middleXY" );
+        velocity.WritePlane( XZ, N/2,  "velocity-middleXZ" );
+        velocity.WritePlane( YZ, N/2,  "velocity-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
             {
-                std::cout << "Writing slowness data...";
+                std::cout << "Writing full velocity data...";
                 std::cout.flush();
             }
-            slowness.WriteVolume("slowness");
+            velocity.WriteVolume("velocity");
             elemental::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
@@ -223,7 +223,7 @@ main( int argc, char* argv[] )
             std::cout << "Beginning to initialize..." << std::endl;
         clique::mpi::Barrier( comm );
         const double initialStartTime = clique::mpi::Time(); 
-        helmholtz.Initialize( slowness, accelerate );
+        helmholtz.Initialize( velocity, accelerate );
         clique::mpi::Barrier( comm );
         const double initialStopTime = clique::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;

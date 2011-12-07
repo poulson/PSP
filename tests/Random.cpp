@@ -31,7 +31,7 @@ void Usage()
               << "  <nz>: Size of grid in z dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
               << "  <imagShift>: imaginary shift [2 pi is standard]\n"
-              << "  <amp>: Amp of random perturbation from unit slowness\n"
+              << "  <amp>: Amp of random perturbation from unit velocity\n"
               << "  <numPlanesPerPanel>: Depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
@@ -125,26 +125,26 @@ main( int argc, char* argv[] )
             std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
                       << std::endl;
 
-        GridData<double> slowness
+        GridData<double> velocity
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
-        double* localSlowness = slowness.LocalBuffer();
-        const int xLocalSize = slowness.XLocalSize();
-        const int yLocalSize = slowness.YLocalSize();
-        const int zLocalSize = slowness.ZLocalSize();
+        double* localVelocity = velocity.LocalBuffer();
+        const int xLocalSize = velocity.XLocalSize();
+        const int yLocalSize = velocity.YLocalSize();
+        const int zLocalSize = velocity.ZLocalSize();
         for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
-            localSlowness[i] = 1+amplitude*plcg::ParallelUniform<double>();
+            localVelocity[i] = 1+amplitude*plcg::ParallelUniform<double>();
 
-        slowness.WritePlane( XY, nz/2, "slowness-middleXY" );
-        slowness.WritePlane( XZ, ny/2, "slowness-middleXZ" );
-        slowness.WritePlane( YZ, nx/2, "slowness-middleYZ" );
+        velocity.WritePlane( XY, nz/2, "velocity-middleXY" );
+        velocity.WritePlane( XZ, ny/2, "velocity-middleXZ" );
+        velocity.WritePlane( YZ, nx/2, "velocity-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
             {
-                std::cout << "Writing slowness data...";
+                std::cout << "Writing velocity data...";
                 std::cout.flush();
             }
-            slowness.WriteVolume("slowness");
+            velocity.WriteVolume("velocity");
             elemental::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
@@ -155,7 +155,7 @@ main( int argc, char* argv[] )
             std::cout << "Beginning to initialize..." << std::endl;
         clique::mpi::Barrier( comm );
         const double initialStartTime = clique::mpi::Time(); 
-        helmholtz.Initialize( slowness, accelerate );
+        helmholtz.Initialize( velocity, accelerate );
         clique::mpi::Barrier( comm );
         const double initialStopTime = clique::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;
