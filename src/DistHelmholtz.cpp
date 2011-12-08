@@ -40,7 +40,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     while( temp >>= 1 )
         ++log2CommSize_;
     if( 1u<<log2CommSize_ != commSize )
-        throw std::logic_error("Must use a power of two number of processes");
+        throw std::logic_error("Must use a power of two number of processes");  
 
     // Decide if the domain is sufficiently deep to warrant sweeping
     const int nx = control.nx;
@@ -79,17 +79,15 @@ psp::DistHelmholtz<R>::DistHelmholtz
     {
         std::cout << "nx=" << nx << ", ny=" << ny << ", nz=" << nz << "\n"
                   << "bx=" << bx << ", by=" << by << ", bz=" << bz << "\n"
-                  << "numPlanesPerPanel=" << numPlanesPerPanel << "\n"
-                  << "topHasPML=" << topHasPML << "\n"
+                  << "# of planes/panel = " << numPlanesPerPanel << "\n"
                   << "\n"
-                  << "bottomDepth_        = " << bottomDepth_ << "\n"
-                  << "topOrigDepth_       = " << topOrigDepth_ << "\n"
-                  << "innerDepth_         = " << innerDepth_ << "\n"
-                  << "leftoverInnerDepth_ = " << leftoverInnerDepth_ << "\n"
+                  << "bottom depth          = " << bottomDepth_ << "\n"
+                  << "top orig depth        = " << topOrigDepth_ << "\n"
+                  << "inner depth           = " << innerDepth_ << "\n"
+                  << "leftover inner depth  = " << leftoverInnerDepth_ << "\n"
                   << "\n"
-                  << "haveLeftover_       = " << haveLeftover_ << "\n"
-                  << "numFullInnerPanels_ = " << numFullInnerPanels_ << "\n"
-                  << "numPanels_          = " << numPanels_ << "\n"
+                  << "# of full inner panels = " << numFullInnerPanels_ << "\n"
+                  << "# of panels            = " << numPanels_ << "\n"
                   << std::endl;
     }
 #endif
@@ -109,21 +107,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
                    numFullInnerPanels_*localFullInnerHeight_ +
                    localLeftoverInnerHeight_ + 
                    localTopHeight_;
-
-#ifndef RELEASE
-    if( commRank == 0 )
-    {
-        std::cout << "localBottomHeight_        = " 
-                  << localBottomHeight_ << "\n"
-                  << "localFullInnerHeight_     = " 
-                  << localFullInnerHeight_ << "\n"
-                  << "localLeftoverInnerHeight_ = " 
-                  << localLeftoverInnerHeight_ << "\n"
-                  << "localTopHeight_           = " << localTopHeight_ << "\n"
-                  << "localHeight_              = " << localHeight_ << "\n"
-                  << std::endl;
-    }
-#endif
 
     // Compute the natural indices of the rows of the global sparse matrix 
     // that are owned by our process. Also, set up the offsets for the 

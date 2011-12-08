@@ -54,7 +54,7 @@ struct FiniteDiffControl
     Stencil stencil; // only 7-point supported so far
     int nx, ny, nz;  // number of grid points in each direction
     R wx, wy, wz;    // width of the PML-padded box in each direction
-    R omega;         // frequency of problem
+    R omega;         // frequency of problem [rad/sec]
 
     R Cx, Cy, Cz;   // coefficient for PML in each direction
     int bx, by, bz; // number of grid points of PML in each direction

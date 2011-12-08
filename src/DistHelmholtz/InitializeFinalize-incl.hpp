@@ -33,6 +33,68 @@ psp::DistHelmholtz<R>::Initialize
     if( velocity.NumScalars() != 1 )
         throw std::logic_error("Velocity grid should have one entry per point");
     const int commRank = elemental::mpi::CommRank( comm_ );
+    const R omega = control_.omega;
+    const R wx = control_.wx;
+    const R wy = control_.wy;
+    const R wz = control_.wz;
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int nz = control_.nz;
+    const int bx = control_.bx;
+    const int by = control_.by;
+    const int bz = control_.bz;
+
+    // Compute the minimum and maximum velocities, then the characteristic 
+    // wavelength and the maximum number of wavelengths in an x/y/z direction.
+    R maxLocalVelocity=-1;
+    const int xLocalSize = velocity.XLocalSize();
+    const int yLocalSize = velocity.YLocalSize();
+    const int zLocalSize = velocity.ZLocalSize();
+    const int localSize = xLocalSize*yLocalSize*zLocalSize;
+    const R* localVelocity = velocity.LockedLocalBuffer();
+    for( int i=0; i<localSize; ++i )
+        maxLocalVelocity=std::max(maxLocalVelocity,localVelocity[i]);
+    R maxVelocity;
+    elemental::mpi::AllReduce
+    ( &maxLocalVelocity, &maxVelocity, 1, elemental::mpi::MAX, comm_ );
+    R minLocalVelocity=maxVelocity;
+    for( int i=0; i<localSize; ++i )
+        minLocalVelocity=std::min(minLocalVelocity,localVelocity[i]);
+    R minVelocity;
+    elemental::mpi::AllReduce
+    ( &minLocalVelocity, &minVelocity, 1, elemental::mpi::MIN, comm_ );
+    const R medianVelocity = (minVelocity+maxVelocity) / 2;
+    const R wavelength = 2.0*M_PI*medianVelocity/omega;
+    const R maxDimension = std::max(std::max(wx,wy),wz);
+    const R numWavelengths = maxDimension / wavelength;
+    const R xSizeInWavelengths = wx / wavelength;
+    const R ySizeInWavelengths = wy / wavelength;
+    const R zSizeInWavelengths = wz / wavelength;
+    const R xPPW = nx / xSizeInWavelengths;
+    const R yPPW = ny / ySizeInWavelengths;
+    const R zPPW = nz / zSizeInWavelengths;
+    const R minPPW = std::min(std::min(xPPW,yPPW),zPPW);
+    const R xPML = hx_*bx / wavelength;
+    const R yPML = hy_*by / wavelength;
+    const R zPML = hz_*bz / wavelength;
+    const R minPML = std::min(std::min(xPML,yPML),zPML);
+    if( commRank == 0 )
+    {
+        std::cout << "Min velocity:                " << minVelocity << "\n"
+                  << "Max velocity:                " << maxVelocity << "\n"
+                  << "Median velocity:             " << medianVelocity << "\n"
+                  << "Characteristic wavelength:   " << wavelength << "\n"
+                  << "Max dimension:               " << maxDimension << "\n"
+                  << "# of wavelengths:            " << numWavelengths << "\n"
+                  << "Min points/wavelength:       " << minPPW << "\n"
+                  << "Min PML size in wavelengths: " << minPML << "\n"
+                  << std::endl;
+        if( minPPW < 7 )
+            std::cerr << "WARNING: minimum points/wavelength is very small"
+                      << std::endl;
+        if( minPML < 0.6 )
+            std::cerr << "WARNING: minimum PML size is very small" << std::endl;
+    }
 
     //
     // Initialize and factor the top panel (first, since it is the largest)
@@ -46,8 +108,8 @@ psp::DistHelmholtz<R>::Initialize
         const double startTime = elemental::mpi::Time();
 
         // Retrieve the velocity for this panel
-        const int vOffset = bottomDepth_ + innerDepth_ - control_.bz;
-        const int vSize = topOrigDepth_ + control_.bz;
+        const int vOffset = bottomDepth_ + innerDepth_ - bz;
+        const int vSize = topOrigDepth_ + bz;
         std::vector<R> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -135,8 +197,8 @@ psp::DistHelmholtz<R>::Initialize
 
         // Retrieve the velocity for this panel
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
-        const int vOffset = bottomDepth_ + k*numPlanesPerPanel - control_.bz;
-        const int vSize = numPlanesPerPanel + control_.bz;
+        const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bz;
+        const int vSize = numPlanesPerPanel + bz;
         std::vector<R> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -159,9 +221,11 @@ psp::DistHelmholtz<R>::Initialize
 
         // Redistribute the LDL^T factorization for faster solves
         if( accelerate )
-            clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS_FAST_LDL );
+            clique::numeric::SetSolveMode
+            ( fullInnerFact, clique::FEW_RHS_FAST_LDL );
         else
-            clique::numeric::SetSolveMode( fullInnerFact, clique::FEW_RHS );
+            clique::numeric::SetSolveMode
+            ( fullInnerFact, clique::FEW_RHS );
 
         const double stopTime = elemental::mpi::Time();
         if( commRank == 0 )
@@ -182,8 +246,8 @@ psp::DistHelmholtz<R>::Initialize
 
         // Retrieve the velocity for this panel
         const int vOffset = bottomDepth_ + innerDepth_ - 
-                            leftoverInnerDepth_ - control_.bz;
-        const int vSize = leftoverInnerDepth_ + control_.bz;
+                            leftoverInnerDepth_ - bz;
+        const int vSize = leftoverInnerDepth_ + bz;
         std::vector<R> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -231,9 +295,6 @@ psp::DistHelmholtz<R>::Initialize
 
         // Now make use of the redistributed velocity data to form the global 
         // sparse matrix
-        const int nx = control_.nx;
-        const int ny = control_.ny;
-        const int nz = control_.nz;
         localEntries_.resize( localRowOffsets_.back() );
         for( int iLocal=0; iLocal<localHeight_; ++iLocal )
         {
