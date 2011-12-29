@@ -38,8 +38,8 @@ public:
     void Initialize( const GridData<R>& velocity, bool accelerate=true );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
-    void SolveWithSQMR( GridData<C>& B ) const;
-    void SolveWithGMRES( GridData<C>& B, int m=20 ) const;
+    void SolveWithSQMR( GridData<C>& B, R bcgRelTol=1e-4 ) const;
+    void SolveWithGMRES( GridData<C>& B, int m=20, R relTol=1e-3 ) const;
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
@@ -63,8 +63,10 @@ private:
     void PushRightHandSides
     ( GridData<C>& gridB, const elemental::Matrix<C>& B ) const;
 
-    void InternalSolveWithGMRES( elemental::Matrix<C>& B, int m ) const;
-    void InternalSolveWithSQMR( elemental::Matrix<C>& B ) const;
+    void InternalSolveWithGMRES
+    ( elemental::Matrix<C>& B, int m, R relTol ) const;
+    void InternalSolveWithSQMR
+    ( elemental::Matrix<C>& B, R bcgRelTol ) const;
 
     bool CheckForNaN( R alpha ) const;
     bool CheckForNaN( C alpha ) const;

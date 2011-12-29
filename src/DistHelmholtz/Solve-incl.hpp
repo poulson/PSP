@@ -21,7 +21,8 @@
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m ) const
+psp::DistHelmholtz<R>::SolveWithGMRES
+( GridData<C>& gridB, int m, R relTol ) const
 {
     if( !elemental::mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
@@ -45,7 +46,7 @@ psp::DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m ) const
     }
 
     // Solve the systems of equations
-    InternalSolveWithGMRES( B, m );
+    InternalSolveWithGMRES( B, m, relTol );
 
     // Restore the solutions back into the GridData form
     {
@@ -66,7 +67,7 @@ psp::DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB ) const
+psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
 {
     if( !elemental::mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
@@ -90,7 +91,7 @@ psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB ) const
     }
 
     // Solve the systems of equations
-    InternalSolveWithSQMR( B );
+    InternalSolveWithSQMR( B, bcgRelTol );
 
     // Restore the solutions back into the GridData form
     {
@@ -299,9 +300,8 @@ psp::DistHelmholtz<R>::PushRightHandSides
 template<typename R>
 void
 psp::DistHelmholtz<R>::InternalSolveWithGMRES
-( elemental::Matrix<C>& bList, int m ) const
+( elemental::Matrix<C>& bList, int m, R relTol ) const
 {
-    const R relTol = 1e-5;
     const int numRhs = bList.Width();
     const int localHeight = bList.Height();
     const int commRank = elemental::mpi::CommRank( comm_ );
@@ -646,10 +646,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 template<typename R>
 void
 psp::DistHelmholtz<R>::InternalSolveWithSQMR
-( elemental::Matrix<C>& bList ) const
+( elemental::Matrix<C>& bList, R bcgRelTol ) const
 {
     const R one = 1;
-    const R bcgRelTol = 1e-6;
     const int numRhs = bList.Width();
     const int localHeight = bList.Height();
     const int commRank = elemental::mpi::CommRank( comm_ );
