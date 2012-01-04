@@ -563,7 +563,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     elemental::Matrix<C> y, z;
                     z.LockedView( zList, 0, k, j+1, 1 );
                     y = z;
-                    elemental::basic::Trsv
+                    elemental::Trsv
                     ( elemental::UPPER, elemental::NORMAL, elemental::NON_UNIT,
                       H, y );
 
@@ -576,7 +576,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     {
                         const C eta_i = y.Get(i,0);
                         vi.LockedView( VInter, 0, i*numRhs+k, localHeight, 1 );
-                        elemental::basic::Axpy( eta_i, vi, x );
+                        elemental::Axpy( eta_i, vi, x );
                     }
                 }
 #ifndef RELEASE
@@ -589,7 +589,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 
             // w := b - A x
             wList = xList; 
-            elemental::basic::Scal( (C)-1, wList );
+            elemental::Scal( (C)-1, wList );
             {
 #ifndef RELEASE
                 elemental::mpi::Barrier( comm_ );
@@ -608,7 +608,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
-            elemental::basic::Axpy( (C)1, bList, wList );
+            elemental::Axpy( (C)1, bList, wList );
 
             // Residual checks
             Norms( wList, residNormList );
@@ -807,7 +807,7 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         for( int k=0; k<numRhs; ++k )
             tempList[k] = cList[k]*cList[k]*alphaList[k];
         AddScaledColumns( tempList, qList, pList );
-        elemental::basic::Axpy( (C)1, pList, bList );
+        elemental::Axpy( (C)1, pList, bList );
         const bool thetaListHasNaN = CheckForNaN( thetaList );
         if( thetaListHasNaN )
             throw std::runtime_error("theta list has NaN");
@@ -862,7 +862,7 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         for( int k=0; k<numRhs; ++k )
             betaList[k] = rhoList[k] / rhoLastList[k];
         MultiplyColumns( qList, betaList );
-        elemental::basic::Axpy( (C)1, tList, qList );
+        elemental::Axpy( (C)1, tList, qList );
 
         ++it;
     }
