@@ -101,13 +101,11 @@ psp::DistHelmholtz<R>::Initialize
     //
     {
         if( commRank == 0 )
-        {
-            std::cout << "  initializing top panel...";
-            std::cout.flush();
-        }
+            std::cout << "  initializing top panel..." << std::endl;
         const double startTime = elemental::mpi::Time();
 
         // Retrieve the velocity for this panel
+        const double gatherStartTime = startTime;
         const int vOffset = bottomDepth_ + innerDepth_ - bz;
         const int vSize = topOrigDepth_ + bz;
         std::vector<R> myPanelVelocity;
@@ -117,25 +115,44 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, topSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
+        const double gatherStopTime = elemental::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
+        const double fillStartTime = gatherStopTime;
         FillPanelFronts
         ( vOffset, vSize, topSymbolicFact_, topFact_,
           velocity, myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
+        const double fillStopTime = elemental::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
+        const double ldlStartTime = fillStopTime;
         clique::numeric::LDL( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
+        const double ldlStopTime = elemental::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
+        const double redistStartTime = ldlStopTime;
         if( accelerate )
             clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS_FAST_LDL );
         else
             clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
+        const double redistStopTime = elemental::mpi::Time();
 
-        const double stopTime = elemental::mpi::Time();
+        const double stopTime = redistStopTime;
         if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
+        {
+            std::cout << "    gather: " << gatherStopTime-gatherStartTime 
+                      << " secs\n"
+                      << "    fill:   " << fillStopTime-fillStartTime 
+                      << " secs\n"
+                      << "    ldl:    " << ldlStopTime-ldlStartTime 
+                      << " secs\n"
+                      << "    redist: " << redistStopTime-redistStartTime
+                      << " secs\n"
+                      << "    total:  " << stopTime-startTime 
+                      << " secs\n" 
+                      << std::endl;
+        }
     }
 
     //
@@ -143,13 +160,11 @@ psp::DistHelmholtz<R>::Initialize
     //
     {
         if( commRank == 0 )
-        {
-            std::cout << "  initializing bottom panel...";
-            std::cout.flush();
-        }
+            std::cout << "  initializing bottom panel..." << std::endl;
         const double startTime = elemental::mpi::Time();
 
         // Retrieve the velocity for this panel
+        const double gatherStartTime = startTime;
         const int vOffset = 0;
         const int vSize = bottomDepth_;
         std::vector<R> myPanelVelocity;
@@ -159,26 +174,45 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, velocity,
           myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
+        const double gatherStopTime = elemental::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
+        const double fillStartTime = gatherStopTime;
         FillPanelFronts
         ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
+        const double fillStopTime = elemental::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
+        const double ldlStartTime = fillStopTime;
         clique::numeric::LDL
         ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+        const double ldlStopTime = elemental::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
+        const double redistStartTime = ldlStopTime;
         if( accelerate )
-            clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS_FAST_LDL );
+            clique::numeric::SetSolveMode
+            ( bottomFact_, clique::FEW_RHS_FAST_LDL );
         else
             clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
+        const double redistStopTime = elemental::mpi::Time();
 
-        const double stopTime = elemental::mpi::Time();
+        const double stopTime = redistStopTime;
         if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
+        {
+            std::cout << "    gather: " << gatherStopTime-gatherStartTime     
+                      << " secs\n"
+                      << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
+                      << "    ldl:    " << ldlStopTime-ldlStartTime
+                      << " secs\n"
+                      << "    redist: " << redistStopTime-redistStartTime
+                      << " secs\n"
+                      << "    total:  " << stopTime-startTime 
+                      << " secs\n"
+                      << std::endl;
+        }
     }
 
     //
@@ -188,14 +222,12 @@ psp::DistHelmholtz<R>::Initialize
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
         if( commRank == 0 )
-        {
             std::cout << "  initializing inner panel " << k << " of " 
-                      << numFullInnerPanels_ << "...";
-            std::cout.flush();
-        }
+                      << numFullInnerPanels_ << "..." << std::endl;
         const double startTime = elemental::mpi::Time();
 
         // Retrieve the velocity for this panel
+        const double gatherStartTime = startTime;
         const int numPlanesPerPanel = control_.numPlanesPerPanel;
         const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bz;
         const int vSize = numPlanesPerPanel + bz;
@@ -206,30 +238,48 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
+        const double gatherStopTime = elemental::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
+        const double fillStartTime = gatherStopTime;
         fullInnerFacts_[k] = new clique::numeric::SymmFrontTree<C>;
         clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
         FillPanelFronts
         ( vOffset, vSize, bottomSymbolicFact_, fullInnerFact,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
+        const double fillStopTime = elemental::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
+        const double ldlStartTime = fillStopTime;
         clique::numeric::LDL
         ( clique::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
+        const double ldlStopTime = elemental::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
+        const double redistStartTime = ldlStopTime;
         if( accelerate )
             clique::numeric::SetSolveMode
             ( fullInnerFact, clique::FEW_RHS_FAST_LDL );
         else
             clique::numeric::SetSolveMode
             ( fullInnerFact, clique::FEW_RHS );
+        const double redistStopTime = elemental::mpi::Time();
 
-        const double stopTime = elemental::mpi::Time();
+        const double stopTime = redistStopTime;
         if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
+        {
+            std::cout << "    gather: " << gatherStopTime-gatherStartTime     
+                      << " secs\n"
+                      << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
+                      << "    ldl:    " << ldlStopTime-ldlStartTime
+                      << " secs\n"
+                      << "    redist: " << redistStopTime-redistStartTime
+                      << " secs\n"
+                      << "    total:  " << stopTime-startTime 
+                      << " secs\n"
+                      << std::endl;
+        }
     }
 
     //
@@ -238,13 +288,11 @@ psp::DistHelmholtz<R>::Initialize
     if( haveLeftover_ )
     {        
         if( commRank == 0 )
-        {
-            std::cout << "  initializing the leftover panel...";
-            std::cout.flush();
-        }
+            std::cout << "  initializing the leftover panel..." << std::endl;
         const double startTime = elemental::mpi::Time();
 
         // Retrieve the velocity for this panel
+        const double gatherStartTime = startTime;
         const int vOffset = bottomDepth_ + innerDepth_ - 
                             leftoverInnerDepth_ - bz;
         const int vSize = leftoverInnerDepth_ + bz;
@@ -255,26 +303,46 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, leftoverInnerSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
+        const double gatherStopTime = elemental::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
+        const double fillStartTime = gatherStopTime;
         FillPanelFronts
         ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
+        const double fillStopTime = elemental::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
+        const double ldlStartTime = fillStopTime;
         clique::numeric::LDL
         ( clique::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+        const double ldlStopTime = elemental::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
+        const double redistStartTime = ldlStopTime;
         if( accelerate )
-            clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS_FAST_LDL );
+            clique::numeric::SetSolveMode
+            ( leftoverInnerFact_, clique::FEW_RHS_FAST_LDL );
         else
-            clique::numeric::SetSolveMode( leftoverInnerFact_, clique::FEW_RHS );
+            clique::numeric::SetSolveMode
+            ( leftoverInnerFact_, clique::FEW_RHS );
+        const double redistStopTime = elemental::mpi::Time();
 
-        const double stopTime = elemental::mpi::Time();
+        const double stopTime = redistStopTime;
         if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
+        {
+            std::cout << "    gather: " << gatherStopTime-gatherStartTime     
+                      << " secs\n"
+                      << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
+                      << "    ldl:    " << ldlStopTime-ldlStartTime
+                      << " secs\n"
+                      << "    redist: " << redistStopTime-redistStartTime
+                      << " secs\n"
+                      << "    total:  " << stopTime-startTime 
+                      << " secs\n"
+                      << std::endl;
+        }
     }
     
     //
