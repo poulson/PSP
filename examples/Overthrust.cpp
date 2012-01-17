@@ -23,22 +23,17 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "EngquistYing <N> <omega> <imagShift> <velocity> "
-                 "<numPlanesPerPanel> <fact blocksize> <solve blocksize> "
-                 "<accelerate?> <SQMR?> <viz?>\n"
-              << "  <N>: Size of grid in each dimension\n"
+    std::cout << "Overthrust <omega> <imagShift> <numPlanesPerPanel> "
+                 "<fact blocksize> <solve blocksize> <accelerate?> <SQMR?> "
+                 "<viz?>\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
               << "  <imagShift>: imaginary shift [2 pi is standard]\n"
-              << "  <velocity>: Which velocity field to use, {1,2}\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
               << "  <accelerate?>: accelerate solves iff !=0\n"
               << "  <SQMR?>: GMRES iff 0, SQMR otherwise\n"
-              << "  <full viz?>:  Full visualization iff != 0\n"
-              << "\n"
-              << "Please see \"Sweeping preconditioner for the Helmholtz "
-                 "equation: moving perfectly matched layers\" for details\n"
+              << "  <full viz?>: Full visualization iff != 0\n"
               << std::endl;
 }
 
@@ -50,7 +45,7 @@ main( int argc, char* argv[] )
     const int commSize = clique::mpi::CommSize( comm );
     const int commRank = clique::mpi::CommRank( comm );
 
-    if( argc < 11 )
+    if( argc < 9 )
     {
         if( commRank == 0 )
             Usage();
@@ -58,10 +53,8 @@ main( int argc, char* argv[] )
         return 0;
     }
     int argNum=1;
-    const int N = atoi( argv[argNum++] );
     const double omega = atof( argv[argNum++] );
     const double imagShift = atof( argv[argNum++] );
-    const int velocityModel = atoi( argv[argNum++] );
     const int numPlanesPerPanel = atoi( argv[argNum++] );
     const int factBlocksize = atoi( argv[argNum++] );
     const int solveBlocksize = atoi( argv[argNum++] );
@@ -69,39 +62,34 @@ main( int argc, char* argv[] )
     const bool useSQMR = atoi( argv[argNum++] );
     const bool fullVisualize = atoi( argv[argNum++] );
 
-    if( velocityModel < 1 || velocityModel > 2 )
-    {
-        if( commRank == 0 )
-            std::cout << "Invalid velocity model choice, must be in {1,2};\n"
-                      << "Please see \"Sweeping preconditioner for the "
-                      << "Helmholtz equation: moving perfectly matched layers\""
-                      << " for more details." << std::endl;
-        clique::Finalize();
-        return 0;
-    }
+    const int Nx = 801;
+    const int Ny = 801;
+    const int Nz = 187;
 
     if( commRank == 0 )
     {
-        std::cout << "Running with N=" << N << ", omega=" << omega 
-                  << ", and numPlanesPerPanel=" << numPlanesPerPanel
-                  << " with velocity model " << velocityModel << std::endl;
+        std::cout << "Running with omega=" << omega 
+                  << ", numPlanesPerPanel=" << numPlanesPerPanel
+                  << ", and imagShift=" << imagShift << std::endl;
     }
     
     FiniteDiffControl<double> control;
     control.stencil = SEVEN_POINT;
-    control.nx = N;
-    control.ny = N;
-    control.nz = N;
-    control.wx = 1;
-    control.wy = 1;
-    control.wz = 1;
+    control.nx = Nx;
+    control.ny = Ny;
+    control.nz = Nz;
+    control.wx = 20;
+    control.wy = 20;
+    control.wz = 4.65;
     control.omega = omega;
-    control.Cx = 1.5;
-    control.Cy = 1.5;
-    control.Cz = 1.5;
-    control.bx = 6;
-    control.by = 6;
-    control.bz = 6;
+    // sInv functions should be dimensionless, so C should have units of length,
+    // so we should scale it by the size of our domain (i.e., 20)
+    control.Cx = 1.5*20;
+    control.Cy = 1.5*20;
+    control.Cz = 1.5*20;
+    control.bx = 5;
+    control.by = 5;
+    control.bz = 5;
     control.imagShift = imagShift;
     control.cutoff = 96;
     control.numPlanesPerPanel = numPlanesPerPanel;
@@ -109,7 +97,7 @@ main( int argc, char* argv[] )
     control.rightBC = PML;
     control.backBC = PML;
     control.leftBC = PML;
-    control.topBC = DIRICHLET;
+    control.topBC = PML;
 
     try 
     {
@@ -133,7 +121,7 @@ main( int argc, char* argv[] )
             std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
                       << std::endl;
 
-        GridData<double> velocity( 1, N, N, N, XYZ, px, py, pz, comm );
+        GridData<double> velocity( 1, Nx, Ny, Nz, XYZ, px, py, pz, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
@@ -141,70 +129,23 @@ main( int argc, char* argv[] )
         const int xShift = velocity.XShift();
         const int yShift = velocity.YShift();
         const int zShift = velocity.ZShift();
-        if( velocityModel == 1 )
-        {
-            // Converging lens
-            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
-            {
-                const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
-                const double argZ = (Z-0.5)*(Z-0.5);
-                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
-                {
-                    const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
-                    const double argY = (Y-0.5)*(Y-0.5);
-                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
-                    {
-                        const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
-                        const double argX = (X-0.5)*(X-0.5);
-                        
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
-                            zLocal*xLocalSize*yLocalSize;
-                        const double speed =
-                            1.0 - 0.4*std::exp(-32.*(argX+argY+argZ));
-                        localVelocity[localIndex] = speed / 0.8;
-                    }
-                }
-            }
-        }
-        else // velocityModel == 2
-        {
-            // Wave guide
-            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
-            {
-                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
-                {
-                    const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
-                    const double argY = (Y-0.5)*(Y-0.5);
-                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
-                    {
-                        const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
-                        const double argX = (X-0.5)*(X-0.5);
-                        
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
-                            zLocal*xLocalSize*yLocalSize;
-                        const double speed =
-                            1.0 - 0.4*std::exp(-32.*(argX+argY));
-                        localVelocity[localIndex] = speed / 0.8;
-                    }
-                }
-            }
-        }
+        std::ostringstream os;
+        os << "overthrust_" << commRank << ".dat";
+        std::ifstream velocityFile;
+        velocityFile.open( os.str().c_str(), std::ios::in|std::ios::binary );
+        velocityFile.read
+        ( (char*)localVelocity, 
+          xLocalSize*yLocalSize*zLocalSize*sizeof(double) );
+        velocityFile.close();
 
-        velocity.WritePlane( XY, N/2, "velocity-middleXY" );
-        velocity.WritePlane( XZ, N/2, "velocity-middleXZ" );
-        velocity.WritePlane( YZ, N/2, "velocity-middleYZ" );
+        velocity.WritePlane( XY, Nz/2, "velocity-middleXY" );
+        velocity.WritePlane( XZ, Ny/2, "velocity-middleXZ" );
+        velocity.WritePlane( YZ, Nx/2, "velocity-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
             {
-                std::cout << "Writing velocity data...";
+                std::cout << "Writing full velocity data...";
                 std::cout.flush();
             }
             velocity.WriteVolume("velocity");
@@ -226,46 +167,49 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<std::complex<double> > B( 2, N, N, N, XYZ, px, py, pz, comm );
+        GridData<std::complex<double> > 
+            B( 3, Nx, Ny, Nz, XYZ, px, py, pz, comm );
         std::complex<double>* localB = B.LocalBuffer();
-        const double dX = 0;
-        const double dY = sqrt(2.0)/2.0;
-        const double dZ = sqrt(2.0)/2.0;
-        const std::complex<double> imagOne( 0.0, 1.0 );
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
-            const double Z = z / (N+1.0);
-            const double argZ = (Z-0.25)*(Z-0.25);
+            const double zSqueeze = control.wz / control.wx;
+            const double Z = zSqueeze * z / (Nz+1.0);
+            const double argZ = (Z-0.1*zSqueeze)*(Z-0.1*zSqueeze);
             for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
                 const int y = yShift + yLocal*py;
-                const double Y = y / (N+1.0);
+                const double Y = y / (Ny+1.0);
                 const double argYOne = (Y-0.5)*(Y-0.5);
                 const double argYTwo = (Y-0.25)*(Y-0.25);
+                const double argYThree = (Y-0.75)*(Y-0.75);
                 for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                 {
                     const int x = xShift + xLocal*px;
-                    const double X = x / (N+1.0);
-                    const double argX = (X-0.5)*(X-0.5);
+                    const double X = x / (Nx+1.0);
+                    const double argXOne = (X-0.5)*(X-0.5);
+                    const double argXTwo = (X-0.25)*(X-0.25);
+                    const double argXThree = (X-0.75)*(X-0.75);
                     
                     const int localIndex = 
-                        2*(xLocal + yLocal*xLocalSize + 
+                        3*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
                     const std::complex<double> fOne = 
-                        N*std::exp(-N*N*(argX+argYOne+argZ));
+                        Nx*std::exp(-10*Nx*(argXOne+argYOne+argZ));
                     const std::complex<double> fTwo = 
-                        N*std::exp(-2*omega*(argX+argYTwo+argZ))*
-                        std::exp(omega*imagOne*(X*dX+Y*dY+Z*dZ));
+                        Nx*std::exp(-10*Nx*(argXTwo+argYTwo+argZ));
+                    const std::complex<double> fThree = 
+                        Nx*std::exp(-10*Nx*(argXThree+argYThree+argZ));
                     localB[localIndex+0] = fOne;
                     localB[localIndex+1] = fTwo;
+                    localB[localIndex+2] = fThree;
                 }
             }
         }
 
-        B.WritePlane( XY, N/2, "source-middleXY" );
-        B.WritePlane( XZ, N/2, "source-middleXZ" );
-        B.WritePlane( YZ, N/2, "source-middleYZ" );
+        B.WritePlane( XY, Nz/2, "source-middleXY" );
+        B.WritePlane( XZ, Ny/2, "source-middleXZ" );
+        B.WritePlane( YZ, Nx/2, "source-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -286,7 +230,7 @@ main( int argc, char* argv[] )
         if( useSQMR )
             helmholtz.SolveWithSQMR( B );
         else
-            helmholtz.SolveWithGMRES( B );
+            helmholtz.SolveWithGMRES( B, 20, 1e-5 );
         clique::mpi::Barrier( comm );
         const double solveStopTime = clique::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
@@ -294,9 +238,9 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        B.WritePlane( XY, N/2, "solution-middleXY" );
-        B.WritePlane( XZ, N/2, "solution-middleXZ" );
-        B.WritePlane( YZ, N/2, "solution-middleYZ" );
+        B.WritePlane( XY, Nz/2, "solution-middleXY" );
+        B.WritePlane( XZ, Ny/2, "solution-middleXZ" );
+        B.WritePlane( YZ, Nx/2, "solution-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
