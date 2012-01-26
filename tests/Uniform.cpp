@@ -2,7 +2,7 @@
    Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
    of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson, Lexing Ying, and
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
 
    This program is free software: you can redistribute it and/or modify
@@ -43,16 +43,16 @@ void Usage()
 int
 main( int argc, char* argv[] )
 {
-    clique::Initialize( argc, argv );
-    clique::mpi::Comm comm = clique::mpi::COMM_WORLD;
-    const int commSize = clique::mpi::CommSize( comm );
-    const int commRank = clique::mpi::CommRank( comm );
+    cliq::Initialize( argc, argv );
+    cliq::mpi::Comm comm = cliq::mpi::COMM_WORLD;
+    const int commSize = cliq::mpi::CommSize( comm );
+    const int commRank = cliq::mpi::CommRank( comm );
 
     if( argc < 12 )
     {
         if( commRank == 0 )
             Usage();
-        clique::Finalize();
+        cliq::Finalize();
         return 0;
     }
     int argNum = 1;
@@ -142,30 +142,30 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             velocity.WriteVolume("velocity");
-            elemental::mpi::Barrier( comm );
+            elem::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
         }
 
-        elemental::SetBlocksize( factBlocksize );
+        elem::SetBlocksize( factBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
-        clique::mpi::Barrier( comm );
-        const double initialStartTime = clique::mpi::Time(); 
+        cliq::mpi::Barrier( comm );
+        const double initialStartTime = cliq::mpi::Time(); 
         helmholtz.Initialize( velocity, accelerate );
-        clique::mpi::Barrier( comm );
-        const double initialStopTime = clique::mpi::Time();
+        cliq::mpi::Barrier( comm );
+        const double initialStopTime = cliq::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;
         if( commRank == 0 )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<std::complex<double> > B
+        GridData<elem::Complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
-        std::complex<double>* localB = B.LocalBuffer();
+        elem::Complex<double>* localB = B.LocalBuffer();
         std::memset
         ( localB, 0, 
-          xLocalSize*yLocalSize*zLocalSize*sizeof(std::complex<double>) );
+          xLocalSize*yLocalSize*zLocalSize*sizeof(elem::Complex<double>) );
         const int xSource = control.nx/2;
         const int ySource = control.ny/2;
         const int zSource = control.nz/2;
@@ -190,17 +190,17 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
-        elemental::SetBlocksize( solveBlocksize );
+        elem::SetBlocksize( solveBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
-        clique::mpi::Barrier( comm );
-        const double solveStartTime = clique::mpi::Time();
+        cliq::mpi::Barrier( comm );
+        const double solveStartTime = cliq::mpi::Time();
         if( useSQMR )
             helmholtz.SolveWithSQMR( B );
         else
             helmholtz.SolveWithGMRES( B );
-        clique::mpi::Barrier( comm );
-        const double solveStopTime = clique::mpi::Time();
+        cliq::mpi::Barrier( comm );
+        const double solveStopTime = cliq::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
         if( commRank == 0 )
             std::cout << "Finished solve: " << solveTime << " seconds." 
@@ -228,11 +228,11 @@ main( int argc, char* argv[] )
         std::cerr << "Caught exception on process " << commRank << ":\n"
                   << e.what() << std::endl;
 #ifndef RELEASE
-        elemental::DumpCallStack();
-        clique::DumpCallStack();
+        elem::DumpCallStack();
+        cliq::DumpCallStack();
 #endif
     }
 
-    clique::Finalize();
+    cliq::Finalize();
     return 0;
 }

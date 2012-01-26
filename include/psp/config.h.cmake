@@ -2,7 +2,7 @@
    Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
    of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson, Lexing Ying, and 
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
    The University of Texas at Austin
  
    This program is free software: you can redistribute it and/or modify

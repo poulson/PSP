@@ -2,7 +2,7 @@
    Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
    of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson, Lexing Ying, and
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
 
    This program is free software: you can redistribute it and/or modify
@@ -67,12 +67,12 @@ public:
     GridData
     ( int numScalars,
       int nx, int ny,int nz, GridDataOrder order,
-      int px, int py, int pz, elemental::mpi::Comm comm );
+      int px, int py, int pz, elem::mpi::Comm comm );
 
     int XSize() const;
     int YSize() const;
     int ZSize() const;
-    elemental::mpi::Comm Comm() const;
+    elem::mpi::Comm Comm() const;
     int OwningProcess( int naturalIndex ) const;
     int OwningProcess( int x, int y, int z ) const;
 
@@ -103,10 +103,10 @@ public:
           PlaneType planeType, int whichPlane, const std::string baseName );
     };
     template<typename R>
-    struct WritePlaneHelper<std::complex<R> >
+    struct WritePlaneHelper<elem::Complex<R> >
     {
         static void Func
-        ( const GridData<std::complex<R> >& parent, 
+        ( const GridData<elem::Complex<R> >& parent, 
           PlaneType planeType, int whichPlane, const std::string baseName );
     };
     template<typename R> friend struct WritePlaneHelper;
@@ -119,10 +119,10 @@ public:
         ( const GridData<R>& parent, const std::string baseName );
     };
     template<typename R>
-    struct WriteVolumeHelper<std::complex<R> >
+    struct WriteVolumeHelper<elem::Complex<R> >
     {
         static void Func
-        ( const GridData<std::complex<R> >& parent, 
+        ( const GridData<elem::Complex<R> >& parent, 
           const std::string baseName );
     };
     template<typename R> friend struct WriteVolumeHelper;
@@ -133,7 +133,7 @@ private:
     GridDataOrder order_;
 
     int px_, py_, pz_;
-    elemental::mpi::Comm comm_;
+    elem::mpi::Comm comm_;
 
     int xShift_, yShift_, zShift_;
     int xLocalSize_, yLocalSize_, zLocalSize_;
@@ -150,13 +150,13 @@ template<typename T>
 inline GridData<T>::GridData
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
-  int px, int py, int pz, elemental::mpi::Comm comm )
+  int px, int py, int pz, elem::mpi::Comm comm )
 : numScalars_(numScalars), 
   nx_(nx), ny_(ny), nz_(nz), order_(order),
   px_(px), py_(py), pz_(pz), comm_(comm)
 {
-    const int commRank = elemental::mpi::CommRank( comm );
-    const int commSize = elemental::mpi::CommSize( comm );
+    const int commRank = elem::mpi::CommRank( comm );
+    const int commSize = elem::mpi::CommSize( comm );
     if( commSize != px*py*pz )
         throw std::logic_error("px*py*pz != commSize");
     if( px < 0 || py < 0 || pz < 0 )
@@ -165,9 +165,9 @@ inline GridData<T>::GridData
     xShift_ = commRank % px;
     yShift_ = (commRank/px) % py;
     zShift_ = commRank/(px*py);
-    xLocalSize_ = elemental::LocalLength( nx, xShift_, px );
-    yLocalSize_ = elemental::LocalLength( ny, yShift_, py );
-    zLocalSize_ = elemental::LocalLength( nz, zShift_, pz );
+    xLocalSize_ = elem::LocalLength( nx, xShift_, px );
+    yLocalSize_ = elem::LocalLength( ny, yShift_, py );
+    zLocalSize_ = elem::LocalLength( nz, zShift_, pz );
     localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
 
@@ -184,7 +184,7 @@ inline int GridData<T>::ZSize() const
 { return nz_; }
 
 template<typename T>
-inline elemental::mpi::Comm GridData<T>::Comm() const
+inline elem::mpi::Comm GridData<T>::Comm() const
 { return comm_; }
 
 template<typename T>
@@ -305,8 +305,8 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
 ( const GridData<R>& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
-    const int commRank = elemental::mpi::CommRank( parent.comm_ );
-    const int commSize = elemental::mpi::CommSize( parent.comm_ );
+    const int commRank = elem::mpi::CommRank( parent.comm_ );
+    const int commSize = elem::mpi::CommSize( parent.comm_ );
     const int nx = parent.nx_;
     const int ny = parent.ny_;
     const int nz = parent.nz_;
@@ -337,11 +337,11 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
             recvCounts.resize( commSize, 0 );
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                const int yLength = elem::LocalLength( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*yLength*numScalars;
@@ -378,7 +378,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
         }
 
         std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
-        elemental::mpi::Gather
+        elem::mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
         sendBuffer.clear();
@@ -390,11 +390,11 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
             const int planeSize = nx*ny;
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                const int yLength = elem::LocalLength( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<yLength; ++jLocal )
@@ -456,7 +456,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                     for( int i=0; i<nx; ++i )
                     {
                         double value = plane[i+j*nx];
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         file << value << " ";
                     }
@@ -490,11 +490,11 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*zLength*numScalars;
@@ -531,7 +531,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
         }
 
         std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
-        elemental::mpi::Gather
+        elem::mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
         sendBuffer.clear();
@@ -543,11 +543,11 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
             const int planeSize = nx*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -608,7 +608,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                     for( int i=0; i<nx; ++i )
                     {
                         double value = plane[i+j*nx];
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         file << value << " ";
                     }
@@ -642,11 +642,11 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
                     const int yLength = 
-                        elemental::LocalLength( ny, yProc, 0, py );
+                        elem::LocalLength( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += yLength*zLength*numScalars;
@@ -683,7 +683,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
         }
 
         std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
-        elemental::mpi::Gather
+        elem::mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
         sendBuffer.clear();
@@ -695,11 +695,11 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
             const int planeSize = ny*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
                     const int yLength = 
-                        elemental::LocalLength( ny, yProc, 0, py );
+                        elem::LocalLength( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -760,7 +760,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                     for( int i=0; i<ny; ++i )
                     {
                         double value = plane[i+j*ny];
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         file << value << " ";
                     }
@@ -780,12 +780,12 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
 
 template<typename T>
 template<typename R>
-inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
-( const GridData<std::complex<R> >& parent, 
+inline void GridData<T>::WritePlaneHelper<elem::Complex<R> >::Func
+( const GridData<elem::Complex<R> >& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
-    const int commRank = elemental::mpi::CommRank( parent.comm_ );
-    const int commSize = elemental::mpi::CommSize( parent.comm_ );
+    const int commRank = elem::mpi::CommRank( parent.comm_ );
+    const int commSize = elem::mpi::CommSize( parent.comm_ );
     const int nx = parent.nx_;
     const int ny = parent.ny_;
     const int nz = parent.nz_;
@@ -817,11 +817,11 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
             recvCounts.resize( commSize, 0 );
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                const int yLength = elem::LocalLength( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*yLength*numScalars;
@@ -858,7 +858,7 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
         }
 
         std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
-        elemental::mpi::Gather
+        elem::mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
         sendBuffer.clear();
@@ -870,11 +870,11 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
             const int planeSize = nx*ny;
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = elemental::LocalLength( ny, yProc, 0, py );
+                const int yLength = elem::LocalLength( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<yLength; ++jLocal )
@@ -939,8 +939,8 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = std::real(plane[i+j*nx]);
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        double value = plane[i+j*nx].real;
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         realFile << value << " ";
                     }
@@ -950,8 +950,8 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = std::imag(plane[i+j*nx]);
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        double value = plane[i+j*nx].imag;
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         imagFile << value << " ";
                     }
@@ -986,11 +986,11 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*zLength*numScalars;
@@ -1027,7 +1027,7 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
         }
 
         std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
-        elemental::mpi::Gather
+        elem::mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
         sendBuffer.clear();
@@ -1039,11 +1039,11 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
             const int planeSize = nx*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
                     const int xLength = 
-                        elemental::LocalLength( nx, xProc, 0, px );
+                        elem::LocalLength( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -1107,8 +1107,8 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = std::real(plane[i+j*nx]);
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        double value = plane[i+j*nx].real;
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         realFile << value << " ";
                     }
@@ -1118,8 +1118,8 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = std::imag(plane[i+j*nx]);
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        double value = plane[i+j*nx].imag;
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         imagFile << value << " ";
                     }
@@ -1154,11 +1154,11 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
                     const int yLength = 
-                        elemental::LocalLength( ny, yProc, 0, py );
+                        elem::LocalLength( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += yLength*zLength*numScalars;
@@ -1195,7 +1195,7 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
         }
 
         std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
-        elemental::mpi::Gather
+        elem::mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
         sendBuffer.clear();
@@ -1207,11 +1207,11 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
             const int planeSize = ny*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = elemental::LocalLength( nz, zProc, 0, pz );
+                const int zLength = elem::LocalLength( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
                     const int yLength = 
-                        elemental::LocalLength( ny, yProc, 0, py );
+                        elem::LocalLength( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -1275,8 +1275,8 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                 {
                     for( int i=0; i<ny; ++i )
                     {
-                        double value = std::real(plane[i+j*ny]);
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        double value = plane[i+j*ny].real;
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         realFile << value << " ";
                     }
@@ -1286,8 +1286,8 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
                 {
                     for( int i=0; i<ny; ++i )
                     {
-                        double value = std::imag(plane[i+j*ny]);
-                        if( elemental::Abs(value) < 1.0e-300 )
+                        double value = plane[i+j*ny].imag;
+                        if( elem::Abs(value) < 1.0e-300 )
                             value = 0;
                         imagFile << value << " ";
                     }
@@ -1309,7 +1309,7 @@ inline void GridData<T>::WritePlaneHelper<std::complex<R> >::Func
 template<typename T>
 inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 {
-    const int commSize = elemental::mpi::CommSize( comm_ );
+    const int commSize = elem::mpi::CommSize( comm_ );
 
     // Compute our local box
     const int xMainSize = nx_ / px_;
@@ -1353,15 +1353,15 @@ inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
     for( int zProc=0; zProc<pz_; ++zProc )
     {
         const int zLength = 
-            elemental::LocalLength( zBoxSize, zProc, zAlign, pz_ );
+            elem::LocalLength( zBoxSize, zProc, zAlign, pz_ );
         for( int yProc=0; yProc<py_; ++yProc )
         {
             const int yLength = 
-                elemental::LocalLength( yBoxSize, yProc, yAlign, py_ );
+                elem::LocalLength( yBoxSize, yProc, yAlign, py_ );
             for( int xProc=0; xProc<px_; ++xProc )
             {
                 const int xLength = 
-                    elemental::LocalLength( xBoxSize, xProc, xAlign, px_ );
+                    elem::LocalLength( xBoxSize, xProc, xAlign, px_ );
                 const int proc = xProc + yProc*px_ + zProc*px_*py_;
 
                 recvCounts[proc] += xLength*yLength*zLength*numScalars_;
@@ -1411,7 +1411,7 @@ inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 
     // Perform AllToAllv
     std::vector<T> recvBuffer( totalRecvSize );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendBuffer.clear();
@@ -1420,19 +1420,19 @@ inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
     localBox.resize( totalRecvSize );
     for( int zProc=0; zProc<pz_; ++zProc )
     {
-        const int zOffset = elemental::Shift( zProc, zAlign, pz_ );
+        const int zOffset = elem::Shift( zProc, zAlign, pz_ );
         const int zLength = 
-            elemental::LocalLength( zBoxSize, zOffset, pz_ );
+            elem::LocalLength( zBoxSize, zOffset, pz_ );
         for( int yProc=0; yProc<py_; ++yProc )
         {
-            const int yOffset = elemental::Shift( yProc, yAlign, py_ );
+            const int yOffset = elem::Shift( yProc, yAlign, py_ );
             const int yLength = 
-                elemental::LocalLength( yBoxSize, yOffset, py_ );
+                elem::LocalLength( yBoxSize, yOffset, py_ );
             for( int xProc=0; xProc<px_; ++xProc )
             {
-                const int xOffset = elemental::Shift( xProc, xAlign, px_ );
+                const int xOffset = elem::Shift( xProc, xAlign, px_ );
                 const int xLength = 
-                    elemental::LocalLength( xBoxSize, xOffset, px_ );
+                    elem::LocalLength( xBoxSize, xOffset, px_ );
                 const int proc = xProc + yProc*px_ + zProc*px_*py_;
 
                 // Unpack all of the data from this process
@@ -1475,7 +1475,7 @@ template<typename R>
 inline void GridData<T>::WriteVolumeHelper<R>::Func
 ( const GridData<R>& parent, const std::string baseName )
 {
-    const int commRank = elemental::mpi::CommRank( parent.comm_ );
+    const int commRank = elem::mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
     const int pz = parent.pz_;
@@ -1611,7 +1611,7 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
                 for( int k=0; k<numScalars; ++k )
                 {
                     double alpha = localBox[offset*numScalars+k];
-                    if( elemental::Abs(alpha) < 1.0e-300 )
+                    if( elem::Abs(alpha) < 1.0e-300 )
                         alpha = 0;
                     *files[k] << alpha << " ";
                 }
@@ -1636,10 +1636,10 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
 template<typename T>
 template<typename R>
 inline void 
-GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
-( const GridData<std::complex<R> >& parent, const std::string baseName )
+GridData<T>::WriteVolumeHelper<elem::Complex<R> >::Func
+( const GridData<elem::Complex<R> >& parent, const std::string baseName )
 {
-    const int commRank = elemental::mpi::CommRank( parent.comm_ );
+    const int commRank = elem::mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
     const int pz = parent.pz_;
@@ -1664,7 +1664,7 @@ GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
     const R h = 1.0/(maxPoints+1.0);
 
     // Form the local box
-    std::vector<std::complex<R> > localBox;
+    std::vector<elem::Complex<R> > localBox;
     parent.RedistributeForVtk( localBox );
 
     // Have the root process create the parallel description
@@ -1801,13 +1801,13 @@ GridData<T>::WriteVolumeHelper<std::complex<R> >::Func
                     xLocal + yLocal*xBoxSize + zLocal*xBoxSize*yBoxSize;
                 for( int k=0; k<numScalars; ++k )
                 {
-                    const std::complex<double> alpha = 
+                    const elem::Complex<double> alpha = 
                         localBox[offset*numScalars+k];
-                    double realAlpha = std::real(alpha);
-                    double imagAlpha = std::imag(alpha);
-                    if( elemental::Abs(realAlpha) < 1.0e-300 )
+                    double realAlpha = alpha.real;
+                    double imagAlpha = alpha.imag;
+                    if( elem::Abs(realAlpha) < 1.0e-300 )
                         realAlpha = 0;
-                    if( elemental::Abs(imagAlpha) < 1.0e-300 )
+                    if( elem::Abs(imagAlpha) < 1.0e-300 )
                         imagAlpha = 0;
                     *realFiles[k] << realAlpha << " ";
                     *imagFiles[k] << imagAlpha << " ";

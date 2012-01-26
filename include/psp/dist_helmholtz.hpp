@@ -2,7 +2,7 @@
    Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
    of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson, Lexing Ying, and
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
 
    This program is free software: you can redistribute it and/or modify
@@ -27,10 +27,10 @@ template<typename R>
 class DistHelmholtz
 {
 public:
-    typedef std::complex<R> C;
+    typedef elem::Complex<R> C;
 
     DistHelmholtz
-    ( const FiniteDiffControl<R>& control, elemental::mpi::Comm comm );
+    ( const FiniteDiffControl<R>& control, elem::mpi::Comm comm );
 
     ~DistHelmholtz();
 
@@ -45,7 +45,7 @@ public:
     void Finalize();
 
 private:
-    elemental::mpi::Comm comm_;
+    elem::mpi::Comm comm_;
     unsigned log2CommSize_;
     const FiniteDiffControl<R> control_;
     const R hx_, hy_, hz_; // grid spacings
@@ -59,14 +59,14 @@ private:
     //
 
     void PullRightHandSides
-    ( const GridData<C>& gridB, elemental::Matrix<C>& B ) const;
+    ( const GridData<C>& gridB, elem::Matrix<C>& B ) const;
     void PushRightHandSides
-    ( GridData<C>& gridB, const elemental::Matrix<C>& B ) const;
+    ( GridData<C>& gridB, const elem::Matrix<C>& B ) const;
 
     void InternalSolveWithGMRES
-    ( elemental::Matrix<C>& B, int m, R relTol ) const;
+    ( elem::Matrix<C>& B, int m, R relTol ) const;
     void InternalSolveWithSQMR
-    ( elemental::Matrix<C>& B, R bcgRelTol ) const;
+    ( elem::Matrix<C>& B, R bcgRelTol ) const;
 
     bool CheckForNaN( R alpha ) const;
     bool CheckForNaN( C alpha ) const;
@@ -76,47 +76,47 @@ private:
     bool CheckForZero( const std::vector<C>& alpha ) const;
 
     void Norms
-    ( const elemental::Matrix<C>& xList, std::vector<R>& normList ) const;
+    ( const elem::Matrix<C>& xList, std::vector<R>& normList ) const;
     void InnerProducts
-    ( const elemental::Matrix<C>& xList, const elemental::Matrix<C>& yList,
+    ( const elem::Matrix<C>& xList, const elem::Matrix<C>& yList,
       std::vector<C>& alphaList ) const;
 
     void PseudoNorms
-    ( const elemental::Matrix<C>& xList, std::vector<C>& pseudoNormList ) const;
+    ( const elem::Matrix<C>& xList, std::vector<C>& pseudoNormList ) const;
     void PseudoInnerProducts
-    ( const elemental::Matrix<C>& xList, const elemental::Matrix<C>& yList,
+    ( const elem::Matrix<C>& xList, const elem::Matrix<C>& yList,
       std::vector<C>& alphaList ) const;
 
     void MultiplyColumns
-    ( elemental::Matrix<C>& xList, const std::vector<C>& deltaList ) const;
+    ( elem::Matrix<C>& xList, const std::vector<C>& deltaList ) const;
     void DivideColumns
-    ( elemental::Matrix<C>& xList, const std::vector<R>& deltaList ) const;
+    ( elem::Matrix<C>& xList, const std::vector<R>& deltaList ) const;
     void AddScaledColumns
     ( const std::vector<C>& deltaList,
-      const elemental::Matrix<C>& xList, elemental::Matrix<C>& yList ) const;
+      const elem::Matrix<C>& xList, elem::Matrix<C>& yList ) const;
     void SubtractScaledColumns
     ( const std::vector<C>& deltaList,
-      const elemental::Matrix<C>& xList, elemental::Matrix<C>& yList ) const;
+      const elem::Matrix<C>& xList, elem::Matrix<C>& yList ) const;
 
-    void Multiply( elemental::Matrix<C>& B ) const;
-    void Precondition( elemental::Matrix<C>& B ) const;
+    void Multiply( elem::Matrix<C>& B ) const;
+    void Precondition( elem::Matrix<C>& B ) const;
 
     // B_i := T_i B_i
-    void SolvePanel( elemental::Matrix<C>& B, int i ) const;
+    void SolvePanel( elem::Matrix<C>& B, int i ) const;
 
     // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
-    void SubdiagonalUpdate( elemental::Matrix<C>& B, int i ) const;
+    void SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const;
 
     // Z := B_i, B_i := 0
     void ExtractPanel
-    ( elemental::Matrix<C>& B, int i, elemental::Matrix<C>& Z ) const;
+    ( elem::Matrix<C>& B, int i, elem::Matrix<C>& Z ) const;
 
     // B_i := -A_{i,i+1} B_{i+1}
-    void MultiplySuperdiagonal( elemental::Matrix<C>& B, int i ) const;
+    void MultiplySuperdiagonal( elem::Matrix<C>& B, int i ) const;
 
     // B_i := B_i + Z
     void UpdatePanel
-    ( elemental::Matrix<C>& B, int i, const elemental::Matrix<C>& Z ) const;
+    ( elem::Matrix<C>& B, int i, const elem::Matrix<C>& Z ) const;
 
     //
     // Information related to the decomposition of the domain into panels
@@ -140,16 +140,16 @@ private:
     int localTopHeight_;
 
     // Symbolic factorizations of each class of panels
-    clique::symbolic::SymmFact 
+    cliq::symbolic::SymmFact 
         bottomSymbolicFact_, 
         leftoverInnerSymbolicFact_, 
         topSymbolicFact_;
 
     // Numeric factorizations of each panel
-    clique::numeric::SymmFrontTree<C> bottomFact_;
-    std::vector<clique::numeric::SymmFrontTree<C>*> fullInnerFacts_;
-    clique::numeric::SymmFrontTree<C> leftoverInnerFact_;
-    clique::numeric::SymmFrontTree<C> topFact_;
+    cliq::numeric::SymmFrontTree<C> bottomFact_;
+    std::vector<cliq::numeric::SymmFrontTree<C>*> fullInnerFacts_;
+    cliq::numeric::SymmFrontTree<C> leftoverInnerFact_;
+    cliq::numeric::SymmFrontTree<C> topFact_;
 
     //
     // Information related to the global sparse matrix
@@ -203,15 +203,15 @@ private:
     // Global sparse helper routines
     //
 
-    clique::numeric::SymmFrontTree<C>& 
+    cliq::numeric::SymmFrontTree<C>& 
     PanelNumericFactorization( int whichPanel );
 
-    const clique::numeric::SymmFrontTree<C>&
+    const cliq::numeric::SymmFrontTree<C>&
     PanelNumericFactorization( int whichPanel ) const;
 
-    clique::symbolic::SymmFact&
+    cliq::symbolic::SymmFact&
     PanelSymbolicFactorization( int whichPanel );
-    const clique::symbolic::SymmFact&
+    const cliq::symbolic::SymmFact&
     PanelSymbolicFactorization( int whichPanel ) const;
 
     int PanelPadding( int whichPanel ) const;
@@ -265,7 +265,7 @@ private:
 
     void GetPanelVelocity
     ( int vOffset, int vSize, 
-      const clique::symbolic::SymmFact& fact,
+      const cliq::symbolic::SymmFact& fact,
       const GridData<R>& velocity,
       std::vector<R>& myPanelVelocity,
       std::vector<int>& offsets,
@@ -274,8 +274,8 @@ private:
 
     void FillPanelFronts
     ( int vOffset, int vSize,
-      const clique::symbolic::SymmFact& symbFact,
-            clique::numeric::SymmFrontTree<C>& fact,
+      const cliq::symbolic::SymmFact& symbFact,
+            cliq::numeric::SymmFrontTree<C>& fact,
       const GridData<R>& velocity,
       const std::vector<R>& myPanelVelocity,
             std::vector<int>& offsets,
@@ -301,13 +301,13 @@ private:
     ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
       int depthTilSerial, int cutoff, int offset );
 
-    void FillOrigPanelStruct( int vSize, clique::symbolic::SymmOrig& S ) const;
+    void FillOrigPanelStruct( int vSize, cliq::symbolic::SymmOrig& S ) const;
     void FillDistOrigPanelStruct
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      clique::symbolic::SymmOrig& S ) const;
+      cliq::symbolic::SymmOrig& S ) const;
     void FillLocalOrigPanelStruct
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      clique::symbolic::SymmOrig& S ) const;
+      cliq::symbolic::SymmOrig& S ) const;
    
     // For use in FillLocalOrigPanelStruct
     struct Box

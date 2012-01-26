@@ -2,7 +2,7 @@
    Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
    of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson, Lexing Ying, and
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
 
    This program is free software: you can redistribute it and/or modify
@@ -49,7 +49,7 @@ enum Stencil { SEVEN_POINT }; // TWENTY_SEVEN_POINT not yet supported
 template<typename R>
 struct FiniteDiffControl
 {
-    typedef typename std::complex<R> C;
+    typedef typename elem::Complex<R> C;
 
     Stencil stencil; // only 7-point supported so far
     int nx, ny, nz;  // number of grid points in each direction

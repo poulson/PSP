@@ -2,7 +2,7 @@
    Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
    of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011 Jack Poulson, Lexing Ying, and
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
 
    This program is free software: you can redistribute it and/or modify
@@ -28,11 +28,11 @@ psp::DistHelmholtz<R>::Initialize
         control_.ny != velocity.YSize() ||
         control_.nz != velocity.ZSize() )
         throw std::logic_error("Velocity grid is incorrect");
-    if( !elemental::mpi::CongruentComms( comm_, velocity.Comm() ) )
+    if( !elem::mpi::CongruentComms( comm_, velocity.Comm() ) )
         throw std::logic_error("Velocity does not have a congruent comm");
     if( velocity.NumScalars() != 1 )
         throw std::logic_error("Velocity grid should have one entry per point");
-    const int commRank = elemental::mpi::CommRank( comm_ );
+    const int commRank = elem::mpi::CommRank( comm_ );
     const R omega = control_.omega;
     const R wx = control_.wx;
     const R wy = control_.wy;
@@ -55,14 +55,14 @@ psp::DistHelmholtz<R>::Initialize
     for( int i=0; i<localSize; ++i )
         maxLocalVelocity=std::max(maxLocalVelocity,localVelocity[i]);
     R maxVelocity;
-    elemental::mpi::AllReduce
-    ( &maxLocalVelocity, &maxVelocity, 1, elemental::mpi::MAX, comm_ );
+    elem::mpi::AllReduce
+    ( &maxLocalVelocity, &maxVelocity, 1, elem::mpi::MAX, comm_ );
     R minLocalVelocity=maxVelocity;
     for( int i=0; i<localSize; ++i )
         minLocalVelocity=std::min(minLocalVelocity,localVelocity[i]);
     R minVelocity;
-    elemental::mpi::AllReduce
-    ( &minLocalVelocity, &minVelocity, 1, elemental::mpi::MIN, comm_ );
+    elem::mpi::AllReduce
+    ( &minLocalVelocity, &minVelocity, 1, elem::mpi::MIN, comm_ );
     const R medianVelocity = (minVelocity+maxVelocity) / 2;
     const R wavelength = 2.0*M_PI*medianVelocity/omega;
     const R maxDimension = std::max(std::max(wx,wy),wz);
@@ -102,7 +102,7 @@ psp::DistHelmholtz<R>::Initialize
     {
         if( commRank == 0 )
             std::cout << "  initializing top panel..." << std::endl;
-        const double startTime = elemental::mpi::Time();
+        const double startTime = elem::mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -115,7 +115,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, topSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elemental::mpi::Time();
+        const double gatherStopTime = elem::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -123,20 +123,20 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, topSymbolicFact_, topFact_,
           velocity, myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elemental::mpi::Time();
+        const double fillStopTime = elem::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
-        clique::numeric::LDL( clique::TRANSPOSE, topSymbolicFact_, topFact_ );
-        const double ldlStopTime = elemental::mpi::Time();
+        cliq::numeric::LDL( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
+        const double ldlStopTime = elem::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode( topFact_, cliq::FEW_RHS_FAST_LDL );
         else
-            clique::numeric::SetSolveMode( topFact_, clique::FEW_RHS );
-        const double redistStopTime = elemental::mpi::Time();
+            cliq::numeric::SetSolveMode( topFact_, cliq::FEW_RHS );
+        const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -161,7 +161,7 @@ psp::DistHelmholtz<R>::Initialize
     {
         if( commRank == 0 )
             std::cout << "  initializing bottom panel..." << std::endl;
-        const double startTime = elemental::mpi::Time();
+        const double startTime = elem::mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -174,7 +174,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, velocity,
           myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elemental::mpi::Time();
+        const double gatherStopTime = elem::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -182,22 +182,22 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elemental::mpi::Time();
+        const double fillStopTime = elem::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
-        clique::numeric::LDL
-        ( clique::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
-        const double ldlStopTime = elemental::mpi::Time();
+        cliq::numeric::LDL
+        ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+        const double ldlStopTime = elem::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            clique::numeric::SetSolveMode
-            ( bottomFact_, clique::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode
+            ( bottomFact_, cliq::FEW_RHS_FAST_LDL );
         else
-            clique::numeric::SetSolveMode( bottomFact_, clique::FEW_RHS );
-        const double redistStopTime = elemental::mpi::Time();
+            cliq::numeric::SetSolveMode( bottomFact_, cliq::FEW_RHS );
+        const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -224,7 +224,7 @@ psp::DistHelmholtz<R>::Initialize
         if( commRank == 0 )
             std::cout << "  initializing inner panel " << k << " of " 
                       << numFullInnerPanels_ << "..." << std::endl;
-        const double startTime = elemental::mpi::Time();
+        const double startTime = elem::mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -238,33 +238,33 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elemental::mpi::Time();
+        const double gatherStopTime = elem::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        fullInnerFacts_[k] = new clique::numeric::SymmFrontTree<C>;
-        clique::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
+        fullInnerFacts_[k] = new cliq::numeric::SymmFrontTree<C>;
+        cliq::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
         FillPanelFronts
         ( vOffset, vSize, bottomSymbolicFact_, fullInnerFact,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elemental::mpi::Time();
+        const double fillStopTime = elem::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         const double ldlStartTime = fillStopTime;
-        clique::numeric::LDL
-        ( clique::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
-        const double ldlStopTime = elemental::mpi::Time();
+        cliq::numeric::LDL
+        ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
+        const double ldlStopTime = elem::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            clique::numeric::SetSolveMode
-            ( fullInnerFact, clique::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode
+            ( fullInnerFact, cliq::FEW_RHS_FAST_LDL );
         else
-            clique::numeric::SetSolveMode
-            ( fullInnerFact, clique::FEW_RHS );
-        const double redistStopTime = elemental::mpi::Time();
+            cliq::numeric::SetSolveMode
+            ( fullInnerFact, cliq::FEW_RHS );
+        const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -289,7 +289,7 @@ psp::DistHelmholtz<R>::Initialize
     {        
         if( commRank == 0 )
             std::cout << "  initializing the leftover panel..." << std::endl;
-        const double startTime = elemental::mpi::Time();
+        const double startTime = elem::mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -303,7 +303,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, leftoverInnerSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elemental::mpi::Time();
+        const double gatherStopTime = elem::mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -311,23 +311,23 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elemental::mpi::Time();
+        const double fillStopTime = elem::mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         const double ldlStartTime = fillStopTime;
-        clique::numeric::LDL
-        ( clique::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
-        const double ldlStopTime = elemental::mpi::Time();
+        cliq::numeric::LDL
+        ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+        const double ldlStopTime = elem::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            clique::numeric::SetSolveMode
-            ( leftoverInnerFact_, clique::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode
+            ( leftoverInnerFact_, cliq::FEW_RHS_FAST_LDL );
         else
-            clique::numeric::SetSolveMode
-            ( leftoverInnerFact_, clique::FEW_RHS );
-        const double redistStopTime = elemental::mpi::Time();
+            cliq::numeric::SetSolveMode
+            ( leftoverInnerFact_, cliq::FEW_RHS );
+        const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -354,7 +354,7 @@ psp::DistHelmholtz<R>::Initialize
             std::cout << "  initializing global sparse matrix...";
             std::cout.flush();
         }
-        const double startTime = elemental::mpi::Time();
+        const double startTime = elem::mpi::Time();
 
         // Gather the velocity for the global sparse matrix
         std::vector<R> myGlobalVelocity;
@@ -378,7 +378,7 @@ psp::DistHelmholtz<R>::Initialize
             FormGlobalRow( alpha, x, y, v, rowOffset );
         }
 
-        const double stopTime = elemental::mpi::Time();
+        const double stopTime = elem::mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -404,7 +404,7 @@ psp::DistHelmholtz<R>::Finalize()
 }
 
 template<typename R>
-std::complex<R>
+elem::Complex<R>
 psp::DistHelmholtz<R>::s1Inv( int x ) const
 {
     const int bx = control_.bx;
@@ -432,7 +432,7 @@ psp::DistHelmholtz<R>::s1Inv( int x ) const
 }
 
 template<typename R>
-std::complex<R>
+elem::Complex<R>
 psp::DistHelmholtz<R>::s2Inv( int y ) const
 {
     const int by = control_.by;
@@ -460,7 +460,7 @@ psp::DistHelmholtz<R>::s2Inv( int y ) const
 }
 
 template<typename R>
-std::complex<R>
+elem::Complex<R>
 psp::DistHelmholtz<R>::s3Inv( int v ) const
 {
     const int bz = control_.bz;
@@ -488,7 +488,7 @@ psp::DistHelmholtz<R>::s3Inv( int v ) const
 }
 
 template<typename R>
-std::complex<R>
+elem::Complex<R>
 psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
     const int bz = control_.bz;
@@ -801,7 +801,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
         std::vector<R>& myGlobalVelocity,
         std::vector<int>& offsets ) const
 {
-    const int commSize = elemental::mpi::CommSize( comm_ );
+    const int commSize = elem::mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we need to recv from each process.
     std::vector<int> recvCounts( commSize, 0 );
@@ -812,7 +812,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &recvCounts[0], 1, 
       &sendCounts[0], 1, comm_ );
 
@@ -838,7 +838,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
         recvIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0], 
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -860,7 +860,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
     sendIndices.clear();
 
     myGlobalVelocity.resize( totalRecvCount );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &sendVelocity[0],     &sendCounts[0], &sendDispls[0],
       &myGlobalVelocity[0], &recvCounts[0], &recvDispls[0], comm_ );
 
@@ -872,7 +872,7 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::GetPanelVelocity
 ( int vOffset, int vSize, 
-  const clique::symbolic::SymmFact& fact,
+  const cliq::symbolic::SymmFact& fact,
   const GridData<R>& velocity,
         std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
@@ -882,7 +882,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int commSize = elemental::mpi::CommSize( comm_ );
+    const int commSize = elem::mpi::CommSize( comm_ );
 
     // Compute the reorderings for the indices in the supernodes in our 
     // local tree
@@ -903,7 +903,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     const int numLocalSupernodes = fact.local.supernodes.size();
     for( int t=0; t<numLocalSupernodes; ++t )
     {
-        const clique::symbolic::LocalSymmFactSupernode& sn = 
+        const cliq::symbolic::LocalSymmFactSupernode& sn = 
             fact.local.supernodes[t];
         const int size = sn.size;
         const int offset = sn.offset;
@@ -921,16 +921,16 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     const int numDistSupernodes = fact.dist.supernodes.size();
     for( int t=1; t<numDistSupernodes; ++t )
     {
-        const clique::symbolic::DistSymmFactSupernode& sn = 
+        const cliq::symbolic::DistSymmFactSupernode& sn = 
             fact.dist.supernodes[t];
-        const clique::Grid& grid = *sn.grid;
+        const cliq::Grid& grid = *sn.grid;
         const int gridCol = grid.MRRank();
         const int gridWidth = grid.Width();
 
         const int size = sn.size;
         const int offset = sn.offset;
         const int localWidth = 
-            elemental::LocalLength( size, gridCol, gridWidth );
+            elem::LocalLength( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
             const int j = gridCol + jLocal*gridWidth;
@@ -944,7 +944,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
         }
     }
     std::vector<int> sendCounts( commSize );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
 
@@ -965,7 +965,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     std::vector<int> recvIndices( totalRecvCount );
     for( int t=0; t<numLocalSupernodes; ++t )
     {
-        const clique::symbolic::LocalSymmFactSupernode& sn = 
+        const cliq::symbolic::LocalSymmFactSupernode& sn = 
             fact.local.supernodes[t];
         const int size = sn.size;
         const int offset = sn.offset;
@@ -982,16 +982,16 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     }
     for( int t=1; t<numDistSupernodes; ++t )
     {
-        const clique::symbolic::DistSymmFactSupernode& sn = 
+        const cliq::symbolic::DistSymmFactSupernode& sn = 
             fact.dist.supernodes[t];
-        const clique::Grid& grid = *sn.grid;
+        const cliq::Grid& grid = *sn.grid;
         const int gridCol = grid.MRRank();
         const int gridWidth = grid.Width();
 
         const int size = sn.size;
         const int offset = sn.offset;
         const int localWidth = 
-            elemental::LocalLength( size, gridCol, gridWidth );
+            elem::LocalLength( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
             const int j = gridCol + jLocal*gridWidth;
@@ -1005,7 +1005,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
         }
     }
     std::vector<int> sendIndices( totalSendCount );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -1030,7 +1030,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     }
     sendIndices.clear();
     myPanelVelocity.resize( totalRecvCount );
-    elemental::mpi::AllToAll
+    elem::mpi::AllToAll
     ( &sendVelocity[0],    &sendCounts[0], &sendDispls[0],
       &myPanelVelocity[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendVelocity.clear();
@@ -1047,7 +1047,7 @@ void psp::DistHelmholtz<R>::LocalReordering
     LocalReorderingRecursion
     ( reordering, offset,
       0, 0, control_.nx, control_.ny, vSize, control_.nx, control_.ny,
-      log2CommSize_, control_.cutoff, elemental::mpi::CommRank(comm_) );
+      log2CommSize_, control_.cutoff, elem::mpi::CommRank(comm_) );
 }
 
 template<typename R>
@@ -1164,8 +1164,8 @@ template<typename R>
 void
 psp::DistHelmholtz<R>::FillPanelFronts
 ( int vOffset, int vSize, 
-  const clique::symbolic::SymmFact& symbFact,
-        clique::numeric::SymmFrontTree<C>& fact,
+  const cliq::symbolic::SymmFact& symbFact,
+        cliq::numeric::SymmFrontTree<C>& fact,
   const GridData<R>& velocity,
   const std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
@@ -1183,8 +1183,8 @@ psp::DistHelmholtz<R>::FillPanelFronts
     fact.local.fronts.resize( numLocalSupernodes );
     for( int t=0; t<numLocalSupernodes; ++t )
     {
-        clique::numeric::LocalSymmFront<C>& front = fact.local.fronts[t];
-        const clique::symbolic::LocalSymmFactSupernode& symbSN = 
+        cliq::numeric::LocalSymmFront<C>& front = fact.local.fronts[t];
+        const cliq::symbolic::LocalSymmFactSupernode& symbSN = 
             symbFact.local.supernodes[t];
 
         // Initialize this front
@@ -1219,17 +1219,17 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
     // Initialize the distributed part of the panel
     const int numDistSupernodes = symbFact.dist.supernodes.size();
-    fact.dist.mode = clique::MANY_RHS;
+    fact.dist.mode = cliq::MANY_RHS;
     fact.dist.fronts.resize( numDistSupernodes );
-    clique::numeric::InitializeDistLeaf( symbFact, fact );
+    cliq::numeric::InitializeDistLeaf( symbFact, fact );
     for( int t=1; t<numDistSupernodes; ++t )
     {
-        clique::numeric::DistSymmFront<C>& front = fact.dist.fronts[t];
-        const clique::symbolic::DistSymmFactSupernode& symbSN = 
+        cliq::numeric::DistSymmFront<C>& front = fact.dist.fronts[t];
+        const cliq::symbolic::DistSymmFactSupernode& symbSN = 
             symbFact.dist.supernodes[t];
 
         // Initialize this front
-        elemental::Grid& grid = *symbSN.grid;
+        elem::Grid& grid = *symbSN.grid;
         const int gridHeight = grid.Height();
         const int gridWidth = grid.Width();
         const int gridRow = grid.MCRank();
