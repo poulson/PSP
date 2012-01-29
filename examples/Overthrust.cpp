@@ -170,39 +170,45 @@ main( int argc, char* argv[] )
         GridData<std::complex<double> > 
             B( 3, Nx, Ny, Nz, XYZ, px, py, pz, comm );
         std::complex<double>* localB = B.LocalBuffer();
+        const double center0[] = { 0.5, 0.5, 0.1 };
+        const double center1[] = { 0.25, 0.25, 0.1 };
+        const double center2[] = { 0.75, 0.75, 0.1 };
+        double arg0[3], arg1[3], arg2[3];
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
             const double zSqueeze = control.wz / control.wx;
             const double Z = zSqueeze * z / (Nz+1.0);
-            const double argZ = (Z-0.1*zSqueeze)*(Z-0.1*zSqueeze);
+            arg0[2] = (Z-center0[2]*zSqueeze)*(Z-center0[2]*zSqueeze);
+            arg1[2] = (Z-center1[2]*zSqueeze)*(Z-center1[2]*zSqueeze);
+            arg2[2] = (Z-center2[2]*zSqueeze)*(Z-center2[2]*zSqueeze);
             for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
                 const int y = yShift + yLocal*py;
                 const double Y = y / (Ny+1.0);
-                const double argYOne = (Y-0.5)*(Y-0.5);
-                const double argYTwo = (Y-0.25)*(Y-0.25);
-                const double argYThree = (Y-0.75)*(Y-0.75);
+                arg0[1] = (Y-center0[1])*(Y-center0[1]);
+                arg1[1] = (Y-center1[1])*(Y-center1[1]);
+                arg2[1] = (Y-center2[1])*(Y-center2[1]);
                 for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                 {
                     const int x = xShift + xLocal*px;
                     const double X = x / (Nx+1.0);
-                    const double argXOne = (X-0.5)*(X-0.5);
-                    const double argXTwo = (X-0.25)*(X-0.25);
-                    const double argXThree = (X-0.75)*(X-0.75);
+                    arg0[0] = (X-center0[0])*(X-center0[0]);
+                    arg1[0] = (X-center1[0])*(X-center1[0]);
+                    arg2[0] = (X-center2[0])*(X-center2[0]);
                     
                     const int localIndex = 
                         3*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
-                    const std::complex<double> fOne = 
-                        Nx*std::exp(-10*Nx*(argXOne+argYOne+argZ));
-                    const std::complex<double> fTwo = 
-                        Nx*std::exp(-10*Nx*(argXTwo+argYTwo+argZ));
-                    const std::complex<double> fThree = 
-                        Nx*std::exp(-10*Nx*(argXThree+argYThree+argZ));
-                    localB[localIndex+0] = fOne;
-                    localB[localIndex+1] = fTwo;
-                    localB[localIndex+2] = fThree;
+                    const std::complex<double> f0 = 
+                        Nx*std::exp(-10*Nx*(arg0[0]+arg0[1]+arg0[2]));
+                    const std::complex<double> f1 = 
+                        Nx*std::exp(-10*Nx*(arg1[0]+arg1[1]+arg1[2]));
+                    const std::complex<double> f2 = 
+                        Nx*std::exp(-10*Nx*(arg2[0]+arg2[1]+arg2[2]));
+                    localB[localIndex+0] = f0;
+                    localB[localIndex+1] = f1;
+                    localB[localIndex+2] = f2;
                 }
             }
         }

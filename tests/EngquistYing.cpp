@@ -109,7 +109,7 @@ main( int argc, char* argv[] )
     control.rightBC = PML;
     control.backBC = PML;
     control.leftBC = PML;
-    control.topBC = DIRICHLET;
+    control.topBC = PML;
 
     try 
     {
@@ -228,39 +228,43 @@ main( int argc, char* argv[] )
 
         GridData<elem::Complex<double> > B( 2, N, N, N, XYZ, px, py, pz, comm );
         elem::Complex<double>* localB = B.LocalBuffer();
-        const double dX = 0;
-        const double dY = sqrt(2.0)/2.0;
-        const double dZ = sqrt(2.0)/2.0;
+        const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
+        const double center0[] = { 0.5, 0.5, 0.25 };
+        const double center1[] = { 0.5, 0.25, 0.25 };
+        double arg0[3];
+        double arg1[3];
         const std::complex<double> imagOne( 0.0, 1.0 );
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
             const double Z = z / (N+1.0);
-            const double argZ = (Z-0.25)*(Z-0.25);
+            arg0[2] = (Z-center0[2])*(Z-center0[2]);
+            arg1[2] = (Z-center1[2])*(Z-center1[2]);
             for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
                 const int y = yShift + yLocal*py;
                 const double Y = y / (N+1.0);
-                const double argYOne = (Y-0.5)*(Y-0.5);
-                const double argYTwo = (Y-0.25)*(Y-0.25);
+                arg0[1] = (Y-center0[1])*(Y-center0[1]);
+                arg1[1] = (Y-center1[1])*(Y-center1[1]);
                 for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                 {
                     const int x = xShift + xLocal*px;
                     const double X = x / (N+1.0);
-                    const double argX = (X-0.5)*(X-0.5);
+                    arg0[0] = (X-center0[0])*(X-center0[0]);
+                    arg1[0] = (X-center1[0])*(X-center1[0]);
                     
                     const int localIndex = 
                         2*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
                     // Use std::complex for std::exp for now...
-                    const std::complex<double> fOne = 
-                        N*std::exp(-N*N*(argX+argYOne+argZ));
-                    const std::complex<double> fTwo = 
-                        N*std::exp(-2*omega*(argX+argYTwo+argZ))*
-                        std::exp(omega*imagOne*(X*dX+Y*dY+Z*dZ));
+                    const std::complex<double> f0 = 
+                        N*std::exp(-N*N*(arg0[0]+arg0[1]+arg0[2]));
+                    const std::complex<double> f1 = 
+                        N*std::exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
+                        std::exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
                     // Convert the std::complex's instead elem::Complex
-                    localB[localIndex+0] = fOne;
-                    localB[localIndex+1] = fTwo;
+                    localB[localIndex+0] = f0;
+                    localB[localIndex+1] = f1;
                 }
             }
         }
