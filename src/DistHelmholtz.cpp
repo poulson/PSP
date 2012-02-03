@@ -46,8 +46,6 @@ psp::DistHelmholtz<R>::DistHelmholtz
     const int nx = control.nx;
     const int ny = control.ny;
     const int nz = control.nz;
-    const int bx = control.bx;
-    const int by = control.by;
     const int bz = control.bz;
     const int numPlanesPerPanel = control.numPlanesPerPanel;
     const bool topHasPML = (control.topBC == PML);
@@ -77,6 +75,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
 #ifndef RELEASE
     if( commRank == 0 )
     {
+        const int bx = control.bx;
+        const int by = control.by;
         std::cout << "nx=" << nx << ", ny=" << ny << ", nz=" << nz << "\n"
                   << "bx=" << bx << ", by=" << by << ", bz=" << bz << "\n"
                   << "# of planes/panel = " << numPlanesPerPanel << "\n"
