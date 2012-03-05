@@ -1113,9 +1113,42 @@ psp::DistHelmholtz<R>::Multiply( elem::Matrix<C>& B ) const
         }
     }
     std::vector<C> recvRhs( totalRecvCount );
+#ifdef USE_CUSTOM_ALLTOALLV_FOR_SPMV
+    int numSends=0,numRecvs=0;
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {
+        if( sendCounts[proc] != 0 )
+            ++numSends;
+        if( recvCounts[proc] != 0 )
+            ++numRecvs;
+    }
+    std::vector<elem::mpi::Status> statuses(numSends+numRecvs);
+    std::vector<elem::mpi::Request> requests(numSends+numRecvs);
+    int rCount=0;
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {
+        int count = recvCounts[proc];
+        int displ = recvDispls[proc];
+        if( count != 0 )
+            elem::mpi::IRecv
+            ( &recvRhs[displ], count, proc, 0, comm_, requests[rCount++] );
+    }
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {
+        int count = sendCounts[proc];
+        int displ = sendDispls[proc];
+        if( count != 0 )
+            elem::mpi::ISend
+            ( &sendRhs[displ], count, proc, 0, comm_, requests[rCount++] );
+    }
+    elem::mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
+    statuses.clear();
+    requests.clear();
+#else
     elem::mpi::AllToAll
     ( &sendRhs[0], &sendCounts[0], &sendDispls[0], 
       &recvRhs[0], &recvCounts[0], &recvDispls[0], comm_ );
+#endif
     sendRhs.clear();
 
     // Run the local multiplies to form the result
@@ -1374,9 +1407,42 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const
     }
 
     std::vector<C> recvBuffer( panelRecvCount*numRhs );
+#ifdef USE_CUSTOM_ALLTOALLV_FOR_SPMV
+    int numSends=0,numRecvs=0;
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {   
+        if( sendCounts[proc] != 0 ) 
+            ++numSends;
+        if( recvCounts[proc] != 0 ) 
+            ++numRecvs;
+    }   
+    std::vector<elem::mpi::Status> statuses(numSends+numRecvs);
+    std::vector<elem::mpi::Request> requests(numSends+numRecvs);
+    int rCount=0;
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {   
+        int count = recvCounts[proc];
+        int displ = recvDispls[proc];
+        if( count != 0 )
+            elem::mpi::IRecv
+            ( &recvBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
+    }
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {
+        int count = sendCounts[proc];
+        int displ = sendDispls[proc];
+        if( count != 0 )
+            elem::mpi::ISend
+            ( &sendBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
+    }
+    elem::mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
+    statuses.clear();
+    requests.clear();
+#else
     elem::mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
+#endif
     sendBuffer.clear();
     sendCounts.clear();
     sendDispls.clear();
@@ -1420,11 +1486,9 @@ psp::DistHelmholtz<R>::ExtractPanel
 
     for( int k=0; k<numRhs; ++k )
     {
-        std::memcpy
-        ( Z.Buffer(0,k), B.LockedBuffer(localPanelOffset,k),
-          localPanelHeight*sizeof(C) );
-        std::memset
-        ( B.Buffer(localPanelOffset,k), 0, localPanelHeight*sizeof(C) );
+        elem::MemCopy
+        ( Z.Buffer(0,k), B.LockedBuffer(localPanelOffset,k), localPanelHeight );
+        elem::MemZero( B.Buffer(localPanelOffset,k), localPanelHeight );
     }
 }
 
@@ -1477,9 +1541,42 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal
         recvDispls[proc] = supdiagRecvDispls_[index]*numRhs;
     }
     std::vector<C> recvBuffer( panelRecvCount*numRhs );
+#ifdef USE_CUSTOM_ALLTOALLV_FOR_SPMV
+    int numSends=0,numRecvs=0;
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {   
+        if( sendCounts[proc] != 0 )
+            ++numSends;
+        if( recvCounts[proc] != 0 )
+            ++numRecvs;
+    }   
+    std::vector<elem::mpi::Status> statuses(numSends+numRecvs);
+    std::vector<elem::mpi::Request> requests(numSends+numRecvs);
+    int rCount=0;
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {
+        int count = recvCounts[proc];
+        int displ = recvDispls[proc];
+        if( count != 0 )
+            elem::mpi::IRecv
+            ( &recvBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
+    }
+    for( unsigned proc=0; proc<commSize; ++proc )
+    {
+        int count = sendCounts[proc];
+        int displ = sendDispls[proc];
+        if( count != 0 )
+            elem::mpi::ISend
+            ( &sendBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
+    }
+    elem::mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
+    statuses.clear();
+    requests.clear();
+#else
     elem::mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
+#endif
     sendBuffer.clear();
     sendCounts.clear();
     sendDispls.clear();
