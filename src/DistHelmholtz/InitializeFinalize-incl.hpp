@@ -133,9 +133,9 @@ psp::DistHelmholtz<R>::Initialize
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            cliq::numeric::SetSolveMode( topFact_, cliq::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
         else
-            cliq::numeric::SetSolveMode( topFact_, cliq::FEW_RHS );
+            cliq::numeric::SetSolveMode( topFact_, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -193,10 +193,9 @@ psp::DistHelmholtz<R>::Initialize
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            cliq::numeric::SetSolveMode
-            ( bottomFact_, cliq::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
         else
-            cliq::numeric::SetSolveMode( bottomFact_, cliq::FEW_RHS );
+            cliq::numeric::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -259,11 +258,9 @@ psp::DistHelmholtz<R>::Initialize
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( accelerate )
-            cliq::numeric::SetSolveMode
-            ( fullInnerFact, cliq::FEW_RHS_FAST_LDL );
+            cliq::numeric::SetSolveMode( fullInnerFact, cliq::FAST_2D_LDL );
         else
-            cliq::numeric::SetSolveMode
-            ( fullInnerFact, cliq::FEW_RHS );
+            cliq::numeric::SetSolveMode( fullInnerFact, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -323,10 +320,10 @@ psp::DistHelmholtz<R>::Initialize
         const double redistStartTime = ldlStopTime;
         if( accelerate )
             cliq::numeric::SetSolveMode
-            ( leftoverInnerFact_, cliq::FEW_RHS_FAST_LDL );
+            ( leftoverInnerFact_, cliq::FAST_2D_LDL );
         else
             cliq::numeric::SetSolveMode
-            ( leftoverInnerFact_, cliq::FEW_RHS );
+            ( leftoverInnerFact_, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -1219,7 +1216,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
 
     // Initialize the distributed part of the panel
     const int numDistSupernodes = symbFact.dist.supernodes.size();
-    fact.dist.mode = cliq::MANY_RHS;
+    fact.dist.mode = cliq::NORMAL_2D;
     fact.dist.fronts.resize( numDistSupernodes );
     cliq::numeric::InitializeDistLeaf( symbFact, fact );
     for( int t=1; t<numDistSupernodes; ++t )
