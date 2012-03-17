@@ -307,11 +307,11 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
     const int commRank = elem::mpi::CommRank( comm_ );
 
     elem::Matrix<C> VInter( localHeight, numRhs*m ), // interwoven
-                         x0List( localHeight, numRhs   ), // contiguous
-                         xList(  localHeight, numRhs   ), // contiguous
-                         wList(  localHeight, numRhs   ), // contiguous
-                         zList(  m+1,         numRhs   ), // contiguous
-                         HList(  m,           m*numRhs ); // contiguous
+                    x0List( localHeight, numRhs   ), // contiguous
+                    xList(  localHeight, numRhs   ), // contiguous
+                    wList(  localHeight, numRhs   ), // contiguous
+                    zList(  m+1,         numRhs   ), // contiguous
+                    HList(  m,           m*numRhs ); // contiguous
 
     // For storing Givens rotations
     elem::Matrix<R> csList( m, numRhs );
@@ -375,7 +375,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
         v0List = wList;
         DivideColumns( v0List, betaList );
 
-        // z := beta e1
+        // z := beta e_0
         zList.SetToZero();
         for( int k=0; k<numRhs; ++k )
             zList.Set(0,k,betaList[k]);
@@ -518,7 +518,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             }
 
             // Generate the new rotation and apply it to our current column
-            // and to z, the rotated beta*e1, then solve for the residual 
+            // and to z, the rotated beta*e_0, then solve for the residual 
             // minimizer
             {
                 if( commRank == 0 )
@@ -654,9 +654,9 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
     const int commRank = elem::mpi::CommRank( comm_ );
 
     elem::Matrix<C> vList( localHeight, numRhs ),
-                         tList( localHeight, numRhs ),
-                         qList( localHeight, numRhs ),
-                         pList( localHeight, numRhs );
+                    tList( localHeight, numRhs ),
+                    qList( localHeight, numRhs ),
+                    pList( localHeight, numRhs );
     std::vector<C> cList( numRhs ),
                    tauList( numRhs ),
                    rhoList( numRhs ),

@@ -80,20 +80,33 @@ psp::DistHelmholtz<R>::Initialize
     const R minPML = std::min(std::min(xPML,yPML),zPML);
     if( commRank == 0 )
     {
-        std::cout << "Min velocity:                " << minVelocity << "\n"
-                  << "Max velocity:                " << maxVelocity << "\n"
-                  << "Median velocity:             " << medianVelocity << "\n"
-                  << "Characteristic wavelength:   " << wavelength << "\n"
-                  << "Max dimension:               " << maxDimension << "\n"
-                  << "# of wavelengths:            " << numWavelengths << "\n"
-                  << "Min points/wavelength:       " << minPPW << "\n"
-                  << "Min PML size in wavelengths: " << minPML << "\n"
-                  << std::endl;
-        if( minPPW < 7 )
-            std::cerr << "WARNING: minimum points/wavelength is very small"
+        if( minPPW < 7 || minPML < 0.6 )
+        {
+            std::cout << "nx:                        " << nx << "\n"
+                      << "ny:                        " << ny << "\n" 
+                      << "nz:                        " << nz << "\n"
+                      << "hx:                        " << hx_ << "\n" 
+                      << "hy:                        " << hy_ << "\n"
+                      << "hz:                        " << hz_ << "\n"
+                      << "bx:                        " << bx << "\n" 
+                      << "by:                        " << by << "\n"
+                      << "bz:                        " << bz << "\n"
+                      << "Min velocity:              " << minVelocity << "\n"
+                      << "Max velocity:              " << maxVelocity << "\n"
+                      << "Median velocity:           " << medianVelocity << "\n"
+                      << "Characteristic wavelength: " << wavelength << "\n"
+                      << "Max dimension:             " << maxDimension << "\n"
+                      << "# of wavelengths:          " << numWavelengths << "\n"
+                      << "Min points/wavelength:     " << minPPW << "\n"
+                      << "Min PML-size/wavelength:   " << minPML << "\n"
                       << std::endl;
-        if( minPML < 0.6 )
-            std::cerr << "WARNING: minimum PML size is very small" << std::endl;
+            if( minPPW < 7 )
+                std::cerr << "WARNING: minimum points/wavelength is very small"
+                          << std::endl;
+            if( minPML < 0.6 )
+                std::cerr << "WARNING: minimum PML size is very small" 
+                          << std::endl;
+        }
     }
 
     //
