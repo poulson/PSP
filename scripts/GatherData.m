@@ -14,9 +14,9 @@
 %
 function[field]=GatherData(fileString,nx,ny,nz,px,py,pz)
 
-xBoxMainSize=nx/px;
-yBoxMainSize=ny/py;
-zBoxMainSize=nz/pz;
+xBoxMainSize=idivide(nx,px,'floor');
+yBoxMainSize=idivide(ny,py,'floor');
+zBoxMainSize=idivide(nz,pz,'floor');
 xBoxLastSize=xBoxMainSize+mod(nx,px);
 yBoxLastSize=yBoxMainSize+mod(ny,py);
 zBoxLastSize=zBoxMainSize+mod(nz,pz);
