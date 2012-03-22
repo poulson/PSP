@@ -46,6 +46,11 @@ for x=0:px-1,
 end
 
 saveFilename=strcat(fileString,'.mat');
-save(saveFilename,'field');
+
+% For MATLAB
+%save(saveFilename,'field');
+
+% For Octave
+save('-mat-binary',saveFilename,'field');
 
 return 
