@@ -1202,8 +1202,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
         const int size = symbSN.size;
         const int updateSize = symbSN.lowerStruct.size();
         const int frontSize = size + updateSize;
-        front.frontL.ResizeTo( frontSize, size );
-        front.frontL.SetToZero();
+        elem::Zeros( frontSize, size, front.frontL );
         for( int j=0; j<size; ++j )
         {
             // Extract the velocity from the recv buffer
@@ -1249,8 +1248,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
         const int updateSize = symbSN.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.front2dL.SetGrid( grid );
-        front.front2dL.ResizeTo( frontSize, size );
-        front.front2dL.SetToZero();
+        elem::Zeros( frontSize, size, front.front2dL );
         const int localSize = front.front2dL.LocalWidth();
         for( int jLocal=0; jLocal<localSize; ++jLocal )
         {

@@ -324,7 +324,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                    relResidNormList( numRhs );
 
     // x := 0
-    xList.SetToZero();
+    elem::MakeZeros( xList );
 
     // w := b (= b - A x_0)
     // origResidNorm := ||w||_2
@@ -376,7 +376,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
         DivideColumns( v0List, betaList );
 
         // z := beta e_0
-        zList.SetToZero();
+        elem::MakeZeros( zList );
         for( int k=0; k<numRhs; ++k )
             zList.Set(0,k,betaList[k]);
 
@@ -711,8 +711,8 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
     // theta := 0
     // rho := v^T q
     qList = tList;
-    bList.SetToZero();
-    pList.SetToZero();
+    elem::MakeZeros( bList );
+    elem::MakeZeros( pList );
     for( int k=0; k<numRhs; ++k )
         thetaList[k] = 0;
     PseudoInnerProducts( vList, qList, rhoList );
@@ -1245,8 +1245,8 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         symbFact.dist.supernodes.back().localOffset1d + 
         symbFact.dist.supernodes.back().localSize1d;
 
-    elem::Matrix<C> localPanelB( localHeight1d, numRhs );
-    localPanelB.SetToZero();
+    elem::Matrix<C> localPanelB;
+    elem::Zeros( localHeight1d, numRhs, localPanelB );
 
     // For each supernode, pull in each right-hand side with a memcpy
     int BOffset = LocalPanelOffset( i );
