@@ -233,7 +233,7 @@ main( int argc, char* argv[] )
         const double center1[] = { 0.5, 0.25, 0.25 };
         double arg0[3];
         double arg1[3];
-        const std::complex<double> imagOne( 0.0, 1.0 );
+        const elem::Complex<double> imagOne( 0.0, 1.0 );
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
@@ -256,15 +256,11 @@ main( int argc, char* argv[] )
                     const int localIndex = 
                         2*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
-                    // Use std::complex for std::exp for now...
-                    const std::complex<double> f0 = 
-                        N*std::exp(-N*N*(arg0[0]+arg0[1]+arg0[2]));
-                    const std::complex<double> f1 = 
-                        N*std::exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
-                        std::exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
-                    // Convert the std::complex's instead elem::Complex
-                    localB[localIndex+0] = f0;
-                    localB[localIndex+1] = f1;
+                    localB[localIndex+0] =
+                        N*elem::Exp(-N*N*(arg0[0]+arg0[1]+arg0[2]));
+                    localB[localIndex+1] = 
+                        N*elem::Exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
+                        elem::Exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
                 }
             }
         }
