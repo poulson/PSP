@@ -37,8 +37,11 @@ void LowerMultiply
 // Implementation begins here                                                 //
 //----------------------------------------------------------------------------//
 
-#include "clique/numeric/local_lower_multiply.hpp"
-#include "clique/numeric/dist_lower_multiply.hpp"
+#include "./lower_multiply/local_front_lower_multiply.hpp"
+#include "./lower_multiply/dist_front_lower_multiply.hpp"
+
+#include "./lower_multiply/local_lower_multiply.hpp"
+#include "./lower_multiply/dist_lower_multiply.hpp"
 
 namespace cliq {
 namespace numeric {

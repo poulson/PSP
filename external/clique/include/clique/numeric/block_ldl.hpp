@@ -17,8 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef CLIQUE_NUMERIC_LDL_HPP
-#define CLIQUE_NUMERIC_LDL_HPP 1
+#ifndef CLIQUE_NUMERIC_BLOCK_LDL_HPP
+#define CLIQUE_NUMERIC_BLOCK_LDL_HPP 1
 
 namespace cliq {
 namespace numeric {
@@ -27,11 +27,7 @@ namespace numeric {
 // original sparse matrix before calling the following factorizations.
 
 template<typename F>
-void InitializeDistLeaf
-( const symbolic::SymmFact& S, numeric::SymmFrontTree<F>& L );
-
-template<typename F>
-void LDL
+void BlockLDL
 ( Orientation orientation, 
   symbolic::SymmFact& S, numeric::SymmFrontTree<F>& L );
 
@@ -42,45 +38,25 @@ void LDL
 // Implementation begins here                                                 //
 //----------------------------------------------------------------------------//
 
-#include "./ldl/local_front_ldl.hpp"
-#include "./ldl/dist_front_ldl.hpp"
+#include "./block_ldl/local_front_block_ldl.hpp"
+#include "./block_ldl/dist_front_block_ldl.hpp"
 
-#include "./ldl/local_ldl.hpp"
-#include "./ldl/dist_ldl.hpp"
+#include "./block_ldl/local_block_ldl.hpp"
+#include "./block_ldl/dist_block_ldl.hpp"
 
 namespace cliq {
 namespace numeric {
 
 template<typename F>
-inline void InitializeDistLeaf
-( const symbolic::SymmFact& S, numeric::SymmFrontTree<F>& L )
-{
-#ifndef RELEASE
-    PushCallStack("numeric::InitializeDistLeaf");
-#endif
-    const symbolic::DistSymmFactSupernode& sn = S.dist.supernodes[0];
-    Matrix<F>& topLocalFrontL = L.local.fronts.back().frontL;
-    DistMatrix<F,MC,MR>& front2dL = L.dist.fronts[0].front2dL;
-
-    front2dL.LockedView
-    ( topLocalFrontL.Height(), topLocalFrontL.Width(), 0, 0,
-      topLocalFrontL.LockedBuffer(), topLocalFrontL.LDim(), 
-      *sn.grid );
-#ifndef RELEASE
-    PopCallStack();
-#endif
-}
-
-template<typename F>
-inline void LDL
+inline void BlockLDL
 ( Orientation orientation, 
   symbolic::SymmFact& S, numeric::SymmFrontTree<F>& L )
 {
 #ifndef RELEASE
-    PushCallStack("numeric::LDL");
+    PushCallStack("numeric::BlockLDL");
 #endif
-    LocalLDL( orientation, S, L );
-    DistLDL( orientation, S, L );
+    LocalBlockLDL( orientation, S, L );
+    DistBlockLDL( orientation, S, L );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -89,4 +65,4 @@ inline void LDL
 } // namespace numeric
 } // namespace cliq
 
-#endif /* CLIQUE_NUMERIC_LDL_HPP */
+#endif /* CLIQUE_NUMERIC_BLOCK_LDL_HPP */
