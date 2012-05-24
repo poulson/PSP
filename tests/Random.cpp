@@ -25,7 +25,7 @@ void Usage()
 {
     std::cout << "Random <nx> <ny> <nz> <omega> <imagShift> <amp> "
                  "<numPlanesPerPanel> <fact blocksize> <solve blocksize> "
-                 "<accelerate?> <SQMR?> <viz?>\n"
+                 "<panelScheme> <SQMR?> <viz?>\n"
               << "  <nx>: Size of grid in x dimension\n"
               << "  <ny>: Size of grid in y dimension\n"
               << "  <nz>: Size of grid in z dimension\n"
@@ -35,7 +35,8 @@ void Usage()
               << "  <numPlanesPerPanel>: Depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
-              << "  <accelerate?>: accelerate solves iff !=0\n"
+              << "  <panel scheme>: NORMAL_1D=0, FAST_2D_LDL=1, "
+                 "COMPRESSED_2D_BLOCK_LDL=2\n"
               << "  <SQMR?>: GMRES iff 0, SQMR otherwise\n"
               << "  <full viz?>:  Full visualization iff != 0\n"
               << std::endl;
@@ -66,7 +67,7 @@ main( int argc, char* argv[] )
     const int numPlanesPerPanel = atoi( argv[argNum++] );
     const int factBlocksize = atoi( argv[argNum++] );
     const int solveBlocksize = atoi( argv[argNum++] );
-    const bool accelerate = atoi( argv[argNum++] );
+    const PanelScheme panelScheme = (PanelScheme)atoi( argv[argNum++] );
     const bool useSQMR = atoi( argv[argNum++] );
     const bool fullVisualize = atoi( argv[argNum++] );
 
@@ -155,7 +156,7 @@ main( int argc, char* argv[] )
             std::cout << "Beginning to initialize..." << std::endl;
         cliq::mpi::Barrier( comm );
         const double initialStartTime = cliq::mpi::Time(); 
-        helmholtz.Initialize( velocity, accelerate );
+        helmholtz.Initialize( velocity, panelScheme );
         cliq::mpi::Barrier( comm );
         const double initialStopTime = cliq::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;

@@ -22,8 +22,9 @@
 template<typename R>
 void
 psp::DistHelmholtz<R>::Initialize
-( const GridData<R>& velocity, bool accelerate )
+( const GridData<R>& velocity, PanelScheme panelScheme )
 {
+    panelScheme_ = panelScheme;
     if( control_.nx != velocity.XSize() ||
         control_.ny != velocity.YSize() ||
         control_.nz != velocity.ZSize() )
@@ -140,14 +141,18 @@ psp::DistHelmholtz<R>::Initialize
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
-        cliq::numeric::LDL( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            cliq::numeric::BlockLDL
+            ( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
+        else
+            cliq::numeric::LDL( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
         const double ldlStopTime = elem::mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
-        if( accelerate )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
-        else
+        else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( topFact_, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
@@ -199,15 +204,19 @@ psp::DistHelmholtz<R>::Initialize
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
-        cliq::numeric::LDL
-        ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            cliq::numeric::BlockLDL
+            ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+        else
+            cliq::numeric::LDL
+            ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
         const double ldlStopTime = elem::mpi::Time();
 
-        // Redistribute the LDL^T factorization for faster solves
+        // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( accelerate )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
-        else
+        else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
@@ -264,15 +273,19 @@ psp::DistHelmholtz<R>::Initialize
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         const double ldlStartTime = fillStopTime;
-        cliq::numeric::LDL
-        ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            cliq::numeric::BlockLDL
+            ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
+        else
+            cliq::numeric::LDL
+            ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
         const double ldlStopTime = elem::mpi::Time();
 
-        // Redistribute the LDL^T factorization for faster solves
+        // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( accelerate )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( fullInnerFact, cliq::FAST_2D_LDL );
-        else
+        else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( fullInnerFact, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();
 
@@ -325,16 +338,20 @@ psp::DistHelmholtz<R>::Initialize
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         const double ldlStartTime = fillStopTime;
-        cliq::numeric::LDL
-        ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            cliq::numeric::BlockLDL
+            ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+        else
+            cliq::numeric::LDL
+            ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
         const double ldlStopTime = elem::mpi::Time();
 
-        // Redistribute the LDL^T factorization for faster solves
+        // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( accelerate )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode
             ( leftoverInnerFact_, cliq::FAST_2D_LDL );
-        else
+        else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode
             ( leftoverInnerFact_, cliq::NORMAL_1D );
         const double redistStopTime = elem::mpi::Time();

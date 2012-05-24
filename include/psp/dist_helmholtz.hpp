@@ -23,6 +23,12 @@
 
 namespace psp {
 
+enum PanelScheme {
+  CLIQUE_NORMAL_1D=0, 
+  CLIQUE_FAST_2D_LDL=1,
+  COMPRESSED_2D_BLOCK_LDL=2
+};
+
 template<typename R>
 class DistHelmholtz
 {
@@ -35,7 +41,8 @@ public:
     ~DistHelmholtz();
 
     // Build the sparse matrix and the preconditioner
-    void Initialize( const GridData<R>& velocity, bool accelerate=true );
+    void Initialize
+    ( const GridData<R>& velocity, PanelScheme panelScheme=CLIQUE_FAST_2D_LDL );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
     void SolveWithSQMR( GridData<C>& B, R bcgRelTol=1e-4 ) const;
@@ -45,6 +52,7 @@ public:
     void Finalize();
 
 private:
+    PanelScheme panelScheme_;
     elem::mpi::Comm comm_;
     unsigned log2CommSize_;
     const FiniteDiffControl<R> control_;

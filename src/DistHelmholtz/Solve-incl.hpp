@@ -1311,8 +1311,13 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
     // Solve against the panel
     const cliq::numeric::SymmFrontTree<C>& fact = 
         PanelNumericFactorization( i );
-    cliq::numeric::LDLSolve
-    ( elem::TRANSPOSE, symbFact, fact, localPanelB );
+    // TODO: This will later be changed to a custom application routine
+    if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
+        cliq::numeric::BlockLDLSolve
+        ( elem::TRANSPOSE, symbFact, fact, localPanelB );
+    else
+        cliq::numeric::LDLSolve
+        ( elem::TRANSPOSE, symbFact, fact, localPanelB );
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );
