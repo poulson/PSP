@@ -19,6 +19,21 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+namespace {
+
+template<typename R>
+void CompressedBlockLDLSolve
+( elem::Orientation orientation, 
+  const cliq::symbolic::SymmFact& symbFact, 
+  const cliq::numeric::SymmFrontTree<elem::Complex<R> >& fact, 
+  elem::Matrix<elem::Complex<R> >& localPanelB )
+{
+    // TODO: Replace this with something which uses the compressed data
+    cliq::numeric::BlockLDLSolve( orientation, symbFact, fact, localPanelB );
+}
+
+} // anonymous namespace
+
 template<typename R>
 void
 psp::DistHelmholtz<R>::SolveWithGMRES
@@ -1313,7 +1328,7 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         PanelNumericFactorization( i );
     // TODO: This will later be changed to a custom application routine
     if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
-        cliq::numeric::BlockLDLSolve
+        CompressedBlockLDLSolve
         ( elem::TRANSPOSE, symbFact, fact, localPanelB );
     else
         cliq::numeric::LDLSolve
