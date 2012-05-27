@@ -23,9 +23,130 @@ namespace {
 
 template<typename R>
 void CompressFronts
-( cliq::numeric::SymmFrontTree<elem::Complex<R> >& frontTree )
+( cliq::numeric::SymmFrontTree<elem::Complex<R> >& L, int depth )
 {
-    // TODO
+    typedef elem::Complex<R> C;
+
+    // Compress the local fronts
+    const int numLocalSupernodes = L.local.fronts.size();
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        elem::Matrix<C>& front = L.local.fronts[t].frontL;
+        const int snSize = front.Width();
+        const int s1 = snSize / depth;
+
+        elem::Matrix<C> A, B;
+        elem::PartitionDown
+        ( front, A,
+                 B, snSize );
+
+        // Compress the top front
+        {
+            const int height = A.Height();
+            const int s2 = height / depth;
+
+            // Shuffle
+            elem::Matrix<C> Z( s1*s2, depth*depth );
+            for( int j2=0; j2<depth; ++j2 )
+                for( int j1=0; j1<depth; ++j1 )
+                    for( int i2=0; i2<s2; ++i2 )
+                        for( int i1=0; i1<s1; ++i1 )
+                            Z.Set( i1+i2*s1, j1+j2*depth, 
+                                   A.Get(i1+j1*depth,i2+j2*depth) );
+
+            // TODO: QR
+        
+            // TODO: SVD
+
+            // TODO: Compress
+
+            // Unshuffle
+            for( int j2=0; j2<depth; ++j2 )
+                for( int j1=0; j1<depth; ++j1 )
+                    for( int i2=0; i2<s2; ++i2 )
+                        for( int i1=0; i1<s1; ++i1 )
+                            A.Set( i1+j1*depth, i2+j2*depth,
+                                   Z.Get(i1+i2*s1,j1+j2*depth) );
+        }
+
+        // Compress the bottom front
+        {
+            const int height = B.Height();
+            const int s2 = height / depth;
+
+            // Shuffle
+            elem::Matrix<C> Z( s1*s2, depth*depth );
+            for( int j2=0; j2<depth; ++j2 )
+                for( int j1=0; j1<depth; ++j1 )
+                    for( int i2=0; i2<s2; ++i2 )
+                        for( int i1=0; i1<s1; ++i1 )
+                            Z.Set( i1+i2*s1, j1+j2*depth, 
+                                   A.Get(i1+j1*depth,i2+j2*depth) );
+
+            // TODO: QR
+        
+            // TODO: SVD
+
+            // TODO: Compress
+
+            // Unshuffle
+            for( int j2=0; j2<depth; ++j2 )
+                for( int j1=0; j1<depth; ++j1 )
+                    for( int i2=0; i2<s2; ++i2 )
+                        for( int i1=0; i1<s1; ++i1 )
+                            A.Set( i1+j1*depth, i2+j2*depth,
+                                   Z.Get(i1+i2*s1,j1+j2*depth) );
+        }
+    }
+
+    // Compress the distributed fronts
+    const int numDistSupernodes = L.dist.fronts.size();
+    for( int t=1; t<numDistSupernodes; ++t )
+    {
+        elem::DistMatrix<C>& front = L.dist.fronts[t].front2dL;
+        const elem::Grid& g = front.Grid();
+        const int snSize = front.Width();
+        const int s1 = snSize / depth;
+
+        elem::DistMatrix<C> A(g), B(g);
+        elem::PartitionDown
+        ( front, A,
+                 B, snSize );
+
+        // Compress the top front
+        {
+            const int height = A.Height();
+            const int s2 = height / depth;
+
+            // TODO: Shuffle
+
+            // TODO: QR
+        
+            // TODO: SVD
+
+            // TODO: Compress
+
+            // TODO: Unshuffle
+
+        }
+
+        // Compress the bottom front
+        {
+            const int height = B.Height();
+            const int s2 = height / depth;
+
+            // TODO: Shuffle
+
+            // TODO: QR
+        
+            // TODO: SVD
+
+            // TODO: Compress
+
+            // TODO: Unshuffle
+
+        }
+    }
 }
 
 } // anonymous namespace
@@ -162,7 +283,7 @@ psp::DistHelmholtz<R>::Initialize
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( topFact_ );
+            CompressFronts( topFact_, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
@@ -228,7 +349,7 @@ psp::DistHelmholtz<R>::Initialize
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( bottomFact_ );
+            CompressFronts( bottomFact_, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
@@ -299,7 +420,7 @@ psp::DistHelmholtz<R>::Initialize
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( fullInnerFact );
+            CompressFronts( fullInnerFact, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( fullInnerFact, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
@@ -356,7 +477,7 @@ psp::DistHelmholtz<R>::Initialize
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( leftoverInnerFact_ );
+            CompressFronts( leftoverInnerFact_, vSize );
         else if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             cliq::numeric::BlockLDL
             ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
