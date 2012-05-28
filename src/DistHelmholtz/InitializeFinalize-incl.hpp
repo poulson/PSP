@@ -21,6 +21,129 @@
 
 namespace {
 
+template<typename Real>
+void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
+{
+    typedef elem::Complex<Real> C;
+
+    const int s1 = A.Height() / depth;
+    const int s2 = A.Width() / depth;
+
+    // Shuffle
+    elem::Matrix<C> Z( s1*s2, depth*depth );
+    for( int j2=0; j2<depth; ++j2 )
+        for( int j1=0; j1<depth; ++j1 )
+            for( int i2=0; i2<s2; ++i2 )
+                for( int i1=0; i1<s1; ++i1 )
+                    Z.Set( i1+i2*s1, j1+j2*depth, 
+                           A.Get(i1+j1*s1,i2+j2*s2) );
+
+    if( Z.Height() >= Z.Width() )
+    {
+        // QR
+        elem::Matrix<C> t;
+        elem::QR( Z, t );
+
+        // SVD
+        elem::Matrix<C> R( Z.Height(), Z.Width() );
+        elem::Matrix<C> ZT;
+        ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
+        elem::Matrix<C> U( ZT );
+        elem::MakeTrapezoidal( elem::LEFT, elem::UPPER, 0, U );
+        elem::Matrix<Real> s;
+        elem::Matrix<C> V;
+        elem::SVD( U, s, V );
+
+        // Compress
+        // TODO: Shorten U, s, and V appropriately
+        elem::DiagonalScale( elem::RIGHT, elem::NORMAL, s, U );
+        elem::Matrix<C> W( Z.Height(), Z.Width() );
+        elem::Matrix<C> WT, WB;
+        elem::PartitionDown
+        ( W, WT,
+             WB, Z.Width() );
+        WT = U;
+        MakeZeros( WB );
+        elem::ApplyPackedReflectors
+        ( elem::LEFT, elem::LOWER, elem::VERTICAL, elem::BACKWARD, 
+          elem::UNCONJUGATED, 0, Z, t, W );
+        elem::Gemm( elem::NORMAL, elem::ADJOINT, (C)1, W, V, (C)0, Z ); 
+    }
+    else
+    {
+        // LQ
+        elem::Matrix<C> t;
+        elem::LQ( Z, t );
+
+        // SVD
+        elem::Matrix<C> L( Z.Height(), Z.Width() );
+        elem::Matrix<C> ZL;
+        ZL.View( Z, 0, 0, Z.Height(), Z.Height() );
+        elem::Matrix<C> U( ZL );
+        elem::MakeTrapezoidal( elem::LEFT, elem::LOWER, 0, U );
+        elem::Matrix<Real> s;
+        elem::Matrix<C> V;
+        elem::SVD( U, s, V );
+
+        // Compress
+        // TODO: Shorten U, s, and V appropriately
+        elem::DiagonalScale( elem::RIGHT, elem::NORMAL, s, U );
+
+        elem::Matrix<C> W( Z.Width(), Z.Height() );
+        elem::Matrix<C> WT, WB;
+        elem::PartitionDown
+        ( W, WT,
+             WB, Z.Height() );
+        WT = V;
+        MakeZeros( WB );
+        elem::ApplyPackedReflectors
+        ( elem::LEFT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD, 
+          elem::CONJUGATED, 0, Z, t, W );
+        elem::Gemm( elem::NORMAL, elem::ADJOINT, (C)1, U, W, (C)0, Z );
+
+        // Alternative approach
+        /*
+        elem::Matrix<C> W( Z.Height(), Z.Width() );
+        elem::Matrix<C> WL, WR;
+        elem::PartitionRight( W, WL, WR, Z.Height() );
+        elem::Adjoint( V, WL );
+        MakeZeros( WR );
+        elem::ApplyPackedReflectors
+        ( elem::RIGHT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD,
+          elem::UNCONJUGATED, 0, Z, t, W );
+        elem::Gemm( elem::NORMAL, elem::NORMAL, (C)1, U, W, (C)0, Z );
+        */
+    }
+
+    // Unshuffle
+    for( int j2=0; j2<depth; ++j2 )
+        for( int j1=0; j1<depth; ++j1 )
+            for( int i2=0; i2<s2; ++i2 )
+                for( int i1=0; i1<s1; ++i1 )
+                    A.Set( i1+j1*s1, i2+j2*s2,
+                           Z.Get(i1+i2*s1,j1+j2*depth) );
+}
+
+template<typename Real>
+void CompressFront
+( elem::DistMatrix<elem::Complex<Real>,elem::MC,elem::MR>& A, int depth )
+{
+    typedef elem::Complex<Real> C;
+
+    const int s1 = A.Height() / depth;
+    const int s2 = A.Width() / depth;
+
+    // TODO: Shuffle
+
+    // TODO: QR
+
+    // TODO: SVD
+
+    // TODO: Compress
+
+    // TODO: Unshuffle
+}
+
 template<typename R>
 void CompressFronts
 ( cliq::numeric::SymmFrontTree<elem::Complex<R> >& L, int depth )
@@ -33,70 +156,15 @@ void CompressFronts
     {
         elem::Matrix<C>& front = L.local.fronts[t].frontL;
         const int snSize = front.Width();
-        const int s1 = snSize / depth;
 
         elem::Matrix<C> A, B;
         elem::PartitionDown
         ( front, A,
                  B, snSize );
 
-        // Compress the top front
-        {
-            const int height = A.Height();
-            const int s2 = height / depth;
-
-            // Shuffle
-            elem::Matrix<C> Z( s1*s2, depth*depth );
-            for( int j2=0; j2<depth; ++j2 )
-                for( int j1=0; j1<depth; ++j1 )
-                    for( int i2=0; i2<s2; ++i2 )
-                        for( int i1=0; i1<s1; ++i1 )
-                            Z.Set( i1+i2*s1, j1+j2*depth, 
-                                   A.Get(i1+j1*depth,i2+j2*depth) );
-
-            // TODO: QR
-        
-            // TODO: SVD
-
-            // TODO: Compress
-
-            // Unshuffle
-            for( int j2=0; j2<depth; ++j2 )
-                for( int j1=0; j1<depth; ++j1 )
-                    for( int i2=0; i2<s2; ++i2 )
-                        for( int i1=0; i1<s1; ++i1 )
-                            A.Set( i1+j1*depth, i2+j2*depth,
-                                   Z.Get(i1+i2*s1,j1+j2*depth) );
-        }
-
-        // Compress the bottom front
-        {
-            const int height = B.Height();
-            const int s2 = height / depth;
-
-            // Shuffle
-            elem::Matrix<C> Z( s1*s2, depth*depth );
-            for( int j2=0; j2<depth; ++j2 )
-                for( int j1=0; j1<depth; ++j1 )
-                    for( int i2=0; i2<s2; ++i2 )
-                        for( int i1=0; i1<s1; ++i1 )
-                            Z.Set( i1+i2*s1, j1+j2*depth, 
-                                   A.Get(i1+j1*depth,i2+j2*depth) );
-
-            // TODO: QR
-        
-            // TODO: SVD
-
-            // TODO: Compress
-
-            // Unshuffle
-            for( int j2=0; j2<depth; ++j2 )
-                for( int j1=0; j1<depth; ++j1 )
-                    for( int i2=0; i2<s2; ++i2 )
-                        for( int i1=0; i1<s1; ++i1 )
-                            A.Set( i1+j1*depth, i2+j2*depth,
-                                   Z.Get(i1+i2*s1,j1+j2*depth) );
-        }
+        // No memory savings, yet
+        CompressFront( A, depth );
+        CompressFront( B, depth );
     }
 
     // Compress the distributed fronts
@@ -106,46 +174,15 @@ void CompressFronts
         elem::DistMatrix<C>& front = L.dist.fronts[t].front2dL;
         const elem::Grid& g = front.Grid();
         const int snSize = front.Width();
-        const int s1 = snSize / depth;
 
         elem::DistMatrix<C> A(g), B(g);
         elem::PartitionDown
         ( front, A,
                  B, snSize );
 
-        // Compress the top front
-        {
-            const int height = A.Height();
-            const int s2 = height / depth;
-
-            // TODO: Shuffle
-
-            // TODO: QR
-        
-            // TODO: SVD
-
-            // TODO: Compress
-
-            // TODO: Unshuffle
-
-        }
-
-        // Compress the bottom front
-        {
-            const int height = B.Height();
-            const int s2 = height / depth;
-
-            // TODO: Shuffle
-
-            // TODO: QR
-        
-            // TODO: SVD
-
-            // TODO: Compress
-
-            // TODO: Unshuffle
-
-        }
+        // No memory savings, yet
+        CompressFront( A, depth );
+        CompressFront( B, depth );
     }
 }
 
@@ -477,8 +514,6 @@ psp::DistHelmholtz<R>::Initialize
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( leftoverInnerFact_, vSize );
-        else if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             cliq::numeric::BlockLDL
             ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
         else
@@ -488,7 +523,9 @@ psp::DistHelmholtz<R>::Initialize
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( panelScheme == CLIQUE_FAST_2D_LDL )
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            CompressFronts( leftoverInnerFact_, vSize );
+        else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode
             ( leftoverInnerFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
