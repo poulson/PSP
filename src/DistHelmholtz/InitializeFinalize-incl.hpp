@@ -21,6 +21,48 @@
 
 namespace {
 
+template<typename R>
+void CompressSVD
+( elem::Matrix<elem::Complex<R> >& U, 
+  elem::Matrix<R>& s, 
+  elem::Matrix<elem::Complex<R> >& V )
+{
+    typedef elem::Complex<R> C;
+    const R tolerance = 0.01;
+    
+    // Compress
+    const R twoNorm = elem::Norm( s, elem::MAX_NORM );
+    const R cutoff = twoNorm*tolerance;
+    const int k = s.Height();
+    int numKeptModes = k;
+    for( int i=1; i<k; ++i )
+    {
+        if( s.Get(i,0) <= cutoff )
+        {
+            numKeptModes = i;
+            break;
+        }
+    }
+    U.ResizeTo( U.Height(), numKeptModes );
+    s.ResizeTo( numKeptModes, 1 );
+    V.ResizeTo( V.Height(), numKeptModes );
+    std::cout << "k=" << k << ", numKeptModes=" 
+              << numKeptModes << std::endl;
+}
+
+template<typename R>
+void Compress( elem::Matrix<elem::Complex<R> >& A )
+{
+    typedef elem::Complex<R> C;
+    elem::Matrix<C> U, V;
+    elem::Matrix<R> s;
+    U = A;
+    elem::SVD( U, s, V );
+    CompressSVD( U, s, V );
+    elem::DiagonalScale( elem::RIGHT, elem::NORMAL, s, U );
+    elem::Gemm( elem::NORMAL, elem::ADJOINT, (C)1, U, V, (C)0, A );
+}
+
 template<typename Real>
 void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
 {
@@ -32,42 +74,47 @@ void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
     // Shuffle
     elem::Matrix<C> Z( s1*s2, depth*depth );
     for( int j2=0; j2<depth; ++j2 )
+    {
         for( int j1=0; j1<depth; ++j1 )
+        {
             for( int i2=0; i2<s2; ++i2 )
-                for( int i1=0; i1<s1; ++i1 )
-                    Z.Set( i1+i2*s1, j1+j2*depth, 
-                           A.Get(i1+j1*s1,i2+j2*s2) );
+            {
+                C* ZCol = Z.Buffer(i2*s1,j1+j2*depth);
+                const C* ACol = A.LockedBuffer(j1*s1,i2+j2*s2);
+                elem::MemCopy( ZCol, ACol, s1 );
+            }
+        }
+    }
 
-    if( Z.Height() >= Z.Width() )
+    if( Z.Height() == Z.Width() )
+    {
+        Compress( Z );
+    }
+    else if( Z.Height() > Z.Width() )
     {
         // QR
         elem::Matrix<C> t;
         elem::QR( Z, t );
 
-        // SVD
-        elem::Matrix<C> R( Z.Height(), Z.Width() );
+        // Compress
         elem::Matrix<C> ZT;
         ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
-        elem::Matrix<C> U( ZT );
-        elem::MakeTrapezoidal( elem::LEFT, elem::UPPER, 0, U );
-        elem::Matrix<Real> s;
-        elem::Matrix<C> V;
-        elem::SVD( U, s, V );
+        elem::Matrix<C> ZTCopy( ZT );
+        elem::MakeTrapezoidal( elem::LEFT, elem::UPPER, 0, ZTCopy );
+        Compress( ZTCopy );
 
-        // Compress
-        // TODO: Shorten U, s, and V appropriately
-        elem::DiagonalScale( elem::RIGHT, elem::NORMAL, s, U );
+        // Reexpand
         elem::Matrix<C> W( Z.Height(), Z.Width() );
         elem::Matrix<C> WT, WB;
         elem::PartitionDown
         ( W, WT,
              WB, Z.Width() );
-        WT = U;
+        WT = ZTCopy;
         MakeZeros( WB );
         elem::ApplyPackedReflectors
         ( elem::LEFT, elem::LOWER, elem::VERTICAL, elem::BACKWARD, 
           elem::UNCONJUGATED, 0, Z, t, W );
-        elem::Gemm( elem::NORMAL, elem::ADJOINT, (C)1, W, V, (C)0, Z ); 
+        Z = W;
     }
     else
     {
@@ -76,52 +123,37 @@ void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
         elem::LQ( Z, t );
 
         // SVD
-        elem::Matrix<C> L( Z.Height(), Z.Width() );
         elem::Matrix<C> ZL;
         ZL.View( Z, 0, 0, Z.Height(), Z.Height() );
-        elem::Matrix<C> U( ZL );
-        elem::MakeTrapezoidal( elem::LEFT, elem::LOWER, 0, U );
-        elem::Matrix<Real> s;
-        elem::Matrix<C> V;
-        elem::SVD( U, s, V );
+        elem::Matrix<C> ZLCopy( ZL );
+        elem::MakeTrapezoidal( elem::LEFT, elem::LOWER, 0, ZLCopy );
+        Compress( ZLCopy );
 
-        // Compress
-        // TODO: Shorten U, s, and V appropriately
-        elem::DiagonalScale( elem::RIGHT, elem::NORMAL, s, U );
-
-        elem::Matrix<C> W( Z.Width(), Z.Height() );
-        elem::Matrix<C> WT, WB;
-        elem::PartitionDown
-        ( W, WT,
-             WB, Z.Height() );
-        WT = V;
-        MakeZeros( WB );
-        elem::ApplyPackedReflectors
-        ( elem::LEFT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD, 
-          elem::CONJUGATED, 0, Z, t, W );
-        elem::Gemm( elem::NORMAL, elem::ADJOINT, (C)1, U, W, (C)0, Z );
-
-        // Alternative approach
-        /*
+        // Reexpand
         elem::Matrix<C> W( Z.Height(), Z.Width() );
         elem::Matrix<C> WL, WR;
         elem::PartitionRight( W, WL, WR, Z.Height() );
-        elem::Adjoint( V, WL );
+        WL = ZLCopy;
         MakeZeros( WR );
         elem::ApplyPackedReflectors
-        ( elem::RIGHT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD,
+        ( elem::RIGHT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD, 
           elem::UNCONJUGATED, 0, Z, t, W );
-        elem::Gemm( elem::NORMAL, elem::NORMAL, (C)1, U, W, (C)0, Z );
-        */
+        Z = W;
     }
 
     // Unshuffle
     for( int j2=0; j2<depth; ++j2 )
+    {
         for( int j1=0; j1<depth; ++j1 )
+        {
             for( int i2=0; i2<s2; ++i2 )
-                for( int i1=0; i1<s1; ++i1 )
-                    A.Set( i1+j1*s1, i2+j2*s2,
-                           Z.Get(i1+i2*s1,j1+j2*depth) );
+            {
+                C* ACol = A.Buffer(j1*s1,i2+j2*s2);
+                const C* ZCol = Z.LockedBuffer(i2*s1,j1+j2*depth);
+                elem::MemCopy( ACol, ZCol, s1 );
+            }
+        }
+    }
 }
 
 template<typename Real>
@@ -130,16 +162,200 @@ void CompressFront
 {
     typedef elem::Complex<Real> C;
 
+    const elem::Grid& grid = A.Grid();
+    const int gridHeight = grid.Height();
+    const int gridWidth = grid.Width();
+    const int gridSize = grid.Size();
+    const int gridRow = grid.Row();
+    const int gridCol = grid.Col();
+    const int gridRank = grid.Rank();
+
     const int s1 = A.Height() / depth;
     const int s2 = A.Width() / depth;
 
-    // TODO: Shuffle
+    //
+    // Shuffle
+    //
+    elem::DistMatrix<C,elem::MC,elem::MR  > Z( grid );
+    elem::DistMatrix<C,elem::VC,elem::STAR> Z_VC_STAR( grid );
+    {
+        // Count the total amount of send data from A
+        std::vector<int> sendCounts( gridSize, 0 );
+        const int ALocalHeight = A.LocalHeight();
+        const int ALocalWidth = A.LocalWidth();
+        const int AColShift = A.ColShift();
+        const int ARowShift = A.RowShift();
+        const int AColStride = A.ColStride();
+        const int ARowStride = A.RowStride();
+        for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
+        {
+            const int j = ARowShift + jLocal*ARowStride;
+            const int j2 = j / s2;
+            const int i2 = j % s2;
 
-    // TODO: QR
+            for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
+            {
+                const int i = AColShift + iLocal*AColStride;
+                const int j1 = i / s1;
+                const int i1 = i % s1;
 
-    // TODO: SVD
+                const int newProc = (i1+i2*s1) % gridSize;
+                ++sendCounts[newProc];
+            }
+        }
 
-    // TODO: Compress
+        // Set up the send displacements and count the total amount
+        int totalSendCount=0;
+        std::vector<int> sendDispls( gridSize );
+        for( int proc=0; proc<gridSize; ++proc )
+        {
+            sendDispls[proc] = totalSendCount;
+            totalSendCount += sendCounts[proc];
+        }
+
+        // Allocate the send buffer and then pack it
+        std::vector<C> sendBuffer( totalSendCount );
+        std::vector<int> offsets = sendDispls;
+        for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
+        {
+            const int j = ARowShift + jLocal*ARowStride;
+            const int j2 = j / s2;
+            const int i2 = j % s2;
+
+            for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
+            {
+                const int i = AColShift + iLocal*AColStride;
+                const int j1 = i / s1;
+                const int i1 = i % s1;
+
+                const int newProc = (i1+i2*s1) % gridSize;
+                const C value = A.GetLocalEntry(iLocal,jLocal);
+                sendBuffer[offsets[newProc]++] = value;
+            }
+        }
+
+        // Count the recv data
+        std::vector<int> recvCounts( gridSize, 0 );
+        const int AColAlignment = A.ColAlignment();
+        const int ARowAlignment = A.RowAlignment();
+        const int ZLocalHeight = elem::LocalLength( s1*s2, gridRank, gridSize );
+        for( int j2=0; j2<depth; ++j2 )
+        {
+            for( int j1=0; j1<depth; ++j1 )
+            {
+                for( int iLocal=0; iLocal<ZLocalHeight; ++iLocal )
+                {
+                    const int i = gridRank + iLocal*gridSize;
+                    const int i1 = i % s1;
+                    const int i2 = i / s1;
+
+                    const int origRow = (i1+j1*s1) % gridHeight;
+                    const int origCol = (i2+j2*s2) % gridWidth;
+                    const int origProc = origRow + origCol*gridHeight;
+                    ++recvCounts[origProc];
+                }
+            }
+        }
+        
+        // Set up the recv displacements and count the total amount
+        int totalRecvCount=0;
+        std::vector<int> recvDispls( gridSize );
+        for( int proc=0; proc<gridSize; ++proc )
+        {
+            recvDispls[proc] = totalRecvCount;
+            totalRecvCount += recvCounts[proc];
+        }
+
+        // Communicate (and free the send data)
+        std::vector<C> recvBuffer( totalRecvCount );
+        elem::mpi::AllToAll
+        ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
+          &recvBuffer[0], &recvCounts[0], &recvDispls[0], grid.Comm() );
+        sendBuffer.clear();
+        sendCounts.clear();
+        sendDispls.clear();
+
+        // Unpack the recv data into Z[VC,* ]
+        Z_VC_STAR.ResizeTo( s1*s2, depth*depth );
+        offsets = recvDispls;
+        for( int j2=0; j2<depth; ++j2 )
+        {
+            for( int j1=0; j1<depth; ++j1 )
+            {
+                for( int iLocal=0; iLocal<ZLocalHeight; ++iLocal )
+                {
+                    const int i = gridRank + iLocal*gridSize;
+                    const int i1 = i % s1;
+                    const int i2 = i / s1;
+
+                    const int origRow = (i1+j1*s1) % gridHeight;
+                    const int origCol = (i2+j2*s2) % gridWidth;
+                    const int origProc = origRow + origCol*gridHeight;
+
+                    const C value = recvBuffer[offsets[origProc]++];
+                    Z_VC_STAR.SetLocalEntry( iLocal, j1+j2*depth, value );
+                }
+            }
+        }
+    }
+    Z = Z_VC_STAR;
+    Z_VC_STAR.Empty();
+
+    if( Z.Height() == Z.Width() )
+    {
+        elem::DistMatrix<C,elem::STAR,elem::STAR> Z_STAR_STAR( Z );
+        Compress( Z_STAR_STAR.LocalMatrix() );
+    }
+    else if( Z.Height() > Z.Width() )
+    {
+        // QR
+        elem::DistMatrix<C,elem::MD,elem::STAR> t( grid );
+        elem::QR( Z, t );
+
+        // Compress
+        elem::DistMatrix<C> ZT( grid );
+        ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
+        elem::DistMatrix<C,elem::STAR,elem::STAR> ZT_STAR_STAR( ZT );
+        elem::MakeTrapezoidal( elem::LEFT, elem::UPPER, 0, ZT_STAR_STAR );
+        Compress( ZT_STAR_STAR.LocalMatrix() );
+
+        // Reexpand
+        elem::DistMatrix<C> W( Z.Height(), Z.Width(), grid );
+        elem::DistMatrix<C> WT( grid ), WB( grid );
+        elem::PartitionDown
+        ( W, WT,
+             WB, Z.Width() );
+        WT = ZT_STAR_STAR;
+        MakeZeros( WB );
+        elem::ApplyPackedReflectors
+        ( elem::LEFT, elem::LOWER, elem::VERTICAL, elem::BACKWARD, 
+          elem::UNCONJUGATED, 0, Z, t, W );
+        Z = W;
+    }
+    else
+    {
+        // LQ
+        elem::DistMatrix<C,elem::MD,elem::STAR> t( grid );
+        elem::LQ( Z, t );
+
+        // SVD
+        elem::DistMatrix<C> ZL( grid );
+        ZL.View( Z, 0, 0, Z.Height(), Z.Height() );
+        elem::DistMatrix<C,elem::STAR,elem::STAR> ZL_STAR_STAR( ZL );
+        elem::MakeTrapezoidal( elem::LEFT, elem::LOWER, 0, ZL_STAR_STAR );
+        Compress( ZL_STAR_STAR.LocalMatrix() );
+
+        // Reexpand
+        elem::DistMatrix<C> W( Z.Height(), Z.Width(), grid );
+        elem::DistMatrix<C> WL( grid ), WR( grid );
+        elem::PartitionRight( W, WL, WR, Z.Height() );
+        WL = ZL_STAR_STAR;
+        MakeZeros( WR );
+        elem::ApplyPackedReflectors
+        ( elem::RIGHT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD, 
+          elem::UNCONJUGATED, 0, Z, t, W );
+        Z = W;
+    }
 
     // TODO: Unshuffle
 }
@@ -164,7 +380,9 @@ void CompressFronts
 
         // No memory savings, yet
         CompressFront( A, depth );
-        CompressFront( B, depth );
+
+        // We will compress B as sparse...
+        //CompressFront( B, depth );
     }
 
     // Compress the distributed fronts
@@ -182,7 +400,9 @@ void CompressFronts
 
         // No memory savings, yet
         CompressFront( A, depth );
-        CompressFront( B, depth );
+
+        // We will compress B as sparse...
+        //CompressFront( B, depth );
     }
 }
 
