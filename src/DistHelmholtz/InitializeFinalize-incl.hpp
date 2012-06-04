@@ -57,8 +57,8 @@ void CompressSVD
   elem::Matrix<elem::Complex<R> >& V )
 {
     typedef elem::Complex<R> C;
-    const R tolerance = 0.01;
-    
+    const R tolerance = 0.02;
+   
     // Compress
     const R twoNorm = elem::Norm( s, elem::MAX_NORM );
     const R cutoff = twoNorm*tolerance;
