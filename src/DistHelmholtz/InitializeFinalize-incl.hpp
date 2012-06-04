@@ -22,6 +22,35 @@
 namespace {
 
 template<typename R>
+int MeasureSparsity( const elem::Matrix<elem::Complex<R> >& A )
+{
+    typedef elem::Complex<R> C;
+    const R tolerance = 1e-15;
+
+    const int height = A.Height();
+    const int width = A.Width();
+    int numNonzeros=0;
+    for( int j=0; j<width; ++j )
+        for( int i=0; i<height; ++i )
+            if( Abs(A.Get(i,j)) > tolerance )
+                ++numNonzeros;
+
+    return numNonzeros;
+}
+
+template<typename R>
+int MeasureSparsity( const elem::DistMatrix<elem::Complex<R> >& A )
+{
+    typedef elem::Complex<R> C;
+    const int numLocalNonzeros = MeasureSparsity( A.LockedLocalMatrix() );
+    int numNonzeros;
+    elem::mpi::AllReduce
+    ( &numLocalNonzeros, &numNonzeros, 1, elem::mpi::SUM, A.Grid().Comm() );
+
+    return numNonzeros;
+}
+
+template<typename R>
 void CompressSVD
 ( elem::Matrix<elem::Complex<R> >& U, 
   elem::Matrix<R>& s, 
@@ -46,8 +75,9 @@ void CompressSVD
     U.ResizeTo( U.Height(), numKeptModes );
     s.ResizeTo( numKeptModes, 1 );
     V.ResizeTo( V.Height(), numKeptModes );
-    std::cout << "k=" << k << ", numKeptModes=" 
-              << numKeptModes << std::endl;
+    std::cout << "kept " << numKeptModes << "/" << k
+              << " modes, " << ((R)100*numKeptModes)/((R)k) << "%"
+              << std::endl;
 }
 
 template<typename R>
@@ -158,7 +188,7 @@ void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
 
 template<typename Real>
 void CompressFront
-( elem::DistMatrix<elem::Complex<Real>,elem::MC,elem::MR>& A, int depth )
+( elem::DistMatrix<elem::Complex<Real> >& A, int depth )
 {
     typedef elem::Complex<Real> C;
 
@@ -176,7 +206,7 @@ void CompressFront
     //
     // Shuffle
     //
-    elem::DistMatrix<C,elem::MC,elem::MR  > Z( grid );
+    elem::DistMatrix<C> Z( grid );
     elem::DistMatrix<C,elem::VC,elem::STAR> Z_VC_STAR( grid );
     {
         // Count the total amount of send data from A
@@ -381,8 +411,13 @@ void CompressFronts
         // No memory savings, yet
         CompressFront( A, depth );
 
-        // We will compress B as sparse...
-        //CompressFront( B, depth );
+        // Also test compressing B as sparse
+        const int numNonzeros = MeasureSparsity( B );
+        const int numEntries = B.Height()*B.Width();
+        const R sparsity = ((R)100*numNonzeros)/((R)numEntries);
+        std::cout << numNonzeros << "/" << numEntries << " entries, " 
+                  << sparsity << "%" << std::endl;
+        CompressFront( B, depth );
     }
 
     // Compress the distributed fronts
@@ -401,8 +436,13 @@ void CompressFronts
         // No memory savings, yet
         CompressFront( A, depth );
 
-        // We will compress B as sparse...
-        //CompressFront( B, depth );
+        // Also test compressing B as sparse
+        const int numNonzeros = MeasureSparsity( B );
+        const int numEntries = B.Height()*B.Width();
+        const R sparsity = ((R)100*numNonzeros)/((R)numEntries);
+        std::cout << numNonzeros << "/" << numEntries << " entries, " 
+                  << sparsity << "%" << std::endl;
+        CompressFront( B, depth );
     }
 }
 
