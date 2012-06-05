@@ -146,7 +146,7 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             velocity.WriteVolume("velocity");
-            elem::mpi::Barrier( comm );
+            mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
         }
@@ -164,12 +164,12 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<elem::Complex<double> > B
+        GridData<Complex<double> > B
         ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
-        elem::Complex<double>* localB = B.LocalBuffer();
+        Complex<double>* localB = B.LocalBuffer();
         std::memset
         ( localB, 0, 
-          xLocalSize*yLocalSize*zLocalSize*sizeof(elem::Complex<double>) );
+          xLocalSize*yLocalSize*zLocalSize*sizeof(Complex<double>) );
         const int xSource = control.nx/2;
         const int ySource = control.ny/2;
         const int zSource = control.nz/2;

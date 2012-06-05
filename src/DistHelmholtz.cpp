@@ -23,9 +23,11 @@
 #include "./DistHelmholtz/InitializeFinalize-incl.hpp"
 #include "./DistHelmholtz/Solve-incl.hpp"
 
+namespace psp {
+
 template<typename R>
-psp::DistHelmholtz<R>::DistHelmholtz
-( const FiniteDiffControl<R>& control, elem::mpi::Comm comm )
+DistHelmholtz<R>::DistHelmholtz
+( const FiniteDiffControl<R>& control, mpi::Comm comm )
 : comm_(comm), control_(control),
   hx_(control.wx/(control.nx+1)),
   hy_(control.wy/(control.ny+1)),
@@ -33,8 +35,8 @@ psp::DistHelmholtz<R>::DistHelmholtz
   initialized_(false)
 {
     // Pull out some information about our communicator
-    const unsigned commRank = elem::mpi::CommRank( comm );
-    const unsigned commSize = elem::mpi::CommSize( comm );
+    const unsigned commRank = mpi::CommRank( comm );
+    const unsigned commSize = mpi::CommSize( comm );
     unsigned temp = commSize;
     log2CommSize_ = 0;
     while( temp >>= 1 )
@@ -145,7 +147,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
         }
     }
     globalSendCounts_.resize( commSize );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &globalRecvCounts_[0], 1,
       &globalSendCounts_[0], 1, comm );
 
@@ -178,7 +180,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     }
     offsets.clear();
     globalSendIndices_.resize( totalSendCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvIndices[0],        &globalRecvCounts_[0], &globalRecvDispls_[0],
       &globalSendIndices_[0], &globalSendCounts_[0], &globalSendDispls_[0], 
       comm );
@@ -231,10 +233,10 @@ psp::DistHelmholtz<R>::DistHelmholtz
     }
     std::vector<int> subdiagSendCountsPerm( (numPanels_-1)*commSize );
     std::vector<int> supdiagSendCountsPerm( (numPanels_-1)*commSize );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &subdiagRecvCountsPerm[0], numPanels_-1,
       &subdiagSendCountsPerm[0], numPanels_-1, comm );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &supdiagRecvCountsPerm[0], numPanels_-1,
       &supdiagSendCountsPerm[0], numPanels_-1, comm );
 
@@ -405,7 +407,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
     // TODO: Think about reducing to a single AllToAll?
     for( int i=0; i<numPanels_-1; ++i )
     {
-        elem::mpi::AllToAll
+        mpi::AllToAll
         ( &subdiagRecvIndices[subdiagPanelRecvDispls_[i]], 
           &subdiagRecvCounts_[i*commSize],
           &subdiagRecvDispls_[i*commSize],
@@ -413,7 +415,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
           &subdiagSendCounts_[i*commSize], 
           &subdiagSendDispls_[i*commSize],
           comm );
-        elem::mpi::AllToAll
+        mpi::AllToAll
         ( &supdiagRecvIndices[supdiagPanelRecvDispls_[i]], 
           &supdiagRecvCounts_[i*commSize], 
           &supdiagRecvDispls_[i*commSize],
@@ -467,7 +469,7 @@ psp::DistHelmholtz<R>::DistHelmholtz
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::LocalPanelHeight
+DistHelmholtz<R>::LocalPanelHeight
 ( int vSize, int vPadding, unsigned commRank ) const
 {
     int localHeight = 0;
@@ -479,7 +481,7 @@ psp::DistHelmholtz<R>::LocalPanelHeight
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::LocalPanelHeightRecursion
+DistHelmholtz<R>::LocalPanelHeightRecursion
 ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
   unsigned teamRank, unsigned depthTilSerial, int& localHeight ) 
 {
@@ -497,10 +499,8 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = 
-            elem::Shift<int>( teamRank, alignment, teamSize );
-        localHeight += 
-            elem::LocalLength<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift<int>( teamRank, alignment, teamSize );
+        localHeight += LocalLength<int>( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSize = (xSize-1) / 2;
@@ -544,10 +544,8 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = 
-            elem::Shift<int>( teamRank, alignment, teamSize );
-        localHeight +=
-            elem::LocalLength<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift<int>( teamRank, alignment, teamSize );
+        localHeight += LocalLength<int>( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSize = (ySize-1) / 2;
@@ -586,7 +584,7 @@ psp::DistHelmholtz<R>::LocalPanelHeightRecursion
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::NumLocalSupernodes( unsigned commRank ) const
+DistHelmholtz<R>::NumLocalSupernodes( unsigned commRank ) const
 {
     int numLocalSupernodes = 0;
     NumLocalSupernodesRecursion
@@ -597,7 +595,7 @@ psp::DistHelmholtz<R>::NumLocalSupernodes( unsigned commRank ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
+DistHelmholtz<R>::NumLocalSupernodesRecursion
 ( int xSize, int ySize, int cutoff, unsigned commRank, unsigned depthTilSerial, 
   int& numLocal ) 
 {
@@ -689,8 +687,8 @@ psp::DistHelmholtz<R>::NumLocalSupernodesRecursion
 }
 
 template<typename R>
-cliq::numeric::SymmFrontTree<elem::Complex<R> >&
-psp::DistHelmholtz<R>::PanelNumericFactorization( int whichPanel )
+cliq::numeric::SymmFrontTree<Complex<R> >&
+DistHelmholtz<R>::PanelNumericFactorization( int whichPanel )
 {
     if( whichPanel == 0 )
         return bottomFact_;
@@ -703,8 +701,8 @@ psp::DistHelmholtz<R>::PanelNumericFactorization( int whichPanel )
 }
 
 template<typename R>
-const cliq::numeric::SymmFrontTree<elem::Complex<R> >&
-psp::DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
+const cliq::numeric::SymmFrontTree<Complex<R> >&
+DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return bottomFact_;
@@ -718,7 +716,7 @@ psp::DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
 
 template<typename R>
 cliq::symbolic::SymmFact&
-psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel )
+DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel )
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomSymbolicFact_;
@@ -730,7 +728,7 @@ psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel )
 
 template<typename R>
 const cliq::symbolic::SymmFact&
-psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel ) const
+DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel ) const
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomSymbolicFact_;
@@ -742,7 +740,7 @@ psp::DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel ) const
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::PanelPadding( int whichPanel ) const
+DistHelmholtz<R>::PanelPadding( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return 0;
@@ -752,7 +750,7 @@ psp::DistHelmholtz<R>::PanelPadding( int whichPanel ) const
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::PanelDepth( int whichPanel ) const
+DistHelmholtz<R>::PanelDepth( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return bottomDepth_;
@@ -766,7 +764,7 @@ psp::DistHelmholtz<R>::PanelDepth( int whichPanel ) const
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::WhichPanel( int v ) const
+DistHelmholtz<R>::WhichPanel( int v ) const
 {
     if( v < bottomDepth_ )
         return 0;
@@ -778,7 +776,7 @@ psp::DistHelmholtz<R>::WhichPanel( int v ) const
 
 template<typename R>
 int 
-psp::DistHelmholtz<R>::LocalV( int v ) const
+DistHelmholtz<R>::LocalV( int v ) const
 {
     if( v < bottomDepth_ )
         return v;
@@ -791,7 +789,7 @@ psp::DistHelmholtz<R>::LocalV( int v ) const
 // Return the lowest v index of the specified panel
 template<typename R>
 int
-psp::DistHelmholtz<R>::PanelV( int whichPanel ) const
+DistHelmholtz<R>::PanelV( int whichPanel ) const
 {
     const int numPlanesPerPanel = control_.numPlanesPerPanel;
     if( whichPanel == 0 )
@@ -809,7 +807,7 @@ psp::DistHelmholtz<R>::PanelV( int whichPanel ) const
 // panel, numbered from the bottom up
 template<typename R>
 int 
-psp::DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
+DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return 0;
@@ -824,7 +822,7 @@ psp::DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
+DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return localBottomHeight_;
@@ -838,7 +836,7 @@ psp::DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::MapLocalPanelIndices
+DistHelmholtz<R>::MapLocalPanelIndices
 ( unsigned commRank, int whichPanel ) 
 {
     const int vSize = PanelDepth( whichPanel );
@@ -853,7 +851,7 @@ psp::DistHelmholtz<R>::MapLocalPanelIndices
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
+DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
   int xOffset, int yOffset, int vOffset, int cutoff, 
   unsigned teamRank, unsigned depthTilSerial,
@@ -948,10 +946,9 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = 
-            elem::Shift<int>( teamRank, alignment, teamSize );
+        const int colShift = Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elem::LocalLength<int>( ySize*vSize, colShift, teamSize );
+            LocalLength<int>( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1034,10 +1031,9 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = 
-            elem::Shift<int>( teamRank, alignment, teamSize );
+        const int colShift = Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elem::LocalLength<int>( xSize*vSize, colShift, teamSize );
+            LocalLength<int>( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1075,7 +1071,7 @@ psp::DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::MapLocalConnectionIndices
+DistHelmholtz<R>::MapLocalConnectionIndices
 ( unsigned commRank, std::vector<int>& localConnections, int whichPanel ) const
 {
     const int vSize = PanelDepth( whichPanel );
@@ -1091,7 +1087,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndices
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
+DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
   int xOffset, int yOffset, int vOffset, int cutoff, 
   unsigned teamRank, unsigned depthTilSerial,
@@ -1176,10 +1172,9 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = 
-            elem::Shift<int>( teamRank, alignment, teamSize );
+        const int colShift = Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elem::LocalLength<int>( ySize*vSize, colShift, teamSize );
+            LocalLength<int>( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1253,10 +1248,9 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int teamSize = 1u<<depthTilSerial;
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = 
-            elem::Shift<int>( teamRank, alignment, teamSize );
+        const int colShift = Shift<int>( teamRank, alignment, teamSize );
         const int localHeight = 
-            elem::LocalLength<int>( xSize*vSize, colShift, teamSize );
+            LocalLength<int>( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1286,7 +1280,7 @@ psp::DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::OwningProcess( int naturalIndex ) const
+DistHelmholtz<R>::OwningProcess( int naturalIndex ) const
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
@@ -1305,7 +1299,7 @@ psp::DistHelmholtz<R>::OwningProcess( int naturalIndex ) const
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::OwningProcess( int x, int y, int v ) const
+DistHelmholtz<R>::OwningProcess( int x, int y, int v ) const
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
@@ -1318,7 +1312,7 @@ psp::DistHelmholtz<R>::OwningProcess( int x, int y, int v ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::OwningProcessRecursion
+DistHelmholtz<R>::OwningProcessRecursion
 ( int x, int y, int vLocal, int xSize, int ySize, unsigned depthToSerial, 
   int& proc )
 {
@@ -1387,7 +1381,7 @@ psp::DistHelmholtz<R>::OwningProcessRecursion
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::ReorderedIndex
+DistHelmholtz<R>::ReorderedIndex
 ( int x, int y, int vLocal, int vSize ) const
 {
     int index = 
@@ -1399,7 +1393,7 @@ psp::DistHelmholtz<R>::ReorderedIndex
 
 template<typename R>
 int
-psp::DistHelmholtz<R>::ReorderedIndexRecursion
+DistHelmholtz<R>::ReorderedIndexRecursion
 ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
   int depthTilSerial, int cutoff, int offset )
 {
@@ -1455,7 +1449,7 @@ psp::DistHelmholtz<R>::ReorderedIndexRecursion
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FillOrigPanelStruct
+DistHelmholtz<R>::FillOrigPanelStruct
 ( int vSize, cliq::symbolic::SymmOrig& S ) const
 {
     int nxSub=control_.nx, nySub=control_.ny, xOffset=0, yOffset=0;    
@@ -1465,14 +1459,14 @@ psp::DistHelmholtz<R>::FillOrigPanelStruct
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FillDistOrigPanelStruct
+DistHelmholtz<R>::FillDistOrigPanelStruct
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
   cliq::symbolic::SymmOrig& S ) const
 {
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int cutoff = control_.cutoff;
-    const unsigned commRank = elem::mpi::CommRank( comm_ );
+    const unsigned commRank = mpi::CommRank( comm_ );
     S.dist.comm = comm_;
     // Fill the distributed nodes
     for( int s=log2CommSize_; s>0; --s )
@@ -1701,7 +1695,7 @@ psp::DistHelmholtz<R>::FillDistOrigPanelStruct
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FillLocalOrigPanelStruct
+DistHelmholtz<R>::FillLocalOrigPanelStruct
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
   cliq::symbolic::SymmOrig& S ) const
 {
@@ -1907,6 +1901,8 @@ psp::DistHelmholtz<R>::FillLocalOrigPanelStruct
         }
     }
 }
+
+} // namespace psp
 
 template class psp::DistHelmholtz<float>;
 template class psp::DistHelmholtz<double>;

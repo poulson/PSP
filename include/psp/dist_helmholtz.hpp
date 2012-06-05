@@ -33,10 +33,10 @@ template<typename R>
 class DistHelmholtz
 {
 public:
-    typedef elem::Complex<R> C;
+    typedef Complex<R> C;
 
     DistHelmholtz
-    ( const FiniteDiffControl<R>& control, elem::mpi::Comm comm );
+    ( const FiniteDiffControl<R>& control, mpi::Comm comm );
 
     ~DistHelmholtz();
 
@@ -53,7 +53,7 @@ public:
 
 private:
     PanelScheme panelScheme_;
-    elem::mpi::Comm comm_;
+    mpi::Comm comm_;
     unsigned log2CommSize_;
     const FiniteDiffControl<R> control_;
     const R hx_, hy_, hz_; // grid spacings
@@ -66,15 +66,11 @@ private:
     // Solve helpers
     //
 
-    void PullRightHandSides
-    ( const GridData<C>& gridB, elem::Matrix<C>& B ) const;
-    void PushRightHandSides
-    ( GridData<C>& gridB, const elem::Matrix<C>& B ) const;
+    void PullRightHandSides( const GridData<C>& gridB, Matrix<C>& B ) const;
+    void PushRightHandSides( GridData<C>& gridB, const Matrix<C>& B ) const;
 
-    void InternalSolveWithGMRES
-    ( elem::Matrix<C>& B, int m, R relTol ) const;
-    void InternalSolveWithSQMR
-    ( elem::Matrix<C>& B, R bcgRelTol ) const;
+    void InternalSolveWithGMRES( Matrix<C>& B, int m, R relTol ) const;
+    void InternalSolveWithSQMR( Matrix<C>& B, R bcgRelTol ) const;
 
     bool CheckForNaN( R alpha ) const;
     bool CheckForNaN( C alpha ) const;
@@ -83,48 +79,45 @@ private:
     bool CheckForZero( const std::vector<R>& alpha ) const;
     bool CheckForZero( const std::vector<C>& alpha ) const;
 
-    void Norms
-    ( const elem::Matrix<C>& xList, std::vector<R>& normList ) const;
+    void Norms( const Matrix<C>& xList, std::vector<R>& normList ) const;
     void InnerProducts
-    ( const elem::Matrix<C>& xList, const elem::Matrix<C>& yList,
+    ( const Matrix<C>& xList, const Matrix<C>& yList,
       std::vector<C>& alphaList ) const;
 
     void PseudoNorms
-    ( const elem::Matrix<C>& xList, std::vector<C>& pseudoNormList ) const;
+    ( const Matrix<C>& xList, std::vector<C>& pseudoNormList ) const;
     void PseudoInnerProducts
-    ( const elem::Matrix<C>& xList, const elem::Matrix<C>& yList,
+    ( const Matrix<C>& xList, const Matrix<C>& yList,
       std::vector<C>& alphaList ) const;
 
     void MultiplyColumns
-    ( elem::Matrix<C>& xList, const std::vector<C>& deltaList ) const;
+    ( Matrix<C>& xList, const std::vector<C>& deltaList ) const;
     void DivideColumns
-    ( elem::Matrix<C>& xList, const std::vector<R>& deltaList ) const;
+    ( Matrix<C>& xList, const std::vector<R>& deltaList ) const;
     void AddScaledColumns
     ( const std::vector<C>& deltaList,
-      const elem::Matrix<C>& xList, elem::Matrix<C>& yList ) const;
+      const Matrix<C>& xList, Matrix<C>& yList ) const;
     void SubtractScaledColumns
     ( const std::vector<C>& deltaList,
-      const elem::Matrix<C>& xList, elem::Matrix<C>& yList ) const;
+      const Matrix<C>& xList, Matrix<C>& yList ) const;
 
-    void Multiply( elem::Matrix<C>& B ) const;
-    void Precondition( elem::Matrix<C>& B ) const;
+    void Multiply( Matrix<C>& B ) const;
+    void Precondition( Matrix<C>& B ) const;
 
     // B_i := T_i B_i
-    void SolvePanel( elem::Matrix<C>& B, int i ) const;
+    void SolvePanel( Matrix<C>& B, int i ) const;
 
     // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
-    void SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const;
+    void SubdiagonalUpdate( Matrix<C>& B, int i ) const;
 
     // Z := B_i, B_i := 0
-    void ExtractPanel
-    ( elem::Matrix<C>& B, int i, elem::Matrix<C>& Z ) const;
+    void ExtractPanel( Matrix<C>& B, int i, Matrix<C>& Z ) const;
 
     // B_i := -A_{i,i+1} B_{i+1}
-    void MultiplySuperdiagonal( elem::Matrix<C>& B, int i ) const;
+    void MultiplySuperdiagonal( Matrix<C>& B, int i ) const;
 
     // B_i := B_i + Z
-    void UpdatePanel
-    ( elem::Matrix<C>& B, int i, const elem::Matrix<C>& Z ) const;
+    void UpdatePanel( Matrix<C>& B, int i, const Matrix<C>& Z ) const;
 
     //
     // Information related to the decomposition of the domain into panels

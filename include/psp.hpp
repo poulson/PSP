@@ -23,6 +23,40 @@
 
 #include "clique.hpp"
 
+namespace psp {
+
+// Pull in some of Elemental's imported libraries
+namespace blas = elem::blas;
+namespace lapack = elem::lapack;
+namespace mpi = elem::mpi;
+
+// Pull in a number of useful enums from Elemental
+using namespace elem::unit_or_non_unit_wrapper;
+using namespace elem::distribution_wrapper;
+using namespace elem::orientation_wrapper;
+using namespace elem::upper_or_lower_wrapper;
+using namespace elem::left_or_right_wrapper;
+using namespace elem::vertical_or_horizontal_wrapper;
+using namespace elem::forward_or_backward_wrapper;
+using namespace elem::conjugation_wrapper;
+
+// Pull in a few classes from Elemental
+using elem::Complex;
+using elem::Matrix;
+using elem::Grid;
+using elem::DistMatrix;
+
+// Pull in a few indexing functions
+using elem::LocalLength;
+using elem::Shift;
+
+// Pull in a few scalar math functions
+using elem::Abs;
+using elem::Conj;
+using elem::Exp;
+
+} // namespace psp
+
 #include "psp/config.h"
 #include "psp/finite_diff_control.hpp"
 #include "psp/grid_data.hpp"

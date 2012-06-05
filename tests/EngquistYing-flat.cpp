@@ -213,7 +213,7 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             velocity.WriteVolume("velocity");
-            elem::mpi::Barrier( comm );
+            mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
         }
@@ -231,15 +231,14 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<elem::Complex<double> > 
-            B( 2, N, N, N/8, XYZ, px, py, pz, comm );
-        elem::Complex<double>* localB = B.LocalBuffer();
+        GridData<Complex<double> > B( 2, N, N, N/8, XYZ, px, py, pz, comm );
+        Complex<double>* localB = B.LocalBuffer();
         const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
         const double center0[] = { 0.5, 0.5, 0.25/8 };
         const double center1[] = { 0.5, 0.25, 0.25/8 };
         double arg0[3];
         double arg1[3];
-        const elem::Complex<double> imagOne( 0.0, 1.0 );
+        const Complex<double> imagOne( 0.0, 1.0 );
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
@@ -263,10 +262,10 @@ main( int argc, char* argv[] )
                         2*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
                     localB[localIndex+0] = 
-                        N*elem::Exp(-N*N*(arg0[0]+arg0[1]+arg0[2]));
+                        N*Exp(-N*N*(arg0[0]+arg0[1]+arg0[2]));
                     localB[localIndex+1] = 
-                        N*elem::Exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
-                        elem::Exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
+                        N*Exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
+                        Exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
                 }
             }
         }

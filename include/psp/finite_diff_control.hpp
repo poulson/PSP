@@ -49,7 +49,7 @@ enum Stencil { SEVEN_POINT }; // TWENTY_SEVEN_POINT not yet supported
 template<typename R>
 struct FiniteDiffControl
 {
-    typedef typename elem::Complex<R> C;
+    typedef Complex<R> C;
 
     Stencil stencil; // only 7-point supported so far
     int nx, ny, nz;  // number of grid points in each direction

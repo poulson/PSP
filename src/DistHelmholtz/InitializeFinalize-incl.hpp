@@ -19,13 +19,15 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-namespace {
+namespace psp {
+
+namespace internal {
 
 template<typename R>
-int MeasureSparsity( const elem::Matrix<elem::Complex<R> >& A )
+int MeasureSparsity( const Matrix<Complex<R> >& A, const R norm )
 {
-    typedef elem::Complex<R> C;
-    const R tolerance = 1e-15;
+    typedef Complex<R> C;
+    const R tolerance = 1e-15*norm;
 
     const int height = A.Height();
     const int width = A.Width();
@@ -39,24 +41,23 @@ int MeasureSparsity( const elem::Matrix<elem::Complex<R> >& A )
 }
 
 template<typename R>
-int MeasureSparsity( const elem::DistMatrix<elem::Complex<R> >& A )
+int MeasureSparsity( const DistMatrix<Complex<R> >& A, R norm )
 {
-    typedef elem::Complex<R> C;
-    const int numLocalNonzeros = MeasureSparsity( A.LockedLocalMatrix() );
+    typedef Complex<R> C;
+    const int numLocalNonzeros = 
+        MeasureSparsity( A.LockedLocalMatrix(), norm );
     int numNonzeros;
-    elem::mpi::AllReduce
-    ( &numLocalNonzeros, &numNonzeros, 1, elem::mpi::SUM, A.Grid().Comm() );
+    mpi::AllReduce
+    ( &numLocalNonzeros, &numNonzeros, 1, mpi::SUM, A.Grid().Comm() );
 
     return numNonzeros;
 }
 
 template<typename R>
 void CompressSVD
-( elem::Matrix<elem::Complex<R> >& U, 
-  elem::Matrix<R>& s, 
-  elem::Matrix<elem::Complex<R> >& V )
+( Matrix<Complex<R> >& U, Matrix<R>& s, Matrix<Complex<R> >& V )
 {
-    typedef elem::Complex<R> C;
+    typedef Complex<R> C;
     const R tolerance = 0.02;
    
     // Compress
@@ -81,28 +82,28 @@ void CompressSVD
 }
 
 template<typename R>
-void Compress( elem::Matrix<elem::Complex<R> >& A )
+void Compress( Matrix<Complex<R> >& A )
 {
-    typedef elem::Complex<R> C;
-    elem::Matrix<C> U, V;
-    elem::Matrix<R> s;
+    typedef Complex<R> C;
+    Matrix<C> U, V;
+    Matrix<R> s;
     U = A;
     elem::SVD( U, s, V );
     CompressSVD( U, s, V );
-    elem::DiagonalScale( elem::RIGHT, elem::NORMAL, s, U );
-    elem::Gemm( elem::NORMAL, elem::ADJOINT, (C)1, U, V, (C)0, A );
+    elem::DiagonalScale( RIGHT, NORMAL, s, U );
+    elem::Gemm( NORMAL, ADJOINT, (C)1, U, V, (C)0, A );
 }
 
 template<typename Real>
-void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
+void CompressFront( Matrix<Complex<Real> >& A, int depth )
 {
-    typedef elem::Complex<Real> C;
+    typedef Complex<Real> C;
 
     const int s1 = A.Height() / depth;
     const int s2 = A.Width() / depth;
 
     // Shuffle
-    elem::Matrix<C> Z( s1*s2, depth*depth );
+    Matrix<C> Z( s1*s2, depth*depth );
     for( int j2=0; j2<depth; ++j2 )
     {
         for( int j1=0; j1<depth; ++j1 )
@@ -123,51 +124,49 @@ void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
     else if( Z.Height() > Z.Width() )
     {
         // QR
-        elem::Matrix<C> t;
+        Matrix<C> t;
         elem::QR( Z, t );
 
         // Compress
-        elem::Matrix<C> ZT;
+        Matrix<C> ZT;
         ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
-        elem::Matrix<C> ZTCopy( ZT );
-        elem::MakeTrapezoidal( elem::LEFT, elem::UPPER, 0, ZTCopy );
+        Matrix<C> ZTCopy( ZT );
+        elem::MakeTrapezoidal( LEFT, UPPER, 0, ZTCopy );
         Compress( ZTCopy );
 
         // Reexpand
-        elem::Matrix<C> W( Z.Height(), Z.Width() );
-        elem::Matrix<C> WT, WB;
+        Matrix<C> W( Z.Height(), Z.Width() );
+        Matrix<C> WT, WB;
         elem::PartitionDown
         ( W, WT,
              WB, Z.Width() );
         WT = ZTCopy;
         MakeZeros( WB );
         elem::ApplyPackedReflectors
-        ( elem::LEFT, elem::LOWER, elem::VERTICAL, elem::BACKWARD, 
-          elem::UNCONJUGATED, 0, Z, t, W );
+        ( LEFT, LOWER, VERTICAL, BACKWARD, UNCONJUGATED, 0, Z, t, W );
         Z = W;
     }
     else
     {
         // LQ
-        elem::Matrix<C> t;
+        Matrix<C> t;
         elem::LQ( Z, t );
 
         // SVD
-        elem::Matrix<C> ZL;
+        Matrix<C> ZL;
         ZL.View( Z, 0, 0, Z.Height(), Z.Height() );
-        elem::Matrix<C> ZLCopy( ZL );
-        elem::MakeTrapezoidal( elem::LEFT, elem::LOWER, 0, ZLCopy );
+        Matrix<C> ZLCopy( ZL );
+        elem::MakeTrapezoidal( LEFT, LOWER, 0, ZLCopy );
         Compress( ZLCopy );
 
         // Reexpand
-        elem::Matrix<C> W( Z.Height(), Z.Width() );
-        elem::Matrix<C> WL, WR;
+        Matrix<C> W( Z.Height(), Z.Width() );
+        Matrix<C> WL, WR;
         elem::PartitionRight( W, WL, WR, Z.Height() );
         WL = ZLCopy;
         MakeZeros( WR );
         elem::ApplyPackedReflectors
-        ( elem::RIGHT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD, 
-          elem::UNCONJUGATED, 0, Z, t, W );
+        ( RIGHT, UPPER, HORIZONTAL, BACKWARD, UNCONJUGATED, 0, Z, t, W );
         Z = W;
     }
 
@@ -187,12 +186,11 @@ void CompressFront( elem::Matrix<elem::Complex<Real> >& A, int depth )
 }
 
 template<typename Real>
-void CompressFront
-( elem::DistMatrix<elem::Complex<Real> >& A, int depth )
+void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
 {
-    typedef elem::Complex<Real> C;
+    typedef Complex<Real> C;
 
-    const elem::Grid& grid = A.Grid();
+    const Grid& grid = A.Grid();
     const int gridHeight = grid.Height();
     const int gridWidth = grid.Width();
     const int gridSize = grid.Size();
@@ -206,8 +204,8 @@ void CompressFront
     //
     // Shuffle
     //
-    elem::DistMatrix<C> Z( grid );
-    elem::DistMatrix<C,elem::VC,elem::STAR> Z_VC_STAR( grid );
+    DistMatrix<C> Z( grid );
+    DistMatrix<C,VC,STAR> Z_VC_STAR( grid );
     {
         // Count the total amount of send data from A
         std::vector<int> sendCounts( gridSize, 0 );
@@ -268,7 +266,7 @@ void CompressFront
         std::vector<int> recvCounts( gridSize, 0 );
         const int AColAlignment = A.ColAlignment();
         const int ARowAlignment = A.RowAlignment();
-        const int ZLocalHeight = elem::LocalLength( s1*s2, gridRank, gridSize );
+        const int ZLocalHeight = LocalLength( s1*s2, gridRank, gridSize );
         for( int j2=0; j2<depth; ++j2 )
         {
             for( int j1=0; j1<depth; ++j1 )
@@ -298,7 +296,7 @@ void CompressFront
 
         // Communicate (and free the send data)
         std::vector<C> recvBuffer( totalRecvCount );
-        elem::mpi::AllToAll
+        mpi::AllToAll
         ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], grid.Comm() );
         sendBuffer.clear();
@@ -333,57 +331,55 @@ void CompressFront
 
     if( Z.Height() == Z.Width() )
     {
-        elem::DistMatrix<C,elem::STAR,elem::STAR> Z_STAR_STAR( Z );
+        DistMatrix<C,STAR,STAR> Z_STAR_STAR( Z );
         Compress( Z_STAR_STAR.LocalMatrix() );
     }
     else if( Z.Height() > Z.Width() )
     {
         // QR
-        elem::DistMatrix<C,elem::MD,elem::STAR> t( grid );
+        DistMatrix<C,MD,STAR> t( grid );
         elem::QR( Z, t );
 
         // Compress
-        elem::DistMatrix<C> ZT( grid );
+        DistMatrix<C> ZT( grid );
         ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
-        elem::DistMatrix<C,elem::STAR,elem::STAR> ZT_STAR_STAR( ZT );
-        elem::MakeTrapezoidal( elem::LEFT, elem::UPPER, 0, ZT_STAR_STAR );
+        DistMatrix<C,STAR,STAR> ZT_STAR_STAR( ZT );
+        elem::MakeTrapezoidal( LEFT, UPPER, 0, ZT_STAR_STAR );
         Compress( ZT_STAR_STAR.LocalMatrix() );
 
         // Reexpand
-        elem::DistMatrix<C> W( Z.Height(), Z.Width(), grid );
-        elem::DistMatrix<C> WT( grid ), WB( grid );
+        DistMatrix<C> W( Z.Height(), Z.Width(), grid );
+        DistMatrix<C> WT( grid ), WB( grid );
         elem::PartitionDown
         ( W, WT,
              WB, Z.Width() );
         WT = ZT_STAR_STAR;
         MakeZeros( WB );
         elem::ApplyPackedReflectors
-        ( elem::LEFT, elem::LOWER, elem::VERTICAL, elem::BACKWARD, 
-          elem::UNCONJUGATED, 0, Z, t, W );
+        ( LEFT, LOWER, VERTICAL, BACKWARD, UNCONJUGATED, 0, Z, t, W );
         Z = W;
     }
     else
     {
         // LQ
-        elem::DistMatrix<C,elem::MD,elem::STAR> t( grid );
+        DistMatrix<C,MD,STAR> t( grid );
         elem::LQ( Z, t );
 
         // SVD
-        elem::DistMatrix<C> ZL( grid );
+        DistMatrix<C> ZL( grid );
         ZL.View( Z, 0, 0, Z.Height(), Z.Height() );
-        elem::DistMatrix<C,elem::STAR,elem::STAR> ZL_STAR_STAR( ZL );
-        elem::MakeTrapezoidal( elem::LEFT, elem::LOWER, 0, ZL_STAR_STAR );
+        DistMatrix<C,STAR,STAR> ZL_STAR_STAR( ZL );
+        elem::MakeTrapezoidal( LEFT, LOWER, 0, ZL_STAR_STAR );
         Compress( ZL_STAR_STAR.LocalMatrix() );
 
         // Reexpand
-        elem::DistMatrix<C> W( Z.Height(), Z.Width(), grid );
-        elem::DistMatrix<C> WL( grid ), WR( grid );
+        DistMatrix<C> W( Z.Height(), Z.Width(), grid );
+        DistMatrix<C> WL( grid ), WR( grid );
         elem::PartitionRight( W, WL, WR, Z.Height() );
         WL = ZL_STAR_STAR;
         MakeZeros( WR );
         elem::ApplyPackedReflectors
-        ( elem::RIGHT, elem::UPPER, elem::HORIZONTAL, elem::BACKWARD, 
-          elem::UNCONJUGATED, 0, Z, t, W );
+        ( RIGHT, UPPER, HORIZONTAL, BACKWARD, UNCONJUGATED, 0, Z, t, W );
         Z = W;
     }
 
@@ -392,18 +388,18 @@ void CompressFront
 
 template<typename R>
 void CompressFronts
-( cliq::numeric::SymmFrontTree<elem::Complex<R> >& L, int depth )
+( cliq::numeric::SymmFrontTree<Complex<R> >& L, int depth )
 {
-    typedef elem::Complex<R> C;
+    typedef Complex<R> C;
 
     // Compress the local fronts
     const int numLocalSupernodes = L.local.fronts.size();
     for( int t=0; t<numLocalSupernodes; ++t )
     {
-        elem::Matrix<C>& front = L.local.fronts[t].frontL;
+        Matrix<C>& front = L.local.fronts[t].frontL;
         const int snSize = front.Width();
 
-        elem::Matrix<C> A, B;
+        Matrix<C> A, B;
         elem::PartitionDown
         ( front, A,
                  B, snSize );
@@ -412,7 +408,8 @@ void CompressFronts
         CompressFront( A, depth );
 
         // Also test compressing B as sparse
-        const int numNonzeros = MeasureSparsity( B );
+        const R infNorm = elem::Norm( B, elem::INFINITY_NORM );
+        const int numNonzeros = MeasureSparsity( B, infNorm );
         const int numEntries = B.Height()*B.Width();
         const R sparsity = ((R)100*numNonzeros)/((R)numEntries);
         std::cout << numNonzeros << "/" << numEntries << " entries, " 
@@ -424,11 +421,11 @@ void CompressFronts
     const int numDistSupernodes = L.dist.fronts.size();
     for( int t=1; t<numDistSupernodes; ++t )
     {
-        elem::DistMatrix<C>& front = L.dist.fronts[t].front2dL;
-        const elem::Grid& g = front.Grid();
+        DistMatrix<C>& front = L.dist.fronts[t].front2dL;
+        const Grid& g = front.Grid();
         const int snSize = front.Width();
 
-        elem::DistMatrix<C> A(g), B(g);
+        DistMatrix<C> A(g), B(g);
         elem::PartitionDown
         ( front, A,
                  B, snSize );
@@ -437,7 +434,8 @@ void CompressFronts
         CompressFront( A, depth );
 
         // Also test compressing B as sparse
-        const int numNonzeros = MeasureSparsity( B );
+        const R infNorm = elem::Norm( B, elem::INFINITY_NORM );
+        const int numNonzeros = MeasureSparsity( B, infNorm );
         const int numEntries = B.Height()*B.Width();
         const R sparsity = ((R)100*numNonzeros)/((R)numEntries);
         std::cout << numNonzeros << "/" << numEntries << " entries, " 
@@ -446,11 +444,11 @@ void CompressFronts
     }
 }
 
-} // anonymous namespace
+} // namespace internal
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Initialize
+DistHelmholtz<R>::Initialize
 ( const GridData<R>& velocity, PanelScheme panelScheme )
 {
     panelScheme_ = panelScheme;
@@ -458,11 +456,11 @@ psp::DistHelmholtz<R>::Initialize
         control_.ny != velocity.YSize() ||
         control_.nz != velocity.ZSize() )
         throw std::logic_error("Velocity grid is incorrect");
-    if( !elem::mpi::CongruentComms( comm_, velocity.Comm() ) )
+    if( !mpi::CongruentComms( comm_, velocity.Comm() ) )
         throw std::logic_error("Velocity does not have a congruent comm");
     if( velocity.NumScalars() != 1 )
         throw std::logic_error("Velocity grid should have one entry per point");
-    const int commRank = elem::mpi::CommRank( comm_ );
+    const int commRank = mpi::CommRank( comm_ );
     const R omega = control_.omega;
     const R wx = control_.wx;
     const R wy = control_.wy;
@@ -485,14 +483,12 @@ psp::DistHelmholtz<R>::Initialize
     for( int i=0; i<localSize; ++i )
         maxLocalVelocity=std::max(maxLocalVelocity,localVelocity[i]);
     R maxVelocity;
-    elem::mpi::AllReduce
-    ( &maxLocalVelocity, &maxVelocity, 1, elem::mpi::MAX, comm_ );
+    mpi::AllReduce( &maxLocalVelocity, &maxVelocity, 1, mpi::MAX, comm_ );
     R minLocalVelocity=maxVelocity;
     for( int i=0; i<localSize; ++i )
         minLocalVelocity=std::min(minLocalVelocity,localVelocity[i]);
     R minVelocity;
-    elem::mpi::AllReduce
-    ( &minLocalVelocity, &minVelocity, 1, elem::mpi::MIN, comm_ );
+    mpi::AllReduce( &minLocalVelocity, &minVelocity, 1, mpi::MIN, comm_ );
     const R medianVelocity = (minVelocity+maxVelocity) / 2;
     const R wavelength = 2.0*M_PI*medianVelocity/omega;
     const R maxDimension = std::max(std::max(wx,wy),wz);
@@ -545,7 +541,7 @@ psp::DistHelmholtz<R>::Initialize
     {
         if( commRank == 0 )
             std::cout << "  initializing top panel..." << std::endl;
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -558,7 +554,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, topSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elem::mpi::Time();
+        const double gatherStopTime = mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -566,7 +562,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, topSymbolicFact_, topFact_,
           velocity, myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elem::mpi::Time();
+        const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
@@ -575,17 +571,17 @@ psp::DistHelmholtz<R>::Initialize
             ( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
         else
             cliq::numeric::LDL( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
-        const double ldlStopTime = elem::mpi::Time();
+        const double ldlStopTime = mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( topFact_, vSize );
+            internal::CompressFronts( topFact_, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( topFact_, cliq::NORMAL_1D );
-        const double redistStopTime = elem::mpi::Time();
+        const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -610,7 +606,7 @@ psp::DistHelmholtz<R>::Initialize
     {
         if( commRank == 0 )
             std::cout << "  initializing bottom panel..." << std::endl;
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -623,7 +619,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, velocity,
           myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elem::mpi::Time();
+        const double gatherStopTime = mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -631,7 +627,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elem::mpi::Time();
+        const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
@@ -641,17 +637,17 @@ psp::DistHelmholtz<R>::Initialize
         else
             cliq::numeric::LDL
             ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
-        const double ldlStopTime = elem::mpi::Time();
+        const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( bottomFact_, vSize );
+            internal::CompressFronts( bottomFact_, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
-        const double redistStopTime = elem::mpi::Time();
+        const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -678,7 +674,7 @@ psp::DistHelmholtz<R>::Initialize
         if( commRank == 0 )
             std::cout << "  initializing inner panel " << k << " of " 
                       << numFullInnerPanels_ << "..." << std::endl;
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -692,7 +688,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elem::mpi::Time();
+        const double gatherStopTime = mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -702,7 +698,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, bottomSymbolicFact_, fullInnerFact,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elem::mpi::Time();
+        const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         const double ldlStartTime = fillStopTime;
@@ -712,17 +708,17 @@ psp::DistHelmholtz<R>::Initialize
         else
             cliq::numeric::LDL
             ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
-        const double ldlStopTime = elem::mpi::Time();
+        const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( fullInnerFact, vSize );
+            internal::CompressFronts( fullInnerFact, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( fullInnerFact, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( fullInnerFact, cliq::NORMAL_1D );
-        const double redistStopTime = elem::mpi::Time();
+        const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -747,7 +743,7 @@ psp::DistHelmholtz<R>::Initialize
     {        
         if( commRank == 0 )
             std::cout << "  initializing the leftover panel..." << std::endl;
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
@@ -761,7 +757,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, leftoverInnerSymbolicFact_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
-        const double gatherStopTime = elem::mpi::Time();
+        const double gatherStopTime = mpi::Time();
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
@@ -769,7 +765,7 @@ psp::DistHelmholtz<R>::Initialize
         ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
           velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
-        const double fillStopTime = elem::mpi::Time();
+        const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         const double ldlStartTime = fillStopTime;
@@ -779,19 +775,19 @@ psp::DistHelmholtz<R>::Initialize
         else
             cliq::numeric::LDL
             ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
-        const double ldlStopTime = elem::mpi::Time();
+        const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressFronts( leftoverInnerFact_, vSize );
+            internal::CompressFronts( leftoverInnerFact_, vSize );
         else if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode
             ( leftoverInnerFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode
             ( leftoverInnerFact_, cliq::NORMAL_1D );
-        const double redistStopTime = elem::mpi::Time();
+        const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
         if( commRank == 0 )
@@ -818,7 +814,7 @@ psp::DistHelmholtz<R>::Initialize
             std::cout << "  initializing global sparse matrix...";
             std::cout.flush();
         }
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         // Gather the velocity for the global sparse matrix
         std::vector<R> myGlobalVelocity;
@@ -842,7 +838,7 @@ psp::DistHelmholtz<R>::Initialize
             FormGlobalRow( alpha, x, y, v, rowOffset );
         }
 
-        const double stopTime = elem::mpi::Time();
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -850,7 +846,7 @@ psp::DistHelmholtz<R>::Initialize
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Finalize()
+DistHelmholtz<R>::Finalize()
 {
     // Release the global sparse matrix memory
     localEntries_.clear();
@@ -868,8 +864,8 @@ psp::DistHelmholtz<R>::Finalize()
 }
 
 template<typename R>
-elem::Complex<R>
-psp::DistHelmholtz<R>::s1Inv( int x ) const
+Complex<R>
+DistHelmholtz<R>::s1Inv( int x ) const
 {
     const int bx = control_.bx;
     const R etax = bx*hx_;
@@ -896,8 +892,8 @@ psp::DistHelmholtz<R>::s1Inv( int x ) const
 }
 
 template<typename R>
-elem::Complex<R>
-psp::DistHelmholtz<R>::s2Inv( int y ) const
+Complex<R>
+DistHelmholtz<R>::s2Inv( int y ) const
 {
     const int by = control_.by;
     const R etay = by*hy_;
@@ -924,8 +920,8 @@ psp::DistHelmholtz<R>::s2Inv( int y ) const
 }
 
 template<typename R>
-elem::Complex<R>
-psp::DistHelmholtz<R>::s3Inv( int v ) const
+Complex<R>
+DistHelmholtz<R>::s3Inv( int v ) const
 {
     const int bz = control_.bz;
     const R etaz = bz*hz_;
@@ -952,8 +948,8 @@ psp::DistHelmholtz<R>::s3Inv( int v ) const
 }
 
 template<typename R>
-elem::Complex<R>
-psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
+Complex<R>
+DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
     const int bz = control_.bz;
     const R etaz = bz*hz_;
@@ -981,7 +977,7 @@ psp::DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FormGlobalRow
+DistHelmholtz<R>::FormGlobalRow
 ( R alpha, int x, int y, int v, int row )
 {
     // Evaluate all of the inverse s functions
@@ -1041,7 +1037,7 @@ psp::DistHelmholtz<R>::FormGlobalRow
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
+DistHelmholtz<R>::FormLowerColumnOfSupernode
 ( R alpha, int x, int y, int v, int vOffset, int vSize, 
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 
@@ -1260,12 +1256,12 @@ psp::DistHelmholtz<R>::FormLowerColumnOfSupernode
         
 template<typename R>
 void
-psp::DistHelmholtz<R>::GetGlobalVelocity
+DistHelmholtz<R>::GetGlobalVelocity
 ( const GridData<R>& velocity,
         std::vector<R>& myGlobalVelocity,
         std::vector<int>& offsets ) const
 {
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we need to recv from each process.
     std::vector<int> recvCounts( commSize, 0 );
@@ -1276,7 +1272,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvCounts[0], 1, 
       &sendCounts[0], 1, comm_ );
 
@@ -1302,7 +1298,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
         recvIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0], 
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -1324,7 +1320,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
     sendIndices.clear();
 
     myGlobalVelocity.resize( totalRecvCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendVelocity[0],     &sendCounts[0], &sendDispls[0],
       &myGlobalVelocity[0], &recvCounts[0], &recvDispls[0], comm_ );
 
@@ -1334,7 +1330,7 @@ psp::DistHelmholtz<R>::GetGlobalVelocity
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::GetPanelVelocity
+DistHelmholtz<R>::GetPanelVelocity
 ( int vOffset, int vSize, 
   const cliq::symbolic::SymmFact& fact,
   const GridData<R>& velocity,
@@ -1346,7 +1342,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     const int nx = control_.nx;
     const int ny = control_.ny;
     const int nz = control_.nz;
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
 
     // Compute the reorderings for the indices in the supernodes in our 
     // local tree
@@ -1393,8 +1389,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
 
         const int size = sn.size;
         const int offset = sn.offset;
-        const int localWidth = 
-            elem::LocalLength( size, gridCol, gridWidth );
+        const int localWidth = LocalLength( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
             const int j = gridCol + jLocal*gridWidth;
@@ -1408,7 +1403,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
         }
     }
     std::vector<int> sendCounts( commSize );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
 
@@ -1454,8 +1449,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
 
         const int size = sn.size;
         const int offset = sn.offset;
-        const int localWidth = 
-            elem::LocalLength( size, gridCol, gridWidth );
+        const int localWidth = LocalLength( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
             const int j = gridCol + jLocal*gridWidth;
@@ -1469,7 +1463,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
         }
     }
     std::vector<int> sendIndices( totalSendCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -1494,7 +1488,7 @@ psp::DistHelmholtz<R>::GetPanelVelocity
     }
     sendIndices.clear();
     myPanelVelocity.resize( totalRecvCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendVelocity[0],    &sendCounts[0], &sendDispls[0],
       &myPanelVelocity[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendVelocity.clear();
@@ -1504,18 +1498,18 @@ psp::DistHelmholtz<R>::GetPanelVelocity
 }
 
 template<typename R>
-void psp::DistHelmholtz<R>::LocalReordering
+void DistHelmholtz<R>::LocalReordering
 ( std::map<int,int>& reordering, int vSize ) const
 {
     int offset = 0;
     LocalReorderingRecursion
     ( reordering, offset,
       0, 0, control_.nx, control_.ny, vSize, control_.nx, control_.ny,
-      log2CommSize_, control_.cutoff, elem::mpi::CommRank(comm_) );
+      log2CommSize_, control_.cutoff, mpi::CommRank(comm_) );
 }
 
 template<typename R>
-void psp::DistHelmholtz<R>::LocalReorderingRecursion
+void DistHelmholtz<R>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
   int depthTilSerial, int cutoff, unsigned commRank )
@@ -1626,7 +1620,7 @@ void psp::DistHelmholtz<R>::LocalReorderingRecursion
 
 template<typename R>        
 void
-psp::DistHelmholtz<R>::FillPanelFronts
+DistHelmholtz<R>::FillPanelFronts
 ( int vOffset, int vSize, 
   const cliq::symbolic::SymmFact& symbFact,
         cliq::numeric::SymmFrontTree<C>& fact,
@@ -1692,7 +1686,7 @@ psp::DistHelmholtz<R>::FillPanelFronts
             symbFact.dist.supernodes[t];
 
         // Initialize this front
-        elem::Grid& grid = *symbSN.grid;
+        Grid& grid = *symbSN.grid;
         const int gridHeight = grid.Height();
         const int gridWidth = grid.Width();
         const int gridRow = grid.MCRank();
@@ -1737,4 +1731,6 @@ psp::DistHelmholtz<R>::FillPanelFronts
         }
     }
 }
+
+} // namespace psp
 

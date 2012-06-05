@@ -19,43 +19,45 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-namespace {
+namespace psp {
+
+namespace internal {
 
 template<typename R>
 void CompressedBlockLDLSolve
-( elem::Orientation orientation, 
+( Orientation orientation, 
   const cliq::symbolic::SymmFact& symbFact, 
-  const cliq::numeric::SymmFrontTree<elem::Complex<R> >& fact, 
-  elem::Matrix<elem::Complex<R> >& localPanelB )
+  const cliq::numeric::SymmFrontTree<Complex<R> >& fact, 
+  Matrix<Complex<R> >& localPanelB )
 {
     // TODO: Replace this with something which uses the compressed data
     cliq::numeric::BlockLDLSolve( orientation, symbFact, fact, localPanelB );
 }
 
-} // anonymous namespace
+} // namespace internal
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithGMRES
+DistHelmholtz<R>::SolveWithGMRES
 ( GridData<C>& gridB, int m, R relTol ) const
 {
-    if( !elem::mpi::CongruentComms( comm_, gridB.Comm() ) )
+    if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
-    const int commRank = elem::mpi::CommRank( comm_ );
+    const int commRank = mpi::CommRank( comm_ );
 
     // Convert B into custom nested-dissection based ordering
-    elem::Matrix<C> B;
+    Matrix<C> B;
     {
         if( commRank == 0 )
         {
             std::cout << "  pulling right-hand sides...";
             std::cout.flush();
         }
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         PullRightHandSides( gridB, B );
 
-        const double stopTime = elem::mpi::Time();
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -70,11 +72,11 @@ psp::DistHelmholtz<R>::SolveWithGMRES
             std::cout << "  pushing right-hand sides...";
             std::cout.flush();
         }
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         PushRightHandSides( gridB, B );
 
-        const double stopTime = elem::mpi::Time();
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -82,25 +84,25 @@ psp::DistHelmholtz<R>::SolveWithGMRES
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
+DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
 {
-    if( !elem::mpi::CongruentComms( comm_, gridB.Comm() ) )
+    if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
-    const int commRank = elem::mpi::CommRank( comm_ );
+    const int commRank = mpi::CommRank( comm_ );
 
     // Convert B into custom nested-dissection based ordering
-    elem::Matrix<C> B;
+    Matrix<C> B;
     {
         if( commRank == 0 )
         {
             std::cout << "  pulling right-hand sides...";
             std::cout.flush();
         }
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         PullRightHandSides( gridB, B );
 
-        const double stopTime = elem::mpi::Time();
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -115,11 +117,11 @@ psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
             std::cout << "  pushing right-hand sides...";
             std::cout.flush();
         }
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
 
         PushRightHandSides( gridB, B );
 
-        const double stopTime = elem::mpi::Time();
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -127,10 +129,10 @@ psp::DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::PullRightHandSides
-( const GridData<C>& gridB, elem::Matrix<C>& B ) const
+DistHelmholtz<R>::PullRightHandSides
+( const GridData<C>& gridB, Matrix<C>& B ) const
 {
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we will need to recv
     std::vector<int> recvCounts( commSize, 0 );
@@ -141,7 +143,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvCounts[0], 1,
       &sendCounts[0], 1, comm_ );
 
@@ -166,7 +168,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
         recvIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> sendIndices( totalSendCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
     recvIndices.clear();
@@ -201,7 +203,7 @@ psp::DistHelmholtz<R>::PullRightHandSides
     }
     sendIndices.clear();
     std::vector<C> recvB( totalRecvCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendB[0], &sendCounts[0], &sendDispls[0], 
       &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendB.clear();
@@ -221,11 +223,11 @@ psp::DistHelmholtz<R>::PullRightHandSides
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::PushRightHandSides
-( GridData<C>& gridB, const elem::Matrix<C>& B ) const
+DistHelmholtz<R>::PushRightHandSides
+( GridData<C>& gridB, const Matrix<C>& B ) const
 {
     const int numRhs = gridB.NumScalars();
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
 
     // Pack and send the amount of data that we will need to send.
     std::vector<int> sendCounts( commSize, 0 );
@@ -236,7 +238,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
         ++sendCounts[proc];
     }
     std::vector<int> recvCounts( commSize );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendCounts[0], 1, 
       &recvCounts[0], 1, comm_ );
 
@@ -262,7 +264,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
         sendIndices[offsets[proc]++] = naturalIndex;
     }
     std::vector<int> recvIndices( totalRecvCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendIndices[0], &sendCounts[0], &sendDispls[0], 
       &recvIndices[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendIndices.clear();
@@ -290,7 +292,7 @@ psp::DistHelmholtz<R>::PushRightHandSides
         offsets[proc] += numRhs;
     }
     std::vector<C> recvB( totalRecvCount );
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendB[0], &sendCounts[0], &sendDispls[0],
       &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
     sendB.clear();
@@ -314,23 +316,23 @@ psp::DistHelmholtz<R>::PushRightHandSides
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::InternalSolveWithGMRES
-( elem::Matrix<C>& bList, int m, R relTol ) const
+DistHelmholtz<R>::InternalSolveWithGMRES
+( Matrix<C>& bList, int m, R relTol ) const
 {
     const int numRhs = bList.Width();
     const int localHeight = bList.Height();
-    const int commRank = elem::mpi::CommRank( comm_ );
+    const int commRank = mpi::CommRank( comm_ );
 
-    elem::Matrix<C> VInter( localHeight, numRhs*m ), // interwoven
-                    x0List( localHeight, numRhs   ), // contiguous
-                    xList(  localHeight, numRhs   ), // contiguous
-                    wList(  localHeight, numRhs   ), // contiguous
-                    zList(  m+1,         numRhs   ), // contiguous
-                    HList(  m,           m*numRhs ); // contiguous
+    Matrix<C> VInter( localHeight, numRhs*m ), // interwoven
+              x0List( localHeight, numRhs   ), // contiguous
+              xList(  localHeight, numRhs   ), // contiguous
+              wList(  localHeight, numRhs   ), // contiguous
+              zList(  m+1,         numRhs   ), // contiguous
+              HList(  m,           m*numRhs ); // contiguous
 
     // For storing Givens rotations
-    elem::Matrix<R> csList( m, numRhs );
-    elem::Matrix<C> snList( m, numRhs );
+    Matrix<R> csList( m, numRhs );
+    Matrix<C> snList( m, numRhs );
 
     // Various scalars
     std::vector<C> alphaList( numRhs );
@@ -363,19 +365,19 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
         // beta := ||w||_2
         {
 #ifndef RELEASE
-            elem::mpi::Barrier( comm_ );
+            mpi::Barrier( comm_ );
 #endif
             if( commRank == 0 )
             {
                 std::cout << "  startup preconditioner application...";
                 std::cout.flush();
             }
-            const double startTime = elem::mpi::Time();
+            const double startTime = mpi::Time();
             Precondition( wList );
 #ifndef RELEASE
-            elem::mpi::Barrier( comm_ );
+            mpi::Barrier( comm_ );
 #endif
-            const double stopTime = elem::mpi::Time();
+            const double stopTime = mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
         }
@@ -385,7 +387,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             throw std::runtime_error("beta list had a NaN");
 
         // v0 := w / beta
-        elem::Matrix<C> v0List;
+        Matrix<C> v0List;
         v0List.View( VInter, 0, 0, localHeight, numRhs );
         v0List = wList;
         DivideColumns( v0List, betaList );
@@ -398,24 +400,24 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
         for( int j=0; j<m; ++j )
         {
             // w := A v_j
-            elem::Matrix<C> vjList;
+            Matrix<C> vjList;
             vjList.LockedView( VInter, 0, j*numRhs, localHeight, numRhs );
             wList = vjList;
             {
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
                 if( commRank == 0 )
                 {
                     std::cout << "    multiplying...";
                     std::cout.flush();
                 }
-                const double startTime = elem::mpi::Time();
+                const double startTime = mpi::Time();
                 Multiply( wList );
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
-                const double stopTime = elem::mpi::Time();
+                const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
@@ -433,12 +435,12 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "    preconditioning...";
                     std::cout.flush();
                 }
-                const double startTime = elem::mpi::Time();
+                const double startTime = mpi::Time();
                 Precondition( wList );
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
-                const double stopTime = elem::mpi::Time();
+                const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
@@ -456,11 +458,11 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "    Arnoldi step...";
                     std::cout.flush();
                 }
-                const double startTime = elem::mpi::Time();
+                const double startTime = mpi::Time();
                 for( int i=0; i<=j; ++i )
                 {
                     // H(i,j) := v_i' w
-                    elem::Matrix<C> viList;
+                    Matrix<C> viList;
                     viList.LockedView
                     ( VInter, 0, i*numRhs, localHeight, numRhs );
                     InnerProducts( viList, wList, alphaList );
@@ -487,16 +489,16 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                 }
                 if( j+1 != m )
                 {
-                    elem::Matrix<C> vjp1List;
+                    Matrix<C> vjp1List;
                     vjp1List.View
                     ( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
                 }
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
-                const double stopTime = elem::mpi::Time();
+                const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
@@ -508,16 +510,16 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "    applying previous rotations...";
                     std::cout.flush();
                 }
-                const double startTime = elem::mpi::Time();
+                const double startTime = mpi::Time();
                 for( int k=0; k<numRhs; ++k )
                 {
-                    elem::Matrix<C> H;
+                    Matrix<C> H;
                     H.View( HList, 0, k*m, j+1, j+1 );
                     for( int i=0; i<j; ++i )
                     {
                         const R c = csList.Get(i,k);
                         const C s = snList.Get(i,k);
-                        const C sConj = elem::Conj(s);
+                        const C sConj = Conj(s);
                         const C eta_i_j = H.Get(i,j);
                         const C eta_ip1_j = H.Get(i+1,j);
                         H.Set( i,   j,  c    *eta_i_j + s*eta_ip1_j );
@@ -525,9 +527,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     }
                 }
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
-                const double stopTime = elem::mpi::Time();
+                const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
@@ -541,11 +543,11 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "    rotating and minimizing residual...";
                     std::cout.flush();
                 }
-                const double startTime = elem::mpi::Time();
+                const double startTime = mpi::Time();
                 for( int k=0; k<numRhs; ++k )
                 {
                     // Apply the rotation to the new column of H
-                    elem::Matrix<C> H;
+                    Matrix<C> H;
                     H.View( HList, 0, k*m, j+1, j+1 );
                     const C eta_j_j = H.Get(j,j);
                     const C eta_jp1_j = deltaList[k];
@@ -555,7 +557,7 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                         throw std::runtime_error("H(j+1,j) was NaN");
                     R c;
                     C s, rho;
-                    elem::lapack::ComputeGivens
+                    lapack::ComputeGivens
                     ( eta_j_j, eta_jp1_j, &c, &s, &rho );
                     if( CheckForNaN(c) )
                         throw std::runtime_error("c in Givens was NaN");
@@ -568,22 +570,20 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     snList.Set(j,k,s);
 
                     // Apply the rotation to z
-                    const C sConj = elem::Conj(s);
+                    const C sConj = Conj(s);
                     const C zeta_j = zList.Get(j,k);
                     const C zeta_jp1 = zList.Get(j+1,k);
                     zList.Set( j,   k,  c    *zeta_j + s*zeta_jp1 );
                     zList.Set( j+1, k, -sConj*zeta_j + c*zeta_jp1 );
 
                     // Minimize the residual
-                    elem::Matrix<C> y, z;
+                    Matrix<C> y, z;
                     z.LockedView( zList, 0, k, j+1, 1 );
                     y = z;
-                    elem::Trsv
-                    ( elem::UPPER, elem::NORMAL, elem::NON_UNIT,
-                      H, y );
+                    elem::Trsv( UPPER, NORMAL, NON_UNIT, H, y );
 
                     // x := x0 + Vj y
-                    elem::Matrix<C> x, x0, vi;
+                    Matrix<C> x, x0, vi;
                     x.View(         xList, 0, k, localHeight, 1 );
                     x0.LockedView( x0List, 0, k, localHeight, 1 );
                     x = x0;
@@ -595,9 +595,9 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
                     }
                 }
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
-                const double stopTime = elem::mpi::Time();
+                const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
@@ -607,19 +607,19 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
             elem::Scal( (C)-1, wList );
             {
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
                 if( commRank == 0 )
                 {
                     std::cout << "    residual multiply...";
                     std::cout.flush();
                 }
-                const double startTime = elem::mpi::Time();
+                const double startTime = mpi::Time();
                 Multiply( wList );
 #ifndef RELEASE
-                elem::mpi::Barrier( comm_ );
+                mpi::Barrier( comm_ );
 #endif
-                const double stopTime = elem::mpi::Time();
+                const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
@@ -660,18 +660,18 @@ psp::DistHelmholtz<R>::InternalSolveWithGMRES
 // for complex symmetric matrices.
 template<typename R>
 void
-psp::DistHelmholtz<R>::InternalSolveWithSQMR
-( elem::Matrix<C>& bList, R bcgRelTol ) const
+DistHelmholtz<R>::InternalSolveWithSQMR
+( Matrix<C>& bList, R bcgRelTol ) const
 {
     const R one = 1;
     const int numRhs = bList.Width();
     const int localHeight = bList.Height();
-    const int commRank = elem::mpi::CommRank( comm_ );
+    const int commRank = mpi::CommRank( comm_ );
 
-    elem::Matrix<C> vList( localHeight, numRhs ),
-                    tList( localHeight, numRhs ),
-                    qList( localHeight, numRhs ),
-                    pList( localHeight, numRhs );
+    Matrix<C> vList( localHeight, numRhs ),
+              tList( localHeight, numRhs ),
+              qList( localHeight, numRhs ),
+              pList( localHeight, numRhs );
     std::vector<C> cList( numRhs ),
                    tauList( numRhs ),
                    rhoList( numRhs ),
@@ -699,19 +699,19 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
     tList = vList;
     {
 #ifndef RELEASE
-        elem::mpi::Barrier( comm_ );
+        mpi::Barrier( comm_ );
 #endif
         if( commRank == 0 )
         {
             std::cout << "  initial preconditioner application...";
             std::cout.flush();
         }
-        const double startTime = elem::mpi::Time();
+        const double startTime = mpi::Time();
         Precondition( tList );
 #ifndef RELEASE
-        elem::mpi::Barrier( comm_ );
+        mpi::Barrier( comm_ );
 #endif
-        const double stopTime = elem::mpi::Time();
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
             std::cout << stopTime-startTime << " secs" << std::endl;
     }
@@ -744,19 +744,19 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         tList = qList;
         {
 #ifndef RELEASE
-            elem::mpi::Barrier( comm_ );
+            mpi::Barrier( comm_ );
 #endif
             if( commRank == 0 )
             {
                 std::cout << "  multiplying...";
                 std::cout.flush();
             }
-            const double startTime = elem::mpi::Time();
+            const double startTime = mpi::Time();
             Multiply( tList );
 #ifndef RELEASE
-            elem::mpi::Barrier( comm_ );
+            mpi::Barrier( comm_ );
 #endif
-            const double stopTime = elem::mpi::Time();
+            const double stopTime = mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
         }
@@ -792,19 +792,19 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
         tList = vList;
         {
 #ifndef RELEASE
-            elem::mpi::Barrier( comm_ );
+            mpi::Barrier( comm_ );
 #endif
             if( commRank == 0 )
             {
                 std::cout << "  preconditioning...";
                 std::cout.flush();
             }
-            const double startTime = elem::mpi::Time();
+            const double startTime = mpi::Time();
             Precondition( tList );
 #ifndef RELEASE
-            elem::mpi::Barrier( comm_ );
+            mpi::Barrier( comm_ );
 #endif
-            const double stopTime = elem::mpi::Time();
+            const double stopTime = mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
         }
@@ -885,21 +885,21 @@ psp::DistHelmholtz<R>::InternalSolveWithSQMR
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForNaN( R alpha ) const
+DistHelmholtz<R>::CheckForNaN( R alpha ) const
 {
     return alpha != alpha; // hopefully this is not optimized away
 }
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForNaN( C alpha ) const
+DistHelmholtz<R>::CheckForNaN( C alpha ) const
 {
     return alpha != alpha; // hopefully this is not optimized away
 }
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForNaN( const std::vector<R>& alphaList ) const
+DistHelmholtz<R>::CheckForNaN( const std::vector<R>& alphaList ) const
 {
     bool foundNaN = false;
     for( unsigned k=0; k<alphaList.size(); ++k )
@@ -910,7 +910,7 @@ psp::DistHelmholtz<R>::CheckForNaN( const std::vector<R>& alphaList ) const
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForNaN( const std::vector<C>& alphaList ) const
+DistHelmholtz<R>::CheckForNaN( const std::vector<C>& alphaList ) const
 {
     bool foundNaN = false;
     for( unsigned k=0; k<alphaList.size(); ++k )
@@ -921,7 +921,7 @@ psp::DistHelmholtz<R>::CheckForNaN( const std::vector<C>& alphaList ) const
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForZero( const std::vector<R>& alphaList ) const
+DistHelmholtz<R>::CheckForZero( const std::vector<R>& alphaList ) const
 {
     bool foundZero = false;
     for( unsigned k=0; k<alphaList.size(); ++k )
@@ -932,7 +932,7 @@ psp::DistHelmholtz<R>::CheckForZero( const std::vector<R>& alphaList ) const
 
 template<typename R>
 bool
-psp::DistHelmholtz<R>::CheckForZero( const std::vector<C>& alphaList ) const
+DistHelmholtz<R>::CheckForZero( const std::vector<C>& alphaList ) const
 {
     bool foundZero = false;
     for( unsigned k=0; k<alphaList.size(); ++k )
@@ -943,41 +943,39 @@ psp::DistHelmholtz<R>::CheckForZero( const std::vector<C>& alphaList ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Norms
-( const elem::Matrix<C>& xList, std::vector<R>& normList ) const
+DistHelmholtz<R>::Norms
+( const Matrix<C>& xList, std::vector<R>& normList ) const
 {
     const int numCols = xList.Width();
     const int localHeight = xList.Height();
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
     std::vector<R> localNorms( numCols );
     for( int j=0; j<numCols; ++j )
-        localNorms[j] = 
-            elem::blas::Nrm2( localHeight, xList.LockedBuffer(0,j), 1 );
+        localNorms[j] = blas::Nrm2( localHeight, xList.LockedBuffer(0,j), 1 );
     std::vector<R> allLocalNorms( numCols*commSize );
-    elem::mpi::AllGather
+    mpi::AllGather
     ( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm_ );
     normList.resize( numCols );
     for( int j=0; j<numCols; ++j )
-        normList[j] = 
-            elem::blas::Nrm2( commSize, &allLocalNorms[j], numCols );
+        normList[j] = blas::Nrm2( commSize, &allLocalNorms[j], numCols );
 }
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::PseudoNorms
-( const elem::Matrix<C>& xList, std::vector<C>& alphaList ) const
+DistHelmholtz<R>::PseudoNorms
+( const Matrix<C>& xList, std::vector<C>& alphaList ) const
 {
     const int numCols = xList.Width();
     const int localHeight = xList.Height();
     std::vector<C> localAlphaList( numCols );
     for( int j=0; j<numCols; ++j )
         localAlphaList[j] = 
-            elem::blas::Dotu
+            blas::Dotu
             ( localHeight, xList.LockedBuffer(0,j), 1,
                            xList.LockedBuffer(0,j), 1 );
     alphaList.resize( numCols );
     // TODO: Think about avoiding overflow?
-    elem::mpi::AllReduce
+    mpi::AllReduce
     ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
     for( int j=0; j<numCols; ++j )
         alphaList[j] = Sqrt(alphaList[j]);
@@ -985,8 +983,8 @@ psp::DistHelmholtz<R>::PseudoNorms
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::InnerProducts
-( const elem::Matrix<C>& xList, const elem::Matrix<C>& yList,
+DistHelmholtz<R>::InnerProducts
+( const Matrix<C>& xList, const Matrix<C>& yList,
   std::vector<C>& alphaList ) const
 {
     const int numCols = xList.Width();
@@ -994,18 +992,18 @@ psp::DistHelmholtz<R>::InnerProducts
     std::vector<C> localAlphaList( numCols );
     for( int j=0; j<numCols; ++j )
         localAlphaList[j] = 
-            elem::blas::Dot
+            blas::Dot
             ( localHeight, xList.LockedBuffer(0,j), 1,
                            yList.LockedBuffer(0,j), 1 );
     alphaList.resize( numCols );
-    elem::mpi::AllReduce
+    mpi::AllReduce
     ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
 }
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::PseudoInnerProducts
-( const elem::Matrix<C>& xList, const elem::Matrix<C>& yList,
+DistHelmholtz<R>::PseudoInnerProducts
+( const Matrix<C>& xList, const Matrix<C>& yList,
   std::vector<C>& alphaList ) const
 {
     const int numCols = xList.Width();
@@ -1013,18 +1011,18 @@ psp::DistHelmholtz<R>::PseudoInnerProducts
     std::vector<C> localAlphaList( numCols );
     for( int j=0; j<numCols; ++j )
         localAlphaList[j] = 
-            elem::blas::Dotu
+            blas::Dotu
             ( localHeight, xList.LockedBuffer(0,j), 1,
                            yList.LockedBuffer(0,j), 1 );
     alphaList.resize( numCols );
-    elem::mpi::AllReduce
+    mpi::AllReduce
     ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
 }
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::DivideColumns
-( elem::Matrix<C>& xList, const std::vector<R>& deltaList ) const
+DistHelmholtz<R>::DivideColumns
+( Matrix<C>& xList, const std::vector<R>& deltaList ) const
 {
     const R one = 1;
     const int numCols = xList.Width();
@@ -1040,8 +1038,8 @@ psp::DistHelmholtz<R>::DivideColumns
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::MultiplyColumns
-( elem::Matrix<C>& xList, const std::vector<C>& deltaList ) const
+DistHelmholtz<R>::MultiplyColumns
+( Matrix<C>& xList, const std::vector<C>& deltaList ) const
 {
     const int numCols = xList.Width();
     const int localHeight = xList.Height();
@@ -1056,9 +1054,9 @@ psp::DistHelmholtz<R>::MultiplyColumns
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::AddScaledColumns
+DistHelmholtz<R>::AddScaledColumns
 ( const std::vector<C>& deltaList, 
-  const elem::Matrix<C>& xList, elem::Matrix<C>& yList ) const
+  const Matrix<C>& xList, Matrix<C>& yList ) const
 {
     const int numCols = xList.Width();
     const int localHeight = xList.Height();
@@ -1074,9 +1072,9 @@ psp::DistHelmholtz<R>::AddScaledColumns
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::SubtractScaledColumns
+DistHelmholtz<R>::SubtractScaledColumns
 ( const std::vector<C>& deltaList, 
-  const elem::Matrix<C>& xList, elem::Matrix<C>& yList ) const
+  const Matrix<C>& xList, Matrix<C>& yList ) const
 {
     const int numCols = xList.Width();
     const int localHeight = xList.Height();
@@ -1093,10 +1091,10 @@ psp::DistHelmholtz<R>::SubtractScaledColumns
 // B := A B
 template<typename R>
 void
-psp::DistHelmholtz<R>::Multiply( elem::Matrix<C>& B ) const
+DistHelmholtz<R>::Multiply( Matrix<C>& B ) const
 {
     const int numRhs = B.Width();
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
 
     // Modify the basic send/recv information for the number of right-hand sides
     std::vector<int> sendCounts = globalSendCounts_;
@@ -1137,15 +1135,15 @@ psp::DistHelmholtz<R>::Multiply( elem::Matrix<C>& B ) const
         if( recvCounts[proc] != 0 )
             ++numRecvs;
     }
-    std::vector<elem::mpi::Status> statuses(numSends+numRecvs);
-    std::vector<elem::mpi::Request> requests(numSends+numRecvs);
+    std::vector<mpi::Status> statuses(numSends+numRecvs);
+    std::vector<mpi::Request> requests(numSends+numRecvs);
     int rCount=0;
     for( unsigned proc=0; proc<commSize; ++proc )
     {
         int count = recvCounts[proc];
         int displ = recvDispls[proc];
         if( count != 0 )
-            elem::mpi::IRecv
+            mpi::IRecv
             ( &recvRhs[displ], count, proc, 0, comm_, requests[rCount++] );
     }
     for( unsigned proc=0; proc<commSize; ++proc )
@@ -1153,14 +1151,14 @@ psp::DistHelmholtz<R>::Multiply( elem::Matrix<C>& B ) const
         int count = sendCounts[proc];
         int displ = sendDispls[proc];
         if( count != 0 )
-            elem::mpi::ISend
+            mpi::ISend
             ( &sendRhs[displ], count, proc, 0, comm_, requests[rCount++] );
     }
-    elem::mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
+    mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
     statuses.clear();
     requests.clear();
 #else
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendRhs[0], &sendCounts[0], &sendDispls[0], 
       &recvRhs[0], &recvCounts[0], &recvDispls[0], comm_ );
 #endif
@@ -1193,7 +1191,7 @@ psp::DistHelmholtz<R>::Multiply( elem::Matrix<C>& B ) const
 
 template<typename R>
 void
-psp::DistHelmholtz<R>::Precondition( elem::Matrix<C>& B ) const
+DistHelmholtz<R>::Precondition( Matrix<C>& B ) const
 {
     // Apply the sweeping preconditioner
     //
@@ -1236,7 +1234,7 @@ psp::DistHelmholtz<R>::Precondition( elem::Matrix<C>& B ) const
     SolvePanel( B, numPanels_-1 );
 
     // Solve against L^T
-    elem::Matrix<C> Z;
+    Matrix<C> Z;
     for( int i=numPanels_-2; i>=0; --i )
     {
         ExtractPanel( B, i, Z );
@@ -1249,7 +1247,7 @@ psp::DistHelmholtz<R>::Precondition( elem::Matrix<C>& B ) const
 // B_i := T_i B_i
 template<typename R>
 void
-psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
+DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 {
     const cliq::symbolic::SymmFact& symbFact = 
         PanelSymbolicFactorization( i );
@@ -1260,7 +1258,7 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         symbFact.dist.supernodes.back().localOffset1d + 
         symbFact.dist.supernodes.back().localSize1d;
 
-    elem::Matrix<C> localPanelB;
+    Matrix<C> localPanelB;
     elem::Zeros( localHeight1d, numRhs, localPanelB );
 
     // For each supernode, pull in each right-hand side with a memcpy
@@ -1297,7 +1295,7 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         const int localOffset1d = sn.localOffset1d;
         const int localSize1d = sn.localSize1d;
 
-        const elem::Grid& grid = *sn.grid;
+        const Grid& grid = *sn.grid;
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
@@ -1308,7 +1306,7 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int localPaddingSize = 
-            elem::LocalLength( paddingSize, gridRank, gridSize );
+            LocalLength( paddingSize, gridRank, gridSize );
         const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )
@@ -1328,11 +1326,11 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         PanelNumericFactorization( i );
     // TODO: This will later be changed to a custom application routine
     if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
-        CompressedBlockLDLSolve
-        ( elem::TRANSPOSE, symbFact, fact, localPanelB );
+        internal::CompressedBlockLDLSolve
+        ( TRANSPOSE, symbFact, fact, localPanelB );
     else
         cliq::numeric::LDLSolve
-        ( elem::TRANSPOSE, symbFact, fact, localPanelB );
+        ( TRANSPOSE, symbFact, fact, localPanelB );
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );
@@ -1366,7 +1364,7 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         const int localOffset1d = sn.localOffset1d;
         const int localSize1d = sn.localSize1d;
 
-        const elem::Grid& grid = *sn.grid;
+        const Grid& grid = *sn.grid;
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
@@ -1377,7 +1375,7 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int localPaddingSize = 
-            elem::LocalLength( paddingSize, gridRank, gridSize );
+            LocalLength( paddingSize, gridRank, gridSize );
         const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )
@@ -1396,9 +1394,9 @@ psp::DistHelmholtz<R>::SolvePanel( elem::Matrix<C>& B, int i ) const
 // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
 template<typename R>
 void
-psp::DistHelmholtz<R>::SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const
+DistHelmholtz<R>::SubdiagonalUpdate( Matrix<C>& B, int i ) const
 {
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
     const int numRhs = B.Width();
     const int panelSendCount = subdiagPanelSendCounts_[i];
     const int panelRecvCount = subdiagPanelRecvCounts_[i];
@@ -1436,15 +1434,15 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const
         if( recvCounts[proc] != 0 ) 
             ++numRecvs;
     }   
-    std::vector<elem::mpi::Status> statuses(numSends+numRecvs);
-    std::vector<elem::mpi::Request> requests(numSends+numRecvs);
+    std::vector<mpi::Status> statuses(numSends+numRecvs);
+    std::vector<mpi::Request> requests(numSends+numRecvs);
     int rCount=0;
     for( unsigned proc=0; proc<commSize; ++proc )
     {   
         int count = recvCounts[proc];
         int displ = recvDispls[proc];
         if( count != 0 )
-            elem::mpi::IRecv
+            mpi::IRecv
             ( &recvBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
     }
     for( unsigned proc=0; proc<commSize; ++proc )
@@ -1452,14 +1450,14 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const
         int count = sendCounts[proc];
         int displ = sendDispls[proc];
         if( count != 0 )
-            elem::mpi::ISend
+            mpi::ISend
             ( &sendBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
     }
-    elem::mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
+    mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
     statuses.clear();
     requests.clear();
 #else
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
 #endif
@@ -1496,8 +1494,7 @@ psp::DistHelmholtz<R>::SubdiagonalUpdate( elem::Matrix<C>& B, int i ) const
 // B_i := 0
 template<typename R>
 void
-psp::DistHelmholtz<R>::ExtractPanel
-( elem::Matrix<C>& B, int i, elem::Matrix<C>& Z ) const
+DistHelmholtz<R>::ExtractPanel( Matrix<C>& B, int i, Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
     const int localPanelHeight = LocalPanelHeight( i );
@@ -1515,10 +1512,9 @@ psp::DistHelmholtz<R>::ExtractPanel
 // B_i := -A_{i,i+1} B_{i+1}
 template<typename R>
 void
-psp::DistHelmholtz<R>::MultiplySuperdiagonal
-( elem::Matrix<C>& B, int i ) const
+DistHelmholtz<R>::MultiplySuperdiagonal( Matrix<C>& B, int i ) const
 {
-    const int commSize = elem::mpi::CommSize( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
     const int numRhs = B.Width();
     const int panelSendCount = supdiagPanelSendCounts_[i];
     const int panelRecvCount = supdiagPanelRecvCounts_[i];
@@ -1570,15 +1566,15 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal
         if( recvCounts[proc] != 0 )
             ++numRecvs;
     }   
-    std::vector<elem::mpi::Status> statuses(numSends+numRecvs);
-    std::vector<elem::mpi::Request> requests(numSends+numRecvs);
+    std::vector<mpi::Status> statuses(numSends+numRecvs);
+    std::vector<mpi::Request> requests(numSends+numRecvs);
     int rCount=0;
     for( unsigned proc=0; proc<commSize; ++proc )
     {
         int count = recvCounts[proc];
         int displ = recvDispls[proc];
         if( count != 0 )
-            elem::mpi::IRecv
+            mpi::IRecv
             ( &recvBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
     }
     for( unsigned proc=0; proc<commSize; ++proc )
@@ -1586,14 +1582,14 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal
         int count = sendCounts[proc];
         int displ = sendDispls[proc];
         if( count != 0 )
-            elem::mpi::ISend
+            mpi::ISend
             ( &sendBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
     }
-    elem::mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
+    mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
     statuses.clear();
     requests.clear();
 #else
-    elem::mpi::AllToAll
+    mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
 #endif
@@ -1629,8 +1625,8 @@ psp::DistHelmholtz<R>::MultiplySuperdiagonal
 // B_i := B_i + Z
 template<typename R>
 void
-psp::DistHelmholtz<R>::UpdatePanel
-( elem::Matrix<C>& B, int i, const elem::Matrix<C>& Z ) const
+DistHelmholtz<R>::UpdatePanel
+( Matrix<C>& B, int i, const Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
     const int localPanelHeight = LocalPanelHeight( i );
@@ -1640,3 +1636,4 @@ psp::DistHelmholtz<R>::UpdatePanel
             B.Update( localPanelOffset+s, k, Z.Get(s,k) );
 }
 
+} // namespace psp
