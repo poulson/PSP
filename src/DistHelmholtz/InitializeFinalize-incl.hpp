@@ -76,14 +76,23 @@ void CompressSVD
     U.ResizeTo( U.Height(), numKeptModes );
     s.ResizeTo( numKeptModes, 1 );
     V.ResizeTo( V.Height(), numKeptModes );
-    std::cout << "kept " << numKeptModes << "/" << k
-              << " modes, " << ((R)100*numKeptModes)/((R)k) << "%"
-              << std::endl;
+    
+    const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
+    if( worldRank == 0 )
+    {
+        std::ostringstream msg;
+        msg << "kept " << numKeptModes << "/" << k << " modes, "
+            << ((R)100*numKeptModes)/((R)k) << "%" << std::endl;
+        std::cout << msg.str();
+    }
 }
 
 template<typename R>
 void Compress( Matrix<Complex<R> >& A )
 {
+    if( A.Height() == 0 || A.Width() == 0 )
+        return;
+
     typedef Complex<R> C;
     Matrix<C> U, V;
     Matrix<R> s;
@@ -101,6 +110,14 @@ void CompressFront( Matrix<Complex<Real> >& A, int depth )
 
     const int s1 = A.Height() / depth;
     const int s2 = A.Width() / depth;
+    
+    const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
+    if( worldRank == 0 )
+    {
+        std::ostringstream msg;
+        msg << "s1=" << s1 << ", s2=" << s2 << ", depth=" << depth << std::endl;
+        std::cout << msg.str();
+    }
 
     // Shuffle
     Matrix<C> Z( s1*s2, depth*depth );
@@ -201,6 +218,11 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
     const int s1 = A.Height() / depth;
     const int s2 = A.Width() / depth;
 
+    const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
+    if( worldRank == 0 )
+        std::cout << "s1=" << s1 << ", s2=" << s2 << ", depth=" << depth
+                  << std::endl;
+
     //
     // Shuffle
     //
@@ -209,26 +231,60 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
     {
         // Count the total amount of send data from A
         std::vector<int> sendCounts( gridSize, 0 );
-        const int ALocalHeight = A.LocalHeight();
-        const int ALocalWidth = A.LocalWidth();
-        const int AColShift = A.ColShift();
-        const int ARowShift = A.RowShift();
-        const int AColStride = A.ColStride();
-        const int ARowStride = A.RowStride();
-        for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
+        if( gridHeight >= s1 && gridWidth >= s2 )
         {
-            const int j = ARowShift + jLocal*ARowStride;
-            const int j2 = j / s2;
-            const int i2 = j % s2;
+            const int ALocalHeight = A.LocalHeight();
+            const int ALocalWidth = A.LocalWidth();
+            const int AColShift = A.ColShift();
+            const int ARowShift = A.RowShift();
+            const int AColStride = A.ColStride();
+            const int ARowStride = A.RowStride();
 
-            for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
+            // We should end up packing and unpacking in the same order by 
+            // default since each process will only own one entry per s1 x s2
+            // block of A
+            for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
             {
-                const int i = AColShift + iLocal*AColStride;
-                const int j1 = i / s1;
-                const int i1 = i % s1;
+                const int j = ARowShift + jLocal*ARowStride;
+                const int j2 = j / s2;
+                const int i2 = j % s2;
 
-                const int newProc = (i1+i2*s1) % gridSize;
-                ++sendCounts[newProc];
+                for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
+                {
+                    const int i = AColShift + iLocal*AColStride;
+                    const int j1 = i / s1;
+                    const int i1 = i % s1;
+
+                    const int newProc = (i1+i2*s1) % gridSize;
+                    ++sendCounts[newProc];
+                }
+            }
+        }
+        else
+        {
+            DistMatrix<C> D( grid );
+            for( int j2=0; j2<depth; ++j2 )
+            {
+                for( int j1=0; j1<depth; ++j1 )
+                {
+                    D.LockedView( A, j1*s1, j2*s2, s1, s2 );
+                    const int DLocalHeight = D.LocalHeight();
+                    const int DLocalWidth = D.LocalWidth();
+                    const int DColShift = D.ColShift();
+                    const int DRowShift = D.RowShift();
+                    const int DColStride = D.ColStride();
+                    const int DRowStride = D.RowStride();
+                    for( int jLocal=0; jLocal<DLocalWidth; ++jLocal )
+                    {
+                        const int i2 = DRowShift + jLocal*DRowStride;
+                        for( int iLocal=0; iLocal<DLocalHeight; ++iLocal )
+                        {
+                            const int i1 = DColShift + iLocal*DColStride;
+                            const int newProc = (i1+i2*s1) % gridSize;
+                            ++sendCounts[newProc];
+                        }
+                    }
+                }
             }
         }
 
@@ -244,21 +300,64 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
         // Allocate the send buffer and then pack it
         std::vector<C> sendBuffer( totalSendCount );
         std::vector<int> offsets = sendDispls;
-        for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
+        if( gridHeight >= s1 && gridWidth >= s2 )
         {
-            const int j = ARowShift + jLocal*ARowStride;
-            const int j2 = j / s2;
-            const int i2 = j % s2;
+            const int ALocalHeight = A.LocalHeight();
+            const int ALocalWidth = A.LocalWidth();
+            const int AColShift = A.ColShift();
+            const int ARowShift = A.RowShift();
+            const int AColStride = A.ColStride();
+            const int ARowStride = A.RowStride();
 
-            for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
+            // We should end up packing and unpacking in the same order by 
+            // default since each process will only own one entry per s1 x s2
+            // block of A
+            for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
             {
-                const int i = AColShift + iLocal*AColStride;
-                const int j1 = i / s1;
-                const int i1 = i % s1;
+                const int j = ARowShift + jLocal*ARowStride;
+                const int j2 = j / s2;
+                const int i2 = j % s2;
 
-                const int newProc = (i1+i2*s1) % gridSize;
-                const C value = A.GetLocalEntry(iLocal,jLocal);
-                sendBuffer[offsets[newProc]++] = value;
+                for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
+                {
+                    const int i = AColShift + iLocal*AColStride;
+                    const int j1 = i / s1;
+                    const int i1 = i % s1;
+
+                    const int newProc = (i1+i2*s1) % gridSize;
+                    const C value = A.GetLocalEntry(iLocal,jLocal);
+                    sendBuffer[offsets[newProc]] = value;
+                    ++offsets[newProc];
+                }
+            }
+        }
+        else
+        {
+            DistMatrix<C> D( grid );
+            for( int j2=0; j2<depth; ++j2 )
+            {
+                for( int j1=0; j1<depth; ++j1 )
+                {
+                    D.LockedView( A, j1*s1, j2*s2, s1, s2 );
+                    const int DLocalHeight = D.LocalHeight();
+                    const int DLocalWidth = D.LocalWidth();
+                    const int DColShift = D.ColShift();
+                    const int DRowShift = D.RowShift();
+                    const int DColStride = D.ColStride();
+                    const int DRowStride = D.RowStride();
+                    for( int jLocal=0; jLocal<DLocalWidth; ++jLocal )
+                    {
+                        const int i2 = DRowShift + jLocal*DRowStride;
+                        for( int iLocal=0; iLocal<DLocalHeight; ++iLocal )
+                        {
+                            const int i1 = DColShift + iLocal*DColStride;
+                            const int newProc = (i1+i2*s1) % gridSize;
+                            const C value = D.GetLocalEntry(iLocal,jLocal);
+                            sendBuffer[offsets[newProc]] = value;
+                            ++offsets[newProc];
+                        }
+                    }
+                }
             }
         }
 
@@ -277,8 +376,8 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
                     const int i1 = i % s1;
                     const int i2 = i / s1;
 
-                    const int origRow = (i1+j1*s1) % gridHeight;
-                    const int origCol = (i2+j2*s2) % gridWidth;
+                    const int origRow = (i1+j1*s1+AColAlignment) % gridHeight;
+                    const int origCol = (i2+j2*s2+ARowAlignment) % gridWidth;
                     const int origProc = origRow + origCol*gridHeight;
                     ++recvCounts[origProc];
                 }
@@ -306,6 +405,7 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
         // Unpack the recv data into Z[VC,* ]
         Z_VC_STAR.ResizeTo( s1*s2, depth*depth );
         offsets = recvDispls;
+
         for( int j2=0; j2<depth; ++j2 )
         {
             for( int j1=0; j1<depth; ++j1 )
@@ -316,12 +416,13 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
                     const int i1 = i % s1;
                     const int i2 = i / s1;
 
-                    const int origRow = (i1+j1*s1) % gridHeight;
-                    const int origCol = (i2+j2*s2) % gridWidth;
+                    const int origCol = (i2+j2*s2+ARowAlignment) % gridWidth;
+                    const int origRow = (i1+j1*s1+AColAlignment) % gridHeight;
                     const int origProc = origRow + origCol*gridHeight;
 
-                    const C value = recvBuffer[offsets[origProc]++];
+                    const C value = recvBuffer[offsets[origProc]];
                     Z_VC_STAR.SetLocalEntry( iLocal, j1+j2*depth, value );
+                    ++offsets[origProc];
                 }
             }
         }
@@ -412,8 +513,14 @@ void CompressFronts
         const int numNonzeros = MeasureSparsity( B, infNorm );
         const int numEntries = B.Height()*B.Width();
         const R sparsity = ((R)100*numNonzeros)/((R)numEntries);
-        std::cout << numNonzeros << "/" << numEntries << " entries, " 
-                  << sparsity << "%" << std::endl;
+        const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
+        if( worldRank == 0 )
+        {
+            std::ostringstream msg;
+            msg << numNonzeros << "/" << numEntries << " entries, " 
+                << sparsity << "%" << std::endl;
+            std::cout << msg.str();
+        }
         CompressFront( B, depth );
     }
 
@@ -438,8 +545,14 @@ void CompressFronts
         const int numNonzeros = MeasureSparsity( B, infNorm );
         const int numEntries = B.Height()*B.Width();
         const R sparsity = ((R)100*numNonzeros)/((R)numEntries);
-        std::cout << numNonzeros << "/" << numEntries << " entries, " 
-                  << sparsity << "%" << std::endl;
+        const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
+        if( worldRank == 0 )
+        {
+            std::ostringstream msg;
+            msg << numNonzeros << "/" << numEntries << " entries, " 
+                << sparsity << "%" << std::endl;
+            std::cout << msg.str();
+        }
         CompressFront( B, depth );
     }
 }
