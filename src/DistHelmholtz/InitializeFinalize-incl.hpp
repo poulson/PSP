@@ -325,7 +325,7 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
                     const int i1 = i % s1;
 
                     const int newProc = (i1+i2*s1) % gridSize;
-                    const C value = A.GetLocalEntry(iLocal,jLocal);
+                    const C value = A.GetLocal(iLocal,jLocal);
                     sendBuffer[offsets[newProc]] = value;
                     ++offsets[newProc];
                 }
@@ -352,7 +352,7 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
                         {
                             const int i1 = DColShift + iLocal*DColStride;
                             const int newProc = (i1+i2*s1) % gridSize;
-                            const C value = D.GetLocalEntry(iLocal,jLocal);
+                            const C value = D.GetLocal(iLocal,jLocal);
                             sendBuffer[offsets[newProc]] = value;
                             ++offsets[newProc];
                         }
@@ -421,7 +421,7 @@ void CompressFront( DistMatrix<Complex<Real> >& A, int depth )
                     const int origProc = origRow + origCol*gridHeight;
 
                     const C value = recvBuffer[offsets[origProc]];
-                    Z_VC_STAR.SetLocalEntry( iLocal, j1+j2*depth, value );
+                    Z_VC_STAR.SetLocal( iLocal, j1+j2*depth, value );
                     ++offsets[origProc];
                 }
             }
@@ -1837,8 +1837,7 @@ DistHelmholtz<R>::FillPanelFronts
                 if( i % gridHeight == gridRow )
                 {
                     const int iLocal = (i-gridRow) / gridHeight;
-                    front.front2dL.SetLocalEntry
-                    ( iLocal, jLocal, values[k] );
+                    front.front2dL.SetLocal( iLocal, jLocal, values[k] );
                 }
             }
         }
