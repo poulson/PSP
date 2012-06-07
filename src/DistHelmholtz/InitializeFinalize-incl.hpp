@@ -97,7 +97,7 @@ void Compress( Matrix<Complex<R> >& A )
     Matrix<C> U, V;
     Matrix<R> s;
     U = A;
-    elem::SVD( U, s, V );
+    elem::SVD( U, s, V, true ); // D&C seemed to fail...
     CompressSVD( U, s, V );
     elem::DiagonalScale( RIGHT, NORMAL, s, U );
     elem::Gemm( NORMAL, ADJOINT, (C)1, U, V, (C)0, A );
