@@ -26,7 +26,8 @@ namespace psp {
 template<typename F> 
 void DistCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth );
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -35,7 +36,8 @@ void DistCompressedBlockLDL
 template<typename F> 
 inline void DistCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth )
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  bool useQR )
 {
     using namespace cliq::symbolic;
 #ifndef RELEASE
@@ -43,15 +45,45 @@ inline void DistCompressedBlockLDL
     if( orientation == NORMAL )
         throw std::logic_error("LDL must be (conjugate-)transposed");
 #endif
-    // The bottom front is already computed, so just view it
+    // The bottom front is already compressed, so just view the relevant data
     LocalCompressedFront<F>& topLocalFront = L.local.fronts.back();
     DistCompressedFront<F>& bottomDistFront = L.dist.fronts[0];
     const Grid& bottomGrid = *S.dist.supernodes[0].grid;
     bottomDistFront.frontL.Empty();
-    bottomDistFront.frontL.LockedView
-    ( topLocalFront.frontL.Height(), topLocalFront.frontL.Width(), 0, 0, 
-      topLocalFront.frontL.LockedBuffer(), topLocalFront.frontL.LDim(), 
-      bottomGrid );
+    bottomDistFront.AGreens.clear();
+    bottomDistFront.BGreens.clear();
+    bottomDistFront.ACoefficients.clear();
+    bottomDistFront.BCoefficients.clear();
+    const int numKeptModes = topLocalFront.AGreens.size();
+    bottomDistFront.AGreens.resize( numKeptModes );
+    bottomDistFront.BGreens.resize( numKeptModes );
+    bottomDistFront.ACoefficients.resize( numKeptModes );
+    bottomDistFront.BCoefficients.resize( numKeptModes );
+    for( int t=0; t<numKeptModes; ++t )
+    {
+        DistMatrix<F>& distAGreen = bottomDistFront.AGreens[t];
+        DistMatrix<F>& distBGreen = bottomDistFront.BGreens[t];
+        DistMatrix<F,STAR,STAR>& distACoeff = bottomDistFront.ACoefficients[t];
+        DistMatrix<F,STAR,STAR>& distBCoeff = bottomDistFront.BCoefficients[t];
+
+        const Matrix<F>& localAGreen = topLocalFront.AGreens[t];
+        const Matrix<F>& localBGreen = topLocalFront.BGreens[t];
+        const Matrix<F>& localACoeff = topLocalFront.ACoefficients[t];
+        const Matrix<F>& localBCoeff = topLocalFront.BCoefficients[t];
+
+        distAGreen.LockedView
+        ( localAGreen.Height(), localAGreen.Width(), 0, 0,
+          localAGreen.LockedBuffer(), localAGreen.LDim(), bottomGrid );
+        distBGreen.LockedView
+        ( localBGreen.Height(), localBGreen.Width(), 0, 0,
+          localBGreen.LockedBuffer(), localBGreen.LDim(), bottomGrid );
+        distACoeff.LockedView
+        ( localACoeff.Height(), localACoeff.Width(),
+          localACoeff.LockedBuffer(), localACoeff.LDim(), bottomGrid );
+        distBCoeff.LockedView
+        ( localBCoeff.Height(), localBCoeff.Width(),
+          localBCoeff.LockedBuffer(), localBCoeff.LDim(), bottomGrid );
+    }
     bottomDistFront.work2d.Empty();
     bottomDistFront.work2d.LockedView
     ( topLocalFront.work.Height(), topLocalFront.work.Width(), 0, 0,
@@ -68,11 +100,6 @@ inline void DistCompressedBlockLDL
         DistCompressedFront<F>& childFront = L.dist.fronts[s-1];
         DistCompressedFront<F>& front = L.dist.fronts[s];
         front.work2d.Empty();
-#ifndef RELEASE
-        if( front.frontL.Height() != sn.size+updateSize ||
-            front.frontL.Width() != sn.size )
-            throw std::logic_error("Front was not the proper size");
-#endif
 
         const bool computeFactRecvIndices = 
             ( sn.childFactRecvIndices.size() == 0 );
@@ -86,12 +113,12 @@ inline void DistCompressedBlockLDL
         const unsigned gridWidth = grid.Width();
 
         // Grab the child's grid information
-        const Grid& childGrid = childFront.frontL.Grid();
+        const DistMatrix<F>& childUpdate = childFront.work2d;
+        const Grid& childGrid = childUpdate.Grid();
         const unsigned childGridHeight = childGrid.Height();
         const unsigned childGridWidth = childGrid.Width();
 
         // Pack our child's update
-        const DistMatrix<F>& childUpdate = childFront.work2d;
         const bool isLeftChild = ( commRank < commSize/2 );
         std::vector<int> sendCounts(commSize), sendDispls(commSize);
         int sendBufferSize = 0;
@@ -265,10 +292,11 @@ inline void DistCompressedBlockLDL
         elem::PartitionDown
         ( front.frontL, A,
                         B, sn.size ); 
-        DistFrontCompression( A, front.AGreens, depth );
-        DistFrontCompression( B, front.BGreens, depth );
-        // TODO: Uncomment after the compressed solve works
-        //front.frontL.Empty();
+        DistFrontCompression
+        ( A, front.AGreens, front.ACoefficients, depth, useQR );
+        DistFrontCompression
+        ( B, front.BGreens, front.BCoefficients, depth, useQR );
+        front.frontL.Empty();
     }
     L.local.fronts.back().work.Empty();
     L.dist.fronts.back().work2d.Empty();

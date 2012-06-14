@@ -29,7 +29,8 @@ namespace psp {
 template<typename F>
 void CompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth );
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  bool useQR=false );
 
 } // namespace psp
 
@@ -48,13 +49,14 @@ namespace psp {
 template<typename F>
 inline void CompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth )
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  bool useQR )
 {
 #ifndef RELEASE
     PushCallStack("CompressedBlockLDL");
 #endif
-    LocalCompressedBlockLDL( orientation, S, L, depth );
-    DistCompressedBlockLDL( orientation, S, L, depth );
+    LocalCompressedBlockLDL( orientation, S, L, depth, useQR );
+    DistCompressedBlockLDL( orientation, S, L, depth, useQR );
 #ifndef RELEASE
     PopCallStack();
 #endif

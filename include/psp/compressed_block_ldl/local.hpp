@@ -26,7 +26,8 @@ namespace psp {
 template<typename F> 
 void LocalCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth );
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -35,7 +36,8 @@ void LocalCompressedBlockLDL
 template<typename F> 
 inline void LocalCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth )
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, 
+  int depth, bool useQR )
 {
     using namespace cliq::symbolic;
 #ifndef RELEASE
@@ -111,16 +113,18 @@ inline void LocalCompressedBlockLDL
         elem::PartitionDown
         ( frontL, A,
                   B, sn.size );
-        LocalFrontCompression( A, front.AGreens, depth );
+        LocalFrontCompression
+        ( A, front.AGreens, front.ACoefficients, depth, useQR );
         if( numChildren == 0 )
         {
             // TODO: Use sparse compression at the leaf-level
-            LocalFrontCompression( B, front.BGreens, depth );
+            LocalFrontCompression
+            ( B, front.BGreens, front.BCoefficients, depth, useQR );
         }
         else
-            LocalFrontCompression( B, front.BGreens, depth );
-        // TODO: Uncomment after compressed solve works
-        //frontL.Empty();
+            LocalFrontCompression
+            ( B, front.BGreens, front.BCoefficients, depth, useQR );
+        frontL.Empty();
     }
 #ifndef RELEASE
     PopCallStack();

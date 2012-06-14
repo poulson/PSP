@@ -39,6 +39,8 @@ struct LocalCompressedFront
     mutable Matrix<F> work;
 
     std::vector<Matrix<F> > AGreens, BGreens;
+    std::vector<Matrix<F> > ACoefficients, BCoefficients;
+
     // TODO: Add possibility of storing B sparsly at the leaf level
     //       Typical sparse-matrix storage scheme?
 };
@@ -57,6 +59,7 @@ struct DistCompressedFront
     mutable DistMatrix<F,VC,STAR> work1d;
 
     std::vector<DistMatrix<F> > AGreens, BGreens;
+    std::vector<DistMatrix<F,STAR,STAR> > ACoefficients, BCoefficients;
 };
 
 template<typename F>

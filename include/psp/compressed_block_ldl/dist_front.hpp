@@ -26,7 +26,9 @@ namespace psp {
 template<typename R>
 void DistFrontCompression
 ( DistMatrix<Complex<R> >& A, 
-  std::vector<DistMatrix<Complex<R> > >& greens, int depth );
+  std::vector<DistMatrix<Complex<R> > >& greens, 
+  std::vector<DistMatrix<Complex<R>,STAR,STAR> >& coefficients, 
+  int depth, bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -35,7 +37,9 @@ void DistFrontCompression
 template<typename R> 
 inline void DistFrontCompression
 ( DistMatrix<Complex<R> >& A, 
-  std::vector<DistMatrix<Complex<R> > >& greens, int depth )
+  std::vector<DistMatrix<Complex<R> > >& greens, 
+  std::vector<DistMatrix<Complex<R>,STAR,STAR> >& coefficients,
+  int depth, bool useQR=false )
 {
 #ifndef RELEASE
     PushCallStack("DistFrontCompression");
