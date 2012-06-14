@@ -672,26 +672,30 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        FillPanelFronts
-        ( vOffset, vSize, topSymbolicFact_, topFact_,
-          velocity, myPanelVelocity, offsets, 
-          panelNestedToNatural, panelNaturalToNested );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            FillPanelFronts
+            ( vOffset, vSize, topSymbolicFact_, topCompressedFact_,
+              velocity, myPanelVelocity, offsets, 
+              panelNestedToNatural, panelNaturalToNested );
+        else
+            FillPanelFronts
+            ( vOffset, vSize, topSymbolicFact_, topFact_,
+              velocity, myPanelVelocity, offsets, 
+              panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            cliq::numeric::BlockLDL
-            ( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
+            CompressedBlockLDL
+            ( TRANSPOSE, topSymbolicFact_, topCompressedFact_, vSize );
         else
-            cliq::numeric::LDL( cliq::TRANSPOSE, topSymbolicFact_, topFact_ );
+            cliq::numeric::LDL( TRANSPOSE, topSymbolicFact_, topFact_ );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            internal::CompressFronts( topFact_, vSize );
-        else if( panelScheme == CLIQUE_FAST_2D_LDL )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( topFact_, cliq::NORMAL_1D );
@@ -737,27 +741,30 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        FillPanelFronts
-        ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
-          velocity, myPanelVelocity, offsets,
-          panelNestedToNatural, panelNaturalToNested );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            FillPanelFronts
+            ( vOffset, vSize, bottomSymbolicFact_, bottomCompressedFact_,
+              velocity, myPanelVelocity, offsets,
+              panelNestedToNatural, panelNaturalToNested );
+        else
+            FillPanelFronts
+            ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
+              velocity, myPanelVelocity, offsets,
+              panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            cliq::numeric::BlockLDL
-            ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+            CompressedBlockLDL
+            ( TRANSPOSE, bottomSymbolicFact_, bottomCompressedFact_, vSize );
         else
-            cliq::numeric::LDL
-            ( cliq::TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+            cliq::numeric::LDL( TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            internal::CompressFronts( bottomFact_, vSize );
-        else if( panelScheme == CLIQUE_FAST_2D_LDL )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
             cliq::numeric::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
@@ -782,7 +789,10 @@ DistHelmholtz<R>::Initialize
     //
     // Initialize and factor the full inner panels
     //
-    fullInnerFacts_.resize( numFullInnerPanels_ );
+    if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        fullInnerCompressedFacts_.resize( numFullInnerPanels_ );
+    else
+        fullInnerFacts_.resize( numFullInnerPanels_ );
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
         if( commRank == 0 )
@@ -806,32 +816,44 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        fullInnerFacts_[k] = new cliq::numeric::SymmFrontTree<C>;
-        cliq::numeric::SymmFrontTree<C>& fullInnerFact = *fullInnerFacts_[k];
-        FillPanelFronts
-        ( vOffset, vSize, bottomSymbolicFact_, fullInnerFact,
-          velocity, myPanelVelocity, offsets,
-          panelNestedToNatural, panelNaturalToNested );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        {
+            fullInnerCompressedFacts_[k] = new CompressedFrontTree<C>;
+            FillPanelFronts
+            ( vOffset, vSize, bottomSymbolicFact_, 
+              *fullInnerCompressedFacts_[k],
+              velocity, myPanelVelocity, offsets,
+              panelNestedToNatural, panelNaturalToNested );
+        }
+        else 
+        {
+            fullInnerFacts_[k] = new cliq::numeric::SymmFrontTree<C>;
+            FillPanelFronts
+            ( vOffset, vSize, bottomSymbolicFact_, *fullInnerFacts_[k],
+              velocity, myPanelVelocity, offsets,
+              panelNestedToNatural, panelNaturalToNested );
+        }
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            cliq::numeric::BlockLDL
-            ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
+            CompressedBlockLDL
+            ( TRANSPOSE, bottomSymbolicFact_, 
+              *fullInnerCompressedFacts_[k], vSize );
         else
             cliq::numeric::LDL
-            ( cliq::TRANSPOSE, bottomSymbolicFact_, fullInnerFact );
+            ( TRANSPOSE, bottomSymbolicFact_, *fullInnerFacts_[k] );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            internal::CompressFronts( fullInnerFact, vSize );
-        else if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::numeric::SetSolveMode( fullInnerFact, cliq::FAST_2D_LDL );
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
+            cliq::numeric::SetSolveMode
+            ( *fullInnerFacts_[k], cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::numeric::SetSolveMode( fullInnerFact, cliq::NORMAL_1D );
+            cliq::numeric::SetSolveMode
+            ( *fullInnerFacts_[k], cliq::NORMAL_1D );
         const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -839,7 +861,8 @@ DistHelmholtz<R>::Initialize
         {
             std::cout << "    gather: " << gatherStopTime-gatherStartTime     
                       << " secs\n"
-                      << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
+                      << "    fill:   " << fillStopTime-fillStartTime 
+                      << " secs\n"
                       << "    ldl:    " << ldlStopTime-ldlStartTime
                       << " secs\n"
                       << "    redist: " << redistStopTime-redistStartTime
@@ -875,27 +898,33 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        FillPanelFronts
-        ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
-          velocity, myPanelVelocity, offsets,
-          panelNestedToNatural, panelNaturalToNested );
+        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+            FillPanelFronts
+            ( vOffset, vSize, leftoverInnerSymbolicFact_, 
+              leftoverInnerCompressedFact_,
+              velocity, myPanelVelocity, offsets,
+              panelNestedToNatural, panelNaturalToNested );
+        else
+            FillPanelFronts
+            ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
+              velocity, myPanelVelocity, offsets,
+              panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            cliq::numeric::BlockLDL
-            ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+            CompressedBlockLDL
+            ( TRANSPOSE,
+              leftoverInnerSymbolicFact_, leftoverInnerCompressedFact_, vSize );
         else
             cliq::numeric::LDL
-            ( cliq::TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+            ( TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            internal::CompressFronts( leftoverInnerFact_, vSize );
-        else if( panelScheme == CLIQUE_FAST_2D_LDL )
+        if( panelScheme == CLIQUE_FAST_2D_LDL )
             cliq::numeric::SetSolveMode
             ( leftoverInnerFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
@@ -966,15 +995,30 @@ DistHelmholtz<R>::Finalize()
     localEntries_.clear();
 
     // Release the padded panel memory
-    bottomFact_.local.fronts.clear();
-    bottomFact_.dist.fronts.clear();
-    for( int k=0; k<numFullInnerPanels_; ++k )
-        delete fullInnerFacts_[k];
-    fullInnerFacts_.clear();
-    leftoverInnerFact_.local.fronts.clear();
-    leftoverInnerFact_.dist.fronts.clear();
-    topFact_.local.fronts.clear();
-    topFact_.dist.fronts.clear();
+    if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
+    {
+        bottomCompressedFact_.local.fronts.clear();
+        bottomCompressedFact_.dist.fronts.clear();
+        for( int k=0; k<numFullInnerPanels_; ++k )
+            delete fullInnerCompressedFacts_[k];
+        fullInnerCompressedFacts_.clear();
+        leftoverInnerCompressedFact_.local.fronts.clear();
+        leftoverInnerCompressedFact_.dist.fronts.clear();
+        topCompressedFact_.local.fronts.clear();
+        topCompressedFact_.dist.fronts.clear();
+    }
+    else
+    {
+        bottomFact_.local.fronts.clear();
+        bottomFact_.dist.fronts.clear();
+        for( int k=0; k<numFullInnerPanels_; ++k )
+            delete fullInnerFacts_[k];
+        fullInnerFacts_.clear();
+        leftoverInnerFact_.local.fronts.clear();
+        leftoverInnerFact_.dist.fronts.clear();
+        topFact_.local.fronts.clear();
+        topFact_.dist.fronts.clear();
+    }
 }
 
 template<typename R>
@@ -1839,6 +1883,128 @@ DistHelmholtz<R>::FillPanelFronts
                 {
                     const int iLocal = (i-gridRow) / gridHeight;
                     front.front2dL.SetLocal( iLocal, jLocal, values[k] );
+                }
+            }
+        }
+    }
+}
+
+template<typename R>        
+void
+DistHelmholtz<R>::FillPanelFronts
+( int vOffset, int vSize, 
+  const cliq::symbolic::SymmFact& symbFact,
+        CompressedFrontTree<C>& fact,
+  const GridData<R>& velocity,
+  const std::vector<R>& myPanelVelocity,
+        std::vector<int>& offsets,
+        std::map<int,int>& panelNestedToNatural,
+        std::map<int,int>& panelNaturalToNested ) const
+{
+    const int nx = control_.nx;
+    const int ny = control_.ny;
+    const int nz = control_.nz;
+
+    // Initialize the local portion of the panel
+    std::vector<int> frontIndices;
+    std::vector<C> values;
+    const int numLocalSupernodes = symbFact.local.supernodes.size();
+    fact.local.fronts.resize( numLocalSupernodes );
+    for( int t=0; t<numLocalSupernodes; ++t )
+    {
+        LocalCompressedFront<C>& front = fact.local.fronts[t];
+        const cliq::symbolic::LocalSymmFactSupernode& symbSN = 
+            symbFact.local.supernodes[t];
+
+        // Initialize this front
+        const int offset = symbSN.offset;
+        const int size = symbSN.size;
+        const int updateSize = symbSN.lowerStruct.size();
+        const int frontSize = size + updateSize;
+        elem::Zeros( frontSize, size, front.frontL );
+        for( int j=0; j<size; ++j )
+        {
+            // Extract the velocity from the recv buffer
+            const int panelNaturalIndex = panelNestedToNatural[j+offset];
+            const int x = panelNaturalIndex % nx;
+            const int y = (panelNaturalIndex/nx) % ny;
+            const int vPanel = panelNaturalIndex/(nx*ny);
+            const int v = vOffset + vPanel;
+            const int z = (nz-1) - v;
+            const int proc = velocity.OwningProcess( x, y, z );
+            const R alpha = myPanelVelocity[offsets[proc]++];
+
+            // Form the j'th lower column of this supernode
+            FormLowerColumnOfSupernode
+            ( alpha, x, y, v, vOffset, vSize, offset, size, j,
+              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              panelNaturalToNested, frontIndices, values );
+            const int numMatches = frontIndices.size();
+            for( int k=0; k<numMatches; ++k )
+                front.frontL.Set( frontIndices[k], j, values[k] );
+        }
+    }
+
+    // Initialize the distributed part of the panel
+    const int numDistSupernodes = symbFact.dist.supernodes.size();
+    fact.dist.fronts.resize( numDistSupernodes );
+    // Replacement for cliq::numeric::InitializeDistLeaf
+    {
+        const cliq::symbolic::DistSymmFactSupernode& sn = 
+            symbFact.dist.supernodes[0];
+        Matrix<C>& topLocalFrontL = fact.local.fronts.back().frontL;
+        DistMatrix<C>& frontL = fact.dist.fronts[0].frontL;
+        frontL.LockedView
+        ( topLocalFrontL.Height(), topLocalFrontL.Width(), 0, 0,
+          topLocalFrontL.LockedBuffer(), topLocalFrontL.LDim(),
+          *sn.grid );
+    }
+    for( int t=1; t<numDistSupernodes; ++t )
+    {
+        DistCompressedFront<C>& front = fact.dist.fronts[t];
+        const cliq::symbolic::DistSymmFactSupernode& symbSN = 
+            symbFact.dist.supernodes[t];
+
+        // Initialize this front
+        Grid& grid = *symbSN.grid;
+        const int gridHeight = grid.Height();
+        const int gridWidth = grid.Width();
+        const int gridRow = grid.MCRank();
+        const int gridCol = grid.MRRank();
+        const int offset = symbSN.offset;
+        const int size = symbSN.size;
+        const int updateSize = symbSN.lowerStruct.size();
+        const int frontSize = size + updateSize;
+        front.frontL.SetGrid( grid );
+        elem::Zeros( frontSize, size, front.frontL );
+        const int localSize = front.frontL.LocalWidth();
+        for( int jLocal=0; jLocal<localSize; ++jLocal )
+        {
+            const int j = gridCol + jLocal*gridWidth;
+
+            // Extract the velocity from the recv buffer
+            const int panelNaturalIndex = panelNestedToNatural[j+offset];
+            const int x = panelNaturalIndex % nx;
+            const int y = (panelNaturalIndex/nx) % ny;
+            const int vPanel = panelNaturalIndex/(nx*ny);
+            const int v = vOffset + vPanel;
+            const int z = (nz-1) - v;
+            const int proc = velocity.OwningProcess( x, y, z );
+            const R alpha = myPanelVelocity[offsets[proc]++];
+
+            // Form the j'th lower column of this supernode
+            FormLowerColumnOfSupernode
+            ( alpha, x, y, v, vOffset, vSize, offset, size, j,
+              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              panelNaturalToNested, frontIndices, values );
+            const int numMatches = frontIndices.size();
+            for( int k=0; k<numMatches; ++k )
+            {
+                const int i = frontIndices[k];
+                if( i % gridHeight == gridRow )
+                {
+                    const int iLocal = (i-gridRow) / gridHeight;
+                    front.frontL.SetLocal( iLocal, jLocal, values[k] );
                 }
             }
         }

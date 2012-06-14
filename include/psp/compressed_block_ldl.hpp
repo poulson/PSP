@@ -1,68 +1,65 @@
 /*
-   Clique: a scalable implementation of the multifrontal algorithm
+   Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+   of a sweeping preconditioner for 3d Helmholtz equations.
 
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
+   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
    The University of Texas at Austin
- 
+
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
- 
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
- 
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef CLIQUE_NUMERIC_BLOCK_LDL_HPP
-#define CLIQUE_NUMERIC_BLOCK_LDL_HPP 1
+#ifndef PSP_COMPRESSED_BLOCK_LDL_HPP
+#define PSP_COMPRESSED_BLOCK_LDL_HPP 1
 
-namespace cliq {
-namespace numeric {
+namespace psp {
 
 // All fronts of L are required to be initialized to the expansions of the 
 // original sparse matrix before calling the following factorizations.
 
 template<typename F>
-void BlockLDL
+void CompressedBlockLDL
 ( Orientation orientation, 
-  symbolic::SymmFact& S, numeric::SymmFrontTree<F>& L );
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth );
 
-} // namespace numeric
-} // namespace cliq
+} // namespace psp
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
 //----------------------------------------------------------------------------//
 
-#include "./block_ldl/local_front.hpp"
-#include "./block_ldl/dist_front.hpp"
+#include "./compressed_block_ldl/local_front.hpp"
+#include "./compressed_block_ldl/dist_front.hpp"
 
-#include "./block_ldl/local.hpp"
-#include "./block_ldl/dist.hpp"
+#include "./compressed_block_ldl/local.hpp"
+#include "./compressed_block_ldl/dist.hpp"
 
-namespace cliq {
-namespace numeric {
+namespace psp {
 
 template<typename F>
-inline void BlockLDL
+inline void CompressedBlockLDL
 ( Orientation orientation, 
-  symbolic::SymmFact& S, numeric::SymmFrontTree<F>& L )
+  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth )
 {
 #ifndef RELEASE
-    PushCallStack("numeric::BlockLDL");
+    PushCallStack("CompressedBlockLDL");
 #endif
-    LocalBlockLDL( orientation, S, L );
-    DistBlockLDL( orientation, S, L );
+    LocalCompressedBlockLDL( orientation, S, L, depth );
+    DistCompressedBlockLDL( orientation, S, L, depth );
 #ifndef RELEASE
     PopCallStack();
 #endif
 }
 
-} // namespace numeric
-} // namespace cliq
+} // namespace psp
 
-#endif /* CLIQUE_NUMERIC_BLOCK_LDL_HPP */
+#endif /* PSP_COMPRESSED_BLOCK_LDL_HPP */

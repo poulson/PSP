@@ -60,6 +60,12 @@ using elem::Exp;
 #include "psp/config.h"
 #include "psp/finite_diff_control.hpp"
 #include "psp/grid_data.hpp"
+
+#include "psp/compressed_front_tree.hpp"
+#include "psp/compressed_block_ldl.hpp"
+#include "psp/compressed_block_lower_solve.hpp"
+#include "psp/compressed_block_ldl_solve.hpp"
+
 #include "psp/dist_helmholtz.hpp"
 
 #endif // PSP_HPP

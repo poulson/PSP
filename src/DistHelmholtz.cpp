@@ -701,6 +701,20 @@ DistHelmholtz<R>::PanelNumericFactorization( int whichPanel )
 }
 
 template<typename R>
+CompressedFrontTree<Complex<R> >&
+DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
+{
+    if( whichPanel == 0 )
+        return bottomCompressedFact_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return *fullInnerCompressedFacts_[whichPanel-1];
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerCompressedFact_;
+    else
+        return topCompressedFact_;
+}
+
+template<typename R>
 const cliq::numeric::SymmFrontTree<Complex<R> >&
 DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
 {
@@ -712,6 +726,20 @@ DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
         return leftoverInnerFact_;
     else
         return topFact_;
+}
+
+template<typename R>
+const CompressedFrontTree<Complex<R> >&
+DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
+{
+    if( whichPanel == 0 )
+        return bottomCompressedFact_;
+    else if( whichPanel < 1 + numFullInnerPanels_ )
+        return *fullInnerCompressedFacts_[whichPanel-1];
+    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+        return leftoverInnerCompressedFact_;
+    else
+        return topCompressedFact_;
 }
 
 template<typename R>

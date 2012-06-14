@@ -152,6 +152,12 @@ private:
     cliq::numeric::SymmFrontTree<C> leftoverInnerFact_;
     cliq::numeric::SymmFrontTree<C> topFact_;
 
+    // Compressed factorizations of each panel
+    CompressedFrontTree<C> bottomCompressedFact_;
+    std::vector<CompressedFrontTree<C>*> fullInnerCompressedFacts_;
+    CompressedFrontTree<C> leftoverInnerCompressedFact_;
+    CompressedFrontTree<C> topCompressedFact_;
+
     //
     // Information related to the global sparse matrix
     //
@@ -206,9 +212,13 @@ private:
 
     cliq::numeric::SymmFrontTree<C>& 
     PanelNumericFactorization( int whichPanel );
+    CompressedFrontTree<C>& 
+    PanelCompressedFactorization( int whichPanel );
 
     const cliq::numeric::SymmFrontTree<C>&
     PanelNumericFactorization( int whichPanel ) const;
+    const CompressedFrontTree<C>&
+    PanelCompressedFactorization( int whichPanel ) const;
 
     cliq::symbolic::SymmFact&
     PanelSymbolicFactorization( int whichPanel );
@@ -277,6 +287,15 @@ private:
     ( int vOffset, int vSize,
       const cliq::symbolic::SymmFact& symbFact,
             cliq::numeric::SymmFrontTree<C>& fact,
+      const GridData<R>& velocity,
+      const std::vector<R>& myPanelVelocity,
+            std::vector<int>& offsets,
+            std::map<int,int>& panelNestedToNatural,
+            std::map<int,int>& panelNaturalToNested ) const;
+    void FillPanelFronts
+    ( int vOffset, int vSize,
+      const cliq::symbolic::SymmFact& symbFact,
+            CompressedFrontTree<C>& fact,
       const GridData<R>& velocity,
       const std::vector<R>& myPanelVelocity,
             std::vector<int>& offsets,

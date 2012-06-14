@@ -21,21 +21,6 @@
 
 namespace psp {
 
-namespace internal {
-
-template<typename R>
-void CompressedBlockLDLSolve
-( Orientation orientation, 
-  const cliq::symbolic::SymmFact& symbFact, 
-  const cliq::numeric::SymmFrontTree<Complex<R> >& fact, 
-  Matrix<Complex<R> >& localPanelB )
-{
-    // TODO: Replace this with something which uses the compressed data
-    cliq::numeric::BlockLDLSolve( orientation, symbFact, fact, localPanelB );
-}
-
-} // namespace internal
-
 template<typename R>
 void
 DistHelmholtz<R>::SolveWithGMRES
@@ -1322,15 +1307,12 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 #endif
 
     // Solve against the panel
-    const cliq::numeric::SymmFrontTree<C>& fact = 
-        PanelNumericFactorization( i );
-    // TODO: This will later be changed to a custom application routine
     if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
-        internal::CompressedBlockLDLSolve
-        ( TRANSPOSE, symbFact, fact, localPanelB );
+        CompressedBlockLDLSolve
+        ( TRANSPOSE, symbFact, PanelCompressedFactorization( i ), localPanelB );
     else
         cliq::numeric::LDLSolve
-        ( TRANSPOSE, symbFact, fact, localPanelB );
+        ( TRANSPOSE, symbFact, PanelNumericFactorization( i ), localPanelB );
 
     // For each supernode, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );
