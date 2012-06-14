@@ -18,11 +18,6 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#include "psp.hpp"
-
-#include "./DistHelmholtz/InitializeFinalize-incl.hpp"
-#include "./DistHelmholtz/Solve-incl.hpp"
-
 namespace psp {
 
 template<typename R>
@@ -466,6 +461,11 @@ DistHelmholtz<R>::DistHelmholtz
     cliq::symbolic::SymmetricFactorization
     ( topSymbolicOrig, topSymbolicFact_, true );
 }
+
+template<typename R>
+inline
+DistHelmholtz<R>::~DistHelmholtz()
+{ }
 
 template<typename R>
 int
@@ -1931,6 +1931,3 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
 }
 
 } // namespace psp
-
-template class psp::DistHelmholtz<float>;
-template class psp::DistHelmholtz<double>;

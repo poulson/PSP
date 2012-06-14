@@ -337,15 +337,14 @@ private:
     };
 };
 
+} // namespace psp
+
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
 //----------------------------------------------------------------------------//
 
-template<typename R>
-inline 
-DistHelmholtz<R>::~DistHelmholtz() 
-{ }
-
-} // namespace psp
+#include "./dist_helmholtz/main.hpp"
+#include "./dist_helmholtz/initialize_finalize.hpp"
+#include "./dist_helmholtz/solve.hpp"
 
 #endif // PSP_DIST_HELMHOLTZ_HPP
