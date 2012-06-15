@@ -54,32 +54,38 @@ inline void DistCompressedBlockLDL
     bottomDistFront.BGreens.clear();
     bottomDistFront.ACoefficients.clear();
     bottomDistFront.BCoefficients.clear();
-    const int numKeptModes = topLocalFront.AGreens.size();
-    bottomDistFront.AGreens.resize( numKeptModes );
-    bottomDistFront.BGreens.resize( numKeptModes );
-    bottomDistFront.ACoefficients.resize( numKeptModes );
-    bottomDistFront.BCoefficients.resize( numKeptModes );
-    for( int t=0; t<numKeptModes; ++t )
+    const int numKeptModesA = topLocalFront.AGreens.size();
+    const int numKeptModesB = topLocalFront.BGreens.size();
+    bottomDistFront.AGreens.resize( numKeptModesA );
+    bottomDistFront.BGreens.resize( numKeptModesB );
+    bottomDistFront.ACoefficients.resize( numKeptModesA );
+    bottomDistFront.BCoefficients.resize( numKeptModesB );
+    for( int t=0; t<numKeptModesA; ++t )
     {
         DistMatrix<F>& distAGreen = bottomDistFront.AGreens[t];
-        DistMatrix<F>& distBGreen = bottomDistFront.BGreens[t];
         DistMatrix<F,STAR,STAR>& distACoeff = bottomDistFront.ACoefficients[t];
-        DistMatrix<F,STAR,STAR>& distBCoeff = bottomDistFront.BCoefficients[t];
 
         const Matrix<F>& localAGreen = topLocalFront.AGreens[t];
-        const Matrix<F>& localBGreen = topLocalFront.BGreens[t];
         const Matrix<F>& localACoeff = topLocalFront.ACoefficients[t];
-        const Matrix<F>& localBCoeff = topLocalFront.BCoefficients[t];
 
         distAGreen.LockedView
         ( localAGreen.Height(), localAGreen.Width(), 0, 0,
           localAGreen.LockedBuffer(), localAGreen.LDim(), bottomGrid );
-        distBGreen.LockedView
-        ( localBGreen.Height(), localBGreen.Width(), 0, 0,
-          localBGreen.LockedBuffer(), localBGreen.LDim(), bottomGrid );
         distACoeff.LockedView
         ( localACoeff.Height(), localACoeff.Width(),
           localACoeff.LockedBuffer(), localACoeff.LDim(), bottomGrid );
+    }
+    for( int t=0; t<numKeptModesB; ++t )
+    {
+        DistMatrix<F>& distBGreen = bottomDistFront.BGreens[t];
+        DistMatrix<F,STAR,STAR>& distBCoeff = bottomDistFront.BCoefficients[t];
+
+        const Matrix<F>& localBGreen = topLocalFront.BGreens[t];
+        const Matrix<F>& localBCoeff = topLocalFront.BCoefficients[t];
+
+        distBGreen.LockedView
+        ( localBGreen.Height(), localBGreen.Width(), 0, 0,
+          localBGreen.LockedBuffer(), localBGreen.LDim(), bottomGrid );
         distBCoeff.LockedView
         ( localBCoeff.Height(), localBCoeff.Width(),
           localBCoeff.LockedBuffer(), localBCoeff.LDim(), bottomGrid );

@@ -24,14 +24,15 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Overthrust <omega> <imagShift> <numPlanesPerPanel> "
-                 "<fact blocksize> <solve blocksize> <accelerate?> <SQMR?> "
+                 "<fact blocksize> <solve blocksize> <panelScheme> <SQMR?> "
                  "<viz?>\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
               << "  <imagShift>: imaginary shift [2 pi is standard]\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
-              << "  <accelerate?>: accelerate solves iff !=0\n"
+              << "  <panel scheme>: NORMAL_1D=0, FAST_2D_LDL=1, "
+                 "COMPRESSED_2D_BLOCK_LDL=2\n"
               << "  <SQMR?>: GMRES iff 0, SQMR otherwise\n"
               << "  <full viz?>: Full visualization iff != 0\n"
               << std::endl;
@@ -40,16 +41,16 @@ void Usage()
 int
 main( int argc, char* argv[] )
 {
-    clique::Initialize( argc, argv );
-    clique::mpi::Comm comm = clique::mpi::COMM_WORLD;
-    const int commSize = clique::mpi::CommSize( comm );
-    const int commRank = clique::mpi::CommRank( comm );
+    psp::Initialize( argc, argv );
+    psp::mpi::Comm comm = psp::mpi::COMM_WORLD;
+    const int commSize = psp::mpi::CommSize( comm );
+    const int commRank = psp::mpi::CommRank( comm );
 
     if( argc < 9 )
     {
         if( commRank == 0 )
             Usage();
-        clique::Finalize();
+        psp::Finalize();
         return 0;
     }
     int argNum=1;
@@ -58,7 +59,7 @@ main( int argc, char* argv[] )
     const int numPlanesPerPanel = atoi( argv[argNum++] );
     const int factBlocksize = atoi( argv[argNum++] );
     const int solveBlocksize = atoi( argv[argNum++] );
-    const bool accelerate = atoi( argv[argNum++] );
+    const PanelScheme panelScheme = (PanelScheme)atoi( argv[argNum++] );
     const bool useSQMR = atoi( argv[argNum++] );
     const bool fullVisualize = atoi( argv[argNum++] );
 
@@ -149,19 +150,19 @@ main( int argc, char* argv[] )
                 std::cout.flush();
             }
             velocity.WriteVolume("velocity");
-            elemental::mpi::Barrier( comm );
+            psp::mpi::Barrier( comm );
             if( commRank == 0 )
                 std::cout << "done" << std::endl;
         }
 
-        elemental::SetBlocksize( factBlocksize );
+        elem::SetBlocksize( factBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
-        clique::mpi::Barrier( comm );
-        const double initialStartTime = clique::mpi::Time(); 
-        helmholtz.Initialize( velocity, accelerate );
-        clique::mpi::Barrier( comm );
-        const double initialStopTime = clique::mpi::Time();
+        psp::mpi::Barrier( comm );
+        const double initialStartTime = psp::mpi::Time(); 
+        helmholtz.Initialize( velocity, panelScheme );
+        psp::mpi::Barrier( comm );
+        const double initialStopTime = psp::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;
         if( commRank == 0 )
             std::cout << "Finished initialization: " << initialTime 
@@ -228,17 +229,17 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
-        elemental::SetBlocksize( solveBlocksize );
+        elem::SetBlocksize( solveBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
-        clique::mpi::Barrier( comm );
-        const double solveStartTime = clique::mpi::Time();
+        psp::mpi::Barrier( comm );
+        const double solveStartTime = psp::mpi::Time();
         if( useSQMR )
             helmholtz.SolveWithSQMR( B );
         else
             helmholtz.SolveWithGMRES( B, 20, 1e-5 );
-        clique::mpi::Barrier( comm );
-        const double solveStopTime = clique::mpi::Time();
+        psp::mpi::Barrier( comm );
+        const double solveStopTime = psp::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
         if( commRank == 0 )
             std::cout << "Finished solve: " << solveTime << " seconds." 
@@ -266,11 +267,12 @@ main( int argc, char* argv[] )
         std::cerr << "Caught exception on process " << commRank << ":\n"
                   << e.what() << std::endl;
 #ifndef RELEASE
-        elemental::DumpCallStack();
-        clique::DumpCallStack();
+        elem::DumpCallStack();
+        cliq::DumpCallStack();
+        psp::DumpCallStack();
 #endif
     }
 
-    clique::Finalize();
+    psp::Finalize();
     return 0;
 }

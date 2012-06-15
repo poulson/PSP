@@ -26,11 +26,13 @@ namespace psp {
 // All fronts of L are required to be initialized to the expansions of the 
 // original sparse matrix before calling the following factorizations.
 
+// Default to the QR algorithm since I have run into several problems with 
+// the Divide and Conquer version, even in LAPACK 3.3.1.
 template<typename F>
 void CompressedBlockLDL
 ( Orientation orientation, 
   cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
-  bool useQR=false );
+  bool useQR=true );
 
 } // namespace psp
 

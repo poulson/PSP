@@ -44,16 +44,16 @@ void Usage()
 int
 main( int argc, char* argv[] )
 {
-    cliq::Initialize( argc, argv );
-    cliq::mpi::Comm comm = cliq::mpi::COMM_WORLD;
-    const int commSize = cliq::mpi::CommSize( comm );
-    const int commRank = cliq::mpi::CommRank( comm );
+    psp::Initialize( argc, argv );
+    psp::mpi::Comm comm = psp::mpi::COMM_WORLD;
+    const int commSize = psp::mpi::CommSize( comm );
+    const int commRank = psp::mpi::CommRank( comm );
 
     if( argc < 12 )
     {
         if( commRank == 0 )
             Usage();
-        cliq::Finalize();
+        psp::Finalize();
         return 0;
     }
     int argNum = 1;
@@ -151,11 +151,11 @@ main( int argc, char* argv[] )
         elem::SetBlocksize( factBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
-        cliq::mpi::Barrier( comm );
-        const double initialStartTime = cliq::mpi::Time(); 
+        psp::mpi::Barrier( comm );
+        const double initialStartTime = psp::mpi::Time(); 
         helmholtz.Initialize( velocity, panelScheme );
-        cliq::mpi::Barrier( comm );
-        const double initialStopTime = cliq::mpi::Time();
+        psp::mpi::Barrier( comm );
+        const double initialStopTime = psp::mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;
         if( commRank == 0 )
             std::cout << "Finished initialization: " << initialTime 
@@ -194,14 +194,14 @@ main( int argc, char* argv[] )
         elem::SetBlocksize( solveBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
-        cliq::mpi::Barrier( comm );
-        const double solveStartTime = cliq::mpi::Time();
+        psp::mpi::Barrier( comm );
+        const double solveStartTime = psp::mpi::Time();
         if( useSQMR )
             helmholtz.SolveWithSQMR( B );
         else
             helmholtz.SolveWithGMRES( B );
-        cliq::mpi::Barrier( comm );
-        const double solveStopTime = cliq::mpi::Time();
+        psp::mpi::Barrier( comm );
+        const double solveStopTime = psp::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
         if( commRank == 0 )
             std::cout << "Finished solve: " << solveTime << " seconds." 
@@ -231,9 +231,10 @@ main( int argc, char* argv[] )
 #ifndef RELEASE
         elem::DumpCallStack();
         cliq::DumpCallStack();
+        psp::DumpCallStack();
 #endif
     }
 
-    cliq::Finalize();
+    psp::Finalize();
     return 0;
 }

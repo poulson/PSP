@@ -94,7 +94,7 @@ inline void DistFrontCompression
     // Shuffle A into tall-skinny form
     const int s1 = A.Height() / depth;
     const int s2 = A.Width() / depth;
-    DistMatrix<C> Z( s2*s2, depth*depth, g );
+    DistMatrix<C> Z( s1*s2, depth*depth, g );
     DistMatrix<C,VC,STAR> Z_VC_STAR( g );
     {
         // Count the total amount of send data from A
@@ -301,6 +301,7 @@ inline void DistFrontCompression
 
     DistMatrix<C> U( g );
     DistMatrix<C,STAR,STAR> V_STAR_STAR( g );
+    if( Z.Height() >= 1.5*Z.Width() )
     {
         // QR
         DistMatrix<C,MD,STAR> t( g );
@@ -333,6 +334,18 @@ inline void DistFrontCompression
         MakeZeros( UB );
         elem::ApplyPackedReflectors
         ( LEFT, LOWER, VERTICAL, BACKWARD, UNCONJUGATED, 0, Z, t, U );
+    }
+    else
+    {
+        DistMatrix<R,STAR,STAR> s_STAR_STAR(g);
+        DistMatrix<C,STAR,STAR> U_STAR_STAR(g);
+        U_STAR_STAR = Z;
+        elem::SVD
+        ( U_STAR_STAR.LocalMatrix(), 
+          s_STAR_STAR.LocalMatrix(), 
+          V_STAR_STAR.LocalMatrix() );
+        internal::CompressSVD( U_STAR_STAR, s_STAR_STAR, V_STAR_STAR );
+        DiagonalScale( RIGHT, NORMAL, s_STAR_STAR, V_STAR_STAR );
     }
 
     // Unpack the columns of U and V into 'greens' and 'coefficients'
