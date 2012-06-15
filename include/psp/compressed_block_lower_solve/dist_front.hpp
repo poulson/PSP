@@ -103,7 +103,6 @@ DistFrontCompressedBlockLowerForwardSolve
     {
         const int sB = front.sB;
 
-        DistMatrix<F,VC,STAR> YB(g), ZB(g);
         std::vector<DistMatrix<F,VC,STAR> > XBBlocks, ZBBlocks;
         XBBlocks.resize( depth );
         ZBBlocks.resize( depth );
@@ -161,6 +160,7 @@ DistFrontCompressedBlockLowerBackwardSolve
 #ifndef RELEASE
     PushCallStack();
 #endif
+    const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
     if( numKeptModesB == 0 )
@@ -171,16 +171,118 @@ DistFrontCompressedBlockLowerBackwardSolve
         return;
     }
 
-    const Grid& g = *front.grid;
+    const int sT = front.sT;
+    const int sB = front.sB;
+    const int depth = front.depth;
+    const int snSize = sT*depth;
+    const int numRhs = X.Width();
+    const bool conjugated = ( orientation==ADJOINT ? true : false );
+
+    DistMatrix<F,VC,STAR> XT(g),
+                          XB(g);
+    elem::PartitionDown
+    ( X, XT,
+         XB, snSize );
 
     // YT := LB^[T/H] XB
     //     = (C_B o G_B)^[T/H] XB
     //     = (C_B^[T/H] o G_B^[T/H]) XB
-    // TODO
+    DistMatrix<F,VC,STAR> YT(g);
+    {
+        Zeros( snSize, numRhs, YT );
+        std::vector<DistMatrix<F,VR,STAR> > YTBlocks, ZTBlocks;
+        YTBlocks.resize( depth );
+        ZTBlocks.resize( depth );
+        for( int i=0; i<depth; ++i )
+        {
+            YTBlocks[i].SetGrid( g );
+            ZTBlocks[i].SetGrid( g );
+            Zeros( sT, numRhs, YTBlocks[i] );
+            Zeros( sT, numRhs, ZTBlocks[i] );
+        }
+        DistMatrix<F,VC,STAR> YTBlock(g), XBBlock(g);
+        DistMatrix<F,VC,STAR> YTBlock_VC_STAR(g);
+        DistMatrix<F,MC,STAR> XBBlock_MC_STAR(g);
+        DistMatrix<F,MR,STAR> ZTBlock_MR_STAR(g);
+        Zeros( sT, numRhs, ZTBlock_MR_STAR );
+        for( int t=0; t<numKeptModesB; ++t )
+        {
+            const DistMatrix<F>& GB = front.BGreens[t];
+            const DistMatrix<F,STAR,STAR>& CB = front.BCoefficients[t];
+
+            XBBlock_MC_STAR.AlignWith( GB );
+            for( int j=0; j<depth; ++j )
+            {
+                XBBlock.LockedView( XB, j*sB, 0, sB, numRhs );
+                XBBlock_MC_STAR = XBBlock;
+                elem::internal::LocalGemm
+                ( orientation, NORMAL,
+                  (F)1, GB, XBBlock_MC_STAR, (F)0, ZTBlock_MR_STAR );
+                ZTBlocks[j].SumScatterFrom( ZTBlock_MR_STAR );
+            }
+            XBBlock_MC_STAR.FreeAlignments();
+
+            for( int i=0; i<depth; ++i )
+            {
+                for( int j=0; j<depth; ++j )
+                {
+                    const F entry = CB.Get(j,i);
+                    const F scalar = ( conjugated ? Conj(entry) : entry );
+                    elem::Axpy( scalar, ZTBlocks[j], YTBlocks[i] );
+                }
+                YTBlock.View( YT, i*sT, 0, sT, numRhs );
+                YTBlock_VC_STAR.AlignWith( YTBlock );
+                YTBlock_VC_STAR = YTBlocks[i];
+                elem::Axpy( (F)1, YTBlock_VC_STAR, YTBlock );
+                YTBlock_VC_STAR.FreeAlignments();
+            }
+        }
+    }
 
     // XT := XT - inv(ATL) YT
     //     = XT - (C_A o G_A) YT
-    // TODO
+    std::vector<DistMatrix<F,VC,STAR> > XTBlocks, ZTBlocks;
+    XTBlocks.resize( depth );
+    ZTBlocks.resize( depth );
+    for( int i=0; i<depth; ++i )
+    {
+        XTBlocks[i].SetGrid( g );
+        ZTBlocks[i].SetGrid( g );
+        Zeros( sT, numRhs, XTBlocks[i] );
+        Zeros( sT, numRhs, ZTBlocks[i] );
+    }
+    DistMatrix<F,VC,STAR> XTBlock(g), YTBlock(g);
+    DistMatrix<F,MR,STAR> YTBlock_MR_STAR(g);
+    DistMatrix<F,MC,STAR> ZTBlock_MC_STAR(g);
+    Zeros( sT, numRhs, ZTBlock_MC_STAR );
+    for( int t=0; t<numKeptModesA; ++t )
+    {
+        const DistMatrix<F>& GA = front.AGreens[t];
+        const DistMatrix<F,STAR,STAR>& CA = front.ACoefficients[t];
+
+        YTBlock_MR_STAR.AlignWith( GA );
+        for( int j=0; j<depth; ++j )
+        {
+            YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
+            YTBlock_MR_STAR = YTBlock;
+            elem::internal::LocalGemm
+            ( NORMAL, NORMAL,
+              (F)1, GA, YTBlock_MR_STAR, (F)0, ZTBlock_MC_STAR );
+            ZTBlocks[j].SumScatterFrom( ZTBlock_MC_STAR );
+        }
+        YTBlock_MR_STAR.FreeAlignments();
+
+        for( int i=0; i<depth; ++i )
+        {
+            for( int j=0; j<depth; ++j )
+            {
+                const F scalar = CA.Get(i,j);
+                elem::Axpy( scalar, ZTBlocks[j], XTBlocks[i] );
+            }
+            XTBlock.View( XT, i*sT, 0, sT, numRhs );
+            elem::Axpy( (F)-1, XTBlocks[i], XTBlock );
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
