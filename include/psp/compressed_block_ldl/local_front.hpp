@@ -116,6 +116,7 @@ inline void LocalFrontCompression
         ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
         W = ZT;
         elem::MakeTrapezoidal( LEFT, UPPER, 0, W );
+        elem::SVD( W, s, V, useQR );
         internal::CompressSVD( W, s, V );
         elem::DiagonalScale( RIGHT, NORMAL, s, V );
 
@@ -131,34 +132,6 @@ inline void LocalFrontCompression
         elem::ApplyPackedReflectors
         ( LEFT, LOWER, VERTICAL, BACKWARD, UNCONJUGATED, 0, Z, t, U );
     }
-    else if( Z.Width() > 1.5*Z.Height() )
-    {
-        // LQ
-        Matrix<C> t;
-        elem::LQ( Z, t );
-        
-        // Compress
-        Matrix<R> s;
-        Matrix<C> ZL, W;
-        ZL.View( Z, 0, 0, Z.Height(), Z.Height() );
-        U = ZL;
-        elem::MakeTrapezoidal( LEFT, LOWER, 0, U );
-        internal::CompressSVD( U, s, W );
-        elem::DiagonalScale( RIGHT, NORMAL, s, U );
-
-        // Reexpand (TODO: Think about explicitly expanded reflectors)
-        const int numKeptModes = s.Height();
-        V.ResizeTo( Z.Width(), numKeptModes );
-        Matrix<C> VT, VB;
-        elem::PartitionDown 
-        ( V, VT,
-             VB, Z.Height() );
-        VT = W;
-        MakeZeros( VB );
-        // TODO: Think about whether or not this should be conjugated
-        elem::ApplyPackedReflectors
-        ( LEFT, UPPER, HORIZONTAL, BACKWARD, CONJUGATED, 0, Z, t, V );
-    }
     else
     {
         Matrix<R> s;
@@ -170,20 +143,23 @@ inline void LocalFrontCompression
 
     // Unshuffle each column of U into an s1 x s2 matrix in 'greens'
     // Unshuffle each column of V into a depth x depth matrix in 'coefficients'
-    const int numKept = U.Width();
-    greens.resize( numKept );
-    coefficients.resize( numKept );
-    for( int t=0; t<numKept; ++t )    
+    const int numKeptModes = U.Width();
+    greens.resize( numKeptModes );
+    coefficients.resize( numKeptModes );
+    for( int t=0; t<numKeptModes; ++t )    
     {
         greens[t].ResizeTo( s1, s2 );
         coefficients[t].ResizeTo( depth, depth );
 
+        // Unshuffle U 
         for( int i2=0; i2<s2; ++i2 )
         {
             C* greenCol = greens[t].Buffer(0,i2);
             const C* UCol = U.LockedBuffer(i2*s1,t);
             elem::MemCopy( greenCol, UCol, s1 );
         }
+
+        // Unshuffle V
         for( int j2=0; j2<depth; ++j2 )
         {
             C* coefficientCol = coefficients[t].Buffer(0,j2);
