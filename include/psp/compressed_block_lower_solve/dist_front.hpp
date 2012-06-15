@@ -158,7 +158,7 @@ DistFrontCompressedBlockLowerBackwardSolve
   const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
 {
 #ifndef RELEASE
-    PushCallStack();
+    PushCallStack("DistFrontCompressedBlockLowerBackwardSolve");
 #endif
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
