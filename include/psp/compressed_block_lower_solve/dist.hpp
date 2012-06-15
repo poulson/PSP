@@ -61,10 +61,9 @@ inline void DistCompressedBlockLowerForwardSolve
     }
 
     // Copy the information from the local portion into the distributed leaf
-    // TODO: Avoid references to front.frontL, as it will be emptied
     const LocalCompressedFront<F>& localRootFront = L.local.fronts.back();
     const DistCompressedFront<F>& distLeafFront = L.dist.fronts[0];
-    const Grid& leafGrid = distLeafFront.frontL.Grid();
+    const Grid& leafGrid = *distLeafFront.grid;
     distLeafFront.work1d.LockedView
     ( localRootFront.work.Height(), localRootFront.work.Width(), 0,
       localRootFront.work.LockedBuffer(), localRootFront.work.LDim(), 
@@ -77,14 +76,17 @@ inline void DistCompressedBlockLowerForwardSolve
         const DistSymmFactSupernode& sn = S.dist.supernodes[s];
         const DistCompressedFront<F>& childFront = L.dist.fronts[s-1];
         const DistCompressedFront<F>& front = L.dist.fronts[s];
-        const Grid& childGrid = childFront.frontL.Grid();
-        const Grid& grid = front.frontL.Grid();
+        const Grid& childGrid = *childFront.grid;
+        const Grid& grid = *front.grid;
         mpi::Comm comm = grid.VCComm();
         mpi::Comm childComm = childGrid.VCComm();
         const int commSize = mpi::CommSize( comm );
         const int commRank = mpi::CommRank( comm );
         const int childCommSize = mpi::CommSize( childComm );
-        const int frontHeight = front.frontL.Height();
+        const int sT = front.sT;
+        const int sB = front.sB;
+        const int depth = front.depth;
+        const int frontHeight = (sT+sB)*depth;
 
         // Set up a workspace
         DistMatrix<F,VC,STAR>& W = front.work1d;
@@ -231,8 +233,7 @@ inline void DistCompressedBlockLowerForwardSolve
         recvDispls.clear();
 
         // Now that the RHS is set up, perform this supernode's solve
-        // TODO: Switch to an approach that exploits the compression
-        cliq::numeric::DistFrontBlockLowerForwardSolve( front.frontL, W );
+        DistFrontCompressedBlockLowerForwardSolve( front, W );
 
         // Store the supernode portion of the result
         localXT = WT.LocalMatrix();
@@ -266,16 +267,14 @@ inline void DistCompressedBlockLowerBackwardSolve
     }
 
     // Directly operate on the root separator's portion of the right-hand sides
-    // TODO: Avoid references to front.frontL, as it will be emptied
     const DistSymmFactSupernode& rootSN = S.dist.supernodes.back();
     const DistCompressedFront<F>& rootFront = L.dist.fronts.back();
-    const Grid& rootGrid = rootFront.frontL.Grid();
+    const Grid& rootGrid = *rootFront.grid;
     rootFront.work1d.View
     ( rootSN.size, width, 0,
       localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
-    // TODO: Use compressed version
-    cliq::numeric::DistFrontBlockLowerBackwardSolve
-    ( orientation, rootFront.frontL, rootFront.work1d );
+    DistFrontCompressedBlockLowerBackwardSolve
+    ( orientation, rootFront, rootFront.work1d );
 
     std::vector<int>::const_iterator it;
     for( int s=numDistSupernodes-2; s>=0; --s )
@@ -284,14 +283,17 @@ inline void DistCompressedBlockLowerBackwardSolve
         const DistSymmFactSupernode& sn = S.dist.supernodes[s];
         const DistCompressedFront<F>& parentFront = L.dist.fronts[s+1];
         const DistCompressedFront<F>& front = L.dist.fronts[s];
-        const Grid& grid = front.frontL.Grid();
-        const Grid& parentGrid = parentFront.frontL.Grid();
+        const Grid& grid = *front.grid;
+        const Grid& parentGrid = *parentFront.grid;
         mpi::Comm comm = grid.VCComm(); 
         mpi::Comm parentComm = parentGrid.VCComm();
         const int commSize = mpi::CommSize( comm );
         const int parentCommSize = mpi::CommSize( parentComm );
         const int parentCommRank = mpi::CommRank( parentComm );
-        const int frontHeight = front.frontL.Height();
+        const int sT = front.sT;
+        const int sB = front.sB;
+        const int depth = front.depth;
+        const int frontHeight = (sT+sB)*depth;
 
         // Set up a workspace
         DistMatrix<F,VC,STAR>& W = front.work1d;
@@ -440,10 +442,8 @@ inline void DistCompressedBlockLowerBackwardSolve
         recvCounts.clear();
         recvDispls.clear();
 
-        // Call the custom supernode backward solve
-        // TODO: Use compressed version
-        cliq::numeric::DistFrontBlockLowerBackwardSolve
-        ( orientation, front.frontL, W );
+        // Use the distributed compressed data
+        DistFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
 
         // Store the supernode portion of the result
         localXT = WT.LocalMatrix();

@@ -23,7 +23,67 @@
 
 namespace psp {
 
-// TODO: Add custom compressed routines
+template<typename F>
+inline void
+DistFrontCompressedBlockLowerForwardSolve
+( const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
+{
+#ifndef RELEASE
+    PushCallStack("DistFrontCompressedBlockLowerForwardSolve");
+#endif
+    const int numKeptModesA = front.AGreens.size();
+    const int numKeptModesB = front.BGreens.size();
+
+    const Grid& g = *front.grid;
+
+    // XT := inv(ATL) XT
+    //     = (C_A o G_A) XT
+    // TODO    
+
+    // XB := XB - LB XT
+    //     = XB - (C_B o G_B) XT
+    if( numKeptModesB != 0 )
+    {
+        // TODO 
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename F>
+inline void
+DistFrontCompressedBlockLowerBackwardSolve
+( Orientation orientation, 
+  const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
+{
+#ifndef RELEASE
+    PushCallStack();
+#endif
+    const int numKeptModesA = front.AGreens.size();
+    const int numKeptModesB = front.BGreens.size();
+    if( numKeptModesB == 0 )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
+    const Grid& g = *front.grid;
+
+    // YT := LB^[T/H] XB
+    //     = (C_B o G_B)^[T/H] XB
+    //     = (C_B^[T/H] o G_B^[T/H]) XB
+    // TODO
+
+    // XT := XT - inv(ATL) YT
+    //     = XT - (C_A o G_A) YT
+    // TODO
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
 } // namespace psp
 

@@ -38,6 +38,7 @@ struct LocalCompressedFront
     Matrix<F> frontL;
     mutable Matrix<F> work;
 
+    int sT, sB, depth;
     std::vector<Matrix<F> > AGreens, BGreens;
     std::vector<Matrix<F> > ACoefficients, BCoefficients;
 
@@ -58,6 +59,8 @@ struct DistCompressedFront
     mutable DistMatrix<F> work2d;
     mutable DistMatrix<F,VC,STAR> work1d;
 
+    int sT, sB, depth;
+    const Grid* grid;
     std::vector<DistMatrix<F> > AGreens, BGreens;
     std::vector<DistMatrix<F,STAR,STAR> > ACoefficients, BCoefficients;
 };

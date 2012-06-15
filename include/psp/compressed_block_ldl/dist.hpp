@@ -292,6 +292,10 @@ inline void DistCompressedBlockLDL
         elem::PartitionDown
         ( front.frontL, A,
                         B, sn.size ); 
+        front.sT = A.Height() / depth;
+        front.sB = B.Height() / depth;
+        front.depth = depth;
+        front.grid = &grid;
         DistFrontCompression
         ( A, front.AGreens, front.ACoefficients, depth, useQR );
         DistFrontCompression

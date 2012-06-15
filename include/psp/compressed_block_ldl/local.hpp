@@ -113,6 +113,9 @@ inline void LocalCompressedBlockLDL
         elem::PartitionDown
         ( frontL, A,
                   B, sn.size );
+        front.sT = A.Height() / depth;
+        front.sB = B.Height() / depth;
+        front.depth = depth;
         LocalFrontCompression
         ( A, front.AGreens, front.ACoefficients, depth, useQR );
         if( numChildren == 0 )

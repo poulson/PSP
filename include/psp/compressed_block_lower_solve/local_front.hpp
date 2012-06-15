@@ -23,7 +23,194 @@
 
 namespace psp {
 
-// TODO: Add compressed versions
+template<typename F>
+inline void
+LocalFrontCompressedBlockLowerForwardSolve
+( const LocalCompressedFront<F>& front, Matrix<F>& X )
+{
+#ifndef RELEASE
+    PushCallStack("LocalFrontCompressedBlockLowerForwardSolve");
+#endif
+    const int numKeptModesA = front.AGreens.size();
+    const int numKeptModesB = front.BGreens.size();
+
+    const int sT = front.sT;     
+    const int depth = front.depth;
+    const int snSize = sT*depth;
+    const int numRhs = X.Width();
+
+    Matrix<F> XT,
+              XB;
+    elem::PartitionDown
+    ( X, XT,
+         XB, snSize );
+
+    // XT := inv(ATL) XT
+    //     = (C_A o G_A) XT
+    Matrix<F> YT, ZT;
+    YT = XT;
+    MakeZeros( XT );
+    Zeros( snSize, numRhs, ZT );
+    Matrix<F> XTBlock, YTBlock, ZTBlock;
+    for( int t=0; t<numKeptModesA; ++t )
+    {
+        const Matrix<F>& GA = front.AGreens[t];
+        const Matrix<F>& CA = front.ACoefficients[t];
+
+        for( int j=0; j<depth; ++j )
+        {
+            ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
+            YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
+            elem::Gemm( NORMAL, NORMAL, (F)1, GA, YTBlock, (F)0, ZTBlock );
+        }
+
+        for( int i=0; i<depth; ++i )
+        {
+            XTBlock.View( XT, i*sT, 0, sT, numRhs );
+            for( int j=0; j<depth; ++j )
+            {
+                ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
+                const F scalar = CA.Get(i,j);
+                elem::Axpy( scalar, ZTBlock, XTBlock );
+            }
+        }
+    }
+    YT.Empty();
+    ZT.Empty();
+
+    // XB := XB - LB XT
+    //     = XB - (C_B o G_B) XT
+    if( numKeptModesB != 0 )
+    {
+        const int sB = front.sB;
+
+        Matrix<F> YB, ZB;
+        Zeros( XB.Height(), numRhs, YB );
+        Zeros( XB.Height(), numRhs, ZB );
+        Matrix<F> XBBlock, YBBlock, ZBBlock;
+        for( int t=0; t<numKeptModesB; ++t )
+        {
+            const Matrix<F>& GB = front.BGreens[t];
+            const Matrix<F>& CB = front.BCoefficients[t];
+
+            for( int j=0; j<depth; ++j )
+            {
+                ZBBlock.View( ZB, j*sB, 0, sB, numRhs );
+                XTBlock.LockedView( XT, j*sT, 0, sT, numRhs );
+                elem::Gemm( NORMAL, NORMAL, (F)1, GB, XTBlock, (F)0, ZBBlock );
+            }
+
+            for( int i=0; i<depth; ++i )
+            {
+                XBBlock.View( XB, i*sB, 0, sB, numRhs );
+                for( int j=0; j<depth; ++j )
+                {
+                    ZBBlock.LockedView( ZB, j*sB, 0, sB, numRhs );
+                    const F scalar = CB.Get(i,j);
+                    elem::Axpy( -scalar, ZBBlock, XBBlock );
+                }
+            }
+        }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename F>
+inline void
+LocalFrontCompressedBlockLowerBackwardSolve
+( Orientation orientation, const LocalCompressedFront<F>& front, Matrix<F>& X )
+{
+#ifndef RELEASE
+    PushCallStack("LocalFrontCompressedBlockLowerBackwardSolve");
+#endif
+    const int numKeptModesA = front.AGreens.size();
+    const int numKeptModesB = front.BGreens.size();
+
+    if( numKeptModesB == 0 )
+    {
+#ifndef RELEASE
+        PopCallStack();
+#endif
+        return;
+    }
+
+    const int sT = front.sT;
+    const int sB = front.sB;
+    const int depth = front.depth;
+    const int snSize = sT*depth;
+    const int numRhs = X.Width();
+    const bool conjugate = ( orientation==ADJOINT ? true : false );
+
+    Matrix<F> XT,
+              XB;
+    elem::PartitionDown
+    ( X, XT,
+         XB, snSize );
+
+    // YT := LB^[T/H] XB,
+    //     = (C_B o G_B)^[T/H] XB
+    //     = (C_B^[T/H] o G_B^[T/H]) XB
+    Matrix<F> YT, ZT;
+    Zeros( snSize, numRhs, YT );
+    Zeros( snSize, numRhs, ZT );
+    Matrix<F> XBBlock, YTBlock, ZTBlock;
+    for( int t=0; t<numKeptModesB; ++t )
+    {
+        const Matrix<F>& GB = front.BGreens[t];
+        const Matrix<F>& CB = front.BCoefficients[t];
+
+        for( int j=0; j<depth; ++j )    
+        {
+            ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
+            XBBlock.LockedView( XB, j*sB, 0, sB, numRhs );
+            elem::Gemm( orientation, NORMAL, (F)1, GB, XBBlock, (F)0, ZTBlock );
+        }
+
+        for( int i=0; i<depth; ++i )
+        {
+            YTBlock.View( YT, i*sT, 0, sT, numRhs );
+            for( int j=0; j<depth; ++j )
+            {
+                ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
+                const F entry = CB.Get(j,i);
+                const F scalar = ( conjugate ? Conj(entry) : entry );
+                elem::Axpy( scalar, ZTBlock, YTBlock );
+            }
+        }
+    }
+
+    // XT := XT - inv(ATL) YT
+    //     = XT - (C_A o G_A) YT
+    Matrix<F> XTBlock;
+    for( int t=0; t<numKeptModesA; ++t )
+    {
+        const Matrix<F>& GA = front.AGreens[t];
+        const Matrix<F>& CA = front.ACoefficients[t];
+
+        for( int j=0; j<depth; ++j )
+        {
+            ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
+            YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
+            elem::Gemm( NORMAL, NORMAL, (F)1, GA, YTBlock, (F)0, ZTBlock );
+        }
+
+        for( int i=0; i<depth; ++i )
+        {
+            XTBlock.View( XT, i*sT, 0, sT, numRhs );
+            for( int j=0; j<depth; ++j )
+            {
+                ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
+                const F scalar = CA.Get(i,j);
+                elem::Axpy( -scalar, ZTBlock, XTBlock );
+            }
+        }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
 } // namespace psp
 

@@ -50,18 +50,20 @@ inline void LocalCompressedBlockLowerForwardSolve
 #ifndef RELEASE
     PushCallStack("LocalCompressedBlockLowerForwardSolve");
 #endif
-    // TODO: Avoid references to front.frontL, as it will be emptied
     const int numLocalSupernodes = S.local.supernodes.size();
     const int width = X.Width();
     for( int s=0; s<numLocalSupernodes; ++s )
     {
         const LocalSymmFactSupernode& sn = S.local.supernodes[s];
         const LocalCompressedFront<F>& front = L.local.fronts[s];
-        const Matrix<F>& frontL = front.frontL;
+        const int sT = front.sT;
+        const int sB = front.sB;
+        const int depth = front.depth;
+        const int frontHeight = (sT+sB)*depth;
         Matrix<F>& W = front.work;
 
         // Set up a workspace
-        W.ResizeTo( frontL.Height(), width );
+        W.ResizeTo( frontHeight, width );
         Matrix<F> WT, WB;
         elem::PartitionDown
         ( W, WT,
@@ -113,8 +115,7 @@ inline void LocalCompressedBlockLowerForwardSolve
         // else numChildren == 0
 
         // Solve against this front
-        // TODO: Use compressed version
-        cliq::numeric::LocalFrontBlockLowerForwardSolve( frontL, W );
+        LocalFrontCompressedBlockLowerForwardSolve( front, W );
 
         // Store the supernode portion of the result
         XT = WT;
@@ -149,16 +150,18 @@ inline void LocalCompressedBlockLowerBackwardSolve
     L.local.fronts.back().work.LockedView
     ( L.dist.fronts[0].work1d.LocalMatrix() );
 
-    // TODO: Avoid references to front.frontL, as it will be emptied
     for( int s=numLocalSupernodes-2; s>=0; --s )
     {
         const LocalSymmFactSupernode& sn = S.local.supernodes[s];
         const LocalCompressedFront<F>& front = L.local.fronts[s];
-        const Matrix<F>& frontL = front.frontL;
+        const int sT = front.sT;
+        const int sB = front.sB;
+        const int depth = front.depth;
+        const int frontHeight = (sT+sB)*depth;
         Matrix<F>& W = front.work;
 
         // Set up a workspace
-        W.ResizeTo( frontL.Height(), width );
+        W.ResizeTo( frontHeight, width );
         Matrix<F> WT, WB;
         elem::PartitionDown
         ( W, WT,
@@ -195,9 +198,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
         }
 
         // Solve against this front
-        // TODO: Switch to compressed version
-        cliq::numeric::LocalFrontBlockLowerBackwardSolve
-        ( orientation, frontL, W );
+        LocalFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
 
         // Store the supernode portion of the result
         XT = WT;
