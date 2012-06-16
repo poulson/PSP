@@ -148,24 +148,24 @@ inline void LocalFrontCompression
     coefficients.resize( numKeptModes );
     for( int t=0; t<numKeptModes; ++t )    
     {
-        greens[t].ResizeTo( s1, s2 );
-        coefficients[t].ResizeTo( depth, depth );
+        Matrix<C>& G = greens[t];
+        Matrix<C>& D = coefficients[t];
+
+        G.ResizeTo( s1, s2 );
+        D.ResizeTo( depth, depth );
 
         // Unshuffle U 
         for( int i2=0; i2<s2; ++i2 )
         {
-            C* greenCol = greens[t].Buffer(0,i2);
+            C* greenCol = G.Buffer(0,i2);
             const C* UCol = U.LockedBuffer(i2*s1,t);
             elem::MemCopy( greenCol, UCol, s1 );
         }
 
         // Unshuffle V
         for( int j2=0; j2<depth; ++j2 )
-        {
-            C* coefficientCol = coefficients[t].Buffer(0,j2);
-            const C* VCol = V.LockedBuffer(j2*depth,t);
-            elem::MemCopy( coefficientCol, VCol, depth );
-        }
+            for( int j1=0; j1<depth; ++j1 )
+                D.Set(j1,j2,Conj(V.Get(j1+j2*depth,t)));
     }
 #ifndef RELEASE
     PopCallStack();

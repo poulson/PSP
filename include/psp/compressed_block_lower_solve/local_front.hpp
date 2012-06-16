@@ -70,8 +70,7 @@ LocalFrontCompressedBlockLowerForwardSolve
             for( int j=0; j<depth; ++j )
             {
                 ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
-                const F scalar = CA.Get(i,j);
-                elem::Axpy( scalar, ZTBlock, XTBlock );
+                elem::Axpy( CA.Get(i,j), ZTBlock, XTBlock );
             }
         }
     }
@@ -105,8 +104,7 @@ LocalFrontCompressedBlockLowerForwardSolve
                 for( int j=0; j<depth; ++j )
                 {
                     ZBBlock.LockedView( ZB, j*sB, 0, sB, numRhs );
-                    const F scalar = CB.Get(i,j);
-                    elem::Axpy( -scalar, ZBBlock, XBBlock );
+                    elem::Axpy( -CB.Get(i,j), ZBBlock, XBBlock );
                 }
             }
         }
@@ -201,8 +199,7 @@ LocalFrontCompressedBlockLowerBackwardSolve
             for( int j=0; j<depth; ++j )
             {
                 ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
-                const F scalar = CA.Get(i,j);
-                elem::Axpy( -scalar, ZTBlock, XTBlock );
+                elem::Axpy( -CA.Get(i,j), ZTBlock, XTBlock );
             }
         }
     }

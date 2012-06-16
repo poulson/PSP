@@ -593,22 +593,9 @@ DivideAndConquerSVD
     s.ResizeTo( k, 1 );
     Matrix<F> U( m, k );
     Matrix<F> VAdj( k, n );
-#ifndef RELEASE
-    Matrix<F> ACopy( A );
-    try {
-#endif
     lapack::DivideAndConquerSVD
     ( m, n, A.Buffer(), A.LDim(), s.Buffer(), U.Buffer(), U.LDim(),
       VAdj.Buffer(), VAdj.LDim() );
-#ifndef RELEASE
-    } 
-    catch( std::exception& e )
-    {
-        std::cerr << "lapack::DivideAndConquerSVD failed" << std::endl;
-        ACopy.Print("Problematic matrix for D&C:");
-        throw e;
-    }
-#endif
 
     A = U;
     Adjoint( VAdj, V );

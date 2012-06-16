@@ -354,10 +354,13 @@ inline void DistFrontCompression
     coefficients.resize( numKeptModes );
     for( int t=0; t<numKeptModes; ++t )
     {
-        greens[t].SetGrid( g );
-        greens[t].ResizeTo( s1, s2 );
-        coefficients[t].SetGrid( g );
-        coefficients[t].ResizeTo( depth, depth );
+        DistMatrix<C>& G = greens[t];
+        DistMatrix<C,STAR,STAR>& D = coefficients[t];
+
+        G.SetGrid( g );
+        D.SetGrid( g );
+        G.ResizeTo( s1, s2 );
+        D.ResizeTo( depth, depth );
 
         // Unshuffle U 
         // (if the number of processes evenly divided s1, this would just be
@@ -365,21 +368,18 @@ inline void DistFrontCompression
         // 
         // TODO: Optimize this...it will have an extremely high latency cost.
         //
-        DistMatrix<C> UStrip( g ), greenStrip( g );
+        DistMatrix<C> UStrip( g ), GStrip( g );
         for( int i2=0; i2<s2; ++i2 )
         {
             UStrip.LockedView( U, i2*s1, t, s1, 1 );
-            greenStrip.View( greens[t], 0, i2, s1, 1 );
-            greenStrip = UStrip; 
+            GStrip.View( G, 0, i2, s1, 1 );
+            GStrip = UStrip; 
         }
 
         // Unshuffle V
         for( int j2=0; j2<depth; ++j2 )
-        {
-            C* coefficientCol = coefficients[t].LocalBuffer(0,j2);
-            const C* VCol = V_STAR_STAR.LockedLocalBuffer(j2*depth,t);
-            elem::MemCopy( coefficientCol, VCol, depth );
-        }
+            for( int j1=0; j1<depth; ++j1 )
+                D.Set( j1, j2, Conj(V_STAR_STAR.Get(j1+j2*depth,t)) );
     }
 #ifndef RELEASE
     PopCallStack();

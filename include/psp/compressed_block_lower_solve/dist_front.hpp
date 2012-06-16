@@ -34,7 +34,7 @@ DistFrontCompressedBlockLowerForwardSolve
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
-
+    
     const int sT = front.sT;
     const int depth = front.depth;
     const int snSize = sT*depth;
@@ -48,8 +48,6 @@ DistFrontCompressedBlockLowerForwardSolve
 
     // XT := inv(ATL) XT
     //     = \sum_t (CA_t o GA_t) XT
-    DistMatrix<F,VC,STAR> YT( XT );
-    MakeZeros( XT );
     std::vector<DistMatrix<F,VC,STAR> > XTBlocks, ZTBlocks;
     XTBlocks.resize( depth );
     ZTBlocks.resize( depth );
@@ -60,8 +58,8 @@ DistFrontCompressedBlockLowerForwardSolve
         Zeros( sT, numRhs, XTBlocks[i] );
         Zeros( sT, numRhs, ZTBlocks[i] );
     }
-    DistMatrix<F,VC,STAR> YTBlock(g);
-    DistMatrix<F,MR,STAR> YTBlock_MR_STAR(g);
+    DistMatrix<F,VC,STAR> XTBlock(g);
+    DistMatrix<F,MR,STAR> XTBlock_MR_STAR(g);
     DistMatrix<F,MC,STAR> ZTBlock_MC_STAR( g );
     Zeros( sT, numRhs, ZTBlock_MC_STAR );
     for( int t=0; t<numKeptModesA; ++t )
@@ -69,30 +67,24 @@ DistFrontCompressedBlockLowerForwardSolve
         const DistMatrix<F>& GA = front.AGreens[t];
         const DistMatrix<F,STAR,STAR>& CA = front.ACoefficients[t];
 
-        YTBlock_MR_STAR.AlignWith( GA );
+        XTBlock_MR_STAR.AlignWith( GA );
         for( int j=0; j<depth; ++j )
         {
-            YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
-            YTBlock_MR_STAR = YTBlock;
+            XTBlock.LockedView( XT, j*sT, 0, sT, numRhs );
+            XTBlock_MR_STAR = XTBlock;
             elem::internal::LocalGemm
             ( NORMAL, NORMAL, 
-              (F)1, GA, YTBlock_MR_STAR, (F)0, ZTBlock_MC_STAR );
+              (F)1, GA, XTBlock_MR_STAR, (F)0, ZTBlock_MC_STAR );
             ZTBlocks[j].SumScatterFrom( ZTBlock_MC_STAR );
         }
-        YTBlock_MR_STAR.FreeAlignments();
+        XTBlock_MR_STAR.FreeAlignments();
 
         for( int i=0; i<depth; ++i )
-        {
             for( int j=0; j<depth; ++j )
-            {
-                const F scalar = CA.Get(i,j);
-                elem::Axpy( scalar, ZTBlocks[j], XTBlocks[i] );
-            }
-        }
+                elem::Axpy( CA.Get(i,j), ZTBlocks[j], XTBlocks[i] );
     }
     // Now that each block of XT has been formed, perform the necessary 
     // redistributions to fix alignments
-    DistMatrix<F,VC,STAR> XTBlock(g);
     for( int i=0; i<depth; ++i )
     {
         XTBlock.View( XT, i*sT, 0, sT, numRhs );
@@ -100,7 +92,7 @@ DistFrontCompressedBlockLowerForwardSolve
     }
     XTBlocks.clear();
     ZTBlocks.clear();
-    YTBlock_MR_STAR.Empty();
+    XTBlock_MR_STAR.Empty();
     ZTBlock_MC_STAR.Empty();
 
     // XB := XB - LB XT
@@ -141,13 +133,8 @@ DistFrontCompressedBlockLowerForwardSolve
             XTBlock_MR_STAR.FreeAlignments();
             
             for( int i=0; i<depth; ++i )
-            {
                 for( int j=0; j<depth; ++j )
-                {
-                    const F scalar = CB.Get(i,j);
-                    elem::Axpy( scalar, ZBBlocks[j], XBUpdates[i] );
-                }
-            }
+                    elem::Axpy( CB.Get(i,j), ZBBlocks[j], XBUpdates[i] );
         }
         // Now that the updates have been formed, perform the redistributions
         // necessary to subtract them from XB
@@ -175,6 +162,7 @@ DistFrontCompressedBlockLowerBackwardSolve
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
+
     if( numKeptModesB == 0 )
     {
 #ifndef RELEASE
@@ -199,17 +187,16 @@ DistFrontCompressedBlockLowerBackwardSolve
     // YT := LB^[T/H] XB
     //     = \sum_t (CB_t o GB_t)^[T/H] XB
     //     = \sum_t (CB_t^[T/H] o GB_t^[T/H]) XB
-    DistMatrix<F,VC,STAR> YT(g);
+    DistMatrix<F,VC,STAR> YT( snSize, numRhs, g );
     {
-        Zeros( snSize, numRhs, YT );
-        std::vector<DistMatrix<F,VR,STAR> > YTUpdates, ZTBlocks;
-        YTUpdates.resize( depth );
+        std::vector<DistMatrix<F,VR,STAR> > YTBlocks, ZTBlocks;
+        YTBlocks.resize( depth );
         ZTBlocks.resize( depth );
         for( int i=0; i<depth; ++i )
         {
-            YTUpdates[i].SetGrid( g );
+            YTBlocks[i].SetGrid( g );
             ZTBlocks[i].SetGrid( g );
-            Zeros( sT, numRhs, YTUpdates[i] );
+            Zeros( sT, numRhs, YTBlocks[i] );
             Zeros( sT, numRhs, ZTBlocks[i] );
         }
         DistMatrix<F,VC,STAR> XBBlock(g);
@@ -239,23 +226,19 @@ DistFrontCompressedBlockLowerBackwardSolve
                 {
                     const F entry = CB.Get(j,i);
                     const F scalar = ( conjugated ? Conj(entry) : entry );
-                    elem::Axpy( scalar, ZTBlocks[j], YTUpdates[i] );
+                    elem::Axpy( scalar, ZTBlocks[j], YTBlocks[i] );
                 }
             }
         }
 
-        // Each YT block update was accumulated in a [VR,* ] distribution for 
+        // Each YT block was accumulated in a [VR,* ] distribution for 
         // efficiency reasons, but we must now redistribute them into [VC,* ]
-        // distributions and add them onto YT
+        // distributions and put them in YT
         DistMatrix<F,VC,STAR> YTBlock(g);
-        DistMatrix<F,VC,STAR> YTUpdate_VC_STAR(g);
         for( int i=0; i<depth; ++i )
         {
             YTBlock.View( YT, i*sT, 0, sT, numRhs );
-            YTUpdate_VC_STAR.AlignWith( YTBlock );
-            YTUpdate_VC_STAR = YTUpdates[i];
-            elem::Axpy( (F)1, YTUpdate_VC_STAR, YTBlock );
-            YTUpdate_VC_STAR.FreeAlignments();
+            YTBlock = YTBlocks[i];
         }
     }
 
@@ -293,13 +276,8 @@ DistFrontCompressedBlockLowerBackwardSolve
         YTBlock_MR_STAR.FreeAlignments();
 
         for( int i=0; i<depth; ++i )
-        {
             for( int j=0; j<depth; ++j )
-            {
-                const F scalar = CA.Get(i,j);
-                elem::Axpy( scalar, ZTBlocks[j], XTUpdates[i] );
-            }
-        }
+                elem::Axpy( CA.Get(i,j), ZTBlocks[j], XTUpdates[i] );
     }
     // Now that the updates have been accumulated in XTUpdates, subtract them
     // from XT
