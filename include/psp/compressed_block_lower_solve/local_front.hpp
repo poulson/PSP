@@ -46,7 +46,7 @@ LocalFrontCompressedBlockLowerForwardSolve
          XB, snSize );
 
     // XT := inv(ATL) XT
-    //     = (C_A o G_A) XT
+    //     = \sum_t (CA_t o GA_t) XT
     Matrix<F> YT, ZT;
     YT = XT;
     MakeZeros( XT );
@@ -79,15 +79,14 @@ LocalFrontCompressedBlockLowerForwardSolve
     ZT.Empty();
 
     // XB := XB - LB XT
-    //     = XB - (C_B o G_B) XT
+    //     = XB - \sum_t (CB_t o GB_t) XT
     if( numKeptModesB != 0 )
     {
         const int sB = front.sB;
 
-        Matrix<F> YB, ZB;
-        Zeros( XB.Height(), numRhs, YB );
+        Matrix<F> ZB;
         Zeros( XB.Height(), numRhs, ZB );
-        Matrix<F> XBBlock, YBBlock, ZBBlock;
+        Matrix<F> XBBlock, ZBBlock;
         for( int t=0; t<numKeptModesB; ++t )
         {
             const Matrix<F>& GB = front.BGreens[t];
@@ -150,8 +149,8 @@ LocalFrontCompressedBlockLowerBackwardSolve
          XB, snSize );
 
     // YT := LB^[T/H] XB,
-    //     = (C_B o G_B)^[T/H] XB
-    //     = (C_B^[T/H] o G_B^[T/H]) XB
+    //     = \sum_t (CB_t o GB_t)^[T/H] XB
+    //     = \sum_t (CB_t^[T/H] o GB_t^[T/H]) XB
     Matrix<F> YT, ZT;
     Zeros( snSize, numRhs, YT );
     Zeros( snSize, numRhs, ZT );
@@ -182,7 +181,7 @@ LocalFrontCompressedBlockLowerBackwardSolve
     }
 
     // XT := XT - inv(ATL) YT
-    //     = XT - (C_A o G_A) YT
+    //     = XT - \sum_t (CA_t o GA_t) YT
     Matrix<F> XTBlock;
     for( int t=0; t<numKeptModesA; ++t )
     {

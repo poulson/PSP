@@ -47,7 +47,7 @@ DistFrontCompressedBlockLowerForwardSolve
          XB, snSize );
 
     // XT := inv(ATL) XT
-    //     = (C_A o G_A) XT
+    //     = \sum_t (CA_t o GA_t) XT
     DistMatrix<F,VC,STAR> YT( XT );
     MakeZeros( XT );
     std::vector<DistMatrix<F,VC,STAR> > XTBlocks, ZTBlocks;
@@ -60,7 +60,7 @@ DistFrontCompressedBlockLowerForwardSolve
         Zeros( sT, numRhs, XTBlocks[i] );
         Zeros( sT, numRhs, ZTBlocks[i] );
     }
-    DistMatrix<F,VC,STAR> XTBlock(g), YTBlock(g);
+    DistMatrix<F,VC,STAR> YTBlock(g);
     DistMatrix<F,MR,STAR> YTBlock_MR_STAR(g);
     DistMatrix<F,MC,STAR> ZTBlock_MC_STAR( g );
     Zeros( sT, numRhs, ZTBlock_MC_STAR );
@@ -88,9 +88,15 @@ DistFrontCompressedBlockLowerForwardSolve
                 const F scalar = CA.Get(i,j);
                 elem::Axpy( scalar, ZTBlocks[j], XTBlocks[i] );
             }
-            XTBlock.View( XT, i*sT, 0, sT, numRhs );
-            XTBlock = XTBlocks[i];
         }
+    }
+    // Now that each block of XT has been formed, perform the necessary 
+    // redistributions to fix alignments
+    DistMatrix<F,VC,STAR> XTBlock(g);
+    for( int i=0; i<depth; ++i )
+    {
+        XTBlock.View( XT, i*sT, 0, sT, numRhs );
+        XTBlock = XTBlocks[i];
     }
     XTBlocks.clear();
     ZTBlocks.clear();
@@ -98,22 +104,22 @@ DistFrontCompressedBlockLowerForwardSolve
     ZTBlock_MC_STAR.Empty();
 
     // XB := XB - LB XT
-    //     = XB - (C_B o G_B) XT
+    //     = XB - \sum_t (CB_t o GB_t) XT
     if( numKeptModesB != 0 )
     {
         const int sB = front.sB;
 
-        std::vector<DistMatrix<F,VC,STAR> > XBBlocks, ZBBlocks;
-        XBBlocks.resize( depth );
+        std::vector<DistMatrix<F,VC,STAR> > XBUpdates, ZBBlocks;
+        XBUpdates.resize( depth );
         ZBBlocks.resize( depth );
         for( int i=0; i<depth; ++i )
         {
-            XBBlocks[i].SetGrid( g );
+            XBUpdates[i].SetGrid( g );
             ZBBlocks[i].SetGrid( g );
-            Zeros( sB, numRhs, XBBlocks[i] );
+            Zeros( sB, numRhs, XBUpdates[i] );
             Zeros( sB, numRhs, ZBBlocks[i] );
         }
-        DistMatrix<F,VC,STAR> XTBlock(g), XBBlock(g);
+        DistMatrix<F,VC,STAR> XTBlock(g);
         DistMatrix<F,MR,STAR> XTBlock_MR_STAR(g);
         DistMatrix<F,MC,STAR> ZBBlock_MC_STAR( g );
         Zeros( sB, numRhs, ZBBlock_MC_STAR );
@@ -139,11 +145,17 @@ DistFrontCompressedBlockLowerForwardSolve
                 for( int j=0; j<depth; ++j )
                 {
                     const F scalar = CB.Get(i,j);
-                    elem::Axpy( scalar, ZBBlocks[j], XBBlocks[i] );
+                    elem::Axpy( scalar, ZBBlocks[j], XBUpdates[i] );
                 }
-                XBBlock.View( XB, i*sB, 0, sB, numRhs );
-                elem::Axpy( (F)-1, XBBlocks[i], XBBlock );
             }
+        }
+        // Now that the updates have been formed, perform the redistributions
+        // necessary to subtract them from XB
+        DistMatrix<F,VC,STAR> XBBlock(g);
+        for( int i=0; i<depth; ++i )
+        {
+            XBBlock.View( XB, i*sB, 0, sB, numRhs );
+            elem::Axpy( (F)-1, XBUpdates[i], XBBlock );
         }
     }
 #ifndef RELEASE
@@ -185,23 +197,22 @@ DistFrontCompressedBlockLowerBackwardSolve
          XB, snSize );
 
     // YT := LB^[T/H] XB
-    //     = (C_B o G_B)^[T/H] XB
-    //     = (C_B^[T/H] o G_B^[T/H]) XB
+    //     = \sum_t (CB_t o GB_t)^[T/H] XB
+    //     = \sum_t (CB_t^[T/H] o GB_t^[T/H]) XB
     DistMatrix<F,VC,STAR> YT(g);
     {
         Zeros( snSize, numRhs, YT );
-        std::vector<DistMatrix<F,VR,STAR> > YTBlocks, ZTBlocks;
-        YTBlocks.resize( depth );
+        std::vector<DistMatrix<F,VR,STAR> > YTUpdates, ZTBlocks;
+        YTUpdates.resize( depth );
         ZTBlocks.resize( depth );
         for( int i=0; i<depth; ++i )
         {
-            YTBlocks[i].SetGrid( g );
+            YTUpdates[i].SetGrid( g );
             ZTBlocks[i].SetGrid( g );
-            Zeros( sT, numRhs, YTBlocks[i] );
+            Zeros( sT, numRhs, YTUpdates[i] );
             Zeros( sT, numRhs, ZTBlocks[i] );
         }
-        DistMatrix<F,VC,STAR> YTBlock(g), XBBlock(g);
-        DistMatrix<F,VC,STAR> YTBlock_VC_STAR(g);
+        DistMatrix<F,VC,STAR> XBBlock(g);
         DistMatrix<F,MC,STAR> XBBlock_MC_STAR(g);
         DistMatrix<F,MR,STAR> ZTBlock_MR_STAR(g);
         Zeros( sT, numRhs, ZTBlock_MR_STAR );
@@ -228,30 +239,39 @@ DistFrontCompressedBlockLowerBackwardSolve
                 {
                     const F entry = CB.Get(j,i);
                     const F scalar = ( conjugated ? Conj(entry) : entry );
-                    elem::Axpy( scalar, ZTBlocks[j], YTBlocks[i] );
+                    elem::Axpy( scalar, ZTBlocks[j], YTUpdates[i] );
                 }
-                YTBlock.View( YT, i*sT, 0, sT, numRhs );
-                YTBlock_VC_STAR.AlignWith( YTBlock );
-                YTBlock_VC_STAR = YTBlocks[i];
-                elem::Axpy( (F)1, YTBlock_VC_STAR, YTBlock );
-                YTBlock_VC_STAR.FreeAlignments();
             }
+        }
+
+        // Each YT block update was accumulated in a [VR,* ] distribution for 
+        // efficiency reasons, but we must now redistribute them into [VC,* ]
+        // distributions and add them onto YT
+        DistMatrix<F,VC,STAR> YTBlock(g);
+        DistMatrix<F,VC,STAR> YTUpdate_VC_STAR(g);
+        for( int i=0; i<depth; ++i )
+        {
+            YTBlock.View( YT, i*sT, 0, sT, numRhs );
+            YTUpdate_VC_STAR.AlignWith( YTBlock );
+            YTUpdate_VC_STAR = YTUpdates[i];
+            elem::Axpy( (F)1, YTUpdate_VC_STAR, YTBlock );
+            YTUpdate_VC_STAR.FreeAlignments();
         }
     }
 
     // XT := XT - inv(ATL) YT
-    //     = XT - (C_A o G_A) YT
-    std::vector<DistMatrix<F,VC,STAR> > XTBlocks, ZTBlocks;
-    XTBlocks.resize( depth );
+    //     = XT - \sum_t (CA_t o GA_t) YT
+    std::vector<DistMatrix<F,VC,STAR> > XTUpdates, ZTBlocks;
+    XTUpdates.resize( depth );
     ZTBlocks.resize( depth );
     for( int i=0; i<depth; ++i )
     {
-        XTBlocks[i].SetGrid( g );
+        XTUpdates[i].SetGrid( g );
         ZTBlocks[i].SetGrid( g );
-        Zeros( sT, numRhs, XTBlocks[i] );
+        Zeros( sT, numRhs, XTUpdates[i] );
         Zeros( sT, numRhs, ZTBlocks[i] );
     }
-    DistMatrix<F,VC,STAR> XTBlock(g), YTBlock(g);
+    DistMatrix<F,VC,STAR> YTBlock(g);
     DistMatrix<F,MR,STAR> YTBlock_MR_STAR(g);
     DistMatrix<F,MC,STAR> ZTBlock_MC_STAR(g);
     Zeros( sT, numRhs, ZTBlock_MC_STAR );
@@ -277,11 +297,17 @@ DistFrontCompressedBlockLowerBackwardSolve
             for( int j=0; j<depth; ++j )
             {
                 const F scalar = CA.Get(i,j);
-                elem::Axpy( scalar, ZTBlocks[j], XTBlocks[i] );
+                elem::Axpy( scalar, ZTBlocks[j], XTUpdates[i] );
             }
-            XTBlock.View( XT, i*sT, 0, sT, numRhs );
-            elem::Axpy( (F)-1, XTBlocks[i], XTBlock );
         }
+    }
+    // Now that the updates have been accumulated in XTUpdates, subtract them
+    // from XT
+    DistMatrix<F,VC,STAR> XTBlock(g);
+    for( int i=0; i<depth; ++i )
+    {
+        XTBlock.View( XT, i*sT, 0, sT, numRhs );
+        elem::Axpy( (F)-1, XTUpdates[i], XTBlock );
     }
 #ifndef RELEASE
     PopCallStack();
