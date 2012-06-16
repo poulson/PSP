@@ -49,6 +49,10 @@ inline void DistCompressedBlockLDL
     LocalCompressedFront<F>& topLocalFront = L.local.fronts.back();
     DistCompressedFront<F>& bottomDistFront = L.dist.fronts[0];
     const Grid& bottomGrid = *S.dist.supernodes[0].grid;
+    bottomDistFront.grid = &bottomGrid;
+    bottomDistFront.depth = topLocalFront.depth;
+    bottomDistFront.sT = topLocalFront.sT;
+    bottomDistFront.sB = topLocalFront.sB;
     bottomDistFront.frontL.Empty();
     bottomDistFront.AGreens.clear();
     bottomDistFront.BGreens.clear();
