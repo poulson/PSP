@@ -301,7 +301,9 @@ inline void DistFrontCompression
 
     DistMatrix<C> U( g );
     DistMatrix<C,STAR,STAR> V_STAR_STAR( g );
-    if( Z.Height() >= 1.5*Z.Width() )
+    const int m = Z.Height();
+    const int n = Z.Width();
+    if( m > 1.5*n )
     {
         // QR
         DistMatrix<C,MD,STAR> t( g );
@@ -309,13 +311,12 @@ inline void DistFrontCompression
 
         // Compress
         DistMatrix<C> ZT( g );
-        DistMatrix<C,STAR,STAR> W_STAR_STAR( g );
-        DistMatrix<R,STAR,STAR> s_STAR_STAR( g );
-        ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
-        W_STAR_STAR = ZT;
+        ZT.View( Z, 0, 0, n, n );
+
+        DistMatrix<R,STAR,STAR> s_STAR_STAR( n, 1, g );
+        DistMatrix<C,STAR,STAR> W_STAR_STAR( ZT );
         elem::MakeTrapezoidal( LEFT, UPPER, 0, W_STAR_STAR );
-        s_STAR_STAR.ResizeTo( Z.Width(), 1 );
-        V_STAR_STAR.ResizeTo( Z.Width(), Z.Width() );
+        V_STAR_STAR.ResizeTo( n, n );
         elem::SVD
         ( W_STAR_STAR.LocalMatrix(),
           s_STAR_STAR.LocalMatrix(),
@@ -325,11 +326,11 @@ inline void DistFrontCompression
 
         // Reexpand (TODO: Think about explicitly expanded reflectors)
         const int numKeptModes = s_STAR_STAR.Height();
-        U.ResizeTo( Z.Height(), numKeptModes );
+        U.ResizeTo( m, numKeptModes );
         DistMatrix<C> UT( g ), UB( g );
         elem::PartitionDown
         ( U, UT,
-             UB, Z.Width() );
+             UB, n );
         UT = W_STAR_STAR;
         MakeZeros( UB );
         elem::ApplyPackedReflectors
@@ -337,14 +338,16 @@ inline void DistFrontCompression
     }
     else
     {
-        DistMatrix<R,STAR,STAR> s_STAR_STAR(g);
-        DistMatrix<C,STAR,STAR> U_STAR_STAR(g);
-        U_STAR_STAR = Z;
+        const int k = std::min( m, n );
+        DistMatrix<R,STAR,STAR> s_STAR_STAR( k, 1, g);
+        DistMatrix<C,STAR,STAR> U_STAR_STAR( Z );
+        V_STAR_STAR.ResizeTo( n, k );
         elem::SVD
         ( U_STAR_STAR.LocalMatrix(), 
           s_STAR_STAR.LocalMatrix(), 
           V_STAR_STAR.LocalMatrix() );
         internal::CompressSVD( U_STAR_STAR, s_STAR_STAR, V_STAR_STAR );
+        U = U_STAR_STAR;
         DiagonalScale( RIGHT, NORMAL, s_STAR_STAR, V_STAR_STAR );
     }
 

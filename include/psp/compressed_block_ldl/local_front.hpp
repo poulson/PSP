@@ -104,7 +104,9 @@ inline void LocalFrontCompression
     // Turn compute a low-rank factorization, Z := U V^H, using an SVD of Z
     // (or an SVD of its 'R' from a QR factorization)
     Matrix<C> U, V;
-    if( Z.Height() > 1.5*Z.Width() )
+    const int m = Z.Height();
+    const int n = Z.Width();
+    if( m > 1.5*n )
     {
         // QR
         Matrix<C> t;
@@ -113,7 +115,7 @@ inline void LocalFrontCompression
         // Compress
         Matrix<R> s;
         Matrix<C> ZT, W;
-        ZT.View( Z, 0, 0, Z.Width(), Z.Width() );
+        ZT.View( Z, 0, 0, n, n );
         W = ZT;
         elem::MakeTrapezoidal( LEFT, UPPER, 0, W );
         elem::SVD( W, s, V, useQR );
@@ -122,11 +124,11 @@ inline void LocalFrontCompression
 
         // Reexpand (TODO: Think about explicitly expanded reflectors)
         const int numKeptModes = s.Height();
-        U.ResizeTo( Z.Height(), numKeptModes );
+        U.ResizeTo( m, numKeptModes );
         Matrix<C> UT, UB;
         elem::PartitionDown
         ( U, UT,
-             UB, Z.Width() ); 
+             UB, n ); 
         UT = W;
         MakeZeros( UB );
         elem::ApplyPackedReflectors
@@ -157,9 +159,9 @@ inline void LocalFrontCompression
         // Unshuffle U 
         for( int i2=0; i2<s2; ++i2 )
         {
-            C* greenCol = G.Buffer(0,i2);
+            C* GCol = G.Buffer(0,i2);
             const C* UCol = U.LockedBuffer(i2*s1,t);
-            elem::MemCopy( greenCol, UCol, s1 );
+            elem::MemCopy( GCol, UCol, s1 );
         }
 
         // Unshuffle V
