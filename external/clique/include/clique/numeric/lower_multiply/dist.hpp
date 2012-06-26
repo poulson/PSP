@@ -56,13 +56,6 @@ inline void DistLowerMultiplyNormal
     const int width = localX.Width();
     if( L.dist.mode != NORMAL_1D )
         throw std::logic_error("This multiply mode is not yet implemented");
-    if( width == 0 )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
-        return;
-    }
 
     // Copy the information from the local portion into the distributed leaf
     const LocalSymmFront<F>& localRootFront = L.local.fronts.back();
@@ -155,63 +148,13 @@ inline void DistLowerMultiplyNormal
         }
         std::vector<F> recvBuffer( recvBufferSize );
 #ifndef RELEASE
-        // Verify the send and recv counts match
-        std::vector<int> actualRecvCounts(commSize);
-        mpi::AllToAll
-        ( &sendCounts[0],       1,
-          &actualRecvCounts[0], 1, comm );
-        for( int proc=0; proc<commSize; ++proc )
-        {
-            if( actualRecvCounts[proc] != recvCounts[proc] )
-            {
-                std::ostringstream msg;
-                msg << "Expected recv count of " << recvCounts[proc]
-                    << " but recv'd " << actualRecvCounts[proc]
-                    << " from process " << proc << " for supernode "
-                    << s << "\n";
-                throw std::logic_error( msg.str().c_str() );
-            }
-        }
-        actualRecvCounts.clear();
+        VerifySendsAndRecvs( sendCounts, recvCounts, comm );
 #endif
 
         // AllToAll to send and receive the child updates
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_MULT
-        int numSends=0,numRecvs=0;
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            if( sendCounts[proc] != 0 )
-                ++numSends;
-            if( recvCounts[proc] != 0 )
-                ++numRecvs;
-        }
-        std::vector<mpi::Status> statuses(numSends+numRecvs);
-        std::vector<mpi::Request> requests(numSends+numRecvs);
-        int rCount=0;
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            int count = recvCounts[proc];
-            int displ = recvDispls[proc];
-            if( count != 0 )
-                mpi::IRecv
-                ( &recvBuffer[displ], count, proc, 0, comm, requests[rCount++] );
-        }
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            int count = sendCounts[proc];
-            int displ = sendDispls[proc];
-            if( count != 0 )
-                mpi::ISend
-                ( &sendBuffer[displ], count, proc, 0, comm, requests[rCount++] );
-        }
-        mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-        statuses.clear();
-        requests.clear();
-#else
-        mpi::AllToAll
-        ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-          &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm );
-#endif
+        SparseAllToAll
+        ( sendBuffer, sendCounts, sendDispls,
+          recvBuffer, recvCounts, recvDispls, comm );
         sendBuffer.clear();
         sendCounts.clear();
         sendDispls.clear();
@@ -260,27 +203,33 @@ inline void DistLowerMultiplyTranspose
     const int width = localX.Width();
     if( L.dist.mode != NORMAL_1D )
         throw std::logic_error("This multiply mode is not yet implemented");
-    if( width == 0 )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
-        return;
-    }
 
     // Directly operate on the root separator's portion of the right-hand sides
     const DistSymmFactSupernode& rootSN = S.dist.supernodes.back();
-    const DistSymmFront<F>& rootFront = L.dist.fronts.back();
-    const Grid& rootGrid = rootFront.front1dL.Grid();
-    DistMatrix<F,VC,STAR> XRoot(rootGrid);
-    XRoot.View
-    ( rootSN.size, width, 0,
-      localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
-    rootFront.work1d = XRoot; // store the RHS for use by the children
-    DistFrontLowerMultiply
-    ( orientation, diag, diagOffset, rootFront.front1dL, XRoot );
+    const LocalSymmFront<F>& localRootFront = L.local.fronts.back();
+    if( numDistSupernodes == 1 )
+    {
+        Matrix<F> XRoot;
+        XRoot.View
+        ( rootSN.size, width, 
+          localX.Buffer(rootSN.localOffset1d,0), localX.LDim() );
+        localRootFront.work = XRoot;
+        LocalFrontLowerMultiply
+        ( orientation, diag, diagOffset, localRootFront.frontL, XRoot );
+    }
+    else
+    {
+        const DistSymmFront<F>& rootFront = L.dist.fronts.back();
+        const Grid& rootGrid = rootFront.front1dL.Grid();
+        DistMatrix<F,VC,STAR> XRoot(rootGrid);
+        XRoot.View
+        ( rootSN.size, width, 0,
+          localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
+        rootFront.work1d = XRoot; // store the RHS for use by the children
+        DistFrontLowerMultiply
+        ( orientation, diag, diagOffset, rootFront.front1dL, XRoot );
+    }
 
-    std::vector<int>::const_iterator it;
     for( int s=numDistSupernodes-2; s>=0; --s )
     {
         const DistSymmFactSupernode& parentSN = S.dist.supernodes[s+1];
@@ -360,65 +309,13 @@ inline void DistLowerMultiplyTranspose
         }
         std::vector<F> recvBuffer( recvBufferSize );
 #ifndef RELEASE
-        // Verify the send and recv counts match
-        std::vector<int> actualRecvCounts(parentCommSize);
-        mpi::AllToAll
-        ( &sendCounts[0],       1,
-          &actualRecvCounts[0], 1, parentComm );
-        for( int proc=0; proc<parentCommSize; ++proc )
-        {
-            if( actualRecvCounts[proc] != recvCounts[proc] )
-            {
-                std::ostringstream msg;
-                msg << "Expected recv count of " << recvCounts[proc]
-                    << " but recv'd " << actualRecvCounts[proc]
-                    << " from process " << proc << " for supernode "
-                    << s << "\n";
-                throw std::logic_error( msg.str().c_str() );
-            }
-        }
-        actualRecvCounts.clear();
+        VerifySendsAndRecvs( sendCounts, recvCounts, parentComm );
 #endif
 
         // AllToAll to send and recv parent updates
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_MULT
-        int numSends=0,numRecvs=0;
-        for( unsigned proc=0; proc<parentCommSize; ++proc )
-        { 
-            if( sendCounts[proc] != 0 )
-                ++numSends;
-            if( recvCounts[proc] != 0 )
-                ++numRecvs;
-        }
-        std::vector<mpi::Status> statuses(numSends+numRecvs);
-        std::vector<mpi::Request> requests(numSends+numRecvs);
-        int rCount=0;
-        for( unsigned proc=0; proc<parentCommSize; ++proc )
-        {   
-            int count = recvCounts[proc];
-            int displ = recvDispls[proc];
-            if( count != 0 )
-                mpi::IRecv
-                ( &recvBuffer[displ], count, proc, 0, parentComm, 
-                  requests[rCount++] );
-        }
-        for( unsigned proc=0; proc<parentCommSize; ++proc )
-        {
-            int count = sendCounts[proc];
-            int displ = sendDispls[proc];
-            if( count != 0 )
-                mpi::ISend
-                ( &sendBuffer[displ], count, proc, 0, parentComm, 
-                  requests[rCount++] );
-        }
-        mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-        statuses.clear();
-        requests.clear();
-#else
-        mpi::AllToAll
-        ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-          &recvBuffer[0], &recvCounts[0], &recvDispls[0], parentComm );
-#endif
+        SparseAllToAll
+        ( sendBuffer, sendCounts, sendDispls,
+          recvBuffer, recvCounts, recvDispls, parentComm );
         sendBuffer.clear();
         sendCounts.clear();
         sendDispls.clear();
@@ -448,8 +345,13 @@ inline void DistLowerMultiplyTranspose
         DistMatrix<F,VC,STAR> XNode( front.work1d );
 
         // Perform the multiply for this front
-        DistFrontLowerMultiply
-        ( orientation, diag, diagOffset, front.front1dL, XNode );
+        if( s > 0 )
+            DistFrontLowerMultiply
+            ( orientation, diag, diagOffset, front.front1dL, XNode );
+        else
+            LocalFrontLowerMultiply
+            ( orientation, diag, diagOffset, 
+              localRootFront.frontL, XNode.LocalMatrix() );
 
         // Store the supernode portion of the result
         DistMatrix<F,VC,STAR> XNodeT(grid), XNodeB(grid);

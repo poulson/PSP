@@ -166,63 +166,13 @@ inline void DistBlockLDL
         }
         std::vector<F> recvBuffer( recvBufferSize );
 #ifndef RELEASE
-        // Verify the send and recv counts match
-        std::vector<int> actualRecvCounts(commSize);
-        mpi::AllToAll
-        ( &sendCounts[0],       1, 
-          &actualRecvCounts[0], 1, comm );
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            if( actualRecvCounts[proc] != recvCounts[proc] )
-            {
-                std::ostringstream msg;
-                msg << "Expected recv count of " << recvCounts[proc]
-                    << " but recv'd " << actualRecvCounts[proc] 
-                    << " from process " << proc << " for supernode "
-                    << s << "\n";
-                throw std::logic_error( msg.str().c_str() );
-            }
-        }
-        actualRecvCounts.clear();
+        VerifySendsAndRecvs( sendCounts, recvCounts, comm );
 #endif
 
         // AllToAll to send and receive the child updates
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_FACT
-        int numSends=0,numRecvs=0;
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            if( sendCounts[proc] != 0 )
-                ++numSends;
-            if( recvCounts[proc] != 0 )
-                ++numRecvs;
-        }
-        std::vector<mpi::Status> statuses(numSends+numRecvs); 
-        std::vector<mpi::Request> requests(numSends+numRecvs);
-        int rCount=0;
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            int count = recvCounts[proc];
-            int displ = recvDispls[proc];
-            if( count != 0 )
-                mpi::IRecv
-                ( &recvBuffer[displ], count, proc, 0, comm, requests[rCount++] );
-        }
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            int count = sendCounts[proc];
-            int displ = sendDispls[proc];
-            if( count != 0 )
-                mpi::ISend
-                ( &sendBuffer[displ], count, proc, 0, comm, requests[rCount++] );
-        }
-        mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-        statuses.clear();
-        requests.clear();
-#else
-        mpi::AllToAll
-        ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-          &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm );
-#endif
+        SparseAllToAll
+        ( sendBuffer, sendCounts, sendDispls,
+          recvBuffer, recvCounts, recvDispls, comm );
         sendBuffer.clear();
         sendCounts.clear();
         sendDispls.clear();

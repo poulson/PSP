@@ -58,13 +58,6 @@ inline void DistLowerForwardSolve
     const bool modeIs1d = ModeIs1d( mode );
     if( mode != NORMAL_1D && mode != FAST_1D_LDL && mode != FAST_2D_LDL )
         throw std::logic_error("This solve mode is not yet implemented");
-    if( width == 0 )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
-        return;
-    }
 
     // Copy the information from the local portion into the distributed leaf
     const LocalSymmFront<F>& localRootFront = L.local.fronts.back();
@@ -159,63 +152,13 @@ inline void DistLowerForwardSolve
         }
         std::vector<F> recvBuffer( recvBufferSize );
 #ifndef RELEASE
-        // Verify the send and recv counts match
-        std::vector<int> actualRecvCounts(commSize);
-        mpi::AllToAll
-        ( &sendCounts[0],       1,
-          &actualRecvCounts[0], 1, comm );
-        for( int proc=0; proc<commSize; ++proc )
-        {
-            if( actualRecvCounts[proc] != recvCounts[proc] )
-            {
-                std::ostringstream msg;
-                msg << "Expected recv count of " << recvCounts[proc]
-                    << " but recv'd " << actualRecvCounts[proc]
-                    << " from process " << proc << " for supernode "
-                    << s << "\n";
-                throw std::logic_error( msg.str().c_str() );
-            }
-        }
-        actualRecvCounts.clear();
+        VerifySendsAndRecvs( sendCounts, recvCounts, comm );
 #endif
 
         // AllToAll to send and receive the child updates
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_SOLVE
-        int numSends=0,numRecvs=0;
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            if( sendCounts[proc] != 0 )
-                ++numSends;
-            if( recvCounts[proc] != 0 )
-                ++numRecvs;
-        }
-        std::vector<mpi::Status> statuses(numSends+numRecvs);
-        std::vector<mpi::Request> requests(numSends+numRecvs);
-        int rCount=0;
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            int count = recvCounts[proc];
-            int displ = recvDispls[proc];
-            if( count != 0 )
-                mpi::IRecv
-                ( &recvBuffer[displ], count, proc, 0, comm, requests[rCount++] );
-        }
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            int count = sendCounts[proc];
-            int displ = sendDispls[proc];
-            if( count != 0 )
-                mpi::ISend
-                ( &sendBuffer[displ], count, proc, 0, comm, requests[rCount++] );
-        }
-        mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-        statuses.clear();
-        requests.clear();
-#else
-        mpi::AllToAll
-        ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-          &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm );
-#endif
+        SparseAllToAll
+        ( sendBuffer, sendCounts, sendDispls,
+          recvBuffer, recvCounts, recvDispls, comm );
         sendBuffer.clear();
         sendCounts.clear();
         sendDispls.clear();
@@ -274,33 +217,37 @@ inline void DistLowerBackwardSolve
     const bool modeIs1d = ModeIs1d( mode );
     if( mode != NORMAL_1D && mode != FAST_1D_LDL && mode != FAST_2D_LDL )
         throw std::logic_error("This solve mode is not yet implemented");
-    if( width == 0 )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
-        return;
-    }
 
     // Directly operate on the root separator's portion of the right-hand sides
     const DistSymmFactSupernode& rootSN = S.dist.supernodes.back();
-    const DistSymmFront<F>& rootFront = L.dist.fronts.back();
-    const Grid& rootGrid = ( modeIs1d ? rootFront.front1dL.Grid() 
-                                      : rootFront.front2dL.Grid() );
-    rootFront.work1d.View
-    ( rootSN.size, width, 0,
-      localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
-    if( mode == NORMAL_1D )
-        DistFrontLowerBackwardSolve
-        ( orientation, diag, rootFront.front1dL, rootFront.work1d );
-    else if( mode == FAST_1D_LDL )
-        DistFrontFastLowerBackwardSolve
-        ( orientation, diag, rootFront.front1dL, rootFront.work1d );
-    else // mode == FAST_2D_LDL
-        DistFrontFastLowerBackwardSolve
-        ( orientation, diag, rootFront.front2dL, rootFront.work1d );
+    const LocalSymmFront<F>& localRootFront = L.local.fronts.back();
+    if( numDistSupernodes == 1 )
+    {
+        localRootFront.work.View
+        ( rootSN.size, width, 
+          localX.Buffer(rootSN.localOffset1d,0), localX.LDim() );
+        LocalFrontLowerBackwardSolve
+        ( orientation, diag, localRootFront.frontL, localRootFront.work );
+    }
+    else
+    {
+        const DistSymmFront<F>& rootFront = L.dist.fronts.back();
+        const Grid& rootGrid = ( modeIs1d ? rootFront.front1dL.Grid() 
+                                          : rootFront.front2dL.Grid() );
+        rootFront.work1d.View
+        ( rootSN.size, width, 0,
+          localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
+        if( mode == NORMAL_1D )
+            DistFrontLowerBackwardSolve
+            ( orientation, diag, rootFront.front1dL, rootFront.work1d );
+        else if( mode == FAST_1D_LDL )
+            DistFrontFastLowerBackwardSolve
+            ( orientation, diag, rootFront.front1dL, rootFront.work1d );
+        else // mode == FAST_2D_LDL
+            DistFrontFastLowerBackwardSolve
+            ( orientation, diag, rootFront.front2dL, rootFront.work1d );
+    }
 
-    std::vector<int>::const_iterator it;
     for( int s=numDistSupernodes-2; s>=0; --s )
     {
         const DistSymmFactSupernode& parentSN = S.dist.supernodes[s+1];
@@ -382,65 +329,13 @@ inline void DistLowerBackwardSolve
         }
         std::vector<F> recvBuffer( recvBufferSize );
 #ifndef RELEASE
-        // Verify the send and recv counts match
-        std::vector<int> actualRecvCounts(parentCommSize);
-        mpi::AllToAll
-        ( &sendCounts[0],       1,
-          &actualRecvCounts[0], 1, parentComm );
-        for( int proc=0; proc<parentCommSize; ++proc )
-        {
-            if( actualRecvCounts[proc] != recvCounts[proc] )
-            {
-                std::ostringstream msg;
-                msg << "Expected recv count of " << recvCounts[proc]
-                    << " but recv'd " << actualRecvCounts[proc]
-                    << " from process " << proc << " for supernode "
-                    << s << "\n";
-                throw std::logic_error( msg.str().c_str() );
-            }
-        }
-        actualRecvCounts.clear();
+        VerifySendsAndRecvs( sendCounts, recvCounts, parentComm );
 #endif
 
         // AllToAll to send and recv parent updates
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_SOLVE
-        int numSends=0,numRecvs=0;
-        for( unsigned proc=0; proc<parentCommSize; ++proc )
-        {  
-            if( sendCounts[proc] != 0 )
-                ++numSends;
-            if( recvCounts[proc] != 0 )
-                ++numRecvs;
-        }
-        std::vector<mpi::Status> statuses(numSends+numRecvs);
-        std::vector<mpi::Request> requests(numSends+numRecvs);
-        int rCount=0; 
-        for( unsigned proc=0; proc<parentCommSize; ++proc )
-        {    
-            int count = recvCounts[proc];
-            int displ = recvDispls[proc];
-            if( count != 0 )
-                mpi::IRecv
-                ( &recvBuffer[displ], count, proc, 0, parentComm, 
-                  requests[rCount++] );
-        }
-        for( unsigned proc=0; proc<parentCommSize; ++proc )
-        {
-            int count = sendCounts[proc];
-            int displ = sendDispls[proc];
-            if( count != 0 )
-                mpi::ISend
-                ( &sendBuffer[displ], count, proc, 0, parentComm, 
-                  requests[rCount++] );
-        }
-        mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-        statuses.clear();
-        requests.clear();
-#else
-        mpi::AllToAll
-        ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-          &recvBuffer[0], &recvCounts[0], &recvDispls[0], parentComm );
-#endif
+        SparseAllToAll
+        ( sendBuffer, sendCounts, sendDispls,
+          recvBuffer, recvCounts, recvDispls, parentComm );
         sendBuffer.clear();
         sendCounts.clear();
         sendDispls.clear();
@@ -467,15 +362,23 @@ inline void DistLowerBackwardSolve
         recvDispls.clear();
 
         // Call the custom supernode backward solve
-        if( mode == NORMAL_1D )
-            DistFrontLowerBackwardSolve
-            ( orientation, diag, front.front1dL, W );
-        else if( mode == FAST_1D_LDL )
-            DistFrontFastLowerBackwardSolve
-            ( orientation, diag, front.front1dL, W );
-        else // mode == FAST_2D_LDL
-            DistFrontFastLowerBackwardSolve
-            ( orientation, diag, front.front2dL, W );
+        if( s > 0 )
+        {
+            if( mode == NORMAL_1D )
+                DistFrontLowerBackwardSolve
+                ( orientation, diag, front.front1dL, W );
+            else if( mode == FAST_1D_LDL )
+                DistFrontFastLowerBackwardSolve
+                ( orientation, diag, front.front1dL, W );
+            else // mode == FAST_2D_LDL
+                DistFrontFastLowerBackwardSolve
+                ( orientation, diag, front.front2dL, W );
+        }
+        else
+        {
+            LocalFrontLowerBackwardSolve
+            ( orientation, diag, localRootFront.frontL, W.LocalMatrix() );
+        }
 
         // Store the supernode portion of the result
         localXT = WT.LocalMatrix();
