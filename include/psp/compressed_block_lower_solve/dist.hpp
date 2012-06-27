@@ -204,13 +204,25 @@ inline void DistCompressedBlockLowerBackwardSolve
 
     // Directly operate on the root separator's portion of the right-hand sides
     const DistSymmFactSupernode& rootSN = S.dist.supernodes.back();
-    const DistCompressedFront<F>& rootFront = L.dist.fronts.back();
-    const Grid& rootGrid = *rootFront.grid;
-    rootFront.work1d.View
-    ( rootSN.size, width, 0,
-      localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
-    DistFrontCompressedBlockLowerBackwardSolve
-    ( orientation, rootFront, rootFront.work1d );
+    const LocalCompressedFront<F>& localRootFront = L.local.fronts.back();
+    if( numDistSupernodes == 1 )
+    {
+        localRootFront.work.View
+        ( rootSN.size, width,
+          localX.Buffer(rootSN.localOffset1d,0), localX.LDim() );
+        LocalFrontCompressedBlockLowerBackwardSolve
+        ( orientation, localRootFront, localRootFront.work );
+    }
+    else
+    {
+        const DistCompressedFront<F>& rootFront = L.dist.fronts.back();
+        const Grid& rootGrid = *rootFront.grid;
+        rootFront.work1d.View
+        ( rootSN.size, width, 0,
+          localX.Buffer(rootSN.localOffset1d,0), localX.LDim(), rootGrid );
+        DistFrontCompressedBlockLowerBackwardSolve
+        ( orientation, rootFront, rootFront.work1d );
+    }
 
     std::vector<int>::const_iterator it;
     for( int s=numDistSupernodes-2; s>=0; --s )
@@ -327,7 +339,11 @@ inline void DistCompressedBlockLowerBackwardSolve
         recvDispls.clear();
 
         // Use the distributed compressed data
-        DistFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
+        if( s > 0 )
+            DistFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
+        else
+            LocalFrontCompressedBlockLowerBackwardSolve
+            ( orientation, localRootFront, W.LocalMatrix() );
 
         // Store the supernode portion of the result
         localXT = WT.LocalMatrix();
