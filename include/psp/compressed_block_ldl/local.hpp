@@ -108,26 +108,9 @@ inline void LocalCompressedBlockLDL
         // Call the custom partial block LDL
         cliq::numeric::LocalFrontBlockLDL( orientation, frontL, frontBR );
 
-        // Compress the A and B fronts
-        Matrix<F> A, B;
-        elem::PartitionDown
-        ( frontL, A,
-                  B, sn.size );
-        front.sT = A.Height() / depth;
-        front.sB = B.Height() / depth;
-        front.depth = depth;
-        LocalFrontCompression
-        ( A, front.AGreens, front.ACoefficients, depth, useQR );
-        if( numChildren == 0 )
-        {
-            // TODO: Use sparse compression at the leaf-level
-            LocalFrontCompression
-            ( B, front.BGreens, front.BCoefficients, depth, useQR );
-        }
-        else
-            LocalFrontCompression
-            ( B, front.BGreens, front.BCoefficients, depth, useQR );
-        frontL.Empty();
+        // Separately compress the A and B portions of the front
+        //LocalFrontCompression( front, depth, numChildren==0, useQR );
+        LocalFrontCompression( front, depth, false, useQR );
     }
 #ifndef RELEASE
     PopCallStack();

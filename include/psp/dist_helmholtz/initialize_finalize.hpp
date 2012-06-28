@@ -21,41 +21,6 @@
 
 namespace psp {
 
-// TODO: Move this batch of functions into the compressed local factorization
-namespace internal {
-
-template<typename R>
-int MeasureSparsity( const Matrix<Complex<R> >& A, const R norm )
-{
-    typedef Complex<R> C;
-    const R tolerance = 1e-15*norm;
-
-    const int height = A.Height();
-    const int width = A.Width();
-    int numNonzeros=0;
-    for( int j=0; j<width; ++j )
-        for( int i=0; i<height; ++i )
-            if( Abs(A.Get(i,j)) > tolerance )
-                ++numNonzeros;
-
-    return numNonzeros;
-}
-
-template<typename R>
-int MeasureSparsity( const DistMatrix<Complex<R> >& A, R norm )
-{
-    typedef Complex<R> C;
-    const int numLocalNonzeros = 
-        MeasureSparsity( A.LockedLocalMatrix(), norm );
-    int numNonzeros;
-    mpi::AllReduce
-    ( &numLocalNonzeros, &numNonzeros, 1, mpi::SUM, A.Grid().Comm() );
-
-    return numNonzeros;
-}
-
-} // namespace internal
-
 template<typename R>
 void
 DistHelmholtz<R>::Initialize
@@ -116,13 +81,15 @@ DistHelmholtz<R>::Initialize
     const R yPPW = ny / ySizeInWavelengths;
     const R zPPW = nz / zSizeInWavelengths;
     const R minPPW = std::min(std::min(xPPW,yPPW),zPPW);
-    const R xPML = hx_*bx / wavelength;
-    const R yPML = hy_*by / wavelength;
-    const R zPML = hz_*bz / wavelength;
-    const R minPML = std::min(std::min(xPML,yPML),zPML);
+    const int minPML = std::min(bx,std::min(by,bz));
+    const R xPMLPerWave = hx_*bx / wavelength;
+    const R yPMLPerWave = hy_*by / wavelength;
+    const R zPMLPerWave = hz_*bz / wavelength;
+    const R minPMLPerWave = 
+        std::min(std::min(xPMLPerWave,yPMLPerWave),zPMLPerWave);
     if( commRank == 0 )
     {
-        if( minPPW < 7 || minPML < 0.6 )
+        if( minPPW < 7 || minPML < 5 )
         {
             std::cout << "nx:                        " << nx << "\n"
                       << "ny:                        " << ny << "\n" 
@@ -140,12 +107,13 @@ DistHelmholtz<R>::Initialize
                       << "Max dimension:             " << maxDimension << "\n"
                       << "# of wavelengths:          " << numWavelengths << "\n"
                       << "Min points/wavelength:     " << minPPW << "\n"
-                      << "Min PML-size/wavelength:   " << minPML << "\n"
+                      << "Min PML-size               " << minPML << "\n"
+                      << "Min PML-size/wavelength:   " << minPMLPerWave << "\n"
                       << std::endl;
             if( minPPW < 7 )
                 std::cerr << "WARNING: minimum points/wavelength is very small"
                           << std::endl;
-            if( minPML < 0.6 )
+            if( minPML < 5 )
                 std::cerr << "WARNING: minimum PML size is very small" 
                           << std::endl;
         }

@@ -138,17 +138,6 @@ inline void LocalCompressedBlockLowerBackwardSolve
 #endif
     const int numLocalSupernodes = S.local.supernodes.size();
     const int width = X.Width();
-    if( width == 0 )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
-        return;
-    }
-
-    // Pull in the top local information from the bottom distributed information
-    L.local.fronts.back().work.LockedView
-    ( L.dist.fronts[0].work1d.LocalMatrix() );
 
     for( int s=numLocalSupernodes-2; s>=0; --s )
     {

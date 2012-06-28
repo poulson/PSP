@@ -58,42 +58,6 @@ inline void DistCompressedBlockLDL
     bottomDistFront.BGreens.clear();
     bottomDistFront.ACoefficients.clear();
     bottomDistFront.BCoefficients.clear();
-    const int numKeptModesA = topLocalFront.AGreens.size();
-    const int numKeptModesB = topLocalFront.BGreens.size();
-    bottomDistFront.AGreens.resize( numKeptModesA );
-    bottomDistFront.BGreens.resize( numKeptModesB );
-    bottomDistFront.ACoefficients.resize( numKeptModesA );
-    bottomDistFront.BCoefficients.resize( numKeptModesB );
-    for( int t=0; t<numKeptModesA; ++t )
-    {
-        DistMatrix<F>& distAGreen = bottomDistFront.AGreens[t];
-        DistMatrix<F,STAR,STAR>& distACoeff = bottomDistFront.ACoefficients[t];
-
-        const Matrix<F>& localAGreen = topLocalFront.AGreens[t];
-        const Matrix<F>& localACoeff = topLocalFront.ACoefficients[t];
-
-        distAGreen.LockedView
-        ( localAGreen.Height(), localAGreen.Width(), 0, 0,
-          localAGreen.LockedBuffer(), localAGreen.LDim(), bottomGrid );
-        distACoeff.LockedView
-        ( localACoeff.Height(), localACoeff.Width(),
-          localACoeff.LockedBuffer(), localACoeff.LDim(), bottomGrid );
-    }
-    for( int t=0; t<numKeptModesB; ++t )
-    {
-        DistMatrix<F>& distBGreen = bottomDistFront.BGreens[t];
-        DistMatrix<F,STAR,STAR>& distBCoeff = bottomDistFront.BCoefficients[t];
-
-        const Matrix<F>& localBGreen = topLocalFront.BGreens[t];
-        const Matrix<F>& localBCoeff = topLocalFront.BCoefficients[t];
-
-        distBGreen.LockedView
-        ( localBGreen.Height(), localBGreen.Width(), 0, 0,
-          localBGreen.LockedBuffer(), localBGreen.LDim(), bottomGrid );
-        distBCoeff.LockedView
-        ( localBCoeff.Height(), localBCoeff.Width(),
-          localBCoeff.LockedBuffer(), localBCoeff.LDim(), bottomGrid );
-    }
     bottomDistFront.work2d.Empty();
     bottomDistFront.work2d.LockedView
     ( topLocalFront.work.Height(), topLocalFront.work.Width(), 0, 0,
@@ -245,20 +209,8 @@ inline void DistCompressedBlockLDL
         cliq::numeric::DistFrontBlockLDL
         ( orientation, front.frontL, front.work2d );
 
-        // Now compress the distributed front
-        DistMatrix<F> A(grid), B(grid);
-        elem::PartitionDown
-        ( front.frontL, A,
-                        B, sn.size ); 
-        front.sT = A.Height() / depth;
-        front.sB = B.Height() / depth;
-        front.depth = depth;
-        front.grid = &grid;
-        DistFrontCompression
-        ( A, front.AGreens, front.ACoefficients, depth, useQR );
-        DistFrontCompression
-        ( B, front.BGreens, front.BCoefficients, depth, useQR );
-        front.frontL.Empty();
+        // Separately compress the A and B blocks 
+        DistFrontCompression( front, depth, useQR );
     }
     L.local.fronts.back().work.Empty();
     L.dist.fronts.back().work2d.Empty();

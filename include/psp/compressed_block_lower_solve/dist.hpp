@@ -342,8 +342,11 @@ inline void DistCompressedBlockLowerBackwardSolve
         if( s > 0 )
             DistFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
         else
+        {
+            localRootFront.work.View( W.LocalMatrix() );
             LocalFrontCompressedBlockLowerBackwardSolve
-            ( orientation, localRootFront, W.LocalMatrix() );
+            ( orientation, localRootFront, localRootFront.work );
+        }
 
         // Store the supernode portion of the result
         localXT = WT.LocalMatrix();

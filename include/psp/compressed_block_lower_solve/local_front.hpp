@@ -79,7 +79,19 @@ LocalFrontCompressedBlockLowerForwardSolve
 
     // XB := XB - LB XT
     //     = XB - \sum_t (CB_t o GB_t) XT
-    if( numKeptModesB != 0 )
+    if( front.isLeaf )
+    {
+        const int numNonzeros = front.BValues.size();
+        for( int k=0; k<numNonzeros; ++k )
+        {
+            const int i = front.BRows[k];
+            const int j = front.BCols[k];
+            const F value = front.BValues[k];
+            for( int l=0; l<numRhs; ++l )
+                XB.Update( i, l, -value*XT.Get(j,l) );
+        }
+    }
+    else if( numKeptModesB != 0 )
     {
         const int sB = front.sB;
 
@@ -123,9 +135,12 @@ LocalFrontCompressedBlockLowerBackwardSolve
     PushCallStack("LocalFrontCompressedBlockLowerBackwardSolve");
 #endif
     const int numKeptModesA = front.AGreens.size();
-    const int numKeptModesB = front.BGreens.size();
 
-    if( numKeptModesB == 0 )
+    const bool isLeaf = front.isLeaf;
+    const int numKeptModesB = ( isLeaf ? 0 : front.BGreens.size() );
+    const int numNonzeros = ( isLeaf ? front.BRows.size() : 0 );
+
+    if( (isLeaf && numNonzeros==0) || (!isLeaf && numKeptModesB==0) )
     {
 #ifndef RELEASE
         PopCallStack();
@@ -146,34 +161,51 @@ LocalFrontCompressedBlockLowerBackwardSolve
     ( X, XT,
          XB, snSize );
 
-    // YT := LB^[T/H] XB,
-    //     = \sum_t (CB_t o GB_t)^[T/H] XB
-    //     = \sum_t (CB_t^[T/H] o GB_t^[T/H]) XB
-    Matrix<F> YT, ZT;
+    // YT := LB^[T/H] XB
+    Matrix<F> YT, ZT, YTBlock, ZTBlock;
     Zeros( snSize, numRhs, YT );
     Zeros( snSize, numRhs, ZT );
-    Matrix<F> XBBlock, YTBlock, ZTBlock;
-    for( int t=0; t<numKeptModesB; ++t )
+    if( isLeaf )
     {
-        const Matrix<F>& GB = front.BGreens[t];
-        const Matrix<F>& CB = front.BCoefficients[t];
-
-        for( int j=0; j<depth; ++j )    
+        for( int k=0; k<numNonzeros; ++k )
         {
-            ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
-            XBBlock.LockedView( XB, j*sB, 0, sB, numRhs );
-            elem::Gemm( orientation, NORMAL, (F)1, GB, XBBlock, (F)0, ZTBlock );
+            const int i = front.BRows[k];
+            const int j = front.BCols[k];
+            const F value = front.BValues[k];
+            const F scalar = ( conjugate ? Conj(value) : value );
+            for( int l=0; l<numRhs; ++l )
+                YT.Update( j, l, scalar*XB.Get(i,l) );
         }
-
-        for( int i=0; i<depth; ++i )
+    }
+    else
+    {
+        // YT := LB^[T/H] XB
+        //     = \sum_t (CB_t o GB_t)^[T/H] XB
+        //     = \sum_t (CB_t^[T/H] o GB_t^[T/H]) XB
+        Matrix<F> XBBlock;
+        for( int t=0; t<numKeptModesB; ++t )
         {
-            YTBlock.View( YT, i*sT, 0, sT, numRhs );
-            for( int j=0; j<depth; ++j )
+            const Matrix<F>& GB = front.BGreens[t];
+            const Matrix<F>& CB = front.BCoefficients[t];
+
+            for( int j=0; j<depth; ++j )    
             {
-                ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
-                const F entry = CB.Get(j,i);
-                const F scalar = ( conjugate ? Conj(entry) : entry );
-                elem::Axpy( scalar, ZTBlock, YTBlock );
+                ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
+                XBBlock.LockedView( XB, j*sB, 0, sB, numRhs );
+                elem::Gemm
+                ( orientation, NORMAL, (F)1, GB, XBBlock, (F)0, ZTBlock );
+            }
+
+            for( int i=0; i<depth; ++i )
+            {
+                YTBlock.View( YT, i*sT, 0, sT, numRhs );
+                for( int j=0; j<depth; ++j )
+                {
+                    ZTBlock.LockedView( ZT, j*sT, 0, sT, numRhs );
+                    const F entry = CB.Get(j,i);
+                    const F scalar = ( conjugate ? Conj(entry) : entry );
+                    elem::Axpy( scalar, ZTBlock, YTBlock );
+                }
             }
         }
     }

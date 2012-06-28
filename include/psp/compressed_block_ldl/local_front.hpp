@@ -25,10 +25,8 @@ namespace psp {
 
 template<typename R>
 void LocalFrontCompression
-( Matrix<Complex<R> >& A, 
-  std::vector<Matrix<Complex<R> > >& greens, 
-  std::vector<Matrix<Complex<R> > >& coefficients,
-  int depth, bool useQR=false );
+( LocalCompressedFront<Complex<R> >& front, 
+  int depth, bool isLeaf, bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -38,10 +36,10 @@ namespace internal {
 
 template<typename R>
 void CompressSVD
-( Matrix<Complex<R> >& U, Matrix<R>& s, Matrix<Complex<R> >& V )
+( Matrix<Complex<R> >& U, Matrix<R>& s, Matrix<Complex<R> >& V, 
+  R tolerance )
 {
     typedef Complex<R> C;
-    const R tolerance = 0.02;
 
     // Compress
     const R twoNorm = elem::Norm( s, elem::MAX_NORM );
@@ -70,17 +68,15 @@ void CompressSVD
     }
 }
 
-} // namespace internal
-
 template<typename R> 
-inline void LocalFrontCompression
+inline void LocalBlockCompression
 ( Matrix<Complex<R> >& A, 
   std::vector<Matrix<Complex<R> > >& greens, 
   std::vector<Matrix<Complex<R> > >& coefficients, 
-  int depth, bool useQR )
+  int depth, R tolerance, bool useQR )
 {
 #ifndef RELEASE
-    PushCallStack("LocalFrontCompression");
+    PushCallStack("internal::LocalBlockCompression");
 #endif
     typedef Complex<R> C;
 
@@ -119,7 +115,7 @@ inline void LocalFrontCompression
         W = ZT;
         elem::MakeTrapezoidal( LEFT, UPPER, 0, W );
         elem::SVD( W, s, V, useQR );
-        internal::CompressSVD( W, s, V );
+        internal::CompressSVD( W, s, V, tolerance );
         elem::DiagonalScale( RIGHT, NORMAL, s, V );
 
         // Reexpand (TODO: Think about explicitly expanded reflectors)
@@ -139,7 +135,7 @@ inline void LocalFrontCompression
         Matrix<R> s;
         U = Z;
         elem::SVD( U, s, V, useQR );
-        internal::CompressSVD( U, s, V );
+        internal::CompressSVD( U, s, V, tolerance );
         elem::DiagonalScale( RIGHT, NORMAL, s, V );
     }
 
@@ -174,7 +170,97 @@ inline void LocalFrontCompression
 #endif
 }
 
-// TODO: Sparse leaf-level B compression
+template<typename R>
+void LocalBlockSparsify
+( Matrix<Complex<R> >& B, 
+  std::vector<int>& rows, 
+  std::vector<int>& cols, 
+  std::vector<Complex<R> >& values ) 
+{
+#ifndef RELEASE
+    PushCallStack("internal::LocalBlockSparsify");
+#endif
+    typedef Complex<R> C;
+
+    // Count the total number of nonzeros
+    int numNonzeros=0;
+    const Complex<R> zero( 0, 0 );
+    const int width = B.Width();
+    const int height = B.Height();
+    for( int j=0; j<width; ++j )
+        for( int i=0; i<height; ++i )
+            if( B.Get(i,j) != zero )
+                ++numNonzeros;
+
+    const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
+    if( worldRank == 0 && height != 0 && width != 0 )
+    {
+        std::ostringstream msg;
+        msg << "kept " << numNonzeros << "/" << height*width << " entries, "
+            << ((R)100*numNonzeros)/((R)height*width) << "%" << std::endl;
+        std::cout << msg.str();
+    }
+
+    // Allocate the space
+    rows.resize( numNonzeros );
+    cols.resize( numNonzeros );
+    values.resize( numNonzeros );
+
+    // Fill the data
+    numNonzeros=0;
+    for( int j=0; j<width; ++j )
+    {
+        for( int i=0; i<height; ++i )
+        {
+            if( B.Get(i,j) != zero )
+            {
+                rows[numNonzeros] = i;
+                cols[numNonzeros] = j;
+                values[numNonzeros] = B.Get(i,j);
+                ++numNonzeros;
+            }
+        }
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+} // namespace internal
+
+template<typename R>
+void LocalFrontCompression
+( LocalCompressedFront<Complex<R> >& front, 
+  int depth, bool isLeaf, bool useQR=false )
+{
+#ifndef RELEASE
+    PushCallStack("LocalFrontCompression");
+#endif
+    const R tolA = 0.02;
+    const R tolB = 0.1;
+
+    const int snSize = front.frontL.Width();
+    Matrix<Complex<R> > A, B;
+    elem::PartitionDown
+    ( front.frontL, A,
+                    B, snSize );
+    front.sT = A.Height() / depth;
+    front.sB = B.Height() / depth;
+    front.depth = depth;
+    front.isLeaf = isLeaf;
+    internal::LocalBlockCompression
+    ( A, front.AGreens, front.ACoefficients, depth, tolA, useQR );
+    if( isLeaf )
+        internal::LocalBlockSparsify
+        ( B, front.BRows, front.BCols, front.BValues );
+    else
+        internal::LocalBlockCompression
+        ( B, front.BGreens, front.BCoefficients, depth, tolB, useQR );
+    front.frontL.Empty();
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
 } // namespace psp
 

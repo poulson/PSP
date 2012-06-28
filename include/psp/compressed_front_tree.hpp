@@ -44,6 +44,9 @@ struct LocalCompressedFront
 
     // TODO: Add possibility of storing B sparsly at the leaf level
     //       Typical sparse-matrix storage scheme?
+    bool isLeaf;
+    std::vector<int> BRows, BCols;
+    std::vector<F> BValues;
 };
 
 template<typename F>
