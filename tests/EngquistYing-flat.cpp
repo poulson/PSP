@@ -114,26 +114,7 @@ main( int argc, char* argv[] )
     try 
     {
         DistHelmholtz<double> helmholtz( control, comm );
-
-        const int cubeRoot = 
-            std::max(1,(int)std::floor(pow((double)commSize,0.333)));
-        int px = cubeRoot;
-        while( commSize % px != 0 )
-            ++px;
-        const int reduced = commSize / px;
-        const int sqrtReduced = 
-            std::max(1,(int)std::floor(sqrt((double)reduced)));
-        int py = sqrtReduced;
-        while( reduced % py != 0 )
-            ++py;
-        const int pz = reduced / py;
-        if( px*py*pz != commSize )
-            throw std::logic_error("Nonsensical process grid");
-        else if( commRank == 0 )
-            std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
-                      << std::endl;
-
-        GridData<double> velocity( 1, N, N, N/8, XYZ, px, py, pz, comm );
+        GridData<double> velocity( 1, N, N, N/8, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
@@ -141,6 +122,9 @@ main( int argc, char* argv[] )
         const int xShift = velocity.XShift();
         const int yShift = velocity.YShift();
         const int zShift = velocity.ZShift();
+        const int px = velocity.XStride();
+        const int py = velocity.YStride();
+        const int pz = velocity.ZStride();
         if( velocityModel == 1 )
         {
             // Converging lens
@@ -230,7 +214,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<Complex<double> > B( 2, N, N, N/8, XYZ, px, py, pz, comm );
+        GridData<Complex<double> > B( 2, N, N, N/8, XYZ, comm );
         Complex<double>* localB = B.LocalBuffer();
         const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
         const double center0[] = { 0.5, 0.5, 0.25/8 };

@@ -29,7 +29,7 @@ void Usage()
               << "  <N>: Size of grid in each dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
               << "  <imagShift>: imaginary shift [2 pi is standard]\n"
-              << "  <velocity>: Which velocity field to use, {1,2}\n"
+              << "  <velocity>: Which velocity field to use, {1,2,3,4}\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
@@ -69,13 +69,17 @@ main( int argc, char* argv[] )
     const bool useSQMR = atoi( argv[argNum++] );
     const bool fullVisualize = atoi( argv[argNum++] );
 
-    if( velocityModel < 1 || velocityModel > 2 )
+    if( velocityModel < 1 || velocityModel > 5 )
     {
         if( commRank == 0 )
-            std::cout << "Invalid velocity model choice, must be in {1,2};\n"
-                      << "Please see \"Sweeping preconditioner for the "
-                      << "Helmholtz equation: moving perfectly matched layers\""
-                      << " for more details." << std::endl;
+            std::cout << "Invalid velocity model choice, must be in {1,...,5}\n"
+                      << "---------------------------------------------------\n"
+                      << "1) Gaussian perturbation of unity\n"
+                      << "2) Wave guide\n"
+                      << "3) Two layers\n"
+                      << "4) Cavity\n"
+                      << "5) Reverse cavity\n"
+                      << std::endl;
         psp::Finalize();
         return 0;
     }
@@ -115,25 +119,7 @@ main( int argc, char* argv[] )
     {
         DistHelmholtz<double> helmholtz( control, comm );
 
-        const int cubeRoot = 
-            std::max(1,(int)std::floor(pow((double)commSize,0.333)));
-        int px = cubeRoot;
-        while( commSize % px != 0 )
-            ++px;
-        const int reduced = commSize / px;
-        const int sqrtReduced = 
-            std::max(1,(int)std::floor(sqrt((double)reduced)));
-        int py = sqrtReduced;
-        while( reduced % py != 0 )
-            ++py;
-        const int pz = reduced / py;
-        if( px*py*pz != commSize )
-            throw std::logic_error("Nonsensical process grid");
-        else if( commRank == 0 )
-            std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
-                      << std::endl;
-
-        GridData<double> velocity( 1, N, N, N, XYZ, px, py, pz, comm );
+        GridData<double> velocity( 1, N, N, N, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
@@ -141,6 +127,9 @@ main( int argc, char* argv[] )
         const int xShift = velocity.XShift();
         const int yShift = velocity.YShift();
         const int zShift = velocity.ZShift();
+        const int px = velocity.XStride();
+        const int py = velocity.YStride();
+        const int pz = velocity.ZStride();
         if( velocityModel == 1 )
         {
             // Converging lens
@@ -170,7 +159,7 @@ main( int argc, char* argv[] )
                 }
             }
         }
-        else // velocityModel == 2
+        else if( velocityModel == 2 )
         {
             // Wave guide
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -192,6 +181,79 @@ main( int argc, char* argv[] )
                         const double speed =
                             1.0 - 0.4*std::exp(-32.*(argX+argY));
                         localVelocity[localIndex] = speed / 0.8;
+                    }
+                }
+            }
+        }
+        else if( velocityModel == 3 )
+        {
+            // Two layers
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                const double speed = ( Z >= 0.5 ? 2.0 : 1.0 );
+                const int localOffset = zLocal*xLocalSize*yLocalSize;
+                for( int i=0; i<xLocalSize*yLocalSize; ++i )
+                    localVelocity[localOffset+i] = speed;
+            }
+        }
+        else if( velocityModel == 4 )
+        {
+            // Cavity
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (N+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (N+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 && 
+                            Y > 0.2 && Y < 0.8 && 
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 1;
+                        else
+                            speed = 8;
+                        const int localIndex = 
+                            xLocal + yLocal*xLocalSize + 
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+        }
+        else if( velocityModel == 5 )
+        {
+            // Cavity
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (N+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (N+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 && 
+                            Y > 0.2 && Y < 0.8 && 
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 8;
+                        else
+                            speed = 1;
+                        const int localIndex = 
+                            xLocal + yLocal*xLocalSize + 
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
                     }
                 }
             }
@@ -226,7 +288,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<Complex<double> > B( 2, N, N, N, XYZ, px, py, pz, comm );
+        GridData<Complex<double> > B( 2, N, N, N, XYZ, comm );
         Complex<double>* localB = B.LocalBuffer();
         const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
         const double center0[] = { 0.5, 0.5, 0.25 };

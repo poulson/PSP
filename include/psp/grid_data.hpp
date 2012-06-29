@@ -69,6 +69,12 @@ public:
       int nx, int ny,int nz, GridDataOrder order,
       int px, int py, int pz, mpi::Comm comm );
 
+    // Same as above, but automatically determine the process grid dimensions
+    GridData
+    ( int numScalars,
+      int nx, int ny,int nz, GridDataOrder order, 
+      mpi::Comm comm );
+
     int XSize() const;
     int YSize() const;
     int ZSize() const;
@@ -168,6 +174,43 @@ inline GridData<T>::GridData
     xLocalSize_ = LocalLength( nx, xShift_, px );
     yLocalSize_ = LocalLength( ny, yShift_, py );
     zLocalSize_ = LocalLength( nz, zShift_, pz );
+    localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
+}
+
+template<typename T>
+inline GridData<T>::GridData
+( int numScalars,
+  int nx, int ny, int nz, GridDataOrder order,
+  mpi::Comm comm )
+: numScalars_(numScalars), 
+  nx_(nx), ny_(ny), nz_(nz), order_(order),
+  comm_(comm)
+{
+    const int commRank = mpi::CommRank( comm );
+    const int commSize = mpi::CommSize( comm );
+
+    const int cubeRoot = 
+        std::max(1,(int)std::floor(pow((double)commSize,1./3.)));
+    px_ = cubeRoot;
+    while( commSize % px_ != 0 )
+        ++px_;
+    const int yzCommSize = commSize / px_;
+    const int squareRoot = 
+        std::max(1,(int)std::floor(sqrt((double)yzCommSize)));
+    py_ = squareRoot;
+    while( squareRoot % py_ != 0 )
+        ++py_;
+    pz_ = yzCommSize / py_;
+
+    if( commSize != px_*py_*pz_ )
+        throw std::logic_error("px*py*pz != commSize");
+
+    xShift_ = commRank % px_;
+    yShift_ = (commRank/px_) % py_;
+    zShift_ = commRank/(px_*py_);
+    xLocalSize_ = LocalLength( nx, xShift_, px_ );
+    yLocalSize_ = LocalLength( ny, yShift_, py_ );
+    zLocalSize_ = LocalLength( nz, zShift_, pz_ );
     localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
 

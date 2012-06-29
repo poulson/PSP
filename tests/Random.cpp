@@ -106,31 +106,14 @@ main( int argc, char* argv[] )
     try 
     {
         DistHelmholtz<double> helmholtz( control, comm );
-
-        const int cubeRoot = 
-            std::max(1,(int)std::floor(pow((double)commSize,0.333)));
-        int px = cubeRoot;
-        while( commSize % px != 0 )
-            ++px;
-        const int reduced = commSize / px;
-        const int sqrtReduced = 
-            std::max(1,(int)std::floor(sqrt((double)reduced)));
-        int py = sqrtReduced;
-        while( reduced % py != 0 )
-            ++py;
-        const int pz = reduced / py;
-        if( px*py*pz != commSize )
-            throw std::logic_error("Nonsensical process grid");
-        else if( commRank == 0 )
-            std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
-                      << std::endl;
-
-        GridData<double> velocity
-        ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
+        GridData<double> velocity( 1, nx, ny, nz, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
         const int zLocalSize = velocity.ZLocalSize();
+        const int px = velocity.XStride();
+        const int py = velocity.YStride();
+        const int pz = velocity.ZStride();
         for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
             localVelocity[i] = 1+amplitude*plcg::ParallelUniform<double>();
 
@@ -163,8 +146,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<Complex<double> > B
-        ( 1, control.nx, control.ny, control.nz, XYZ, px, py, pz, comm );
+        GridData<Complex<double> > B( 1, nx, ny, nz, XYZ, comm );
         Complex<double>* localB = B.LocalBuffer();
         std::memset
         ( localB, 0, 
