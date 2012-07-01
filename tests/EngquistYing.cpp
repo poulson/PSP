@@ -69,16 +69,21 @@ main( int argc, char* argv[] )
     const bool useSQMR = atoi( argv[argNum++] );
     const bool fullVisualize = atoi( argv[argNum++] );
 
-    if( velocityModel < 1 || velocityModel > 5 )
+    if( velocityModel < 1 || velocityModel > 10 )
     {
         if( commRank == 0 )
-            std::cout << "Invalid velocity model choice, must be in {1,...,5}\n"
-                      << "---------------------------------------------------\n"
+            std::cout << "Invalid velocity model, must be in {1,...,10}\n"
+                      << "---------------------------------------------\n"
                       << "1) Gaussian perturbation of unity\n"
                       << "2) Wave guide\n"
                       << "3) Two layers\n"
                       << "4) Cavity\n"
                       << "5) Reverse cavity\n"
+                      << "6) Top half of cavity\n"
+                      << "7) Bottom half of cavity\n"
+                      << "8) Increasing layers\n"
+                      << "9) Decreasing layers\n"
+                      << "10) Sideways layers\n"
                       << std::endl;
         psp::Finalize();
         return 0;
@@ -91,33 +96,13 @@ main( int argc, char* argv[] )
                   << " with velocity model " << velocityModel << std::endl;
     }
     
-    FiniteDiffControl<double> control;
-    control.stencil = SEVEN_POINT;
-    control.nx = N;
-    control.ny = N;
-    control.nz = N;
-    control.wx = 1;
-    control.wy = 1;
-    control.wz = 1;
-    control.omega = omega;
-    control.Cx = 1.5;
-    control.Cy = 1.5;
-    control.Cz = 1.5;
-    control.bx = 6;
-    control.by = 6;
-    control.bz = 6;
-    control.imagShift = imagShift;
-    control.cutoff = 96;
-    control.numPlanesPerPanel = numPlanesPerPanel;
-    control.frontBC = PML;
-    control.rightBC = PML;
-    control.backBC = PML;
-    control.leftBC = PML;
-    control.topBC = PML;
+    Discretization<double> disc
+    ( omega, N, N, N, 1., 1., 1., PML, PML, PML, PML, DIRICHLET );
 
     try 
     {
-        DistHelmholtz<double> helmholtz( control, comm );
+        DistHelmholtz<double> helmholtz
+        ( disc, comm, imagShift, numPlanesPerPanel );
 
         GridData<double> velocity( 1, N, N, N, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
@@ -192,7 +177,7 @@ main( int argc, char* argv[] )
             {
                 const int z = zShift + zLocal*pz;
                 const double Z = z / (N+1.0);
-                const double speed = ( Z >= 0.5 ? 2.0 : 1.0 );
+                const double speed = ( Z >= 0.5 ? 8.0 : 1.0 );
                 const int localOffset = zLocal*xLocalSize*yLocalSize;
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
                     localVelocity[localOffset+i] = speed;
@@ -230,7 +215,7 @@ main( int argc, char* argv[] )
         }
         else if( velocityModel == 5 )
         {
-            // Cavity
+            // Reverse-cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
@@ -252,6 +237,145 @@ main( int argc, char* argv[] )
                             speed = 1;
                         const int localIndex = 
                             xLocal + yLocal*xLocalSize + 
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+        }
+        else if( velocityModel == 6 )
+        {
+            // Bottom half of cavity
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (N+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (N+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 && 
+                            Y > 0.2 && Y < 0.8 && 
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 1;
+                        else if( Z > 0.5 )
+                            speed = 1;
+                        else
+                            speed = 8;
+                        const int localIndex = 
+                            xLocal + yLocal*xLocalSize + 
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+        }
+        else if( velocityModel == 7 )
+        {
+            // Top half of cavity
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (N+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (N+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 && 
+                            Y > 0.2 && Y < 0.8 && 
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 1;
+                        else if( Z < 0.5 )
+                            speed = 1;
+                        else
+                            speed = 8;
+                        const int localIndex = 
+                            xLocal + yLocal*xLocalSize + 
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+        }
+        else if( velocityModel == 8 )
+        {
+            // Increasing layers
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                double speed;
+                if( Z < 0.2 )
+                    speed = 1;
+                else if( Z < 0.4 )
+                    speed = 2;
+                else if( Z < 0.6 )
+                    speed = 3;
+                else if( Z < 0.8 )
+                    speed = 4;
+                else
+                    speed = 5;
+                const int localOffset = zLocal*xLocalSize*yLocalSize;
+                for( int i=0; i<xLocalSize*yLocalSize; ++i )
+                    localVelocity[i+localOffset] = speed;
+            }
+        }
+        else if( velocityModel == 9 )
+        {
+            // Decreasing layers
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                double speed;
+                if( Z < 0.2 )
+                    speed = 5;
+                else if( Z < 0.4 )
+                    speed = 4;
+                else if( Z < 0.6 )
+                    speed = 3;
+                else if( Z < 0.8 )
+                    speed = 2;
+                else
+                    speed = 1;
+                const int localOffset = zLocal*xLocalSize*yLocalSize;
+                for( int i=0; i<xLocalSize*yLocalSize; ++i )
+                    localVelocity[i+localOffset] = speed;
+            }
+        }
+        else if( velocityModel == 10 )
+        {
+            // Sideways layers
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*pz;
+                        const double X = x / (N+1.0);
+                        double speed;
+                        if( X < 0.2 )
+                            speed = 5;
+                        else if( X < 0.4 )
+                            speed = 4;
+                        else if( X < 0.6 )
+                            speed = 3;
+                        else if( X < 0.8 )
+                            speed = 2;
+                        else
+                            speed = 1;
+                        const int localIndex = xLocal + yLocal*xLocalSize + 
                             zLocal*xLocalSize*yLocalSize;
                         localVelocity[localIndex] = speed;
                     }

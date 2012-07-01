@@ -76,33 +76,13 @@ main( int argc, char* argv[] )
                   << std::endl;
     }
     
-    FiniteDiffControl<double> control;
-    control.stencil = SEVEN_POINT;
-    control.nx = nx;
-    control.ny = ny;
-    control.nz = nz;
-    control.wx = 1;
-    control.wy = 1;
-    control.wz = 1;
-    control.omega = omega;
-    control.Cx = 1.5;
-    control.Cy = 1.5;
-    control.Cz = 1.5;
-    control.bx = 5;
-    control.by = 5;
-    control.bz = 5;
-    control.imagShift = imagShift;
-    control.cutoff = 96;
-    control.numPlanesPerPanel = numPlanesPerPanel;
-    control.frontBC = PML;
-    control.rightBC = PML;
-    control.backBC = PML;
-    control.leftBC = PML;
-    control.topBC = DIRICHLET;
+    Discretization<double> disc( omega, nx, ny, nz, 1., 1., 1. );
 
     try 
     {
-        DistHelmholtz<double> helmholtz( control, comm );
+        DistHelmholtz<double> helmholtz
+        ( disc, comm, imagShift, numPlanesPerPanel );
+
         GridData<double> velocity( 1, nx, ny, nz, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
@@ -148,13 +128,13 @@ main( int argc, char* argv[] )
         std::memset
         ( localB, 0, 
           xLocalSize*yLocalSize*zLocalSize*sizeof(Complex<double>) );
-        const int xSource = control.nx/2;
-        const int ySource = control.ny/2;
-        const int zSource = control.nz/2;
+        const int xSource = nx/2;
+        const int ySource = ny/2;
+        const int zSource = nz/2;
         if( commRank == B.OwningProcess( xSource, ySource, zSource ) )
         {
             const int localIndex = B.LocalIndex( xSource, ySource, zSource ); 
-            localB[localIndex] = control.nx;
+            localB[localIndex] = nx;
         }
 
         B.WritePlane( XY, nz/2, "source-middleXY" );

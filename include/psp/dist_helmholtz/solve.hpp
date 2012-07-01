@@ -23,8 +23,7 @@ namespace psp {
 
 template<typename R>
 void
-DistHelmholtz<R>::SolveWithGMRES
-( GridData<C>& gridB, int m, R relTol ) const
+DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m, R relTol ) const
 {
     if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");

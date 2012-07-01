@@ -33,25 +33,25 @@ DistHelmholtz<R>::Initialize
         throw std::logic_error( msg.str().c_str() );
     }
     panelScheme_ = panelScheme;
-    if( control_.nx != velocity.XSize() ||
-        control_.ny != velocity.YSize() ||
-        control_.nz != velocity.ZSize() )
+    if( disc_.nx != velocity.XSize() ||
+        disc_.ny != velocity.YSize() ||
+        disc_.nz != velocity.ZSize() )
         throw std::logic_error("Velocity grid is incorrect");
     if( !mpi::CongruentComms( comm_, velocity.Comm() ) )
         throw std::logic_error("Velocity does not have a congruent comm");
     if( velocity.NumScalars() != 1 )
         throw std::logic_error("Velocity grid should have one entry per point");
     const int commRank = mpi::CommRank( comm_ );
-    const R omega = control_.omega;
-    const R wx = control_.wx;
-    const R wy = control_.wy;
-    const R wz = control_.wz;
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
-    const int bx = control_.bx;
-    const int by = control_.by;
-    const int bz = control_.bz;
+    const R omega = disc_.omega;
+    const R wx = disc_.wx;
+    const R wy = disc_.wy;
+    const R wz = disc_.wz;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
+    const int nz = disc_.nz;
+    const int bx = disc_.bx;
+    const int by = disc_.by;
+    const int bz = disc_.bz;
 
     // Compute the minimum and maximum velocities, then the characteristic 
     // wavelength and the maximum number of wavelengths in an x/y/z direction.
@@ -272,9 +272,8 @@ DistHelmholtz<R>::Initialize
 
         // Retrieve the velocity for this panel
         const double gatherStartTime = startTime;
-        const int numPlanesPerPanel = control_.numPlanesPerPanel;
-        const int vOffset = bottomDepth_ + k*numPlanesPerPanel - bz;
-        const int vSize = numPlanesPerPanel + bz;
+        const int vOffset = bottomDepth_ + k*numPlanesPerPanel_ - bz;
+        const int vSize = numPlanesPerPanel_ + bz;
         std::vector<R> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
@@ -495,24 +494,24 @@ template<typename R>
 Complex<R>
 DistHelmholtz<R>::s1Inv( int x ) const
 {
-    const int bx = control_.bx;
+    const int bx = disc_.bx;
     const R etax = bx*hx_;
-    if( x+1 < bx && control_.frontBC==PML )
+    if( x+1 < bx && disc_.frontBC==PML )
     {
         const R delta = bx - (x+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cx/etax)*(delta/bx)*(delta/bx)*
-            (2*M_PI/control_.omega);
+            (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( x > (control_.nx-bx) && control_.backBC==PML )
+    else if( x > (disc_.nx-bx) && disc_.backBC==PML )
     {
-        const R delta = x-(control_.nx-bx);
+        const R delta = x-(disc_.nx-bx);
         const R realPart = 1;
         const R imagPart =
-            (control_.Cx/etax)*(delta/bx)*(delta/bx)*
-            (2*M_PI/control_.omega);
+            (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -523,24 +522,24 @@ template<typename R>
 Complex<R>
 DistHelmholtz<R>::s2Inv( int y ) const
 {
-    const int by = control_.by;
+    const int by = disc_.by;
     const R etay = by*hy_;
-    if( y+1 < by && control_.leftBC==PML )
+    if( y+1 < by && disc_.leftBC==PML )
     {
         const R delta = by - (y+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cy/etay)*(delta/by)*(delta/by)*
-            (2*M_PI/control_.omega);
+            (disc_.Cy/etay)*(delta/by)*(delta/by)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( y > (control_.ny-by) && control_.rightBC==PML )
+    else if( y > (disc_.ny-by) && disc_.rightBC==PML )
     {
-        const R delta = y-(control_.ny-by);
+        const R delta = y-(disc_.ny-by);
         const R realPart = 1;
         const R imagPart =
-            (control_.Cy/etay)*(delta/by)*(delta/by)*
-            (2*M_PI/control_.omega);
+            (disc_.Cy/etay)*(delta/by)*(delta/by)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -551,24 +550,24 @@ template<typename R>
 Complex<R>
 DistHelmholtz<R>::s3Inv( int v ) const
 {
-    const int bz = control_.bz;
+    const int bz = disc_.bz;
     const R etaz = bz*hz_;
     if( v+1 < bz )
     {
         const R delta = bz - (v+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
-            (2*M_PI/control_.omega);
+            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (control_.nz-bz) && control_.topBC==PML )
+    else if( v > (disc_.nz-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (control_.nz-bz);
+        const R delta = v - (disc_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
-            (2*M_PI/control_.omega);
+            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -579,24 +578,24 @@ template<typename R>
 Complex<R>
 DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
-    const int bz = control_.bz;
+    const int bz = disc_.bz;
     const R etaz = bz*hz_;
     if( v+1 < vOffset+bz )
     {
         const R delta = vOffset + bz - (v+1);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
-            (2*M_PI/control_.omega);
+            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (control_.nz-bz) && control_.topBC==PML )
+    else if( v > (disc_.nz-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (control_.nz-bz);
+        const R delta = v - (disc_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
-            (control_.Cz/etaz)*(delta/bz)*(delta/bz)*
-            (2*M_PI/control_.omega);
+            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else
@@ -642,7 +641,7 @@ DistHelmholtz<R>::FormGlobalRow
 
     // Compute the center term
     const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
-        (control_.omega/alpha)*(control_.omega/alpha)*s1InvM*s2InvM*s3InvM;
+        (disc_.omega/alpha)*(disc_.omega/alpha)*s1InvM*s2InvM*s3InvM;
 
     // Fill in the center term
     int offset = row;
@@ -651,15 +650,15 @@ DistHelmholtz<R>::FormGlobalRow
     // Fill the rest of the terms
     if( x > 0 )
         localEntries_[offset++] = xTermL;
-    if( x+1 < control_.nx )
+    if( x+1 < disc_.nx )
         localEntries_[offset++] = xTermR;
     if( y > 0 )
         localEntries_[offset++] = yTermL;
-    if( y+1 < control_.ny )
+    if( y+1 < disc_.ny )
         localEntries_[offset++] = yTermR;
     if( v > 0 )
         localEntries_[offset++] = vTermL;
-    if( v+1 < control_.nz )
+    if( v+1 < disc_.nz )
         localEntries_[offset++] = vTermR;
 }
 
@@ -707,12 +706,12 @@ DistHelmholtz<R>::FormLowerColumnOfSupernode
     const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 
     // Compute the center term
-    const C shiftedOmega = C(control_.omega,control_.imagShift);
+    const C shiftedOmega = C(disc_.omega,imagShift_);
     const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
         (shiftedOmega/alpha)*(shiftedOmega/alpha)*s1InvM*s2InvM*s3InvM;
     const int vLocal = v - vOffset;
-    const int nx = control_.nx;
-    const int ny = control_.ny;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
 
     // Set up the memory
     std::vector<int>::const_iterator first;
@@ -967,9 +966,9 @@ DistHelmholtz<R>::GetPanelVelocity
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
+    const int nz = disc_.nz;
     const int commSize = mpi::CommSize( comm_ );
 
     // Compute the reorderings for the indices in the supernodes in our 
@@ -1132,8 +1131,8 @@ void DistHelmholtz<R>::LocalReordering
     int offset = 0;
     LocalReorderingRecursion
     ( reordering, offset,
-      0, 0, control_.nx, control_.ny, vSize, control_.nx, control_.ny,
-      log2CommSize_, control_.cutoff, mpi::CommRank(comm_) );
+      0, 0, disc_.nx, disc_.ny, vSize, disc_.nx, disc_.ny,
+      log2CommSize_, nestedCutoff_, mpi::CommRank(comm_) );
 }
 
 template<typename R>
@@ -1258,9 +1257,9 @@ DistHelmholtz<R>::FillPanelFronts
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
+    const int nz = disc_.nz;
 
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;
@@ -1371,9 +1370,9 @@ DistHelmholtz<R>::FillPanelFronts
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
+    const int nz = disc_.nz;
 
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;

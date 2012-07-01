@@ -87,33 +87,13 @@ main( int argc, char* argv[] )
                   << " with velocity model " << velocityModel << std::endl;
     }
     
-    FiniteDiffControl<double> control;
-    control.stencil = SEVEN_POINT;
-    control.nx = N;
-    control.ny = N;
-    control.nz = N/8;
-    control.wx = 1;
-    control.wy = 1;
-    control.wz = 0.125;
-    control.omega = omega;
-    control.Cx = 1.5;
-    control.Cy = 1.5;
-    control.Cz = 1.5;
-    control.bx = 5;
-    control.by = 5;
-    control.bz = 5;
-    control.imagShift = imagShift;
-    control.cutoff = 96;
-    control.numPlanesPerPanel = numPlanesPerPanel;
-    control.frontBC = PML;
-    control.rightBC = PML;
-    control.backBC = PML;
-    control.leftBC = PML;
-    control.topBC = PML;
+    Discretization<double> disc( omega, N, N, N/8, 1., 1., 0.125 );
 
     try 
     {
-        DistHelmholtz<double> helmholtz( control, comm );
+        DistHelmholtz<double> helmholtz
+        ( disc, comm, imagShift, numPlanesPerPanel );
+
         GridData<double> velocity( 1, N, N, N/8, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();

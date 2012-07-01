@@ -22,7 +22,7 @@
 #define PSP_HPP 1
 
 #include "psp/environment.hpp"
-#include "psp/finite_diff_control.hpp"
+#include "psp/discretization.hpp"
 #include "psp/grid_data.hpp"
 
 #include "psp/compressed_front_tree.hpp"

@@ -22,11 +22,15 @@ namespace psp {
 
 template<typename R>
 DistHelmholtz<R>::DistHelmholtz
-( const FiniteDiffControl<R>& control, mpi::Comm comm )
-: comm_(comm), control_(control),
-  hx_(control.wx/(control.nx+1)),
-  hy_(control.wy/(control.ny+1)),
-  hz_(control.wz/(control.nz+1)),
+( const Discretization<R>& disc, mpi::Comm comm,
+  R imagShift, int numPlanesPerPanel, int cutoff )
+: comm_(comm), disc_(disc),
+  hx_(disc.wx/(disc.nx+1)),
+  hy_(disc.wy/(disc.ny+1)),
+  hz_(disc.wz/(disc.nz+1)),
+  imagShift_(imagShift),
+  numPlanesPerPanel_(numPlanesPerPanel), 
+  nestedCutoff_(cutoff),
   initialized_(false)
 {
     // Pull out some information about our communicator
@@ -40,14 +44,13 @@ DistHelmholtz<R>::DistHelmholtz
         throw std::logic_error("Must use a power of two number of processes");  
 
     // Decide if the domain is sufficiently deep to warrant sweeping
-    const int nx = control.nx;
-    const int ny = control.ny;
-    const int nz = control.nz;
-    const int bz = control.bz;
-    const int numPlanesPerPanel = control.numPlanesPerPanel;
-    const bool topHasPML = (control.topBC == PML);
-    bottomDepth_ = bz+numPlanesPerPanel;
-    topOrigDepth_ = (topHasPML ? bz+numPlanesPerPanel : numPlanesPerPanel );
+    const int nx = disc.nx;
+    const int ny = disc.ny;
+    const int nz = disc.nz;
+    const int bz = disc.bz;
+    const bool topHasPML = (disc.topBC == PML);
+    bottomDepth_ = bz+numPlanesPerPanel_;
+    topOrigDepth_ = (topHasPML ? bz+numPlanesPerPanel_ : numPlanesPerPanel_ );
     if( nz <= bottomDepth_+topOrigDepth_ )
         throw std::logic_error
         ("The domain is very shallow. Please run a sparse-direct factorization "
@@ -64,19 +67,19 @@ DistHelmholtz<R>::DistHelmholtz
     //   | Bottom    |     ||
     //    -----------
     innerDepth_ = nz-(bottomDepth_+topOrigDepth_);
-    leftoverInnerDepth_ = innerDepth_ % numPlanesPerPanel;
+    leftoverInnerDepth_ = innerDepth_ % numPlanesPerPanel_;
     haveLeftover_ = ( leftoverInnerDepth_ != 0 );
-    numFullInnerPanels_ = innerDepth_ / numPlanesPerPanel;
+    numFullInnerPanels_ = innerDepth_ / numPlanesPerPanel_;
     numPanels_ = 1 + numFullInnerPanels_ + haveLeftover_ + 1;
 
 #ifndef RELEASE
     if( commRank == 0 )
     {
-        const int bx = control.bx;
-        const int by = control.by;
+        const int bx = disc.bx;
+        const int by = disc.by;
         std::cout << "nx=" << nx << ", ny=" << ny << ", nz=" << nz << "\n"
                   << "bx=" << bx << ", by=" << by << ", bz=" << bz << "\n"
-                  << "# of planes/panel = " << numPlanesPerPanel << "\n"
+                  << "# of planes/panel = " << numPlanesPerPanel_ << "\n"
                   << "\n"
                   << "bottom depth          = " << bottomDepth_ << "\n"
                   << "top orig depth        = " << topOrigDepth_ << "\n"
@@ -96,7 +99,7 @@ DistHelmholtz<R>::DistHelmholtz
     // Compute the number of rows we own of the sparse distributed matrix
     localBottomHeight_ = LocalPanelHeight( bottomDepth_, 0, commRank );
     localFullInnerHeight_ = 
-        LocalPanelHeight( numPlanesPerPanel, bz, commRank );
+        LocalPanelHeight( numPlanesPerPanel_, bz, commRank );
     localLeftoverInnerHeight_ = 
         LocalPanelHeight( leftoverInnerDepth_, bz, commRank );
     localTopHeight_ = LocalPanelHeight( topOrigDepth_, bz, commRank );
@@ -474,7 +477,7 @@ DistHelmholtz<R>::LocalPanelHeight
 {
     int localHeight = 0;
     LocalPanelHeightRecursion
-    ( control_.nx, control_.ny, vSize, vPadding, control_.cutoff, 
+    ( disc_.nx, disc_.ny, vSize, vPadding, nestedCutoff_, 
       commRank, log2CommSize_, localHeight );
     return localHeight;
 }
@@ -588,7 +591,7 @@ DistHelmholtz<R>::NumLocalSupernodes( unsigned commRank ) const
 {
     int numLocalSupernodes = 0;
     NumLocalSupernodesRecursion
-    ( control_.nx, control_.ny, control_.cutoff, commRank, log2CommSize_, 
+    ( disc_.nx, disc_.ny, nestedCutoff_, commRank, log2CommSize_, 
       numLocalSupernodes );
     return numLocalSupernodes;
 }
@@ -773,7 +776,7 @@ DistHelmholtz<R>::PanelPadding( int whichPanel ) const
     if( whichPanel == 0 )
         return 0;
     else
-        return control_.bz;
+        return disc_.bz;
 }
 
 template<typename R>
@@ -783,7 +786,7 @@ DistHelmholtz<R>::PanelDepth( int whichPanel ) const
     if( whichPanel == 0 )
         return bottomDepth_;
     else if( whichPanel < 1 + numFullInnerPanels_ )
-        return control_.numPlanesPerPanel;
+        return numPlanesPerPanel_;
     else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
         return leftoverInnerDepth_;
     else
@@ -797,7 +800,7 @@ DistHelmholtz<R>::WhichPanel( int v ) const
     if( v < bottomDepth_ )
         return 0;
     else if( v < bottomDepth_ + innerDepth_ )
-        return (v-bottomDepth_)/control_.numPlanesPerPanel + 1;
+        return (v-bottomDepth_)/numPlanesPerPanel_ + 1;
     else
         return numPanels_ - 1;
 }
@@ -809,9 +812,9 @@ DistHelmholtz<R>::LocalV( int v ) const
     if( v < bottomDepth_ )
         return v;
     else if( v < bottomDepth_ + innerDepth_ )
-        return ((v-bottomDepth_) % control_.numPlanesPerPanel) + control_.bz;
+        return ((v-bottomDepth_) % numPlanesPerPanel_) + disc_.bz;
     else // v in [topDepth+innerDepth,topDepth+innerDepth+bottomOrigDepth)
-        return (v - (bottomDepth_+innerDepth_)) + control_.bz;
+        return (v - (bottomDepth_+innerDepth_)) + disc_.bz;
 }
 
 // Return the lowest v index of the specified panel
@@ -819,15 +822,14 @@ template<typename R>
 int
 DistHelmholtz<R>::PanelV( int whichPanel ) const
 {
-    const int numPlanesPerPanel = control_.numPlanesPerPanel;
     if( whichPanel == 0 )
         return 0;
     else if( whichPanel < numFullInnerPanels_+1 )
-        return bottomDepth_ + numPlanesPerPanel*(whichPanel-1);
+        return bottomDepth_ + numPlanesPerPanel_*(whichPanel-1);
     else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
-        return bottomDepth_ + numPlanesPerPanel*numFullInnerPanels_;
+        return bottomDepth_ + numPlanesPerPanel_*numFullInnerPanels_;
     else
-        return bottomDepth_ + numPlanesPerPanel*numFullInnerPanels_ + 
+        return bottomDepth_ + numPlanesPerPanel_*numFullInnerPanels_ + 
                leftoverInnerDepth_;
 }
 
@@ -872,8 +874,8 @@ DistHelmholtz<R>::MapLocalPanelIndices
     const int vOffset = PanelV( whichPanel );
     int localOffset = LocalPanelOffset( whichPanel );
     MapLocalPanelIndicesRecursion
-    ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, vSize, 
-      vPadding, 0, 0, vOffset, control_.cutoff, commRank, log2CommSize_, 
+    ( disc_.nx, disc_.ny, disc_.nz, disc_.nx, disc_.ny, vSize, 
+      vPadding, 0, 0, vOffset, nestedCutoff_, commRank, log2CommSize_, 
       localToNaturalMap_, localRowOffsets_, localOffset );
 }
 
@@ -1108,8 +1110,8 @@ DistHelmholtz<R>::MapLocalConnectionIndices
     int panelOffset = LocalPanelOffset( whichPanel );
     int localOffset = localRowOffsets_[panelOffset];
     MapLocalConnectionIndicesRecursion
-    ( control_.nx, control_.ny, control_.nz, control_.nx, control_.ny, vSize, 
-      vPadding, 0, 0, vOffset, control_.cutoff, commRank, log2CommSize_, 
+    ( disc_.nx, disc_.ny, disc_.nz, disc_.nx, disc_.ny, vSize, 
+      vPadding, 0, 0, vOffset, nestedCutoff_, commRank, log2CommSize_, 
       localConnections, localOffset );
 }
 
@@ -1310,9 +1312,9 @@ template<typename R>
 int
 DistHelmholtz<R>::OwningProcess( int naturalIndex ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int nz = control_.nz;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
+    const int nz = disc_.nz;
 
     const int x = naturalIndex % nx;
     const int y = (naturalIndex/nx) % ny;
@@ -1329,8 +1331,8 @@ template<typename R>
 int
 DistHelmholtz<R>::OwningProcess( int x, int y, int v ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
     const int vLocal = LocalV( v );
 
     int proc = 0;
@@ -1414,8 +1416,8 @@ DistHelmholtz<R>::ReorderedIndex
 {
     int index = 
         ReorderedIndexRecursion
-        ( x, y, vLocal, control_.nx, control_.ny, vSize, log2CommSize_, 
-          control_.cutoff, 0 );
+        ( x, y, vLocal, disc_.nx, disc_.ny, vSize, log2CommSize_, 
+          nestedCutoff_, 0 );
     return index;
 }
 
@@ -1480,7 +1482,7 @@ void
 DistHelmholtz<R>::FillOrigPanelStruct
 ( int vSize, cliq::symbolic::SymmOrig& S ) const
 {
-    int nxSub=control_.nx, nySub=control_.ny, xOffset=0, yOffset=0;    
+    int nxSub=disc_.nx, nySub=disc_.ny, xOffset=0, yOffset=0;    
     FillDistOrigPanelStruct( vSize, nxSub, nySub, xOffset, yOffset, S );
     FillLocalOrigPanelStruct( vSize, nxSub, nySub, xOffset, yOffset, S );
 }
@@ -1491,9 +1493,9 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
   cliq::symbolic::SymmOrig& S ) const
 {
-    const int nx = control_.nx;
-    const int ny = control_.ny;
-    const int cutoff = control_.cutoff;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
+    const int cutoff = nestedCutoff_;
     const unsigned commRank = mpi::CommRank( comm_ );
     S.dist.comm = comm_;
     // Fill the distributed nodes
@@ -1728,9 +1730,9 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
   cliq::symbolic::SymmOrig& S ) const
 {
     const int numLocalSupernodes = S.local.supernodes.size();
-    const int cutoff = control_.cutoff;
-    const int nx = control_.nx;
-    const int ny = control_.ny;
+    const int cutoff = nestedCutoff_;
+    const int nx = disc_.nx;
+    const int ny = disc_.ny;
 
     // Initialize with the local root's box
     std::stack<Box> boxStack;
