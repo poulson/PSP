@@ -69,7 +69,7 @@ main( int argc, char* argv[] )
     const bool useSQMR = atoi( argv[argNum++] );
     const bool fullVisualize = atoi( argv[argNum++] );
 
-    if( velocityModel < 1 || velocityModel > 10 )
+    if( velocityModel < 1 || velocityModel > 11 )
     {
         if( commRank == 0 )
             std::cout << "Invalid velocity model, must be in {1,...,10}\n"
@@ -84,6 +84,7 @@ main( int argc, char* argv[] )
                       << "8) Increasing layers\n"
                       << "9) Decreasing layers\n"
                       << "10) Sideways layers\n"
+                      << "11) Wedge\n"
                       << std::endl;
         psp::Finalize();
         return 0;
@@ -362,7 +363,7 @@ main( int argc, char* argv[] )
                 {
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
-                        const int x = xShift + xLocal*pz;
+                        const int x = xShift + xLocal*px;
                         const double X = x / (N+1.0);
                         double speed;
                         if( X < 0.2 )
@@ -379,6 +380,31 @@ main( int argc, char* argv[] )
                             zLocal*xLocalSize*yLocalSize;
                         localVelocity[localIndex] = speed;
                     }
+                }
+            }
+        }
+        else if( velocityModel == 11 )
+        {
+            // Wedge
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (N+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (N+1.0);
+                    double speed;
+                    if( Z <= 0.4+0.1*Y )
+                        speed = 2.;
+                    else if( Z <= .8-0.2*Y )
+                        speed = 1.5;
+                    else
+                        speed = 3.;
+                    const int localOffset = 
+                        yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                        localVelocity[localOffset+xLocal] = speed;
                 }
             }
         }
