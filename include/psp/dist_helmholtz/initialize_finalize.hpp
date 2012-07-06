@@ -662,6 +662,8 @@ DistHelmholtz<R>::FormGlobalRow
         localEntries_[offset++] = vTermR;
 }
 
+// NOTE: This assumed a 7-point finite-difference stencil and must be 
+//       generalized
 template<typename R>
 void
 DistHelmholtz<R>::FormLowerColumnOfSupernode
@@ -881,6 +883,8 @@ DistHelmholtz<R>::FormLowerColumnOfSupernode
     }
 }
         
+// NOTE: This assumed the velocity only enters through the diagonal of the 
+//       operator and must be generalized.
 template<typename R>
 void
 DistHelmholtz<R>::GetGlobalVelocity
@@ -955,6 +959,10 @@ DistHelmholtz<R>::GetGlobalVelocity
     offsets = recvDispls;
 }
 
+// NOTE: This assumes a discretization where the velocity field only
+//       enters through the diagonal of the operator. If we have elements
+//       then we will need to know the velocity field over the entire 
+//       element.
 template<typename R>
 void
 DistHelmholtz<R>::GetPanelVelocity
@@ -1135,6 +1143,8 @@ void DistHelmholtz<R>::LocalReordering
       log2CommSize_, nestedCutoff_, mpi::CommRank(comm_) );
 }
 
+// NOTE: This routine will need to be modified for spectral elements so that 
+//       the separators are chosen on element boundaries.
 template<typename R>
 void DistHelmholtz<R>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
@@ -1164,6 +1174,8 @@ void DistHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the X dimension
         //
+        // NOTE: computation of xLeftSize needs to be modified to ensure that
+        //       the separator is placed on an element boundary
         const int xLeftSize = (xSize-1)/2;
         const int xRightSize = std::max(xSize-xLeftSize-1,0);
         const unsigned powerOfTwo = 1u << (depthTilSerial-1);
@@ -1206,6 +1218,8 @@ void DistHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the Y dimension
         //
+        // NOTE: computation of yLeftSize needs to be modified to ensure that
+        //       the separator is placed on an element boundary
         const int yLeftSize = (ySize-1)/2;
         const int yRightSize = std::max(ySize-yLeftSize-1,0);
         const unsigned powerOfTwo = 1u << (depthTilSerial-1);

@@ -1161,6 +1161,9 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         //
 
         // Add the left and/or right sides
+        //
+        // NOTE: xLeftSize computation will need to be generalized
+        //
         const int xLeftSize = (xSize-1) / 2;
         if( depthTilSerial == 0 )
         {
@@ -1237,6 +1240,9 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         //
 
         // Add the left and/or right sides
+        //
+        // NOTE: yLeftSize computation will need to be generalized
+        //
         const int yLeftSize = (ySize-1) / 2;
         if( depthTilSerial == 0 )
         {
@@ -1354,6 +1360,8 @@ DistHelmholtz<R>::OwningProcessRecursion
         //
         // Cut the x dimension
         //
+        // NOTE: computation of xLeftSize needs to be generalized
+        //
 
         const int xLeftSize = (xSize-1) / 2;
         if( x == xLeftSize )
@@ -1383,7 +1391,8 @@ DistHelmholtz<R>::OwningProcessRecursion
         //
         // Cut the y dimension 
         //
-
+        // NOTE: computation of xLeftSize needs to be generalized
+        //
         const int yLeftSize = (ySize-1) / 2;
         if( y == yLeftSize )
         {
@@ -1436,6 +1445,8 @@ DistHelmholtz<R>::ReorderedIndexRecursion
     else if( xSize >= ySize )
     {
         // Partition the X dimension
+        //
+        // NOTE: computation of middle needs to be generalized
         const int middle = (xSize-1)/2;
         if( x < middle )
         {
@@ -1457,6 +1468,8 @@ DistHelmholtz<R>::ReorderedIndexRecursion
     else
     {
         // Partition the Y dimension
+        //
+        // NOTE: computation of middle needs to be generalized
         const int middle = (ySize-1)/2;
         if( y < middle )
         {
@@ -1507,6 +1520,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         if( nxSub >= nySub )
         {
             // Form the structure of a partition of the X dimension
+            //
+            // NOTE: computation of middle needs to be generalized
             const int middle = (nxSub-1)/2;
             sn.size = nySub*vSize;
             sn.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
@@ -1553,6 +1568,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         else
         {
             // Form the structure of a partition of the Y dimension
+            //
+            // NOTE: computation of middle needs to be generalized
             const int middle = (nySub-1)/2;
             sn.size = nxSub*vSize;
             sn.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
@@ -1656,6 +1673,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
     else if( nxSub >= nySub )
     {
         // Form the structure of a partition of the X dimension
+        //
+        // NOTE: computation of middle needs to be generalized
         const int middle = (nxSub-1)/2;
         sn.size = nySub*vSize;
         sn.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
@@ -1690,6 +1709,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
     else
     {
         // Form the structure of a partition of the Y dimension
+        //
+        // NOTE: computation of middle needs to be generalized
         const int middle = (nySub-1)/2;
         sn.size = nxSub*vSize;
         sn.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
@@ -1823,6 +1844,8 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
             if( box.nx >= box.ny )
             {
                 // Partition the X dimension (this is the separator)
+                //
+                // NOTE: computation of middle needs to be generalized
                 const int middle = (box.nx-1)/2;
                 sn.size = box.ny*vSize;
                 sn.offset = ReorderedIndex
@@ -1877,6 +1900,8 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
             else
             {
                 // Partition the Y dimension (this is the separator)
+                //
+                // NOTE: computation of middle needs to be generalized
                 const int middle = (box.ny-1)/2;
                 sn.size = box.nx*vSize;
                 sn.offset = ReorderedIndex
