@@ -706,7 +706,7 @@ DistHelmholtz<R>::FormLowerColumnOfSupernode
     const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 
     // Compute the center term
-    const C shiftedOmega = C(disc_.omega,imagShift_);
+    const C shiftedOmega = C(disc_.omega,damping_);
     const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
         (shiftedOmega/alpha)*(shiftedOmega/alpha)*s1InvM*s2InvM*s3InvM;
     const int vLocal = v - vOffset;

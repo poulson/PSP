@@ -37,7 +37,7 @@ public:
 
     DistHelmholtz
     ( const Discretization<R>& disc, mpi::Comm comm, 
-      R imagShift=7.5, int numPlanesPerPanel=4, int cutoff=96 );
+      R damping=7.5, int numPlanesPerPanel=4, int cutoff=96 );
 
     ~DistHelmholtz();
 
@@ -58,7 +58,7 @@ private:
     unsigned log2CommSize_;
     const Discretization<R> disc_;
     const R hx_, hy_, hz_; // grid spacings
-    const R imagShift_;
+    const R damping_;
     const int numPlanesPerPanel_;
     const int nestedCutoff_;
 

@@ -23,22 +23,35 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "EngquistYing <N> <omega> <imagShift> <velocity> "
-                 "<numPlanesPerPanel> <fact blocksize> <solve blocksize> "
-                 "<panel scheme> <SQMR?> <viz?>\n"
+    std::cout << "UnitCube <velocity> <N> <omega> "
+                 "[damping=7] [# planes/panel=4] [panel scheme=1] [viz=0] "
+                 "[fact blocksize=96] [solve blocksize=64]\n"
+              << "  <velocity>: Which velocity field to use, {0,...,12}\n"
               << "  <N>: Size of grid in each dimension\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
-              << "  <imagShift>: imaginary shift [2 pi is standard]\n"
-              << "  <velocity>: Which velocity field to use, {1,2,3,4}\n"
-              << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
-              << "  <fact blocksize>: factorization algorithmic blocksize\n"
-              << "  <solve blocksize>: solve algorithmic blocksize\n"
-              << "  <panel scheme>: NORMAL_1D=0, FAST_2D_LDL=1\n"
-              << "  <SQMR?>: GMRES iff 0, SQMR otherwise\n"
-              << "  <full viz?>:  Full visualization iff != 0\n"
+              << "  [damping=7]: imaginary freq shift for preconditioner\n"
+              << "  [# planes/panel=4]: number of planes per subdomain\n"
+              << "  [panel scheme=1]: NORMAL_1D=0, FAST_2D_LDL=1\n"
+              << "  [full viz=0]:  Full visualization iff != 0\n"
+              << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
+              << "  [solve blocksize=64]: solve algorithmic blocksize\n"
               << "\n"
-              << "Please see \"Sweeping preconditioner for the Helmholtz "
-                 "equation: moving perfectly matched layers\" for details\n"
+              << "\n"
+              << "velocity model:\n"
+              << "---------------------------------------------\n"
+              << "0) Unity\n"
+              << "1) Gaussian perturbation of unity\n"
+              << "2) Wave guide\n"
+              << "3) Two layers\n"
+              << "4) Cavity\n"
+              << "5) Reverse cavity\n"
+              << "6) Top half of cavity\n"
+              << "7) Bottom half of cavity\n"
+              << "8) Increasing layers\n"
+              << "9) Decreasing layers\n"
+              << "10) Sideways layers\n"
+              << "11) Wedge\n"
+              << "12) Random\n"
               << std::endl;
 }
 
@@ -50,7 +63,7 @@ main( int argc, char* argv[] )
     const int commSize = psp::mpi::CommSize( comm );
     const int commRank = psp::mpi::CommRank( comm );
 
-    if( argc < 11 )
+    if( argc < 4 )
     {
         if( commRank == 0 )
             Usage();
@@ -58,22 +71,24 @@ main( int argc, char* argv[] )
         return 0;
     }
     int argNum=1;
-    const int N = atoi( argv[argNum++] );
-    const double omega = atof( argv[argNum++] );
-    const double imagShift = atof( argv[argNum++] );
-    const int velocityModel = atoi( argv[argNum++] );
-    const int numPlanesPerPanel = atoi( argv[argNum++] );
-    const int factBlocksize = atoi( argv[argNum++] );
-    const int solveBlocksize = atoi( argv[argNum++] );
-    const PanelScheme panelScheme = (PanelScheme)atoi( argv[argNum++] );
-    const bool useSQMR = atoi( argv[argNum++] );
-    const bool fullVisualize = atoi( argv[argNum++] );
+    const int velocityModel = atoi(argv[argNum++]);
+    const int N = atoi(argv[argNum++]);
+    const double omega = atof(argv[argNum++]);
+    const double damping = ( argc >= 5 ? atof(argv[argNum++]) : 7. );
+    const int numPlanesPerPanel = ( argc >= 6 ? atoi(argv[argNum++]) : 4 );
+    const PanelScheme panelScheme = 
+        ( argc >= 7 ? (PanelScheme)atoi(argv[argNum++]) 
+                    : psp::CLIQUE_FAST_2D_LDL );
+    const bool fullVisualize = ( argc >= 8 ? atoi(argv[argNum++]) : true );
+    const int factBlocksize = ( argc >= 9 ? atoi( argv[argNum++] ) : 96 );
+    const int solveBlocksize = ( argc >= 10 ? atoi( argv[argNum++] ) : 64 );
 
-    if( velocityModel < 1 || velocityModel > 11 )
+    if( velocityModel < 0 || velocityModel > 12 )
     {
         if( commRank == 0 )
-            std::cout << "Invalid velocity model, must be in {1,...,10}\n"
+            std::cout << "Invalid velocity model, must be in {0,...,12}\n"
                       << "---------------------------------------------\n"
+                      << "0) Unity\n"
                       << "1) Gaussian perturbation of unity\n"
                       << "2) Wave guide\n"
                       << "3) Two layers\n"
@@ -85,6 +100,7 @@ main( int argc, char* argv[] )
                       << "9) Decreasing layers\n"
                       << "10) Sideways layers\n"
                       << "11) Wedge\n"
+                      << "12) Random\n"
                       << std::endl;
         psp::Finalize();
         return 0;
@@ -103,7 +119,7 @@ main( int argc, char* argv[] )
     try 
     {
         DistHelmholtz<double> helmholtz
-        ( disc, comm, imagShift, numPlanesPerPanel );
+        ( disc, comm, damping, numPlanesPerPanel );
 
         GridData<double> velocity( 1, N, N, N, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
@@ -116,8 +132,14 @@ main( int argc, char* argv[] )
         const int px = velocity.XStride();
         const int py = velocity.YStride();
         const int pz = velocity.ZStride();
-        if( velocityModel == 1 )
+        switch( velocityModel )
         {
+        case 0:
+            // Unit velocity
+            for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
+                localVelocity[i] = 1.;
+            break;
+        case 1:
             // Converging lens
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -144,9 +166,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 2 )
-        {
+            break;
+        case 2:
             // Wave guide
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -170,9 +191,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 3 )
-        {
+            break;
+        case 3:
             // Two layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -183,9 +203,8 @@ main( int argc, char* argv[] )
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
                     localVelocity[localOffset+i] = speed;
             }
-        }
-        else if( velocityModel == 4 )
-        {
+            break;
+        case 4:
             // Cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -213,9 +232,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 5 )
-        {
+            break;
+        case 5:
             // Reverse-cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -243,9 +261,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 6 )
-        {
+            break;
+        case 6:
             // Bottom half of cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -275,9 +292,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 7 )
-        {
+            break;
+        case 7:
             // Top half of cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -307,9 +323,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 8 )
-        {
+            break;
+        case 8:
             // Increasing layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -330,9 +345,8 @@ main( int argc, char* argv[] )
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
                     localVelocity[i+localOffset] = speed;
             }
-        }
-        else if( velocityModel == 9 )
-        {
+            break;
+        case 9:
             // Decreasing layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -353,9 +367,8 @@ main( int argc, char* argv[] )
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
                     localVelocity[i+localOffset] = speed;
             }
-        }
-        else if( velocityModel == 10 )
-        {
+            break;
+        case 10:
             // Sideways layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -382,9 +395,8 @@ main( int argc, char* argv[] )
                     }
                 }
             }
-        }
-        else if( velocityModel == 11 )
-        {
+            break;
+        case 11:
             // Wedge
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -407,6 +419,14 @@ main( int argc, char* argv[] )
                         localVelocity[localOffset+xLocal] = speed;
                 }
             }
+            break;
+        case 12:
+            // Uniform perturbation of unity (between 1 and 3)
+            for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
+                localVelocity[i] = 2.+plcg::ParallelUniform<double>();
+            break;
+        default:
+            throw std::runtime_error("Invalid velocity model");
         }
 
         velocity.WritePlane( XY, N/2, "velocity-middleXY" );
@@ -497,10 +517,7 @@ main( int argc, char* argv[] )
             std::cout << "Beginning solve..." << std::endl;
         psp::mpi::Barrier( comm );
         const double solveStartTime = psp::mpi::Time();
-        if( useSQMR )
-            helmholtz.SolveWithSQMR( B );
-        else
-            helmholtz.SolveWithGMRES( B );
+        helmholtz.SolveWithGMRES( B );
         psp::mpi::Barrier( comm );
         const double solveStopTime = psp::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;

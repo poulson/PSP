@@ -23,12 +23,12 @@ namespace psp {
 template<typename R>
 DistHelmholtz<R>::DistHelmholtz
 ( const Discretization<R>& disc, mpi::Comm comm,
-  R imagShift, int numPlanesPerPanel, int cutoff )
+  R damping, int numPlanesPerPanel, int cutoff )
 : comm_(comm), disc_(disc),
   hx_(disc.wx/(disc.nx+1)),
   hy_(disc.wy/(disc.ny+1)),
   hz_(disc.wz/(disc.nz+1)),
-  imagShift_(imagShift),
+  damping_(damping),
   numPlanesPerPanel_(numPlanesPerPanel), 
   nestedCutoff_(cutoff),
   initialized_(false)
