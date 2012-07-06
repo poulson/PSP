@@ -479,6 +479,7 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
                 std::ostringstream os;
                 os << baseName << "_" << k << ".vti";
                 std::ofstream file( os.str().c_str(), std::ios::out );
+
                 os.clear(); os.str("");
                 os << "<?xml version=\"1.0\"?>\n"
                    << "<VTKFile type=\"ImageData\" version=\"0.1\">\n"
@@ -1528,7 +1529,8 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
     std::vector<R> localBox;
     parent.RedistributeForVtk( localBox );
 
-    // Have the root process create the parallel description
+    // Have the root process create the parallel descriptions and the 
+    // appropriate subdirectories (if possible)
     if( commRank == 0 )
     {
         std::vector<std::ofstream*> files(numScalars);
@@ -1538,6 +1540,11 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
             os << baseName << "_" << k << ".pvti";
             files[k] = new std::ofstream;
             files[k]->open( os.str().c_str() );
+#ifdef HAVE_MKDIR
+            os.clear(); os.str("");
+            os << baseName << "_" << k;
+            EnsureDirExists( os.str().c_str() );
+#endif
         }
         std::ostringstream os;
         os << "<?xml version=\"1.0\"?>\n"
@@ -1576,7 +1583,13 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
                         *files[k] << os.str();
                     os.clear(); os.str("");
                     for( int k=0; k<numScalars; ++k )
+                    {
+#ifdef HAVE_MKDIR
+                        *files[k] << k << "/" << proc << ".vti\"/>\n";
+#else
                         *files[k] << k << "_" << proc << ".vti\"/>\n";
+#endif
+                    }
                 }
             }
         }
@@ -1589,6 +1602,7 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
             delete files[k];
         }
     }
+    mpi::Barrier( parent.comm_ );
 
     // Have each process create their individual data file
     const int xShift = parent.xShift_;
@@ -1604,7 +1618,11 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
     for( int k=0; k<numScalars; ++k )
     {
         std::ostringstream os;    
+#ifdef HAVE_MKDIR
+        os << baseName << "_" << k << "/" << commRank << ".vti";
+#else
         os << baseName << "_" << k << "_" << commRank << ".vti";
+#endif
         files[k] = new std::ofstream;
         files[k]->open( os.str().c_str() );
     }
@@ -1703,6 +1721,11 @@ GridData<T>::WriteVolumeHelper<Complex<R> >::Func
             os << baseName << "_" << k << "_real.pvti";
             realFiles[k] = new std::ofstream;
             realFiles[k]->open( os.str().c_str() );
+#ifdef HAVE_MKDIR
+            os.clear(); os.str("");
+            os << baseName << "_" << k << "_real";
+            EnsureDirExists( os.str().c_str() );
+#endif
         }
         for( int k=0; k<numScalars; ++k )
         {
@@ -1710,6 +1733,11 @@ GridData<T>::WriteVolumeHelper<Complex<R> >::Func
             os << baseName << "_" << k << "_imag.pvti";
             imagFiles[k] = new std::ofstream;
             imagFiles[k]->open( os.str().c_str() );
+#ifdef HAVE_MKDIR
+            os.clear(); os.str("");
+            os << baseName << "_" << k << "_imag";
+            EnsureDirExists( os.str().c_str() );
+#endif
         }
         std::ostringstream os;
         os << "<?xml version=\"1.0\"?>\n"
@@ -1752,8 +1780,13 @@ GridData<T>::WriteVolumeHelper<Complex<R> >::Func
                     os.clear(); os.str("");
                     for( int k=0; k<numScalars; ++k )
                     {
+#ifdef HAVE_MKDIR
+                        *realFiles[k] << k << "_real/" << proc << ".vti\"/>\n";
+                        *imagFiles[k] << k << "_imag/" << proc << ".vti\"/>\n";
+#else
                         *realFiles[k] << k << "_real_" << proc << ".vti\"/>\n";
                         *imagFiles[k] << k << "_imag_" << proc << ".vti\"/>\n";
+#endif
                     }
                 }
             }
@@ -1770,6 +1803,7 @@ GridData<T>::WriteVolumeHelper<Complex<R> >::Func
             delete imagFiles[k];
         }
     }
+    mpi::Barrier( parent.comm_ );
 
     // Have each process create their individual data file
     const int xShift = parent.xShift_;
@@ -1785,14 +1819,22 @@ GridData<T>::WriteVolumeHelper<Complex<R> >::Func
     for( int k=0; k<numScalars; ++k )
     {
         std::ostringstream os;    
+#ifdef HAVE_MKDIR
+        os << baseName << "_" << k << "_real/" << commRank << ".vti";
+#else
         os << baseName << "_" << k << "_real_" << commRank << ".vti";
+#endif
         realFiles[k] = new std::ofstream;
         realFiles[k]->open( os.str().c_str() );
     }
     for( int k=0; k<numScalars; ++k )
     {
         std::ostringstream os;
+#ifdef HAVE_MKDIR
+        os << baseName << "_" << k << "_imag/" << commRank << ".vti";
+#else
         os << baseName << "_" << k << "_imag_" << commRank << ".vti";
+#endif
         imagFiles[k] = new std::ofstream;
         imagFiles[k]->open( os.str().c_str() );
     }

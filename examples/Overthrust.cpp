@@ -23,11 +23,11 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "Overthrust <omega> <imagShift> <numPlanesPerPanel> "
+    std::cout << "Overthrust <omega> <damping> <numPlanesPerPanel> "
                  "<fact blocksize> <solve blocksize> <panelScheme> <SQMR?> "
                  "<viz?>\n"
               << "  <omega>: Frequency (in rad/sec) of problem\n"
-              << "  <imagShift>: imaginary shift [2 pi is standard]\n"
+              << "  <damping>: imaginary shift [2 pi is standard]\n"
               << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
               << "  <fact blocksize>: factorization algorithmic blocksize\n"
               << "  <solve blocksize>: solve algorithmic blocksize\n"
@@ -55,7 +55,7 @@ main( int argc, char* argv[] )
     }
     int argNum=1;
     const double omega = atof( argv[argNum++] );
-    const double imagShift = atof( argv[argNum++] );
+    const double damping = atof( argv[argNum++] );
     const int numPlanesPerPanel = atoi( argv[argNum++] );
     const int factBlocksize = atoi( argv[argNum++] );
     const int solveBlocksize = atoi( argv[argNum++] );
@@ -71,38 +71,17 @@ main( int argc, char* argv[] )
     {
         std::cout << "Running with omega=" << omega 
                   << ", numPlanesPerPanel=" << numPlanesPerPanel
-                  << ", and imagShift=" << imagShift << std::endl;
+                  << ", and damping=" << damping << std::endl;
     }
     
-    FiniteDiffControl<double> control;
-    control.stencil = SEVEN_POINT;
-    control.nx = Nx;
-    control.ny = Ny;
-    control.nz = Nz;
-    control.wx = 20;
-    control.wy = 20;
-    control.wz = 4.65;
-    control.omega = omega;
-    // sInv functions should be dimensionless, so C should have units of length,
-    // so we should scale it by the size of our domain (i.e., 20)
-    control.Cx = 1.5*20;
-    control.Cy = 1.5*20;
-    control.Cz = 1.5*20;
-    control.bx = 5;
-    control.by = 5;
-    control.bz = 5;
-    control.imagShift = imagShift;
-    control.cutoff = 96;
-    control.numPlanesPerPanel = numPlanesPerPanel;
-    control.frontBC = PML;
-    control.rightBC = PML;
-    control.backBC = PML;
-    control.leftBC = PML;
-    control.topBC = PML;
+    Discretization<double> disc
+    ( omega, Nx, Ny, Nz, 20., 20., 4.65, 
+      PML, PML, PML, PML, DIRICHLET, 5, 5, 5 );
 
     try 
     {
-        DistHelmholtz<double> helmholtz( control, comm );
+        DistHelmholtz<double> helmholtz
+        ( control, comm, damping, numPlanesPerPanel );
 
         const int cubeRoot = 
             std::max(1,(int)std::floor(pow((double)commSize,0.333)));

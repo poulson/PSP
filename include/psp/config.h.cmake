@@ -25,5 +25,6 @@
 #define PSP_VERSION_MINOR @PSP_VERSION_MINOR@
 
 #cmakedefine USE_CUSTOM_ALLTOALLV_FOR_SPMV
+#cmakedefine HAVE_MKDIR
 
 #endif /* PSP_CONFIG_HPP */

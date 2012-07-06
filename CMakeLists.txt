@@ -38,6 +38,11 @@ include_directories(${MPI_CXX_INCLUDE_PATH})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
 
+# Detect whether or not we can use mkdir to create directories.
+# This should ideally exist on all POSIX machines.
+include(CheckFunctionExists)
+check_function_exists(mkdir HAVE_MKDIR)
+
 # Create the PSP configuration header
 configure_file( 
   ${PROJECT_SOURCE_DIR}/include/psp/config.h.cmake
@@ -100,7 +105,9 @@ if(BUILD_TESTS)
   endforeach(TEST)
 endif(BUILD_TESTS)
 
-# Simplify the inclusion of PSP as a subproject in another build system
+################################################################################
+# Uncomment if including PSP as a subproject in another build system           #
+################################################################################
 #set(USE_CUSTOM_ALLTOALLV_FOR_FACT ${USE_CUSTOM_ALLTOALLV_FOR_FACT} PARENT_SCOPE)
 #set(USE_CUSTOM_ALLTOALLV_FOR_MULT ${USE_CUSTOM_ALLTOALLV_FOR_MULT} PARENT_SCOPE)
 #set(USE_CUSTOM_ALLTOALLV_FOR_SOLVE ${USE_CUSTOM_ALLTOALLV_FOR_SOLVE} PARENT_SCOPE)

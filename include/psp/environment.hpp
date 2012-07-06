@@ -69,4 +69,27 @@ using elem::Exp;
 
 #include "psp/config.h"
 
+#ifdef HAVE_MKDIR
+#include <sys/stat.h>
+#endif
+
+namespace psp {
+
+#ifdef HAVE_MKDIR
+inline void EnsureDirExists( const char* path, mode_t mode=0777 )
+{
+    struct stat s;
+    if( stat( path, &s ) != 0 )
+    {
+        // The directory doesn't yet exist, so try to create it
+        if( mkdir( path, mode ) != 0 )
+            throw std::runtime_error("Could not create directory");
+    }
+    else if( !S_ISDIR( s.st_mode ) )
+        throw std::runtime_error("Invalid directory");
+}
+#endif
+
+} // namespace psp
+
 #endif // PSP_ENVIRONMENT_HPP
