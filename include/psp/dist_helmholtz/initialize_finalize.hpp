@@ -1128,7 +1128,7 @@ void DistHelmholtz<R>::LocalReordering
     LocalReorderingRecursion
     ( reordering, offset,
       0, 0, disc_.nx, disc_.ny, vSize, disc_.nx, disc_.ny,
-      log2CommSize_, nestedCutoff_, mpi::CommRank(comm_) );
+      distDepth_, nestedCutoff_, mpi::CommRank(comm_), mpi::CommSize(comm_) );
 }
 
 // NOTE: This routine will need to be modified for spectral elements so that 
@@ -1137,7 +1137,7 @@ template<typename R>
 void DistHelmholtz<R>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-  int depthTilSerial, int cutoff, unsigned commRank )
+  int depthTilSerial, int cutoff, unsigned commRank, unsigned commSize )
 {
     const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )
@@ -1166,18 +1166,19 @@ void DistHelmholtz<R>::LocalReorderingRecursion
         //       the separator is placed on an element boundary
         const int xLeftSize = (xSize-1)/2;
         const int xRightSize = std::max(xSize-xLeftSize-1,0);
-        const unsigned powerOfTwo = 1u << (depthTilSerial-1);
-        const bool onLeft = 
-            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)==0 );
-        const bool onRight =
-            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)!=0 );
+
+        const int leftTeamSize = ( commSize==1 ? 1 : commSize/2 );
+        const int rightTeamSize = ( commSize==1 ? 1 : commSize - leftTeamSize );
+        const bool onLeft = ( commRank < leftTeamSize );
+        const bool onRight = ( depthTilSerial==0 || !onLeft );
+        const int childCommRank = ( onLeft ? commRank : commRank-leftTeamSize );
 
         // Recurse on the left side
         if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, xLeftSize, ySize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank );
+              nextDepthTilSerial, cutoff, childCommRank, leftTeamSize );
         offset += xLeftSize*ySize*vSize;
 
         // Recurse on the right side
@@ -1185,7 +1186,7 @@ void DistHelmholtz<R>::LocalReorderingRecursion
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset+xLeftSize+1, yOffset, xRightSize, ySize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank );
+              nextDepthTilSerial, cutoff, childCommRank, rightTeamSize );
         offset += xRightSize*ySize*vSize;
 
         // Store the separator
@@ -1210,18 +1211,19 @@ void DistHelmholtz<R>::LocalReorderingRecursion
         //       the separator is placed on an element boundary
         const int yLeftSize = (ySize-1)/2;
         const int yRightSize = std::max(ySize-yLeftSize-1,0);
-        const unsigned powerOfTwo = 1u << (depthTilSerial-1);
-        const bool onLeft = 
-            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)==0 );
-        const bool onRight =
-            ( depthTilSerial==0 ? true : (commRank&powerOfTwo)!=0 );
+
+        const int leftTeamSize = ( commSize==1 ? 1 : commSize/2 );
+        const int rightTeamSize = ( commSize==1 ? 1 : commSize - leftTeamSize );
+        const bool onLeft = ( commRank < leftTeamSize );
+        const bool onRight = ( depthTilSerial==0 || !onLeft );
+        const int childCommRank = ( onLeft ? commRank : commRank-leftTeamSize );
 
         // Recurse on the left side
         if( onLeft )
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, xSize, yLeftSize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank );
+              nextDepthTilSerial, cutoff, childCommRank, leftTeamSize );
         offset += xSize*yLeftSize*vSize;
 
         // Recurse on the right side
@@ -1229,7 +1231,7 @@ void DistHelmholtz<R>::LocalReorderingRecursion
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset+yLeftSize+1, xSize, yRightSize, vSize, nx, ny,
-              nextDepthTilSerial, cutoff, commRank );
+              nextDepthTilSerial, cutoff, childCommRank, rightTeamSize );
         offset += xSize*yRightSize*vSize;
 
         // Store the separator

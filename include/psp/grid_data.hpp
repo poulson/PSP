@@ -198,7 +198,7 @@ inline GridData<T>::GridData
     const int squareRoot = 
         std::max(1,(int)std::floor(sqrt((double)yzCommSize)));
     py_ = squareRoot;
-    while( squareRoot % py_ != 0 )
+    while( yzCommSize % py_ != 0 )
         ++py_;
     pz_ = yzCommSize / py_;
 
