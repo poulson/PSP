@@ -25,7 +25,7 @@ namespace psp {
 
 template<typename R>
 void DistFrontCompression
-( DistCompressedFront<Complex<R> >& front, int depth, bool useQR=false );
+( DistCompressedFront<Complex<R> >& front, int depth, bool useQR=true );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -315,7 +315,7 @@ inline void DistBlockCompression
         elem::SVD
         ( W_STAR_STAR.LocalMatrix(),
           s_STAR_STAR.LocalMatrix(),
-          V_STAR_STAR.LocalMatrix() );
+          V_STAR_STAR.LocalMatrix(), useQR );
         internal::CompressSVD
         ( W_STAR_STAR, s_STAR_STAR, V_STAR_STAR, tolerance );
         DiagonalScale( RIGHT, NORMAL, s_STAR_STAR, V_STAR_STAR );
@@ -341,7 +341,7 @@ inline void DistBlockCompression
         elem::SVD
         ( U_STAR_STAR.LocalMatrix(), 
           s_STAR_STAR.LocalMatrix(), 
-          V_STAR_STAR.LocalMatrix() );
+          V_STAR_STAR.LocalMatrix(), useQR );
         internal::CompressSVD
         ( U_STAR_STAR, s_STAR_STAR, V_STAR_STAR, tolerance );
         U = U_STAR_STAR;

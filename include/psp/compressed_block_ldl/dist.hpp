@@ -27,7 +27,7 @@ template<typename F>
 void DistCompressedBlockLDL
 ( Orientation orientation, 
   cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
-  bool useQR=false );
+  bool useQR=true );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //

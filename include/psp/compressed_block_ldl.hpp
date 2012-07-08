@@ -57,8 +57,12 @@ inline void CompressedBlockLDL
 #ifndef RELEASE
     PushCallStack("CompressedBlockLDL");
 #endif
+    LocalCompressedBlockLDL( orientation, info, L, depth, true );
+    DistCompressedBlockLDL( orientation, info, L, depth, false );
+    /*
     LocalCompressedBlockLDL( orientation, info, L, depth, useQR );
     DistCompressedBlockLDL( orientation, info, L, depth, useQR );
+    */
 #ifndef RELEASE
     PopCallStack();
 #endif
