@@ -26,7 +26,7 @@ namespace psp {
 template<typename F> 
 void LocalCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
   bool useQR=false );
 
 //----------------------------------------------------------------------------//
@@ -36,37 +36,36 @@ void LocalCompressedBlockLDL
 template<typename F> 
 inline void LocalCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, 
+  cliq::SymmInfo& info, CompressedFrontTree<F>& L, 
   int depth, bool useQR )
 {
-    using namespace cliq::symbolic;
 #ifndef RELEASE
     PushCallStack("LocalCompressedBlockLDL");
     if( orientation == NORMAL )
         throw std::logic_error("LDL must be (conjugate-)transposed");
 #endif
-    const int numLocalSupernodes = S.local.supernodes.size();
-    for( int s=0; s<numLocalSupernodes; ++s )
+    const int numLocalNodes = info.local.nodes.size();
+    for( int s=0; s<numLocalNodes; ++s )
     {
-        LocalSymmFactSupernode& sn = S.local.supernodes[s];
-        const int updateSize = sn.lowerStruct.size();
+        cliq::LocalSymmNodeInfo& node = info.local.nodes[s];
+        const int updateSize = node.lowerStruct.size();
         LocalCompressedFront<F>& front = L.local.fronts[s];
         Matrix<F>& frontL = front.frontL;
         Matrix<F>& frontBR = front.work;
         frontBR.Empty();
 #ifndef RELEASE
-        if( frontL.Height() != sn.size+updateSize ||
-            frontL.Width() != sn.size )
+        if( frontL.Height() != node.size+updateSize ||
+            frontL.Width() != node.size )
             throw std::logic_error("Front was not the proper size");
 #endif
 
         // Add updates from children (if they exist)
         elem::Zeros( updateSize, updateSize, frontBR );
-        const int numChildren = sn.children.size();
+        const int numChildren = node.children.size();
         if( numChildren == 2 )
         {
-            const int leftIndex = sn.children[0];
-            const int rightIndex = sn.children[1];
+            const int leftIndex = node.children[0];
+            const int rightIndex = node.children[1];
             Matrix<F>& leftUpdate = L.local.fronts[leftIndex].work;
             Matrix<F>& rightUpdate = L.local.fronts[rightIndex].work;
 
@@ -74,15 +73,16 @@ inline void LocalCompressedBlockLDL
             const int leftUpdateSize = leftUpdate.Height();
             for( int jChild=0; jChild<leftUpdateSize; ++jChild )
             {
-                const int jFront = sn.leftChildRelIndices[jChild];
+                const int jFront = node.leftChildRelIndices[jChild];
                 for( int iChild=0; iChild<leftUpdateSize; ++iChild )
                 {
-                    const int iFront = sn.leftChildRelIndices[iChild];
+                    const int iFront = node.leftChildRelIndices[iChild];
                     const F value = leftUpdate.Get(iChild,jChild);
-                    if( jFront < sn.size )
+                    if( jFront < node.size )
                         frontL.Update( iFront, jFront, value );
-                    else if( iFront >= sn.size )
-                        frontBR.Update( iFront-sn.size, jFront-sn.size, value );
+                    else if( iFront >= node.size )
+                        frontBR.Update
+                        ( iFront-node.size, jFront-node.size, value );
                 }
             }
             leftUpdate.Empty();
@@ -91,22 +91,23 @@ inline void LocalCompressedBlockLDL
             const int rightUpdateSize = rightUpdate.Height();
             for( int jChild=0; jChild<rightUpdateSize; ++jChild )
             {
-                const int jFront = sn.rightChildRelIndices[jChild];
+                const int jFront = node.rightChildRelIndices[jChild];
                 for( int iChild=0; iChild<rightUpdateSize; ++iChild )
                 {
-                    const int iFront = sn.rightChildRelIndices[iChild];
+                    const int iFront = node.rightChildRelIndices[iChild];
                     const F value = rightUpdate.Get(iChild,jChild);
-                    if( jFront < sn.size )
+                    if( jFront < node.size )
                         frontL.Update( iFront, jFront, value );
-                    else if( iFront >= sn.size )
-                        frontBR.Update( iFront-sn.size, jFront-sn.size, value );
+                    else if( iFront >= node.size )
+                        frontBR.Update
+                        ( iFront-node.size, jFront-node.size, value );
                 }
             }
             rightUpdate.Empty();
         }
 
         // Call the custom partial block LDL
-        cliq::numeric::LocalFrontBlockLDL( orientation, frontL, frontBR );
+        cliq::LocalFrontBlockLDL( orientation, frontL, frontBR );
 
         // Separately compress the A and B portions of the front
         //LocalFrontCompression( front, depth, numChildren==0, useQR );

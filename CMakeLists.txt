@@ -27,9 +27,6 @@ set(PSP_VERSION_MINOR 1)
 
 option(BUILD_TESTS "Build a collection of test executables" OFF)
 
-option(USE_CUSTOM_ALLTOALLV_FOR_SPMV 
-       "Avoid MPI_Alltoallv in sparse matvec for performance reasons" ON)
-
 add_subdirectory(external/clique)
 include_directories("${PROJECT_BINARY_DIR}/external/clique/include")
 include_directories(

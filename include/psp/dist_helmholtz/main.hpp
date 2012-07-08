@@ -435,34 +435,18 @@ DistHelmholtz<R>::DistHelmholtz
     // Form the symbolic factorizations of the three prototypical panels
     //
 
-    // Create space for the original structures of the panel classes
-    const int numLocalSupernodes = NumLocalSupernodes( commRank );
-    const int numDistSupernodes = log2CommSize_+1;
-    cliq::symbolic::SymmOrig bottomSymbolicOrig, 
-                               leftoverInnerSymbolicOrig, 
-                               topSymbolicOrig;
-    bottomSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    bottomSymbolicOrig.dist.supernodes.resize( numDistSupernodes );
-    leftoverInnerSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    leftoverInnerSymbolicOrig.dist.supernodes.resize( numDistSupernodes );
-    topSymbolicOrig.local.supernodes.resize( numLocalSupernodes );
-    topSymbolicOrig.dist.supernodes.resize( numDistSupernodes );
-
     // Fill the original structures (in the nested-dissection ordering)
-    FillOrigPanelStruct( bottomDepth_, bottomSymbolicOrig );
+    cliq::SymmElimTree bottomETree, leftoverInnerETree, topETree;
+    FillPanelElimTree( bottomDepth_, bottomETree );
     if( haveLeftover_ )
-        FillOrigPanelStruct
-        ( leftoverInnerDepth_+bz, leftoverInnerSymbolicOrig );
-    FillOrigPanelStruct( topOrigDepth_+bz, topSymbolicOrig );
+        FillPanelElimTree( leftoverInnerDepth_+bz, leftoverInnerETree );
+    FillPanelElimTree( topOrigDepth_+bz, topETree );
 
-    // Perform the parallel symbolic factorizations
-    cliq::symbolic::SymmetricFactorization
-    ( bottomSymbolicOrig, bottomSymbolicFact_, true );
+    // Perform the parallel analyses
+    cliq::SymmetricAnalysis( bottomETree, bottomInfo_, true ); 
     if( haveLeftover_ )
-        cliq::symbolic::SymmetricFactorization
-        ( leftoverInnerSymbolicOrig, leftoverInnerSymbolicFact_, true );
-    cliq::symbolic::SymmetricFactorization
-    ( topSymbolicOrig, topSymbolicFact_, true );
+        cliq::SymmetricAnalysis( leftoverInnerETree, leftoverInnerInfo_, true );
+    cliq::SymmetricAnalysis( topETree, topInfo_, true );
 }
 
 template<typename R>
@@ -587,18 +571,18 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
 
 template<typename R>
 int
-DistHelmholtz<R>::NumLocalSupernodes( unsigned commRank ) const
+DistHelmholtz<R>::NumLocalNodes( unsigned commRank ) const
 {
-    int numLocalSupernodes = 0;
-    NumLocalSupernodesRecursion
+    int numLocalNodes = 0;
+    NumLocalNodesRecursion
     ( disc_.nx, disc_.ny, nestedCutoff_, commRank, log2CommSize_, 
-      numLocalSupernodes );
-    return numLocalSupernodes;
+      numLocalNodes );
+    return numLocalNodes;
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::NumLocalSupernodesRecursion
+DistHelmholtz<R>::NumLocalNodesRecursion
 ( int xSize, int ySize, int cutoff, unsigned commRank, unsigned depthTilSerial, 
   int& numLocal ) 
 {
@@ -620,11 +604,11 @@ DistHelmholtz<R>::NumLocalSupernodesRecursion
             ++numLocal;
 
             // Add the left side
-            NumLocalSupernodesRecursion
+            NumLocalNodesRecursion
             ( xLeftSize, ySize, cutoff, 0, 0, numLocal );
 
             // Add the right side
-            NumLocalSupernodesRecursion
+            NumLocalNodesRecursion
             ( xSize-(xLeftSize+1), ySize, cutoff, 0, 0, numLocal );
         }
         else
@@ -634,14 +618,14 @@ DistHelmholtz<R>::NumLocalSupernodesRecursion
             if( onLeft )
             {
                 // Add the left side
-                NumLocalSupernodesRecursion
+                NumLocalNodesRecursion
                 ( xLeftSize, ySize, cutoff, commRank, depthTilSerial-1, 
                   numLocal );
             }
             else
             {
                 // Add the right side
-                NumLocalSupernodesRecursion
+                NumLocalNodesRecursion
                 ( xSize-(xLeftSize+1), ySize, cutoff, commRank, 
                   depthTilSerial-1, numLocal );
             }
@@ -661,10 +645,10 @@ DistHelmholtz<R>::NumLocalSupernodesRecursion
             ++numLocal;
 
             // Add the left side
-            NumLocalSupernodesRecursion
+            NumLocalNodesRecursion
             ( xSize, yLeftSize, cutoff, 0, 0, numLocal );
             // Add the right side
-            NumLocalSupernodesRecursion
+            NumLocalNodesRecursion
             ( xSize, ySize-(yLeftSize+1), cutoff, 0, 0, numLocal );
         }
         else
@@ -674,14 +658,14 @@ DistHelmholtz<R>::NumLocalSupernodesRecursion
             if( onLeft )
             {
                 // Add the left side
-                NumLocalSupernodesRecursion
+                NumLocalNodesRecursion
                 ( xSize, yLeftSize, cutoff, commRank, depthTilSerial-1, 
                   numLocal );
             }
             else
             {
                 // Add the right side
-                NumLocalSupernodesRecursion
+                NumLocalNodesRecursion
                 ( xSize, ySize-(yLeftSize+1), cutoff, commRank, 
                   depthTilSerial-1, numLocal );
             }
@@ -690,8 +674,8 @@ DistHelmholtz<R>::NumLocalSupernodesRecursion
 }
 
 template<typename R>
-cliq::numeric::SymmFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelNumericFactorization( int whichPanel )
+cliq::SymmFrontTree<Complex<R> >&
+DistHelmholtz<R>::PanelFactorization( int whichPanel )
 {
     if( whichPanel == 0 )
         return bottomFact_;
@@ -718,8 +702,8 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
 }
 
 template<typename R>
-const cliq::numeric::SymmFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelNumericFactorization( int whichPanel ) const
+const cliq::SymmFrontTree<Complex<R> >&
+DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return bottomFact_;
@@ -746,27 +730,26 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
 }
 
 template<typename R>
-cliq::symbolic::SymmFact&
-DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel )
+cliq::SymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
-        return bottomSymbolicFact_;
+        return bottomInfo_;
     else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
-        return leftoverInnerSymbolicFact_;
+        return leftoverInnerInfo_;
     else
-        return topSymbolicFact_;
+        return topInfo_;
 }
 
 template<typename R>
-const cliq::symbolic::SymmFact&
-DistHelmholtz<R>::PanelSymbolicFactorization( int whichPanel ) const
+const cliq::SymmInfo&
+DistHelmholtz<R>::PanelAnalysis( int whichPanel ) const
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
-        return bottomSymbolicFact_;
+        return bottomInfo_;
     else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
-        return leftoverInnerSymbolicFact_;
+        return leftoverInnerInfo_;
     else
-        return topSymbolicFact_;
+        return topInfo_;
 }
 
 template<typename R>
@@ -1492,39 +1475,56 @@ DistHelmholtz<R>::ReorderedIndexRecursion
 
 template<typename R>
 void
-DistHelmholtz<R>::FillOrigPanelStruct
-( int vSize, cliq::symbolic::SymmOrig& S ) const
+DistHelmholtz<R>::FillPanelElimTree
+( int vSize, cliq::SymmElimTree& eTree ) const
 {
     int nxSub=disc_.nx, nySub=disc_.ny, xOffset=0, yOffset=0;    
-    FillDistOrigPanelStruct( vSize, nxSub, nySub, xOffset, yOffset, S );
-    FillLocalOrigPanelStruct( vSize, nxSub, nySub, xOffset, yOffset, S );
+    FillPanelDistElimTree( vSize, nxSub, nySub, xOffset, yOffset, eTree );
+    FillPanelLocalElimTree( vSize, nxSub, nySub, xOffset, yOffset, eTree );
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::FillDistOrigPanelStruct
+DistHelmholtz<R>::FillPanelDistElimTree
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
-  cliq::symbolic::SymmOrig& S ) const
+  cliq::SymmElimTree& eTree ) const
 {
+    // TODO: Generalize this for non power-of-two numbers of processes
+    const int numDistNodes = log2CommSize_+1;
+
+    eTree.dist.nodes.resize( numDistNodes );
+    mpi::CommDup( comm_, eTree.dist.nodes.back().comm );
+
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int cutoff = nestedCutoff_;
     const unsigned commRank = mpi::CommRank( comm_ );
-    S.dist.comm = comm_;
+    mpi::CommDup( comm_, eTree.dist.nodes.back().comm );
+
     // Fill the distributed nodes
-    for( int s=log2CommSize_; s>0; --s )
+    for( int s=numDistNodes-1; s>0; --s )
     {
-        cliq::symbolic::DistSymmOrigSupernode& sn = S.dist.supernodes[s];
-        const unsigned powerOfTwo = 1u<<(s-1);
-        const bool onLeft = (commRank & powerOfTwo) == 0;
+        cliq::DistSymmNode& node = eTree.dist.nodes[s];
+        cliq::DistSymmNode& childNode = eTree.dist.nodes[s-1];
+
+        const int nodeCommRank = mpi::CommRank( node.comm );
+        const int nodeCommSize = mpi::CommSize( node.comm );
+        const int rightTeamSize = nodeCommSize/2;
+        const int leftTeamSize = nodeCommSize - rightTeamSize;
+
+        const bool onLeft = ( nodeCommRank < nodeCommSize/2 );
+        const int childNodeCommRank = 
+            ( onLeft ? nodeCommRank : nodeCommRank-leftTeamSize );
+        mpi::CommSplit( node.comm, onLeft, childNodeCommRank, childNode.comm );
+
         if( nxSub >= nySub )
         {
             // Form the structure of a partition of the X dimension
             //
             // NOTE: computation of middle needs to be generalized
             const int middle = (nxSub-1)/2;
-            sn.size = nySub*vSize;
-            sn.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
+            node.size = nySub*vSize;
+            node.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
 
             // Allocate space for the lower structure
             int numJoins = 0;
@@ -1532,26 +1532,26 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
                 ++numJoins;
             if( yOffset+nySub < ny )
                 ++numJoins;
-            sn.lowerStruct.resize( numJoins*vSize );
+            node.lowerStruct.resize( numJoins*vSize );
 
             // Fill the (unsorted) lower structure
             int joinOffset = 0;
             if( yOffset-1 >= 0 )
             {
                 for( int i=0; i<vSize; ++i )
-                    sn.lowerStruct[i] = ReorderedIndex
+                    node.lowerStruct[i] = ReorderedIndex
                     ( xOffset+middle, yOffset-1, i, vSize );
                 joinOffset += vSize;
             }
             if( yOffset+nySub < ny )
             {
                 for( int i=0; i<vSize; ++i )
-                    sn.lowerStruct[joinOffset+i] = ReorderedIndex
+                    node.lowerStruct[joinOffset+i] = ReorderedIndex
                     ( xOffset+middle, yOffset+nySub, i, vSize );
             }
 
             // Sort the lower structure
-            std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+            std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
 
             // Pick the new offsets and sizes based upon our rank
             if( onLeft )
@@ -1571,8 +1571,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
             //
             // NOTE: computation of middle needs to be generalized
             const int middle = (nySub-1)/2;
-            sn.size = nxSub*vSize;
-            sn.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
+            node.size = nxSub*vSize;
+            node.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
 
             // Allocate space for the lower structure
             int numJoins = 0;
@@ -1580,26 +1580,26 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
                 ++numJoins;
             if( xOffset+nxSub < nx )
                 ++numJoins;
-            sn.lowerStruct.resize( numJoins*vSize );
+            node.lowerStruct.resize( numJoins*vSize );
 
             // Fill the (unsorted) lower structure
             int joinOffset = 0;
             if( xOffset-1 >= 0 )
             {
                 for( int i=0; i<vSize; ++i )
-                    sn.lowerStruct[i] = ReorderedIndex
+                    node.lowerStruct[i] = ReorderedIndex
                     ( xOffset-1, yOffset+middle, i, vSize );
                 joinOffset += vSize;
             }
             if( xOffset+nxSub < nx )
             {
                 for( int i=0; i<vSize; ++i )
-                    sn.lowerStruct[joinOffset+i] = ReorderedIndex
+                    node.lowerStruct[joinOffset+i] = ReorderedIndex
                     ( xOffset+nxSub, yOffset+middle, i, vSize );
             }
 
             // Sort the lower structure
-            std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+            std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
 
             // Pick the new offsets and sizes based upon our rank
             if( onLeft )
@@ -1616,11 +1616,11 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
     }
 
     // Fill the bottom node, which is only owned by a single process
-    cliq::symbolic::DistSymmOrigSupernode& sn = S.dist.supernodes[0];
+    cliq::DistSymmNode& node = eTree.dist.nodes[0];
     if( nxSub*nySub <= cutoff )
     {
-        sn.size = nxSub*nySub*vSize;
-        sn.offset = ReorderedIndex( xOffset, yOffset, 0, vSize );
+        node.size = nxSub*nySub*vSize;
+        node.offset = ReorderedIndex( xOffset, yOffset, 0, vSize );
 
         // Count, allocate, and fill the lower struct
         int joinSize = 0;
@@ -1632,14 +1632,14 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
             joinSize += nxSub*vSize;
         if( yOffset+nySub < ny )
             joinSize += nxSub*vSize;
-        sn.lowerStruct.resize( joinSize );
+        node.lowerStruct.resize( joinSize );
 
         int joinOffset = 0;
         if( xOffset-1 >= 0 )
         {
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nySub; ++j )
-                    sn.lowerStruct[i*nySub+j] = ReorderedIndex
+                    node.lowerStruct[i*nySub+j] = ReorderedIndex
                     ( xOffset-1, yOffset+j, i, vSize );
             joinOffset += nySub*vSize;
         }
@@ -1647,7 +1647,7 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         {
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nySub; ++j )
-                    sn.lowerStruct[joinOffset+i*nySub+j] = ReorderedIndex
+                    node.lowerStruct[joinOffset+i*nySub+j] = ReorderedIndex
                     ( xOffset+nxSub, yOffset+j, i, vSize );
             joinOffset += nySub*vSize;
         }
@@ -1655,7 +1655,7 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         {
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nxSub; ++j )
-                    sn.lowerStruct[joinOffset+i*nxSub+j] = ReorderedIndex
+                    node.lowerStruct[joinOffset+i*nxSub+j] = ReorderedIndex
                     ( xOffset+j, yOffset-1, i, vSize );
             joinOffset += nxSub*vSize;
         }
@@ -1663,12 +1663,12 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         {
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nxSub; ++j )
-                    sn.lowerStruct[joinOffset+i*nxSub+j] = ReorderedIndex
+                    node.lowerStruct[joinOffset+i*nxSub+j] = ReorderedIndex
                     ( xOffset+j, yOffset+nySub, i, vSize );
         }
 
         // Sort the lower structure
-        std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+        std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
     }
     else if( nxSub >= nySub )
     {
@@ -1676,8 +1676,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         //
         // NOTE: computation of middle needs to be generalized
         const int middle = (nxSub-1)/2;
-        sn.size = nySub*vSize;
-        sn.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
+        node.size = nySub*vSize;
+        node.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
 
         // Allocate space for the lower structure
         int numJoins = 0;
@@ -1685,26 +1685,26 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
             ++numJoins;
         if( yOffset+nySub < ny )
             ++numJoins;
-        sn.lowerStruct.resize( numJoins*vSize );
+        node.lowerStruct.resize( numJoins*vSize );
 
         // Fill the (unsorted) lower structure
         int joinOffset = 0;
         if( yOffset-1 >= 0 )
         {
             for( int i=0; i<vSize; ++i )
-                sn.lowerStruct[i] = ReorderedIndex
+                node.lowerStruct[i] = ReorderedIndex
                 ( xOffset+middle, yOffset-1, i, vSize );
             joinOffset += vSize;
         }
         if( yOffset+nySub < ny )
         {
             for( int i=0; i<vSize; ++i )
-                sn.lowerStruct[joinOffset+i] = ReorderedIndex
+                node.lowerStruct[joinOffset+i] = ReorderedIndex
                 ( xOffset+middle, yOffset+nySub, i, vSize );
         }
 
         // Sort the lower structure
-        std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+        std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
     }
     else
     {
@@ -1712,8 +1712,8 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
         //
         // NOTE: computation of middle needs to be generalized
         const int middle = (nySub-1)/2;
-        sn.size = nxSub*vSize;
-        sn.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
+        node.size = nxSub*vSize;
+        node.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
 
         // Allocate space for the lower structure
         int numJoins = 0;
@@ -1721,36 +1721,39 @@ DistHelmholtz<R>::FillDistOrigPanelStruct
             ++numJoins;
         if( xOffset+nxSub < nx )
             ++numJoins;
-        sn.lowerStruct.resize( numJoins*vSize );
+        node.lowerStruct.resize( numJoins*vSize );
 
         // Fill the (unsorted) lower structure
         int joinOffset = 0;
         if( xOffset-1 >= 0 )
         {
             for( int i=0; i<vSize; ++i )
-                sn.lowerStruct[i] = ReorderedIndex
+                node.lowerStruct[i] = ReorderedIndex
                 ( xOffset-1, yOffset+middle, i, vSize );
             joinOffset += vSize;
         }
         if( xOffset+nxSub < nx )
         {
             for( int i=0; i<vSize; ++i )
-                sn.lowerStruct[joinOffset+i] = ReorderedIndex
+                node.lowerStruct[joinOffset+i] = ReorderedIndex
                 ( xOffset+nxSub, yOffset+middle, i, vSize );
         }
 
         // Sort the lower structure
-        std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+        std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
     }
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::FillLocalOrigPanelStruct
+DistHelmholtz<R>::FillPanelLocalElimTree
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-  cliq::symbolic::SymmOrig& S ) const
+  cliq::SymmElimTree& eTree ) const
 {
-    const int numLocalSupernodes = S.local.supernodes.size();
+    const int commRank = mpi::CommRank( comm_ );
+    const int numLocalNodes = NumLocalNodes( commRank );
+    eTree.local.nodes.resize( numLocalNodes );
+
     const int cutoff = nestedCutoff_;
     const int nx = disc_.nx;
     const int ny = disc_.ny;
@@ -1769,26 +1772,26 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
     }
 
     // Fill the local tree
-    for( int s=numLocalSupernodes-1; s>=0; --s )
+    for( int s=numLocalNodes-1; s>=0; --s )
     {
         Box box = boxStack.top();
         boxStack.pop();
 
-        cliq::symbolic::LocalSymmOrigSupernode& sn = S.local.supernodes[s];
-        sn.parent = box.parentIndex;
-        if( sn.parent != -1 )
+        cliq::LocalSymmNode& node = eTree.local.nodes[s];
+        node.parent = box.parentIndex;
+        if( node.parent != -1 )
         {
             if( box.leftChild )
-                S.local.supernodes[sn.parent].children[0] = s;
+                eTree.local.nodes[node.parent].children[0] = s;
             else
-                S.local.supernodes[sn.parent].children[1] = s;
+                eTree.local.nodes[node.parent].children[1] = s;
         }
 
         if( box.nx*box.ny <= cutoff )
         {
-            sn.size = box.nx*box.ny*vSize;
-            sn.offset = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
-            sn.children.clear();
+            node.size = box.nx*box.ny*vSize;
+            node.offset = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
+            node.children.clear();
 
             // Count, allocate, and fill the lower struct
             int joinSize = 0;
@@ -1800,14 +1803,14 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
                 joinSize += box.nx*vSize;
             if( box.yOffset+box.ny < ny )
                 joinSize += box.nx*vSize;
-            sn.lowerStruct.resize( joinSize );
+            node.lowerStruct.resize( joinSize );
 
             int joinOffset = 0;
             if( box.xOffset-1 >= 0 )
             {
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.ny; ++j )
-                        sn.lowerStruct[i*box.ny+j] = ReorderedIndex
+                        node.lowerStruct[i*box.ny+j] = ReorderedIndex
                         ( box.xOffset-1, box.yOffset+j, i, vSize );
                 joinOffset += box.ny*vSize;
             }
@@ -1815,7 +1818,7 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
             {
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.ny; ++j )
-                        sn.lowerStruct[joinOffset+i*box.ny+j] = ReorderedIndex
+                        node.lowerStruct[joinOffset+i*box.ny+j] = ReorderedIndex
                         ( box.xOffset+box.nx, box.yOffset+j, i, vSize );
                 joinOffset += box.ny*vSize;
             }
@@ -1823,7 +1826,7 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
             {
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.nx; ++j )
-                        sn.lowerStruct[joinOffset+i*box.nx+j] = ReorderedIndex
+                        node.lowerStruct[joinOffset+i*box.nx+j] = ReorderedIndex
                         ( box.xOffset+j, box.yOffset-1, i, vSize );
                 joinOffset += box.nx*vSize;
             }
@@ -1831,24 +1834,24 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
             {
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.nx; ++j )
-                        sn.lowerStruct[joinOffset+i*box.nx+j] = ReorderedIndex
+                        node.lowerStruct[joinOffset+i*box.nx+j] = ReorderedIndex
                         ( box.xOffset+j, box.yOffset+box.ny, i, vSize );
             }
 
             // Sort the lower structure
-            std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+            std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
         }
         else
         {
-            sn.children.resize(2);
+            node.children.resize(2);
             if( box.nx >= box.ny )
             {
                 // Partition the X dimension (this is the separator)
                 //
                 // NOTE: computation of middle needs to be generalized
                 const int middle = (box.nx-1)/2;
-                sn.size = box.ny*vSize;
-                sn.offset = ReorderedIndex
+                node.size = box.ny*vSize;
+                node.offset = ReorderedIndex
                     ( box.xOffset+middle, box.yOffset, 0, vSize );
 
                 // Count, allocate, and fill the lower struct
@@ -1857,25 +1860,25 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
                     ++numJoins;
                 if( box.yOffset+box.ny < ny )
                     ++numJoins;
-                sn.lowerStruct.resize( numJoins*vSize );
+                node.lowerStruct.resize( numJoins*vSize );
 
                 int joinOffset = 0;
                 if( box.yOffset-1 >= 0 )
                 {
                     for( int i=0; i<vSize; ++i )
-                        sn.lowerStruct[i] = ReorderedIndex
+                        node.lowerStruct[i] = ReorderedIndex
                         ( box.xOffset+middle, box.yOffset-1, i, vSize );
                     joinOffset += vSize;
                 }
                 if( box.yOffset+box.ny < ny )
                 {
                     for( int i=0; i<vSize; ++i )
-                        sn.lowerStruct[joinOffset+i] = ReorderedIndex
+                        node.lowerStruct[joinOffset+i] = ReorderedIndex
                         ( box.xOffset+middle, box.yOffset+box.ny, i, vSize );
                 }
 
                 // Sort the lower structure
-                std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+                std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
 
                 // Push the left child box onto the stack
                 Box leftBox;
@@ -1903,8 +1906,8 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
                 //
                 // NOTE: computation of middle needs to be generalized
                 const int middle = (box.ny-1)/2;
-                sn.size = box.nx*vSize;
-                sn.offset = ReorderedIndex
+                node.size = box.nx*vSize;
+                node.offset = ReorderedIndex
                     ( box.xOffset, box.yOffset+middle, 0, vSize );
 
                 // Count, allocate, and fill the lower struct
@@ -1913,25 +1916,25 @@ DistHelmholtz<R>::FillLocalOrigPanelStruct
                     ++numJoins;
                 if( box.xOffset+box.nx < nx )
                     ++numJoins;
-                sn.lowerStruct.resize( numJoins*vSize );
+                node.lowerStruct.resize( numJoins*vSize );
 
                 int joinOffset = 0;
                 if( box.xOffset-1 >= 0 )
                 {
                     for( int i=0; i<vSize; ++i )
-                        sn.lowerStruct[i] = ReorderedIndex
+                        node.lowerStruct[i] = ReorderedIndex
                         ( box.xOffset-1, box.yOffset+middle, i, vSize );
                     joinOffset += vSize;
                 }
                 if( box.xOffset+box.nx < nx )
                 {
                     for( int i=0; i<vSize; ++i )
-                        sn.lowerStruct[joinOffset+i] = ReorderedIndex
+                        node.lowerStruct[joinOffset+i] = ReorderedIndex
                         ( box.xOffset+box.nx, box.yOffset+middle, i, vSize );
                 }
 
                 // Sort the lower structure
-                std::sort( sn.lowerStruct.begin(), sn.lowerStruct.end() );
+                std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
 
                 // Push the left child box onto the stack
                 Box leftBox;

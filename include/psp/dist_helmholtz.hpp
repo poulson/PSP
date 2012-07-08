@@ -144,17 +144,14 @@ private:
     int topOrigDepth_;
     int localTopHeight_;
 
-    // Symbolic factorizations of each class of panels
-    cliq::symbolic::SymmFact 
-        bottomSymbolicFact_, 
-        leftoverInnerSymbolicFact_, 
-        topSymbolicFact_;
+    // Analyses of each class of panels
+    cliq::SymmInfo bottomInfo_, leftoverInnerInfo_, topInfo_;
 
-    // Numeric factorizations of each panel
-    cliq::numeric::SymmFrontTree<C> bottomFact_;
-    std::vector<cliq::numeric::SymmFrontTree<C>*> fullInnerFacts_;
-    cliq::numeric::SymmFrontTree<C> leftoverInnerFact_;
-    cliq::numeric::SymmFrontTree<C> topFact_;
+    // Factorizations of each panel
+    cliq::SymmFrontTree<C> bottomFact_;
+    std::vector<cliq::SymmFrontTree<C>*> fullInnerFacts_;
+    cliq::SymmFrontTree<C> leftoverInnerFact_;
+    cliq::SymmFrontTree<C> topFact_;
 
     // Compressed factorizations of each panel
     CompressedFrontTree<C> bottomCompressedFact_;
@@ -205,8 +202,8 @@ private:
     C s3Inv( int v ) const;
     C s3InvArtificial( int v, int vOffset ) const;
 
-    int NumLocalSupernodes( unsigned commRank ) const;
-    static void NumLocalSupernodesRecursion
+    int NumLocalNodes( unsigned commRank ) const;
+    static void NumLocalNodesRecursion
     ( int xSize, int ySize, int cutoff, 
       unsigned commRank, unsigned depthTilSerial, int& numLocal );
 
@@ -214,20 +211,15 @@ private:
     // Global sparse helper routines
     //
 
-    cliq::numeric::SymmFrontTree<C>& 
-    PanelNumericFactorization( int whichPanel );
-    CompressedFrontTree<C>& 
-    PanelCompressedFactorization( int whichPanel );
+    cliq::SymmFrontTree<C>& PanelFactorization( int whichPanel );
+    CompressedFrontTree<C>& PanelCompressedFactorization( int whichPanel );
 
-    const cliq::numeric::SymmFrontTree<C>&
-    PanelNumericFactorization( int whichPanel ) const;
-    const CompressedFrontTree<C>&
+    const cliq::SymmFrontTree<C>& PanelFactorization( int whichPanel ) const;
+    const CompressedFrontTree<C>& 
     PanelCompressedFactorization( int whichPanel ) const;
 
-    cliq::symbolic::SymmFact&
-    PanelSymbolicFactorization( int whichPanel );
-    const cliq::symbolic::SymmFact&
-    PanelSymbolicFactorization( int whichPanel ) const;
+    cliq::SymmInfo& PanelAnalysis( int whichPanel );
+    const cliq::SymmInfo& PanelAnalysis( int whichPanel ) const;
 
     int PanelPadding( int whichPanel ) const;
     int PanelDepth( int whichPanel ) const;
@@ -280,7 +272,7 @@ private:
 
     void GetPanelVelocity
     ( int vOffset, int vSize, 
-      const cliq::symbolic::SymmFact& fact,
+      const cliq::SymmInfo& info,
       const GridData<R>& velocity,
       std::vector<R>& myPanelVelocity,
       std::vector<int>& offsets,
@@ -289,8 +281,8 @@ private:
 
     void FillPanelFronts
     ( int vOffset, int vSize,
-      const cliq::symbolic::SymmFact& symbFact,
-            cliq::numeric::SymmFrontTree<C>& fact,
+      const cliq::SymmInfo& info,
+            cliq::SymmFrontTree<C>& fact,
       const GridData<R>& velocity,
       const std::vector<R>& myPanelVelocity,
             std::vector<int>& offsets,
@@ -298,7 +290,7 @@ private:
             std::map<int,int>& panelNaturalToNested ) const;
     void FillPanelFronts
     ( int vOffset, int vSize,
-      const cliq::symbolic::SymmFact& symbFact,
+      const cliq::SymmInfo& info,
             CompressedFrontTree<C>& fact,
       const GridData<R>& velocity,
       const std::vector<R>& myPanelVelocity,
@@ -306,7 +298,7 @@ private:
             std::map<int,int>& panelNestedToNatural,
             std::map<int,int>& panelNaturalToNested ) const;
 
-    void FormLowerColumnOfSupernode
+    void FormLowerColumnOfNode
     ( R alpha, int x, int y, int v, int vOffset, int vSize,
       int offset, int size, int j, 
       const std::vector<int>& origLowerStruct, 
@@ -325,15 +317,15 @@ private:
     ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
       int depthTilSerial, int cutoff, int offset );
 
-    void FillOrigPanelStruct( int vSize, cliq::symbolic::SymmOrig& S ) const;
-    void FillDistOrigPanelStruct
+    void FillPanelElimTree( int vSize, cliq::SymmElimTree& eTree ) const;
+    void FillPanelDistElimTree
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      cliq::symbolic::SymmOrig& S ) const;
-    void FillLocalOrigPanelStruct
+      cliq::SymmElimTree& eTree ) const;
+    void FillPanelLocalElimTree
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      cliq::symbolic::SymmOrig& S ) const;
+      cliq::SymmElimTree& eTree ) const;
    
-    // For use in FillLocalOrigPanelStruct
+    // For use in FillPanelLocalElimTree
     struct Box
     {
         int parentIndex, nx, ny, xOffset, yOffset;

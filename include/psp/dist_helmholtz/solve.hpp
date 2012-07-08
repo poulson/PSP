@@ -1110,42 +1110,9 @@ DistHelmholtz<R>::Multiply( Matrix<C>& B ) const
         }
     }
     std::vector<C> recvRhs( totalRecvCount );
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_SPMV
-    int numSends=0,numRecvs=0;
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {
-        if( sendCounts[proc] != 0 )
-            ++numSends;
-        if( recvCounts[proc] != 0 )
-            ++numRecvs;
-    }
-    std::vector<mpi::Status> statuses(numSends+numRecvs);
-    std::vector<mpi::Request> requests(numSends+numRecvs);
-    int rCount=0;
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {
-        int count = recvCounts[proc];
-        int displ = recvDispls[proc];
-        if( count != 0 )
-            mpi::IRecv
-            ( &recvRhs[displ], count, proc, 0, comm_, requests[rCount++] );
-    }
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {
-        int count = sendCounts[proc];
-        int displ = sendDispls[proc];
-        if( count != 0 )
-            mpi::ISend
-            ( &sendRhs[displ], count, proc, 0, comm_, requests[rCount++] );
-    }
-    mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-    statuses.clear();
-    requests.clear();
-#else
-    mpi::AllToAll
-    ( &sendRhs[0], &sendCounts[0], &sendDispls[0], 
-      &recvRhs[0], &recvCounts[0], &recvDispls[0], comm_ );
-#endif
+    cliq::SparseAllToAll
+    ( sendRhs, sendCounts, sendDispls,
+      recvRhs, recvCounts, recvDispls, comm_ );
     sendRhs.clear();
 
     // Run the local multiplies to form the result
@@ -1233,31 +1200,29 @@ template<typename R>
 void
 DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 {
-    const cliq::symbolic::SymmFact& symbFact = 
-        PanelSymbolicFactorization( i );
+    const cliq::SymmInfo& info = PanelAnalysis( i );
     const int numRhs = B.Width();
     const int panelPadding = PanelPadding( i );
     const int panelDepth = PanelDepth( i );
     const int localHeight1d = 
-        symbFact.dist.supernodes.back().localOffset1d + 
-        symbFact.dist.supernodes.back().localSize1d;
+        info.dist.nodes.back().localOffset1d + 
+        info.dist.nodes.back().localSize1d;
 
     Matrix<C> localPanelB;
     elem::Zeros( localHeight1d, numRhs, localPanelB );
 
-    // For each supernode, pull in each right-hand side with a memcpy
+    // For each node, pull in each right-hand side with a memcpy
     int BOffset = LocalPanelOffset( i );
-    const int numLocalSupernodes = symbFact.local.supernodes.size();
-    for( int t=0; t<numLocalSupernodes; ++t )
+    const int numLocalNodes = info.local.nodes.size();
+    for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::symbolic::LocalSymmFactSupernode& sn = 
-            symbFact.local.supernodes[t];
-        const int size = sn.size;
-        const int myOffset = sn.myOffset;
+        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const int size = node.size;
+        const int myOffset = node.myOffset;
 
 #ifndef RELEASE
         if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Local supernode size problem");
+            throw std::logic_error("Local node size problem");
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
@@ -1270,22 +1235,21 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
               remainingSize*sizeof(C) );
         BOffset += remainingSize;
     }
-    const int numDistSupernodes = symbFact.dist.supernodes.size();
-    for( int t=1; t<numDistSupernodes; ++t )
+    const int numDistNodes = info.dist.nodes.size();
+    for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::symbolic::DistSymmFactSupernode& sn = 
-            symbFact.dist.supernodes[t];
-        const int size = sn.size;
-        const int localOffset1d = sn.localOffset1d;
-        const int localSize1d = sn.localSize1d;
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const int size = node.size;
+        const int localOffset1d = node.localOffset1d;
+        const int localSize1d = node.localSize1d;
 
-        const Grid& grid = *sn.grid;
+        const Grid& grid = *node.grid;
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
 #ifndef RELEASE
         if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Dist supernode size problem");
+            throw std::logic_error("Dist node size problem");
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
@@ -1308,23 +1272,22 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     // Solve against the panel
     if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
         CompressedBlockLDLSolve
-        ( TRANSPOSE, symbFact, PanelCompressedFactorization( i ), localPanelB );
+        ( TRANSPOSE, info, PanelCompressedFactorization( i ), localPanelB );
     else
-        cliq::numeric::LDLSolve
-        ( TRANSPOSE, symbFact, PanelNumericFactorization( i ), localPanelB );
+        cliq::LDLSolve
+        ( TRANSPOSE, info, PanelFactorization( i ), localPanelB );
 
-    // For each supernode, extract each right-hand side with memcpy
+    // For each node, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );
-    for( int t=0; t<numLocalSupernodes; ++t )
+    for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::symbolic::LocalSymmFactSupernode& sn = 
-            symbFact.local.supernodes[t];
-        const int size = sn.size;
-        const int myOffset = sn.myOffset;
+        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const int size = node.size;
+        const int myOffset = node.myOffset;
 
 #ifndef RELEASE
         if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Local supernode size problem");
+            throw std::logic_error("Local node size problem");
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
@@ -1337,21 +1300,20 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
               remainingSize*sizeof(C) );
         BOffset += remainingSize;
     }
-    for( int t=1; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::symbolic::DistSymmFactSupernode& sn = 
-            symbFact.dist.supernodes[t];
-        const int size = sn.size;
-        const int localOffset1d = sn.localOffset1d;
-        const int localSize1d = sn.localSize1d;
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const int size = node.size;
+        const int localOffset1d = node.localOffset1d;
+        const int localSize1d = node.localSize1d;
 
-        const Grid& grid = *sn.grid;
+        const Grid& grid = *node.grid;
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
 #ifndef RELEASE
         if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Dist supernode size problem");
+            throw std::logic_error("Dist node size problem");
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
@@ -1406,42 +1368,9 @@ DistHelmholtz<R>::SubdiagonalUpdate( Matrix<C>& B, int i ) const
     }
 
     std::vector<C> recvBuffer( panelRecvCount*numRhs );
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_SPMV
-    int numSends=0,numRecvs=0;
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {   
-        if( sendCounts[proc] != 0 ) 
-            ++numSends;
-        if( recvCounts[proc] != 0 ) 
-            ++numRecvs;
-    }   
-    std::vector<mpi::Status> statuses(numSends+numRecvs);
-    std::vector<mpi::Request> requests(numSends+numRecvs);
-    int rCount=0;
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {   
-        int count = recvCounts[proc];
-        int displ = recvDispls[proc];
-        if( count != 0 )
-            mpi::IRecv
-            ( &recvBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
-    }
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {
-        int count = sendCounts[proc];
-        int displ = sendDispls[proc];
-        if( count != 0 )
-            mpi::ISend
-            ( &sendBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
-    }
-    mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-    statuses.clear();
-    requests.clear();
-#else
-    mpi::AllToAll
-    ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-      &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
-#endif
+    cliq::SparseAllToAll
+    ( sendBuffer, sendCounts, sendDispls,
+      recvBuffer, recvCounts, recvDispls, comm_ );
     sendBuffer.clear();
     sendCounts.clear();
     sendDispls.clear();
@@ -1538,42 +1467,9 @@ DistHelmholtz<R>::MultiplySuperdiagonal( Matrix<C>& B, int i ) const
         recvDispls[proc] = supdiagRecvDispls_[index]*numRhs;
     }
     std::vector<C> recvBuffer( panelRecvCount*numRhs );
-#ifdef USE_CUSTOM_ALLTOALLV_FOR_SPMV
-    int numSends=0,numRecvs=0;
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {   
-        if( sendCounts[proc] != 0 )
-            ++numSends;
-        if( recvCounts[proc] != 0 )
-            ++numRecvs;
-    }   
-    std::vector<mpi::Status> statuses(numSends+numRecvs);
-    std::vector<mpi::Request> requests(numSends+numRecvs);
-    int rCount=0;
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {
-        int count = recvCounts[proc];
-        int displ = recvDispls[proc];
-        if( count != 0 )
-            mpi::IRecv
-            ( &recvBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
-    }
-    for( unsigned proc=0; proc<commSize; ++proc )
-    {
-        int count = sendCounts[proc];
-        int displ = sendDispls[proc];
-        if( count != 0 )
-            mpi::ISend
-            ( &sendBuffer[displ], count, proc, 0, comm_, requests[rCount++] );
-    }
-    mpi::WaitAll( numSends+numRecvs, &requests[0], &statuses[0] );
-    statuses.clear();
-    requests.clear();
-#else
-    mpi::AllToAll
-    ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
-      &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
-#endif
+    cliq::SparseAllToAll
+    ( sendBuffer, sendCounts, sendDispls,
+      recvBuffer, recvCounts, recvDispls, comm_ );
     sendBuffer.clear();
     sendCounts.clear();
     sendDispls.clear();

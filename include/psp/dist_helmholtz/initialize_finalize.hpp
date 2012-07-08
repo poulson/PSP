@@ -135,7 +135,7 @@ DistHelmholtz<R>::Initialize
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
-        ( vOffset, vSize, topSymbolicFact_, velocity,
+        ( vOffset, vSize, topInfo_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
         const double gatherStopTime = mpi::Time();
@@ -144,12 +144,12 @@ DistHelmholtz<R>::Initialize
         const double fillStartTime = gatherStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             FillPanelFronts
-            ( vOffset, vSize, topSymbolicFact_, topCompressedFact_,
+            ( vOffset, vSize, topInfo_, topCompressedFact_,
               velocity, myPanelVelocity, offsets, 
               panelNestedToNatural, panelNaturalToNested );
         else
             FillPanelFronts
-            ( vOffset, vSize, topSymbolicFact_, topFact_,
+            ( vOffset, vSize, topInfo_, topFact_,
               velocity, myPanelVelocity, offsets, 
               panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
@@ -158,17 +158,17 @@ DistHelmholtz<R>::Initialize
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             CompressedBlockLDL
-            ( TRANSPOSE, topSymbolicFact_, topCompressedFact_, vSize );
+            ( TRANSPOSE, topInfo_, topCompressedFact_, vSize );
         else
-            cliq::numeric::LDL( TRANSPOSE, topSymbolicFact_, topFact_ );
+            cliq::LDL( TRANSPOSE, topInfo_, topFact_ );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute the LDL^T factorization for faster solves
         const double redistStartTime = ldlStopTime;
         if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::numeric::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
+            cliq::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::numeric::SetSolveMode( topFact_, cliq::NORMAL_1D );
+            cliq::SetSolveMode( topFact_, cliq::NORMAL_1D );
         const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -204,8 +204,7 @@ DistHelmholtz<R>::Initialize
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
-        ( vOffset, vSize, bottomSymbolicFact_, velocity,
-          myPanelVelocity, offsets,
+        ( vOffset, vSize, bottomInfo_, velocity, myPanelVelocity, offsets,
           panelNestedToNatural, panelNaturalToNested );
         const double gatherStopTime = mpi::Time();
 
@@ -213,12 +212,12 @@ DistHelmholtz<R>::Initialize
         const double fillStartTime = gatherStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             FillPanelFronts
-            ( vOffset, vSize, bottomSymbolicFact_, bottomCompressedFact_,
+            ( vOffset, vSize, bottomInfo_, bottomCompressedFact_,
               velocity, myPanelVelocity, offsets,
               panelNestedToNatural, panelNaturalToNested );
         else
             FillPanelFronts
-            ( vOffset, vSize, bottomSymbolicFact_, bottomFact_,
+            ( vOffset, vSize, bottomInfo_, bottomFact_,
               velocity, myPanelVelocity, offsets,
               panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
@@ -227,17 +226,17 @@ DistHelmholtz<R>::Initialize
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             CompressedBlockLDL
-            ( TRANSPOSE, bottomSymbolicFact_, bottomCompressedFact_, vSize );
+            ( TRANSPOSE, bottomInfo_, bottomCompressedFact_, vSize );
         else
-            cliq::numeric::LDL( TRANSPOSE, bottomSymbolicFact_, bottomFact_ );
+            cliq::LDL( TRANSPOSE, bottomInfo_, bottomFact_ );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::numeric::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
+            cliq::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::numeric::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
+            cliq::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
         const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -278,7 +277,7 @@ DistHelmholtz<R>::Initialize
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
-        ( vOffset, vSize, bottomSymbolicFact_, velocity,
+        ( vOffset, vSize, bottomInfo_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
         const double gatherStopTime = mpi::Time();
@@ -289,16 +288,16 @@ DistHelmholtz<R>::Initialize
         {
             fullInnerCompressedFacts_[k] = new CompressedFrontTree<C>;
             FillPanelFronts
-            ( vOffset, vSize, bottomSymbolicFact_, 
+            ( vOffset, vSize, bottomInfo_, 
               *fullInnerCompressedFacts_[k],
               velocity, myPanelVelocity, offsets,
               panelNestedToNatural, panelNaturalToNested );
         }
         else 
         {
-            fullInnerFacts_[k] = new cliq::numeric::SymmFrontTree<C>;
+            fullInnerFacts_[k] = new cliq::SymmFrontTree<C>;
             FillPanelFronts
-            ( vOffset, vSize, bottomSymbolicFact_, *fullInnerFacts_[k],
+            ( vOffset, vSize, bottomInfo_, *fullInnerFacts_[k],
               velocity, myPanelVelocity, offsets,
               panelNestedToNatural, panelNaturalToNested );
         }
@@ -308,21 +307,18 @@ DistHelmholtz<R>::Initialize
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             CompressedBlockLDL
-            ( TRANSPOSE, bottomSymbolicFact_, 
+            ( TRANSPOSE, bottomInfo_, 
               *fullInnerCompressedFacts_[k], vSize );
         else
-            cliq::numeric::LDL
-            ( TRANSPOSE, bottomSymbolicFact_, *fullInnerFacts_[k] );
+            cliq::LDL( TRANSPOSE, bottomInfo_, *fullInnerFacts_[k] );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::numeric::SetSolveMode
-            ( *fullInnerFacts_[k], cliq::FAST_2D_LDL );
+            cliq::SetSolveMode( *fullInnerFacts_[k], cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::numeric::SetSolveMode
-            ( *fullInnerFacts_[k], cliq::NORMAL_1D );
+            cliq::SetSolveMode( *fullInnerFacts_[k], cliq::NORMAL_1D );
         const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -360,7 +356,7 @@ DistHelmholtz<R>::Initialize
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
-        ( vOffset, vSize, leftoverInnerSymbolicFact_, velocity,
+        ( vOffset, vSize, leftoverInnerInfo_, velocity,
           myPanelVelocity, offsets, 
           panelNestedToNatural, panelNaturalToNested );
         const double gatherStopTime = mpi::Time();
@@ -369,13 +365,13 @@ DistHelmholtz<R>::Initialize
         const double fillStartTime = gatherStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             FillPanelFronts
-            ( vOffset, vSize, leftoverInnerSymbolicFact_, 
+            ( vOffset, vSize, leftoverInnerInfo_, 
               leftoverInnerCompressedFact_,
               velocity, myPanelVelocity, offsets,
               panelNestedToNatural, panelNaturalToNested );
         else
             FillPanelFronts
-            ( vOffset, vSize, leftoverInnerSymbolicFact_, leftoverInnerFact_,
+            ( vOffset, vSize, leftoverInnerInfo_, leftoverInnerFact_,
               velocity, myPanelVelocity, offsets,
               panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
@@ -385,20 +381,17 @@ DistHelmholtz<R>::Initialize
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
             CompressedBlockLDL
             ( TRANSPOSE,
-              leftoverInnerSymbolicFact_, leftoverInnerCompressedFact_, vSize );
+              leftoverInnerInfo_, leftoverInnerCompressedFact_, vSize );
         else
-            cliq::numeric::LDL
-            ( TRANSPOSE, leftoverInnerSymbolicFact_, leftoverInnerFact_ );
+            cliq::LDL( TRANSPOSE, leftoverInnerInfo_, leftoverInnerFact_ );
         const double ldlStopTime = mpi::Time();
 
         // Redistribute and/or compress the LDL^T factorization
         const double redistStartTime = ldlStopTime;
         if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::numeric::SetSolveMode
-            ( leftoverInnerFact_, cliq::FAST_2D_LDL );
+            cliq::SetSolveMode( leftoverInnerFact_, cliq::FAST_2D_LDL );
         else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::numeric::SetSolveMode
-            ( leftoverInnerFact_, cliq::NORMAL_1D );
+            cliq::SetSolveMode( leftoverInnerFact_, cliq::NORMAL_1D );
         const double redistStopTime = mpi::Time();
 
         const double stopTime = redistStopTime;
@@ -666,7 +659,7 @@ DistHelmholtz<R>::FormGlobalRow
 //       generalized
 template<typename R>
 void
-DistHelmholtz<R>::FormLowerColumnOfSupernode
+DistHelmholtz<R>::FormLowerColumnOfNode
 ( R alpha, int x, int y, int v, int vOffset, int vSize, 
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 
@@ -967,7 +960,7 @@ template<typename R>
 void
 DistHelmholtz<R>::GetPanelVelocity
 ( int vOffset, int vSize, 
-  const cliq::symbolic::SymmFact& fact,
+  const cliq::SymmInfo& info,
   const GridData<R>& velocity,
         std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
@@ -979,8 +972,7 @@ DistHelmholtz<R>::GetPanelVelocity
     const int nz = disc_.nz;
     const int commSize = mpi::CommSize( comm_ );
 
-    // Compute the reorderings for the indices in the supernodes in our 
-    // local tree
+    // Compute the reorderings for the indices in the nodes in our local tree
     panelNestedToNatural.clear();
     panelNaturalToNested.clear();
     LocalReordering( panelNestedToNatural, vSize );
@@ -995,13 +987,12 @@ DistHelmholtz<R>::GetPanelVelocity
 
     // Send the amount of data that we need to recv from each process.
     std::vector<int> recvCounts( commSize, 0 );
-    const int numLocalSupernodes = fact.local.supernodes.size();
-    for( int t=0; t<numLocalSupernodes; ++t )
+    const int numLocalNodes = info.local.nodes.size();
+    for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::symbolic::LocalSymmFactSupernode& sn = 
-            fact.local.supernodes[t];
-        const int size = sn.size;
-        const int offset = sn.offset;
+        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const int size = node.size;
+        const int offset = node.offset;
         for( int j=0; j<size; ++j )
         {
             const int naturalIndex = panelNestedToNatural[offset+j];
@@ -1013,17 +1004,16 @@ DistHelmholtz<R>::GetPanelVelocity
             ++recvCounts[proc];
         }
     }
-    const int numDistSupernodes = fact.dist.supernodes.size();
-    for( int t=1; t<numDistSupernodes; ++t )
+    const int numDistNodes = info.dist.nodes.size();
+    for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::symbolic::DistSymmFactSupernode& sn = 
-            fact.dist.supernodes[t];
-        const cliq::Grid& grid = *sn.grid;
-        const int gridCol = grid.MRRank();
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const Grid& grid = *node.grid;
+        const int gridCol = grid.Col();
         const int gridWidth = grid.Width();
 
-        const int size = sn.size;
-        const int offset = sn.offset;
+        const int size = node.size;
+        const int offset = node.offset;
         const int localWidth = LocalLength( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
@@ -1057,12 +1047,11 @@ DistHelmholtz<R>::GetPanelVelocity
     // Send the indices that we need to recv from each process.
     offsets = recvDispls;
     std::vector<int> recvIndices( totalRecvCount );
-    for( int t=0; t<numLocalSupernodes; ++t )
+    for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::symbolic::LocalSymmFactSupernode& sn = 
-            fact.local.supernodes[t];
-        const int size = sn.size;
-        const int offset = sn.offset;
+        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const int size = node.size;
+        const int offset = node.offset;
         for( int j=0; j<size; ++j )
         {
             const int naturalIndex = panelNestedToNatural[offset+j];
@@ -1074,16 +1063,15 @@ DistHelmholtz<R>::GetPanelVelocity
             recvIndices[offsets[proc]++] = naturalIndex;
         }
     }
-    for( int t=1; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::symbolic::DistSymmFactSupernode& sn = 
-            fact.dist.supernodes[t];
-        const cliq::Grid& grid = *sn.grid;
-        const int gridCol = grid.MRRank();
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const Grid& grid = *node.grid;
+        const int gridCol = grid.Col();
         const int gridWidth = grid.Width();
 
-        const int size = sn.size;
-        const int offset = sn.offset;
+        const int size = node.size;
+        const int offset = node.offset;
         const int localWidth = LocalLength( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
@@ -1263,8 +1251,8 @@ template<typename R>
 void
 DistHelmholtz<R>::FillPanelFronts
 ( int vOffset, int vSize, 
-  const cliq::symbolic::SymmFact& symbFact,
-        cliq::numeric::SymmFrontTree<C>& fact,
+  const cliq::SymmInfo& info,
+        cliq::SymmFrontTree<C>& fact,
   const GridData<R>& velocity,
   const std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
@@ -1278,18 +1266,17 @@ DistHelmholtz<R>::FillPanelFronts
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;
     std::vector<C> values;
-    const int numLocalSupernodes = symbFact.local.supernodes.size();
-    fact.local.fronts.resize( numLocalSupernodes );
-    for( int t=0; t<numLocalSupernodes; ++t )
+    const int numLocalNodes = info.local.nodes.size();
+    fact.local.fronts.resize( numLocalNodes );
+    for( int t=0; t<numLocalNodes; ++t )
     {
-        cliq::numeric::LocalSymmFront<C>& front = fact.local.fronts[t];
-        const cliq::symbolic::LocalSymmFactSupernode& symbSN = 
-            symbFact.local.supernodes[t];
+        cliq::LocalSymmFront<C>& front = fact.local.fronts[t];
+        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
 
         // Initialize this front
-        const int offset = symbSN.offset;
-        const int size = symbSN.size;
-        const int updateSize = symbSN.lowerStruct.size();
+        const int offset = node.offset;
+        const int size = node.size;
+        const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
         elem::Zeros( frontSize, size, front.frontL );
         for( int j=0; j<size; ++j )
@@ -1304,10 +1291,10 @@ DistHelmholtz<R>::FillPanelFronts
             const int proc = velocity.OwningProcess( x, y, z );
             const R alpha = myPanelVelocity[offsets[proc]++];
 
-            // Form the j'th lower column of this supernode
-            FormLowerColumnOfSupernode
+            // Form the j'th lower column of this node
+            FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1316,25 +1303,24 @@ DistHelmholtz<R>::FillPanelFronts
     }
 
     // Initialize the distributed part of the panel
-    const int numDistSupernodes = symbFact.dist.supernodes.size();
+    const int numDistNodes = info.dist.nodes.size();
     fact.dist.mode = cliq::NORMAL_2D;
-    fact.dist.fronts.resize( numDistSupernodes );
-    cliq::numeric::InitializeDistLeaf( symbFact, fact );
-    for( int t=1; t<numDistSupernodes; ++t )
+    fact.dist.fronts.resize( numDistNodes );
+    cliq::InitializeDistLeaf( info, fact );
+    for( int t=1; t<numDistNodes; ++t )
     {
-        cliq::numeric::DistSymmFront<C>& front = fact.dist.fronts[t];
-        const cliq::symbolic::DistSymmFactSupernode& symbSN = 
-            symbFact.dist.supernodes[t];
+        cliq::DistSymmFront<C>& front = fact.dist.fronts[t];
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
 
         // Initialize this front
-        Grid& grid = *symbSN.grid;
+        Grid& grid = *node.grid;
         const int gridHeight = grid.Height();
         const int gridWidth = grid.Width();
-        const int gridRow = grid.MCRank();
-        const int gridCol = grid.MRRank();
-        const int offset = symbSN.offset;
-        const int size = symbSN.size;
-        const int updateSize = symbSN.lowerStruct.size();
+        const int gridRow = grid.Row();
+        const int gridCol = grid.Col();
+        const int offset = node.offset;
+        const int size = node.size;
+        const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.front2dL.SetGrid( grid );
         elem::Zeros( frontSize, size, front.front2dL );
@@ -1353,10 +1339,10 @@ DistHelmholtz<R>::FillPanelFronts
             const int proc = velocity.OwningProcess( x, y, z );
             const R alpha = myPanelVelocity[offsets[proc]++];
 
-            // Form the j'th lower column of this supernode
-            FormLowerColumnOfSupernode
+            // Form the j'th lower column of this node
+            FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1376,7 +1362,7 @@ template<typename R>
 void
 DistHelmholtz<R>::FillPanelFronts
 ( int vOffset, int vSize, 
-  const cliq::symbolic::SymmFact& symbFact,
+  const cliq::SymmInfo& info,
         CompressedFrontTree<C>& fact,
   const GridData<R>& velocity,
   const std::vector<R>& myPanelVelocity,
@@ -1391,18 +1377,17 @@ DistHelmholtz<R>::FillPanelFronts
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;
     std::vector<C> values;
-    const int numLocalSupernodes = symbFact.local.supernodes.size();
-    fact.local.fronts.resize( numLocalSupernodes );
-    for( int t=0; t<numLocalSupernodes; ++t )
+    const int numLocalNodes = info.local.nodes.size();
+    fact.local.fronts.resize( numLocalNodes );
+    for( int t=0; t<numLocalNodes; ++t )
     {
         LocalCompressedFront<C>& front = fact.local.fronts[t];
-        const cliq::symbolic::LocalSymmFactSupernode& symbSN = 
-            symbFact.local.supernodes[t];
+        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
 
         // Initialize this front
-        const int offset = symbSN.offset;
-        const int size = symbSN.size;
-        const int updateSize = symbSN.lowerStruct.size();
+        const int offset = node.offset;
+        const int size = node.size;
+        const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
         elem::Zeros( frontSize, size, front.frontL );
         for( int j=0; j<size; ++j )
@@ -1417,10 +1402,10 @@ DistHelmholtz<R>::FillPanelFronts
             const int proc = velocity.OwningProcess( x, y, z );
             const R alpha = myPanelVelocity[offsets[proc]++];
 
-            // Form the j'th lower column of this supernode
-            FormLowerColumnOfSupernode
+            // Form the j'th lower column of this node
+            FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1429,34 +1414,32 @@ DistHelmholtz<R>::FillPanelFronts
     }
 
     // Initialize the distributed part of the panel
-    const int numDistSupernodes = symbFact.dist.supernodes.size();
-    fact.dist.fronts.resize( numDistSupernodes );
-    // Replacement for cliq::numeric::InitializeDistLeaf
+    const int numDistNodes = info.dist.nodes.size();
+    fact.dist.fronts.resize( numDistNodes );
+    // Replacement for cliq::InitializeDistLeaf
     {
-        const cliq::symbolic::DistSymmFactSupernode& sn = 
-            symbFact.dist.supernodes[0];
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[0];
         Matrix<C>& topLocalFrontL = fact.local.fronts.back().frontL;
         DistMatrix<C>& frontL = fact.dist.fronts[0].frontL;
         frontL.LockedView
         ( topLocalFrontL.Height(), topLocalFrontL.Width(), 0, 0,
           topLocalFrontL.LockedBuffer(), topLocalFrontL.LDim(),
-          *sn.grid );
+          *node.grid );
     }
-    for( int t=1; t<numDistSupernodes; ++t )
+    for( int t=1; t<numDistNodes; ++t )
     {
         DistCompressedFront<C>& front = fact.dist.fronts[t];
-        const cliq::symbolic::DistSymmFactSupernode& symbSN = 
-            symbFact.dist.supernodes[t];
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
 
         // Initialize this front
-        Grid& grid = *symbSN.grid;
+        Grid& grid = *node.grid;
         const int gridHeight = grid.Height();
         const int gridWidth = grid.Width();
-        const int gridRow = grid.MCRank();
-        const int gridCol = grid.MRRank();
-        const int offset = symbSN.offset;
-        const int size = symbSN.size;
-        const int updateSize = symbSN.lowerStruct.size();
+        const int gridRow = grid.Row();
+        const int gridCol = grid.Col();
+        const int offset = node.offset;
+        const int size = node.size;
+        const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.frontL.SetGrid( grid );
         elem::Zeros( frontSize, size, front.frontL );
@@ -1475,10 +1458,10 @@ DistHelmholtz<R>::FillPanelFronts
             const int proc = velocity.OwningProcess( x, y, z );
             const R alpha = myPanelVelocity[offsets[proc]++];
 
-            // Form the j'th lower column of this supernode
-            FormLowerColumnOfSupernode
+            // Form the j'th lower column of this node
+            FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              symbSN.origLowerStruct, symbSN.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelIndices, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1495,4 +1478,3 @@ DistHelmholtz<R>::FillPanelFronts
 }
 
 } // namespace psp
-

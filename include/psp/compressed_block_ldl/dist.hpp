@@ -26,7 +26,7 @@ namespace psp {
 template<typename F> 
 void DistCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
   bool useQR=false );
 
 //----------------------------------------------------------------------------//
@@ -36,10 +36,9 @@ void DistCompressedBlockLDL
 template<typename F> 
 inline void DistCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::symbolic::SymmFact& S, CompressedFrontTree<F>& L, int depth,
+  cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
   bool useQR )
 {
-    using namespace cliq::symbolic;
 #ifndef RELEASE
     PushCallStack("DistCompressedBlockLDL");
     if( orientation == NORMAL )
@@ -48,7 +47,7 @@ inline void DistCompressedBlockLDL
     // The bottom front is already compressed, so just view the relevant data
     LocalCompressedFront<F>& topLocalFront = L.local.fronts.back();
     DistCompressedFront<F>& bottomDistFront = L.dist.fronts[0];
-    const Grid& bottomGrid = *S.dist.supernodes[0].grid;
+    const Grid& bottomGrid = *info.dist.nodes[0].grid;
     bottomDistFront.grid = &bottomGrid;
     bottomDistFront.depth = topLocalFront.depth;
     bottomDistFront.sT = topLocalFront.sT;
@@ -65,18 +64,18 @@ inline void DistCompressedBlockLDL
       bottomGrid );
 
     // Perform the distributed portion of the factorization
-    const unsigned numDistSupernodes = S.dist.supernodes.size();
-    for( unsigned s=1; s<numDistSupernodes; ++s )
+    const unsigned numDistNodes = info.dist.nodes.size();
+    for( unsigned s=1; s<numDistNodes; ++s )
     {
-        const DistSymmFactSupernode& childSN = S.dist.supernodes[s-1];
-        const DistSymmFactSupernode& sn = S.dist.supernodes[s];
-        const int updateSize = sn.lowerStruct.size();
+        const cliq::DistSymmNodeInfo& childNode = info.dist.nodes[s-1];
+        const cliq::DistSymmNodeInfo& node = info.dist.nodes[s];
+        const int updateSize = node.lowerStruct.size();
         DistCompressedFront<F>& childFront = L.dist.fronts[s-1];
         DistCompressedFront<F>& front = L.dist.fronts[s];
         front.work2d.Empty();
 
         const bool computeFactRecvIndices = 
-            ( sn.childFactRecvIndices.size() == 0 );
+            ( node.childFactRecvIndices.size() == 0 );
 
         // Grab this front's grid information
         const Grid& grid = front.frontL.Grid();
@@ -98,7 +97,7 @@ inline void DistCompressedBlockLDL
         int sendBufferSize = 0;
         for( unsigned proc=0; proc<commSize; ++proc )
         {
-            const int sendSize = sn.numChildFactSendIndices[proc];
+            const int sendSize = node.numChildFactSendIndices[proc];
             sendCounts[proc] = sendSize;
             sendDispls[proc] = sendBufferSize;
             sendBufferSize += sendSize;
@@ -106,8 +105,8 @@ inline void DistCompressedBlockLDL
         std::vector<F> sendBuffer( sendBufferSize );
 
         const std::vector<int>& myChildRelIndices = 
-            ( isLeftChild ? sn.leftChildRelIndices
-                          : sn.rightChildRelIndices );
+            ( isLeftChild ? node.leftChildRelIndices
+                          : node.rightChildRelIndices );
         const int updateColShift = childUpdate.ColShift();
         const int updateRowShift = childUpdate.RowShift();
         const int updateLocalHeight = childUpdate.LocalHeight();
@@ -140,7 +139,7 @@ inline void DistCompressedBlockLDL
         for( unsigned proc=0; proc<commSize; ++proc )
         {
             if( packOffsets[proc]-sendDispls[proc] != 
-                sn.numChildFactSendIndices[proc] )
+                node.numChildFactSendIndices[proc] )
                 throw std::logic_error("Error in packing stage");
         }
 #endif
@@ -151,12 +150,12 @@ inline void DistCompressedBlockLDL
 
         // Set up the recv buffer for the AllToAll
         if( computeFactRecvIndices )
-            ComputeFactRecvIndices( sn, childSN );
+            ComputeFactRecvIndices( node, childNode );
         std::vector<int> recvCounts(commSize), recvDispls(commSize);
         int recvBufferSize=0;
         for( unsigned proc=0; proc<commSize; ++proc )
         {
-            const int recvSize = sn.childFactRecvIndices[proc].size()/2;
+            const int recvSize = node.childFactRecvIndices[proc].size()/2;
             recvCounts[proc] = recvSize;
             recvDispls[proc] = recvBufferSize;
             recvBufferSize += recvSize;
@@ -176,15 +175,16 @@ inline void DistCompressedBlockLDL
 
         // Unpack the child udpates (with an Axpy)
         front.work2d.SetGrid( front.frontL.Grid() );
-        front.work2d.Align( sn.size%grid.Height(), sn.size%grid.Width() );
+        front.work2d.Align( node.size % gridHeight, node.size % gridWidth );
         elem::Zeros( updateSize, updateSize, front.work2d );
         const int leftLocalWidth = front.frontL.LocalWidth();
         const int topLocalHeight = 
-            LocalLength<int>( sn.size, grid.MCRank(), gridHeight );
+            LocalLength<int>( node.size, grid.MCRank(), gridHeight );
         for( unsigned proc=0; proc<commSize; ++proc )
         {
             const F* recvValues = &recvBuffer[recvDispls[proc]];
-            const std::deque<int>& recvIndices = sn.childFactRecvIndices[proc];
+            const std::deque<int>& recvIndices = 
+                node.childFactRecvIndices[proc];
             const int numRecvIndexPairs = recvIndices.size()/2;
             for( int k=0; k<numRecvIndexPairs; ++k )
             {
@@ -203,11 +203,10 @@ inline void DistCompressedBlockLDL
         recvCounts.clear();
         recvDispls.clear();
         if( computeFactRecvIndices )
-            sn.childFactRecvIndices.clear();
+            node.childFactRecvIndices.clear();
 
         // Now that the frontal matrix is set up, perform the factorization
-        cliq::numeric::DistFrontBlockLDL
-        ( orientation, front.frontL, front.work2d );
+        cliq::DistFrontBlockLDL( orientation, front.frontL, front.work2d );
 
         // Separately compress the A and B blocks 
         DistFrontCompression( front, depth, useQR );

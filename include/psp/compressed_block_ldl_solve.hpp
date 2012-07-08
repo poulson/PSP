@@ -26,7 +26,7 @@ namespace psp {
 template<typename F>
 void CompressedBlockLDLSolve
 ( Orientation orientation,
-  const cliq::symbolic::SymmFact& S,
+  const cliq::SymmInfo& info,
   const CompressedFrontTree<F>& L,
         Matrix<F>& localX );
 
@@ -37,7 +37,7 @@ void CompressedBlockLDLSolve
 template<typename F>
 inline void CompressedBlockLDLSolve
 ( Orientation orientation,
-  const cliq::symbolic::SymmFact& S,
+  const cliq::SymmInfo& info,
   const CompressedFrontTree<F>& L,
         Matrix<F>& localX )
 {
@@ -47,10 +47,10 @@ inline void CompressedBlockLDLSolve
         throw std::logic_error("Invalid orientation for BlockLDL");
 #endif
     // Solve against block diagonal factor, L D
-    CompressedBlockLowerSolve( NORMAL, S, L, localX );
+    CompressedBlockLowerSolve( NORMAL, info, L, localX );
 
     // Solve against the (conjugate-)transpose of the block unit diagonal L
-    CompressedBlockLowerSolve( orientation, S, L, localX );
+    CompressedBlockLowerSolve( orientation, info, L, localX );
 #ifndef RELEASE
     PopCallStack();
 #endif

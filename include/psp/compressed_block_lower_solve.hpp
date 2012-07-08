@@ -26,7 +26,7 @@ namespace psp {
 template<typename F>
 void CompressedBlockLowerSolve
 ( Orientation orientation, 
-  const cliq::symbolic::SymmFact& S,
+  const cliq::SymmInfo& info,
   const CompressedFrontTree<F>& L,
         Matrix<F>& localX );
 
@@ -47,7 +47,7 @@ namespace psp {
 template<typename F>
 inline void CompressedBlockLowerSolve
 ( Orientation orientation,
-  const cliq::symbolic::SymmFact& S,
+  const cliq::SymmInfo& info,
   const CompressedFrontTree<F>& L,
         Matrix<F>& localX )
 {
@@ -56,13 +56,13 @@ inline void CompressedBlockLowerSolve
 #endif
     if( orientation == NORMAL )
     {
-        LocalCompressedBlockLowerForwardSolve( S, L, localX );
-        DistCompressedBlockLowerForwardSolve( S, L, localX );
+        LocalCompressedBlockLowerForwardSolve( info, L, localX );
+        DistCompressedBlockLowerForwardSolve( info, L, localX );
     }
     else
     {
-        DistCompressedBlockLowerBackwardSolve( orientation, S, L, localX );
-        LocalCompressedBlockLowerBackwardSolve( orientation, S, L, localX );
+        DistCompressedBlockLowerBackwardSolve( orientation, info, L, localX );
+        LocalCompressedBlockLowerBackwardSolve( orientation, info, L, localX );
     }
 #ifndef RELEASE
     PopCallStack();

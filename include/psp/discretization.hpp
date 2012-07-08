@@ -83,7 +83,7 @@ struct Discretization
     : stencil(SEVEN_POINT), omega(frequency), 
       nx(xSize), ny(ySize), nz(zSize),
       wx(xWidth), wy(yWidth), wz(zWidth),
-      frontBC(front), rightBC(right), backBC(PML), leftBC(PML), topBC(PML),
+      frontBC(front), rightBC(right), backBC(back), leftBC(left), topBC(top),
       bx(5), by(5), bz(5)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
@@ -99,7 +99,7 @@ struct Discretization
     : stencil(SEVEN_POINT), omega(frequency), 
       nx(xSize), ny(ySize), nz(zSize),
       wx(xWidth), wy(yWidth), wz(zWidth),
-      frontBC(front), rightBC(right), backBC(PML), leftBC(PML), topBC(PML),
+      frontBC(front), rightBC(right), backBC(back), leftBC(left), topBC(top),
       bx(xPMLSize), by(yPMLSize), bz(zPMLSize)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
