@@ -43,11 +43,12 @@ public:
 
     // Build the sparse matrix and the preconditioner
     void Initialize
-    ( const GridData<R>& velocity, PanelScheme panelScheme=CLIQUE_FAST_2D_LDL );
+    ( const DistUniformGrid<R>& velocity, 
+      PanelScheme panelScheme=CLIQUE_FAST_2D_LDL );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
-    void SolveWithSQMR( GridData<C>& B, R bcgRelTol=1e-4 ) const;
-    void SolveWithGMRES( GridData<C>& B, int m=20, R relTol=1e-3 ) const;
+    void SolveWithSQMR( DistUniformGrid<C>& B, R bcgRelTol=1e-4 ) const;
+    void SolveWithGMRES( DistUniformGrid<C>& B, int m=20, R relTol=1e-3 ) const;
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
@@ -70,8 +71,10 @@ private:
     // Solve helpers
     //
 
-    void PullRightHandSides( const GridData<C>& gridB, Matrix<C>& B ) const;
-    void PushRightHandSides( GridData<C>& gridB, const Matrix<C>& B ) const;
+    void PullRightHandSides
+    ( const DistUniformGrid<C>& gridB, Matrix<C>& B ) const;
+    void PushRightHandSides
+    ( DistUniformGrid<C>& gridB, const Matrix<C>& B ) const;
 
     void InternalSolveWithGMRES( Matrix<C>& B, int m, R relTol ) const;
     void InternalSolveWithSQMR( Matrix<C>& B, R bcgRelTol ) const;
@@ -145,19 +148,19 @@ private:
     int localTopHeight_;
 
     // Analyses of each class of panels
-    cliq::SymmInfo bottomInfo_, leftoverInnerInfo_, topInfo_;
+    cliq::DistSymmInfo bottomInfo_, leftoverInnerInfo_, topInfo_;
 
     // Factorizations of each panel
-    cliq::SymmFrontTree<C> bottomFact_;
-    std::vector<cliq::SymmFrontTree<C>*> fullInnerFacts_;
-    cliq::SymmFrontTree<C> leftoverInnerFact_;
-    cliq::SymmFrontTree<C> topFact_;
+    cliq::DistSymmFrontTree<C> bottomFact_;
+    std::vector<cliq::DistSymmFrontTree<C>*> fullInnerFacts_;
+    cliq::DistSymmFrontTree<C> leftoverInnerFact_;
+    cliq::DistSymmFrontTree<C> topFact_;
 
     // Compressed factorizations of each panel
-    CompressedFrontTree<C> bottomCompressedFact_;
-    std::vector<CompressedFrontTree<C>*> fullInnerCompressedFacts_;
-    CompressedFrontTree<C> leftoverInnerCompressedFact_;
-    CompressedFrontTree<C> topCompressedFact_;
+    DistCompressedFrontTree<C> bottomCompressedFact_;
+    std::vector<DistCompressedFrontTree<C>*> fullInnerCompressedFacts_;
+    DistCompressedFrontTree<C> leftoverInnerCompressedFact_;
+    DistCompressedFrontTree<C> topCompressedFact_;
 
     //
     // Information related to the global sparse matrix
@@ -211,15 +214,16 @@ private:
     // Global sparse helper routines
     //
 
-    cliq::SymmFrontTree<C>& PanelFactorization( int whichPanel );
-    CompressedFrontTree<C>& PanelCompressedFactorization( int whichPanel );
+    cliq::DistSymmFrontTree<C>& PanelFactorization( int whichPanel );
+    DistCompressedFrontTree<C>& PanelCompressedFactorization( int whichPanel );
 
-    const cliq::SymmFrontTree<C>& PanelFactorization( int whichPanel ) const;
-    const CompressedFrontTree<C>& 
+    const cliq::DistSymmFrontTree<C>& 
+    PanelFactorization( int whichPanel ) const;
+    const DistCompressedFrontTree<C>& 
     PanelCompressedFactorization( int whichPanel ) const;
 
-    cliq::SymmInfo& PanelAnalysis( int whichPanel );
-    const cliq::SymmInfo& PanelAnalysis( int whichPanel ) const;
+    cliq::DistSymmInfo& PanelAnalysis( int whichPanel );
+    const cliq::DistSymmInfo& PanelAnalysis( int whichPanel ) const;
 
     int PanelPadding( int whichPanel ) const;
     int PanelDepth( int whichPanel ) const;
@@ -230,7 +234,7 @@ private:
     int LocalPanelHeight( int whichPanel ) const;
 
     void GetGlobalVelocity
-    ( const GridData<R>& velocity,
+    ( const DistUniformGrid<R>& velocity,
       std::vector<R>& myGlobalVelocity,
       std::vector<int>& offsets ) const;
 
@@ -278,8 +282,8 @@ private:
 
     void GetPanelVelocity
     ( int vOffset, int vSize, 
-      const cliq::SymmInfo& info,
-      const GridData<R>& velocity,
+      const cliq::DistSymmInfo& info,
+      const DistUniformGrid<R>& velocity,
       std::vector<R>& myPanelVelocity,
       std::vector<int>& offsets,
       std::map<int,int>& panelNestedToNatural, 
@@ -287,18 +291,18 @@ private:
 
     void FillPanelFronts
     ( int vOffset, int vSize,
-      const cliq::SymmInfo& info,
-            cliq::SymmFrontTree<C>& fact,
-      const GridData<R>& velocity,
+      const cliq::DistSymmInfo& info,
+            cliq::DistSymmFrontTree<C>& fact,
+      const DistUniformGrid<R>& velocity,
       const std::vector<R>& myPanelVelocity,
             std::vector<int>& offsets,
             std::map<int,int>& panelNestedToNatural,
             std::map<int,int>& panelNaturalToNested ) const;
     void FillPanelFronts
     ( int vOffset, int vSize,
-      const cliq::SymmInfo& info,
-            CompressedFrontTree<C>& fact,
-      const GridData<R>& velocity,
+      const cliq::DistSymmInfo& info,
+            DistCompressedFrontTree<C>& fact,
+      const DistUniformGrid<R>& velocity,
       const std::vector<R>& myPanelVelocity,
             std::vector<int>& offsets,
             std::map<int,int>& panelNestedToNatural,
@@ -323,13 +327,13 @@ private:
     ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
       int depthTilSerial, int cutoff, int offset );
 
-    void FillPanelElimTree( int vSize, cliq::SymmElimTree& eTree ) const;
+    void FillPanelElimTree( int vSize, cliq::DistSymmElimTree& eTree ) const;
     void FillPanelDistElimTree
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      cliq::SymmElimTree& eTree ) const;
+      cliq::DistSymmElimTree& eTree ) const;
     void FillPanelLocalElimTree
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-      cliq::SymmElimTree& eTree ) const;
+      cliq::DistSymmElimTree& eTree ) const;
    
     // For use in FillPanelLocalElimTree
     struct Box

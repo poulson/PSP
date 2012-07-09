@@ -433,7 +433,7 @@ DistHelmholtz<R>::DistHelmholtz
     //
 
     // Fill the original structures (in the nested-dissection ordering)
-    cliq::SymmElimTree bottomETree, leftoverInnerETree, topETree;
+    cliq::DistSymmElimTree bottomETree, leftoverInnerETree, topETree;
     FillPanelElimTree( bottomDepth_, bottomETree );
     if( haveLeftover_ )
         FillPanelElimTree( leftoverInnerDepth_+bz, leftoverInnerETree );
@@ -687,7 +687,7 @@ DistHelmholtz<R>::NumLocalNodesRecursion
 }
 
 template<typename R>
-cliq::SymmFrontTree<Complex<R> >&
+cliq::DistSymmFrontTree<Complex<R> >&
 DistHelmholtz<R>::PanelFactorization( int whichPanel )
 {
     if( whichPanel == 0 )
@@ -701,7 +701,7 @@ DistHelmholtz<R>::PanelFactorization( int whichPanel )
 }
 
 template<typename R>
-CompressedFrontTree<Complex<R> >&
+DistCompressedFrontTree<Complex<R> >&
 DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
 {
     if( whichPanel == 0 )
@@ -715,7 +715,7 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
 }
 
 template<typename R>
-const cliq::SymmFrontTree<Complex<R> >&
+const cliq::DistSymmFrontTree<Complex<R> >&
 DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
 {
     if( whichPanel == 0 )
@@ -729,7 +729,7 @@ DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
 }
 
 template<typename R>
-const CompressedFrontTree<Complex<R> >&
+const DistCompressedFrontTree<Complex<R> >&
 DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
 {
     if( whichPanel == 0 )
@@ -743,7 +743,7 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
 }
 
 template<typename R>
-cliq::SymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
+cliq::DistSymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomInfo_;
@@ -754,7 +754,7 @@ cliq::SymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
 }
 
 template<typename R>
-const cliq::SymmInfo&
+const cliq::DistSymmInfo&
 DistHelmholtz<R>::PanelAnalysis( int whichPanel ) const
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
@@ -1526,7 +1526,7 @@ DistHelmholtz<R>::ReorderedIndexRecursion
 template<typename R>
 void
 DistHelmholtz<R>::FillPanelElimTree
-( int vSize, cliq::SymmElimTree& eTree ) const
+( int vSize, cliq::DistSymmElimTree& eTree ) const
 {
     int nxSub=disc_.nx, nySub=disc_.ny, xOffset=0, yOffset=0;    
     FillPanelDistElimTree( vSize, nxSub, nySub, xOffset, yOffset, eTree );
@@ -1537,24 +1537,24 @@ template<typename R>
 void
 DistHelmholtz<R>::FillPanelDistElimTree
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
-  cliq::SymmElimTree& eTree ) const
+  cliq::DistSymmElimTree& eTree ) const
 {
     const int numDistNodes = distDepth_+1;
 
-    eTree.dist.nodes.resize( numDistNodes );
-    mpi::CommDup( comm_, eTree.dist.nodes.back().comm );
+    eTree.distNodes.resize( numDistNodes );
+    mpi::CommDup( comm_, eTree.distNodes.back().comm );
 
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int cutoff = nestedCutoff_;
     const unsigned commRank = mpi::CommRank( comm_ );
-    mpi::CommDup( comm_, eTree.dist.nodes.back().comm );
+    mpi::CommDup( comm_, eTree.distNodes.back().comm );
 
     // Fill the distributed nodes
     for( int s=numDistNodes-1; s>0; --s )
     {
-        cliq::DistSymmNode& node = eTree.dist.nodes[s];
-        cliq::DistSymmNode& childNode = eTree.dist.nodes[s-1];
+        cliq::DistSymmNode& node = eTree.distNodes[s];
+        cliq::DistSymmNode& childNode = eTree.distNodes[s-1];
 
         const int nodeCommRank = mpi::CommRank( node.comm );
         const int nodeCommSize = mpi::CommSize( node.comm );
@@ -1665,7 +1665,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
     }
 
     // Fill the bottom node, which is only owned by a single process
-    cliq::DistSymmNode& node = eTree.dist.nodes[0];
+    cliq::DistSymmNode& node = eTree.distNodes[0];
     if( nxSub*nySub <= cutoff )
     {
         node.size = nxSub*nySub*vSize;
@@ -1797,12 +1797,12 @@ template<typename R>
 void
 DistHelmholtz<R>::FillPanelLocalElimTree
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
-  cliq::SymmElimTree& eTree ) const
+  cliq::DistSymmElimTree& eTree ) const
 {
     const int commRank = mpi::CommRank( comm_ );
     const int commSize = mpi::CommSize( comm_ );
     const int numLocalNodes = NumLocalNodes( commRank, commSize );
-    eTree.local.nodes.resize( numLocalNodes );
+    eTree.localNodes.resize( numLocalNodes );
 
     const int cutoff = nestedCutoff_;
     const int nx = disc_.nx;
@@ -1827,14 +1827,14 @@ DistHelmholtz<R>::FillPanelLocalElimTree
         Box box = boxStack.top();
         boxStack.pop();
 
-        cliq::LocalSymmNode& node = eTree.local.nodes[s];
+        cliq::LocalSymmNode& node = eTree.localNodes[s];
         node.parent = box.parentIndex;
         if( node.parent != -1 )
         {
             if( box.leftChild )
-                eTree.local.nodes[node.parent].children[0] = s;
+                eTree.localNodes[node.parent].children[0] = s;
             else
-                eTree.local.nodes[node.parent].children[1] = s;
+                eTree.localNodes[node.parent].children[1] = s;
         }
 
         if( box.nx*box.ny <= cutoff )

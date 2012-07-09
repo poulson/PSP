@@ -26,8 +26,8 @@ namespace psp {
 template<typename F>
 void CompressedBlockLowerSolve
 ( Orientation orientation, 
-  const cliq::SymmInfo& info,
-  const CompressedFrontTree<F>& L,
+  const cliq::DistSymmInfo& info,
+  const DistCompressedFrontTree<F>& L,
         Matrix<F>& localX );
 
 } // namespace psp
@@ -47,8 +47,8 @@ namespace psp {
 template<typename F>
 inline void CompressedBlockLowerSolve
 ( Orientation orientation,
-  const cliq::SymmInfo& info,
-  const CompressedFrontTree<F>& L,
+  const cliq::DistSymmInfo& info,
+  const DistCompressedFrontTree<F>& L,
         Matrix<F>& localX )
 {
 #ifndef RELEASE

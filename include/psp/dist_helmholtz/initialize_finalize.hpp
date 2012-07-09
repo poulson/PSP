@@ -24,7 +24,7 @@ namespace psp {
 template<typename R>
 void
 DistHelmholtz<R>::Initialize
-( const GridData<R>& velocity, PanelScheme panelScheme )
+( const DistUniformGrid<R>& velocity, PanelScheme panelScheme )
 {
     if( panelScheme < 0 || panelScheme > 2 )
     {
@@ -286,7 +286,7 @@ DistHelmholtz<R>::Initialize
         const double fillStartTime = gatherStopTime;
         if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
         {
-            fullInnerCompressedFacts_[k] = new CompressedFrontTree<C>;
+            fullInnerCompressedFacts_[k] = new DistCompressedFrontTree<C>;
             FillPanelFronts
             ( vOffset, vSize, bottomInfo_, 
               *fullInnerCompressedFacts_[k],
@@ -295,7 +295,7 @@ DistHelmholtz<R>::Initialize
         }
         else 
         {
-            fullInnerFacts_[k] = new cliq::SymmFrontTree<C>;
+            fullInnerFacts_[k] = new cliq::DistSymmFrontTree<C>;
             FillPanelFronts
             ( vOffset, vSize, bottomInfo_, *fullInnerFacts_[k],
               velocity, myPanelVelocity, offsets,
@@ -459,27 +459,27 @@ DistHelmholtz<R>::Finalize()
     // Release the padded panel memory
     if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
     {
-        bottomCompressedFact_.local.fronts.clear();
-        bottomCompressedFact_.dist.fronts.clear();
+        bottomCompressedFact_.localFronts.clear();
+        bottomCompressedFact_.distFronts.clear();
         for( int k=0; k<numFullInnerPanels_; ++k )
             delete fullInnerCompressedFacts_[k];
         fullInnerCompressedFacts_.clear();
-        leftoverInnerCompressedFact_.local.fronts.clear();
-        leftoverInnerCompressedFact_.dist.fronts.clear();
-        topCompressedFact_.local.fronts.clear();
-        topCompressedFact_.dist.fronts.clear();
+        leftoverInnerCompressedFact_.localFronts.clear();
+        leftoverInnerCompressedFact_.distFronts.clear();
+        topCompressedFact_.localFronts.clear();
+        topCompressedFact_.distFronts.clear();
     }
     else
     {
-        bottomFact_.local.fronts.clear();
-        bottomFact_.dist.fronts.clear();
+        bottomFact_.localFronts.clear();
+        bottomFact_.distFronts.clear();
         for( int k=0; k<numFullInnerPanels_; ++k )
             delete fullInnerFacts_[k];
         fullInnerFacts_.clear();
-        leftoverInnerFact_.local.fronts.clear();
-        leftoverInnerFact_.dist.fronts.clear();
-        topFact_.local.fronts.clear();
-        topFact_.dist.fronts.clear();
+        leftoverInnerFact_.localFronts.clear();
+        leftoverInnerFact_.distFronts.clear();
+        topFact_.localFronts.clear();
+        topFact_.distFronts.clear();
     }
 }
 
@@ -881,7 +881,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
 template<typename R>
 void
 DistHelmholtz<R>::GetGlobalVelocity
-( const GridData<R>& velocity,
+( const DistUniformGrid<R>& velocity,
         std::vector<R>& myGlobalVelocity,
         std::vector<int>& offsets ) const
 {
@@ -960,8 +960,8 @@ template<typename R>
 void
 DistHelmholtz<R>::GetPanelVelocity
 ( int vOffset, int vSize, 
-  const cliq::SymmInfo& info,
-  const GridData<R>& velocity,
+  const cliq::DistSymmInfo& info,
+  const DistUniformGrid<R>& velocity,
         std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
@@ -987,10 +987,10 @@ DistHelmholtz<R>::GetPanelVelocity
 
     // Send the amount of data that we need to recv from each process.
     std::vector<int> recvCounts( commSize, 0 );
-    const int numLocalNodes = info.local.nodes.size();
+    const int numLocalNodes = info.localNodes.size();
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int offset = node.offset;
         for( int j=0; j<size; ++j )
@@ -1004,10 +1004,10 @@ DistHelmholtz<R>::GetPanelVelocity
             ++recvCounts[proc];
         }
     }
-    const int numDistNodes = info.dist.nodes.size();
+    const int numDistNodes = info.distNodes.size();
     for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
         const Grid& grid = *node.grid;
         const int gridCol = grid.Col();
         const int gridWidth = grid.Width();
@@ -1049,7 +1049,7 @@ DistHelmholtz<R>::GetPanelVelocity
     std::vector<int> recvIndices( totalRecvCount );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int offset = node.offset;
         for( int j=0; j<size; ++j )
@@ -1065,7 +1065,7 @@ DistHelmholtz<R>::GetPanelVelocity
     }
     for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
         const Grid& grid = *node.grid;
         const int gridCol = grid.Col();
         const int gridWidth = grid.Width();
@@ -1253,9 +1253,9 @@ template<typename R>
 void
 DistHelmholtz<R>::FillPanelFronts
 ( int vOffset, int vSize, 
-  const cliq::SymmInfo& info,
-        cliq::SymmFrontTree<C>& fact,
-  const GridData<R>& velocity,
+  const cliq::DistSymmInfo& info,
+        cliq::DistSymmFrontTree<C>& fact,
+  const DistUniformGrid<R>& velocity,
   const std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
@@ -1268,12 +1268,12 @@ DistHelmholtz<R>::FillPanelFronts
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;
     std::vector<C> values;
-    const int numLocalNodes = info.local.nodes.size();
-    fact.local.fronts.resize( numLocalNodes );
+    const int numLocalNodes = info.localNodes.size();
+    fact.localFronts.resize( numLocalNodes );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        cliq::LocalSymmFront<C>& front = fact.local.fronts[t];
-        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        cliq::LocalSymmFront<C>& front = fact.localFronts[t];
+        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
 
         // Initialize this front
         const int offset = node.offset;
@@ -1305,14 +1305,14 @@ DistHelmholtz<R>::FillPanelFronts
     }
 
     // Initialize the distributed part of the panel
-    const int numDistNodes = info.dist.nodes.size();
-    fact.dist.mode = cliq::NORMAL_2D;
-    fact.dist.fronts.resize( numDistNodes );
+    const int numDistNodes = info.distNodes.size();
+    fact.mode = cliq::NORMAL_2D;
+    fact.distFronts.resize( numDistNodes );
     cliq::InitializeDistLeaf( info, fact );
     for( int t=1; t<numDistNodes; ++t )
     {
-        cliq::DistSymmFront<C>& front = fact.dist.fronts[t];
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        cliq::DistSymmFront<C>& front = fact.distFronts[t];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
 
         // Initialize this front
         Grid& grid = *node.grid;
@@ -1364,9 +1364,9 @@ template<typename R>
 void
 DistHelmholtz<R>::FillPanelFronts
 ( int vOffset, int vSize, 
-  const cliq::SymmInfo& info,
-        CompressedFrontTree<C>& fact,
-  const GridData<R>& velocity,
+  const cliq::DistSymmInfo& info,
+        DistCompressedFrontTree<C>& fact,
+  const DistUniformGrid<R>& velocity,
   const std::vector<R>& myPanelVelocity,
         std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
@@ -1379,12 +1379,12 @@ DistHelmholtz<R>::FillPanelFronts
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;
     std::vector<C> values;
-    const int numLocalNodes = info.local.nodes.size();
-    fact.local.fronts.resize( numLocalNodes );
+    const int numLocalNodes = info.localNodes.size();
+    fact.localFronts.resize( numLocalNodes );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        LocalCompressedFront<C>& front = fact.local.fronts[t];
-        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        LocalCompressedFront<C>& front = fact.localFronts[t];
+        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
 
         // Initialize this front
         const int offset = node.offset;
@@ -1416,13 +1416,13 @@ DistHelmholtz<R>::FillPanelFronts
     }
 
     // Initialize the distributed part of the panel
-    const int numDistNodes = info.dist.nodes.size();
-    fact.dist.fronts.resize( numDistNodes );
+    const int numDistNodes = info.distNodes.size();
+    fact.distFronts.resize( numDistNodes );
     // Replacement for cliq::InitializeDistLeaf
     {
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[0];
-        Matrix<C>& topLocalFrontL = fact.local.fronts.back().frontL;
-        DistMatrix<C>& frontL = fact.dist.fronts[0].frontL;
+        const cliq::DistSymmNodeInfo& node = info.distNodes[0];
+        Matrix<C>& topLocalFrontL = fact.localFronts.back().frontL;
+        DistMatrix<C>& frontL = fact.distFronts[0].frontL;
         frontL.LockedView
         ( topLocalFrontL.Height(), topLocalFrontL.Width(), 0, 0,
           topLocalFrontL.LockedBuffer(), topLocalFrontL.LDim(),
@@ -1430,8 +1430,8 @@ DistHelmholtz<R>::FillPanelFronts
     }
     for( int t=1; t<numDistNodes; ++t )
     {
-        DistCompressedFront<C>& front = fact.dist.fronts[t];
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        DistCompressedFront<C>& front = fact.distFronts[t];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
 
         // Initialize this front
         Grid& grid = *node.grid;

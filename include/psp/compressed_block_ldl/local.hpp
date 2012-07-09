@@ -26,7 +26,7 @@ namespace psp {
 template<typename F> 
 void LocalCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
+  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
   bool useQR=true );
 
 //----------------------------------------------------------------------------//
@@ -36,7 +36,7 @@ void LocalCompressedBlockLDL
 template<typename F> 
 inline void LocalCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::SymmInfo& info, CompressedFrontTree<F>& L, 
+  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, 
   int depth, bool useQR )
 {
 #ifndef RELEASE
@@ -44,12 +44,12 @@ inline void LocalCompressedBlockLDL
     if( orientation == NORMAL )
         throw std::logic_error("LDL must be (conjugate-)transposed");
 #endif
-    const int numLocalNodes = info.local.nodes.size();
+    const int numLocalNodes = info.localNodes.size();
     for( int s=0; s<numLocalNodes; ++s )
     {
-        cliq::LocalSymmNodeInfo& node = info.local.nodes[s];
+        cliq::LocalSymmNodeInfo& node = info.localNodes[s];
         const int updateSize = node.lowerStruct.size();
-        LocalCompressedFront<F>& front = L.local.fronts[s];
+        LocalCompressedFront<F>& front = L.localFronts[s];
         Matrix<F>& frontL = front.frontL;
         Matrix<F>& frontBR = front.work;
         frontBR.Empty();
@@ -66,8 +66,8 @@ inline void LocalCompressedBlockLDL
         {
             const int leftIndex = node.children[0];
             const int rightIndex = node.children[1];
-            Matrix<F>& leftUpdate = L.local.fronts[leftIndex].work;
-            Matrix<F>& rightUpdate = L.local.fronts[rightIndex].work;
+            Matrix<F>& leftUpdate = L.localFronts[leftIndex].work;
+            Matrix<F>& rightUpdate = L.localFronts[rightIndex].work;
 
             // Add the left child's update matrix
             const int leftUpdateSize = leftUpdate.Height();

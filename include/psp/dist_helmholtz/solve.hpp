@@ -23,7 +23,8 @@ namespace psp {
 
 template<typename R>
 void
-DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m, R relTol ) const
+DistHelmholtz<R>::SolveWithGMRES
+( DistUniformGrid<C>& gridB, int m, R relTol ) const
 {
     if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
@@ -49,7 +50,7 @@ DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m, R relTol ) const
     // Solve the systems of equations
     InternalSolveWithGMRES( B, m, relTol );
 
-    // Restore the solutions back into the GridData form
+    // Restore the solutions back into the original form
     {
         if( commRank == 0 )
         {
@@ -68,7 +69,7 @@ DistHelmholtz<R>::SolveWithGMRES( GridData<C>& gridB, int m, R relTol ) const
 
 template<typename R>
 void
-DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
+DistHelmholtz<R>::SolveWithSQMR( DistUniformGrid<C>& gridB, R bcgRelTol ) const
 {
     if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
@@ -94,7 +95,7 @@ DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
     // Solve the systems of equations
     InternalSolveWithSQMR( B, bcgRelTol );
 
-    // Restore the solutions back into the GridData form
+    // Restore the solutions back into the original form
     {
         if( commRank == 0 )
         {
@@ -114,7 +115,7 @@ DistHelmholtz<R>::SolveWithSQMR( GridData<C>& gridB, R bcgRelTol ) const
 template<typename R>
 void
 DistHelmholtz<R>::PullRightHandSides
-( const GridData<C>& gridB, Matrix<C>& B ) const
+( const DistUniformGrid<C>& gridB, Matrix<C>& B ) const
 {
     const int commSize = mpi::CommSize( comm_ );
 
@@ -208,7 +209,7 @@ DistHelmholtz<R>::PullRightHandSides
 template<typename R>
 void
 DistHelmholtz<R>::PushRightHandSides
-( GridData<C>& gridB, const Matrix<C>& B ) const
+( DistUniformGrid<C>& gridB, const Matrix<C>& B ) const
 {
     const int numRhs = gridB.NumScalars();
     const int commSize = mpi::CommSize( comm_ );
@@ -1200,23 +1201,23 @@ template<typename R>
 void
 DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 {
-    const cliq::SymmInfo& info = PanelAnalysis( i );
+    const cliq::DistSymmInfo& info = PanelAnalysis( i );
     const int numRhs = B.Width();
     const int panelPadding = PanelPadding( i );
     const int panelDepth = PanelDepth( i );
     const int localHeight1d = 
-        info.dist.nodes.back().localOffset1d + 
-        info.dist.nodes.back().localSize1d;
+        info.distNodes.back().localOffset1d + 
+        info.distNodes.back().localSize1d;
 
     Matrix<C> localPanelB;
     elem::Zeros( localHeight1d, numRhs, localPanelB );
 
     // For each node, pull in each right-hand side with a memcpy
     int BOffset = LocalPanelOffset( i );
-    const int numLocalNodes = info.local.nodes.size();
+    const int numLocalNodes = info.localNodes.size();
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int myOffset = node.myOffset;
 
@@ -1235,10 +1236,10 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
               remainingSize*sizeof(C) );
         BOffset += remainingSize;
     }
-    const int numDistNodes = info.dist.nodes.size();
+    const int numDistNodes = info.distNodes.size();
     for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
         const int size = node.size;
         const int localOffset1d = node.localOffset1d;
         const int localSize1d = node.localSize1d;
@@ -1281,7 +1282,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     BOffset = LocalPanelOffset( i );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.local.nodes[t];
+        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int myOffset = node.myOffset;
 
@@ -1302,7 +1303,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     }
     for( int t=1; t<numDistNodes; ++t )
     {
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[t];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
         const int size = node.size;
         const int localOffset1d = node.localOffset1d;
         const int localSize1d = node.localSize1d;

@@ -18,8 +18,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_GRID_DATA_HPP
-#define PSP_GRID_DATA_HPP 1
+#ifndef PSP_DIST_UNIFORM_GRID_HPP
+#define PSP_DIST_UNIFORM_GRID_HPP 1
 
 namespace psp {
 
@@ -57,20 +57,20 @@ enum PlaneType {
 // and z third.
 //
 template<typename T>
-class GridData
+class DistUniformGrid
 {
 public:
 
     // Generate an nx x ny x nz grid, where each node contains 'numScalars' 
     // entries of type 'T' and the grid is distributed over a px x py x pz grid 
     // over the specified communicator.
-    GridData
+    DistUniformGrid
     ( int numScalars,
       int nx, int ny,int nz, GridDataOrder order,
       int px, int py, int pz, mpi::Comm comm );
 
     // Same as above, but automatically determine the process grid dimensions
-    GridData
+    DistUniformGrid
     ( int numScalars,
       int nx, int ny,int nz, GridDataOrder order, 
       mpi::Comm comm );
@@ -105,14 +105,14 @@ public:
     struct WritePlaneHelper
     {
         static void Func
-        ( const GridData<R>& parent, 
+        ( const DistUniformGrid<R>& parent, 
           PlaneType planeType, int whichPlane, const std::string baseName );
     };
     template<typename R>
     struct WritePlaneHelper<Complex<R> >
     {
         static void Func
-        ( const GridData<Complex<R> >& parent, 
+        ( const DistUniformGrid<Complex<R> >& parent, 
           PlaneType planeType, int whichPlane, const std::string baseName );
     };
     template<typename R> friend struct WritePlaneHelper;
@@ -122,13 +122,13 @@ public:
     struct WriteVolumeHelper
     {
         static void Func
-        ( const GridData<R>& parent, const std::string baseName );
+        ( const DistUniformGrid<R>& parent, const std::string baseName );
     };
     template<typename R>
     struct WriteVolumeHelper<Complex<R> >
     {
         static void Func
-        ( const GridData<Complex<R> >& parent, 
+        ( const DistUniformGrid<Complex<R> >& parent, 
           const std::string baseName );
     };
     template<typename R> friend struct WriteVolumeHelper;
@@ -153,7 +153,7 @@ private:
 //----------------------------------------------------------------------------//
 
 template<typename T>
-inline GridData<T>::GridData
+inline DistUniformGrid<T>::DistUniformGrid
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
   int px, int py, int pz, mpi::Comm comm )
@@ -178,7 +178,7 @@ inline GridData<T>::GridData
 }
 
 template<typename T>
-inline GridData<T>::GridData
+inline DistUniformGrid<T>::DistUniformGrid
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
   mpi::Comm comm )
@@ -215,71 +215,71 @@ inline GridData<T>::GridData
 }
 
 template<typename T>
-inline int GridData<T>::XSize() const
+inline int DistUniformGrid<T>::XSize() const
 { return nx_; }
 
 template<typename T>
-inline int GridData<T>::YSize() const
+inline int DistUniformGrid<T>::YSize() const
 { return ny_; }
 
 template<typename T>
-inline int GridData<T>::ZSize() const
+inline int DistUniformGrid<T>::ZSize() const
 { return nz_; }
 
 template<typename T>
-inline mpi::Comm GridData<T>::Comm() const
+inline mpi::Comm DistUniformGrid<T>::Comm() const
 { return comm_; }
 
 template<typename T>
-inline int GridData<T>::XShift() const
+inline int DistUniformGrid<T>::XShift() const
 { return xShift_; }
 
 template<typename T>
-inline int GridData<T>::YShift() const
+inline int DistUniformGrid<T>::YShift() const
 { return yShift_; }
 
 template<typename T>
-inline int GridData<T>::ZShift() const
+inline int DistUniformGrid<T>::ZShift() const
 { return zShift_; }
 
 template<typename T>
-inline int GridData<T>::XStride() const
+inline int DistUniformGrid<T>::XStride() const
 { return px_; }
 
 template<typename T>
-inline int GridData<T>::YStride() const
+inline int DistUniformGrid<T>::YStride() const
 { return py_; }
 
 template<typename T>
-inline int GridData<T>::ZStride() const
+inline int DistUniformGrid<T>::ZStride() const
 { return pz_; }
 
 template<typename T>
-inline int GridData<T>::XLocalSize() const
+inline int DistUniformGrid<T>::XLocalSize() const
 { return xLocalSize_; }
 
 template<typename T>
-inline int GridData<T>::YLocalSize() const
+inline int DistUniformGrid<T>::YLocalSize() const
 { return yLocalSize_; }
 
 template<typename T>
-inline int GridData<T>::ZLocalSize() const
+inline int DistUniformGrid<T>::ZLocalSize() const
 { return zLocalSize_; }
 
 template<typename T>
-inline T* GridData<T>::LocalBuffer()
+inline T* DistUniformGrid<T>::LocalBuffer()
 { return &localData_[0]; }
 
 template<typename T>
-inline const T* GridData<T>::LockedLocalBuffer() const
+inline const T* DistUniformGrid<T>::LockedLocalBuffer() const
 { return &localData_[0]; }
 
 template<typename T>
-inline int GridData<T>::NumScalars() const
+inline int DistUniformGrid<T>::NumScalars() const
 { return numScalars_; }
 
 template<typename T>
-inline int GridData<T>::OwningProcess( int naturalIndex ) const
+inline int DistUniformGrid<T>::OwningProcess( int naturalIndex ) const
 {
     const int x = naturalIndex % nx_;
     const int y = (naturalIndex/nx_) % ny_;
@@ -288,7 +288,7 @@ inline int GridData<T>::OwningProcess( int naturalIndex ) const
 }
 
 template<typename T>
-inline int GridData<T>::OwningProcess( int x, int y, int z ) const
+inline int DistUniformGrid<T>::OwningProcess( int x, int y, int z ) const
 {
     const int xProc = x % px_;
     const int yProc = y % py_;
@@ -297,7 +297,7 @@ inline int GridData<T>::OwningProcess( int x, int y, int z ) const
 }
 
 template<typename T>
-inline int GridData<T>::LocalIndex( int naturalIndex ) const
+inline int DistUniformGrid<T>::LocalIndex( int naturalIndex ) const
 {
     const int x = naturalIndex % nx_;
     const int y = (naturalIndex/nx_) % ny_;
@@ -306,7 +306,7 @@ inline int GridData<T>::LocalIndex( int naturalIndex ) const
 }
 
 template<typename T>
-inline int GridData<T>::LocalIndex( int x, int y, int z ) const
+inline int DistUniformGrid<T>::LocalIndex( int x, int y, int z ) const
 { 
     const int xLocal = (x-xShift_) / px_;
     const int yLocal = (y-yShift_) / py_;
@@ -338,14 +338,14 @@ inline int GridData<T>::LocalIndex( int x, int y, int z ) const
 }
 
 template<typename T>
-inline void GridData<T>::WritePlane
+inline void DistUniformGrid<T>::WritePlane
 ( PlaneType planeType, int whichPlane, const std::string baseName ) const
 { return WritePlaneHelper<T>::Func( *this, planeType, whichPlane, baseName ); }
 
 template<typename T>
 template<typename R>
-inline void GridData<T>::WritePlaneHelper<R>::Func
-( const GridData<R>& parent, 
+inline void DistUniformGrid<T>::WritePlaneHelper<R>::Func
+( const DistUniformGrid<R>& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
     const int commRank = mpi::CommRank( parent.comm_ );
@@ -818,8 +818,8 @@ inline void GridData<T>::WritePlaneHelper<R>::Func
 
 template<typename T>
 template<typename R>
-inline void GridData<T>::WritePlaneHelper<Complex<R> >::Func
-( const GridData<Complex<R> >& parent, 
+inline void DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
+( const DistUniformGrid<Complex<R> >& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
     const int commRank = mpi::CommRank( parent.comm_ );
@@ -1339,7 +1339,8 @@ inline void GridData<T>::WritePlaneHelper<Complex<R> >::Func
 }
 
 template<typename T>
-inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
+inline void DistUniformGrid<T>::RedistributeForVtk
+( std::vector<T>& localBox ) const
 {
     const int commSize = mpi::CommSize( comm_ );
 
@@ -1493,13 +1494,13 @@ inline void GridData<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 }
 
 template<typename T>
-inline void GridData<T>::WriteVolume( const std::string baseName ) const
+inline void DistUniformGrid<T>::WriteVolume( const std::string baseName ) const
 { return WriteVolumeHelper<T>::Func( *this, baseName ); }
 
 template<typename T>
 template<typename R>
-inline void GridData<T>::WriteVolumeHelper<R>::Func
-( const GridData<R>& parent, const std::string baseName )
+inline void DistUniformGrid<T>::WriteVolumeHelper<R>::Func
+( const DistUniformGrid<R>& parent, const std::string baseName )
 {
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
@@ -1679,8 +1680,8 @@ inline void GridData<T>::WriteVolumeHelper<R>::Func
 template<typename T>
 template<typename R>
 inline void 
-GridData<T>::WriteVolumeHelper<Complex<R> >::Func
-( const GridData<Complex<R> >& parent, const std::string baseName )
+DistUniformGrid<T>::WriteVolumeHelper<Complex<R> >::Func
+( const DistUniformGrid<Complex<R> >& parent, const std::string baseName )
 {
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
@@ -1904,4 +1905,4 @@ GridData<T>::WriteVolumeHelper<Complex<R> >::Func
 
 } // namespace psp
 
-#endif // PSP_GRID_DATA_HPP
+#endif // PSP_DIST_UNIFORM_GRID_HPP

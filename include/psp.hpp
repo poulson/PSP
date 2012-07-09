@@ -23,9 +23,9 @@
 
 #include "psp/environment.hpp"
 #include "psp/discretization.hpp"
-#include "psp/grid_data.hpp"
+#include "psp/dist_uniform_grid.hpp"
 
-#include "psp/compressed_front_tree.hpp"
+#include "psp/dist_compressed_front_tree.hpp"
 #include "psp/compressed_block_ldl.hpp"
 #include "psp/compressed_block_lower_solve.hpp"
 #include "psp/compressed_block_ldl_solve.hpp"

@@ -25,15 +25,15 @@ namespace psp {
 
 template<typename F> 
 void DistCompressedBlockLowerForwardSolve
-( const cliq::SymmInfo& info,
-  const CompressedFrontTree<F>& L, 
+( const cliq::DistSymmInfo& info,
+  const DistCompressedFrontTree<F>& L, 
         Matrix<F>& localX );
 
 template<typename F>
 void DistCompressedBlockLowerBackwardSolve
 ( Orientation orientation, 
-  const cliq::SymmInfo& info,
-  const CompressedFrontTree<F>& L,
+  const cliq::DistSymmInfo& info,
+  const DistCompressedFrontTree<F>& L,
         Matrix<F>& localX );
 
 //----------------------------------------------------------------------------//
@@ -42,19 +42,19 @@ void DistCompressedBlockLowerBackwardSolve
 
 template<typename F> 
 inline void DistCompressedBlockLowerForwardSolve
-( const cliq::SymmInfo& info,
-  const CompressedFrontTree<F>& L, 
+( const cliq::DistSymmInfo& info,
+  const DistCompressedFrontTree<F>& L, 
         Matrix<F>& localX )
 {
 #ifndef RELEASE
     PushCallStack("DistCompressedBlockLowerForwardSolve");
 #endif
-    const int numDistNodes = info.dist.nodes.size();
+    const int numDistNodes = info.distNodes.size();
     const int width = localX.Width();
 
     // Copy the information from the local portion into the distributed leaf
-    const LocalCompressedFront<F>& localRootFront = L.local.fronts.back();
-    const DistCompressedFront<F>& distLeafFront = L.dist.fronts[0];
+    const LocalCompressedFront<F>& localRootFront = L.localFronts.back();
+    const DistCompressedFront<F>& distLeafFront = L.distFronts[0];
     const Grid& leafGrid = *distLeafFront.grid;
     distLeafFront.work1d.LockedView
     ( localRootFront.work.Height(), localRootFront.work.Width(), 0,
@@ -64,10 +64,10 @@ inline void DistCompressedBlockLowerForwardSolve
     // Perform the distributed portion of the forward solve
     for( int s=1; s<numDistNodes; ++s )
     {
-        const cliq::DistSymmNodeInfo& childNode = info.dist.nodes[s-1];
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[s];
-        const DistCompressedFront<F>& childFront = L.dist.fronts[s-1];
-        const DistCompressedFront<F>& front = L.dist.fronts[s];
+        const cliq::DistSymmNodeInfo& childNode = info.distNodes[s-1];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[s];
+        const DistCompressedFront<F>& childFront = L.distFronts[s-1];
+        const DistCompressedFront<F>& front = L.distFronts[s];
         const Grid& childGrid = *childFront.grid;
         const Grid& grid = *front.grid;
         mpi::Comm comm = grid.VCComm();
@@ -130,7 +130,7 @@ inline void DistCompressedBlockLowerForwardSolve
         packOffsets.clear();
         childW.Empty();
         if( s == 1 )
-            L.local.fronts.back().work.Empty();
+            L.localFronts.back().work.Empty();
 
         // Set up the receive buffer
         int recvBufferSize = 0;
@@ -181,8 +181,8 @@ inline void DistCompressedBlockLowerForwardSolve
         // Store this node's portion of the result
         localXT = WT.LocalMatrix();
     }
-    L.local.fronts.back().work.Empty();
-    L.dist.fronts.back().work1d.Empty();
+    L.localFronts.back().work.Empty();
+    L.distFronts.back().work1d.Empty();
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -191,19 +191,19 @@ inline void DistCompressedBlockLowerForwardSolve
 template<typename F>
 inline void DistCompressedBlockLowerBackwardSolve
 ( Orientation orientation, 
-  const cliq::SymmInfo& info,
-  const CompressedFrontTree<F>& L,
+  const cliq::DistSymmInfo& info,
+  const DistCompressedFrontTree<F>& L,
         Matrix<F>& localX )
 {
 #ifndef RELEASE
     PushCallStack("DistCompressedBlockLowerBackwardSolve");
 #endif
-    const int numDistNodes = info.dist.nodes.size();
+    const int numDistNodes = info.distNodes.size();
     const int width = localX.Width();
 
     // Directly operate on the root separator's portion of the right-hand sides
-    const cliq::DistSymmNodeInfo& rootNode = info.dist.nodes.back();
-    const LocalCompressedFront<F>& localRootFront = L.local.fronts.back();
+    const cliq::DistSymmNodeInfo& rootNode = info.distNodes.back();
+    const LocalCompressedFront<F>& localRootFront = L.localFronts.back();
     if( numDistNodes == 1 )
     {
         localRootFront.work.View
@@ -214,7 +214,7 @@ inline void DistCompressedBlockLowerBackwardSolve
     }
     else
     {
-        const DistCompressedFront<F>& rootFront = L.dist.fronts.back();
+        const DistCompressedFront<F>& rootFront = L.distFronts.back();
         const Grid& rootGrid = *rootFront.grid;
         rootFront.work1d.View
         ( rootNode.size, width, 0,
@@ -226,10 +226,10 @@ inline void DistCompressedBlockLowerBackwardSolve
     std::vector<int>::const_iterator it;
     for( int s=numDistNodes-2; s>=0; --s )
     {
-        const cliq::DistSymmNodeInfo& parentNode = info.dist.nodes[s+1];
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[s];
-        const DistCompressedFront<F>& parentFront = L.dist.fronts[s+1];
-        const DistCompressedFront<F>& front = L.dist.fronts[s];
+        const cliq::DistSymmNodeInfo& parentNode = info.distNodes[s+1];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[s];
+        const DistCompressedFront<F>& parentFront = L.distFronts[s+1];
+        const DistCompressedFront<F>& front = L.distFronts[s];
         const Grid& grid = *front.grid;
         const Grid& parentGrid = *parentFront.grid;
         mpi::Comm comm = grid.VCComm(); 

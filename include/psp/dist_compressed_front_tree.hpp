@@ -18,8 +18,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef PSP_COMPRESSED_FRONT_TREE_HPP
-#define PSP_COMPRESSED_FRONT_TREE_HPP 1
+#ifndef PSP_DIST_COMPRESSED_FRONT_TREE_HPP
+#define PSP_DIST_COMPRESSED_FRONT_TREE_HPP 1
 
 namespace psp {
 
@@ -50,12 +50,6 @@ struct LocalCompressedFront
 };
 
 template<typename F>
-struct LocalCompressedFrontTree
-{
-    std::vector<LocalCompressedFront<F> > fronts;
-};
-
-template<typename F>
 struct DistCompressedFront
 {
     mutable DistMatrix<F> frontL;
@@ -71,16 +65,10 @@ struct DistCompressedFront
 template<typename F>
 struct DistCompressedFrontTree
 {
-    std::vector<DistCompressedFront<F> > fronts;
-};
-
-template<typename F>
-struct CompressedFrontTree
-{
-    LocalCompressedFrontTree<F> local;
-    DistCompressedFrontTree<F> dist;
+    std::vector<LocalCompressedFront<F> > localFronts;
+    std::vector<DistCompressedFront<F> > distFronts;
 };
 
 } // namespace psp
 
-#endif // PSP_COMPRESSED_FRONT_TREE_HPP
+#endif // PSP_DIST_COMPRESSED_FRONT_TREE_HPP

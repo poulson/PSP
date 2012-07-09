@@ -26,7 +26,7 @@ namespace psp {
 template<typename F> 
 void DistCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
+  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
   bool useQR=true );
 
 //----------------------------------------------------------------------------//
@@ -36,7 +36,7 @@ void DistCompressedBlockLDL
 template<typename F> 
 inline void DistCompressedBlockLDL
 ( Orientation orientation, 
-  cliq::SymmInfo& info, CompressedFrontTree<F>& L, int depth,
+  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
   bool useQR )
 {
 #ifndef RELEASE
@@ -45,9 +45,9 @@ inline void DistCompressedBlockLDL
         throw std::logic_error("LDL must be (conjugate-)transposed");
 #endif
     // The bottom front is already compressed, so just view the relevant data
-    LocalCompressedFront<F>& topLocalFront = L.local.fronts.back();
-    DistCompressedFront<F>& bottomDistFront = L.dist.fronts[0];
-    const Grid& bottomGrid = *info.dist.nodes[0].grid;
+    LocalCompressedFront<F>& topLocalFront = L.localFronts.back();
+    DistCompressedFront<F>& bottomDistFront = L.distFronts[0];
+    const Grid& bottomGrid = *info.distNodes[0].grid;
     bottomDistFront.grid = &bottomGrid;
     bottomDistFront.depth = topLocalFront.depth;
     bottomDistFront.sT = topLocalFront.sT;
@@ -64,14 +64,14 @@ inline void DistCompressedBlockLDL
       bottomGrid );
 
     // Perform the distributed portion of the factorization
-    const unsigned numDistNodes = info.dist.nodes.size();
+    const unsigned numDistNodes = info.distNodes.size();
     for( unsigned s=1; s<numDistNodes; ++s )
     {
-        const cliq::DistSymmNodeInfo& childNode = info.dist.nodes[s-1];
-        const cliq::DistSymmNodeInfo& node = info.dist.nodes[s];
+        const cliq::DistSymmNodeInfo& childNode = info.distNodes[s-1];
+        const cliq::DistSymmNodeInfo& node = info.distNodes[s];
         const int updateSize = node.lowerStruct.size();
-        DistCompressedFront<F>& childFront = L.dist.fronts[s-1];
-        DistCompressedFront<F>& front = L.dist.fronts[s];
+        DistCompressedFront<F>& childFront = L.distFronts[s-1];
+        DistCompressedFront<F>& front = L.distFronts[s];
         front.work2d.Empty();
 
         const bool computeFactRecvIndices = 
@@ -211,8 +211,8 @@ inline void DistCompressedBlockLDL
         // Separately compress the A and B blocks 
         DistFrontCompression( front, depth, useQR );
     }
-    L.local.fronts.back().work.Empty();
-    L.dist.fronts.back().work2d.Empty();
+    L.localFronts.back().work.Empty();
+    L.distFronts.back().work2d.Empty();
 #ifndef RELEASE
     PopCallStack();
 #endif
