@@ -12,6 +12,139 @@
 
 #include <parmetislib.h>
 
+int CliqBisect(idx_t *vtxdist, idx_t *xadj, idx_t *adjncy, 
+              idx_t *p_nseps, idx_t *s_nseps, 
+              real_t *ubfrac, idx_t *idbglvl, idx_t *order, idx_t *sizes, 
+              MPI_Comm *comm)
+{
+  idx_t i, npes, mype, dbglvl, status;
+  ctrl_t *ctrl;
+  graph_t *graph;
+  size_t curmem;
+
+  gkMPI_Comm_size(*comm, &npes);
+  gkMPI_Comm_rank(*comm, &mype);
+
+  /* Deal with poor vertex distributions */
+  if (GlobalSEMinComm(*comm, vtxdist[mype+1]-vtxdist[mype]) < 1) {
+    printf("Error: Poor vertex distribution (processor with no vertices).\n");
+    return METIS_ERROR;
+  }
+
+  status = METIS_OK;
+  gk_malloc_init();
+  curmem = gk_GetCurMemoryUsed();
+
+  ctrl = SetupCtrl(PARMETIS_OP_KMETIS, NULL, 1, 2, NULL, NULL, *comm);
+
+  dbglvl = (idbglvl == NULL ? 0 : *idbglvl);
+  ctrl->dbglvl = dbglvl;
+
+  graph = SetupGraph(ctrl, 1, vtxdist, xadj, NULL, NULL, adjncy, NULL, 0);
+  AllocateWSpace(ctrl, 10*graph->nvtxs);
+
+  /* Compute an initial partition: for some reason this improves the quality */
+  ctrl->CoarsenTo = gk_min(vtxdist[npes]+1, 200*gk_max(npes,ctrl->nparts));
+  Global_Partition(ctrl, graph); 
+
+  /* Compute an ordering */
+  ctrl->optype    = PARMETIS_OP_OMETIS;
+  ctrl->partType  = ORDER_PARTITION;
+  ctrl->mtype     = PARMETIS_MTYPE_GLOBAL;
+  ctrl->rtype     = PARMETIS_SRTYPE_2PHASE;
+  ctrl->p_nseps   = (p_nseps  == NULL ? 1 : *p_nseps);
+  ctrl->s_nseps   = (s_nseps  == NULL ? 1 : *s_nseps);
+  ctrl->ubfrac    = (ubfrac == NULL ? ORDER_UNBALANCE_FRACTION : *ubfrac);
+  ctrl->dbglvl    = dbglvl;
+  ctrl->ipart     = ISEP_NODE;
+  ctrl->CoarsenTo = gk_min(graph->gnvtxs-1,1500*npes); 
+  CliqOrder(ctrl, graph, order, sizes);
+
+  FreeInitialGraphAndRemap(graph);
+
+  goto DONE;
+
+DONE:
+  FreeCtrl(&ctrl);
+  if (gk_GetCurMemoryUsed() - curmem > 0) {
+    printf("ParMETIS appears to have a memory leak of %zdbytes. Report this.\n",
+        (ssize_t)(gk_GetCurMemoryUsed() - curmem));
+  }
+  gk_malloc_cleanup(0);
+
+  return (int)status;
+}
+
+void CliqOrder(ctrl_t *ctrl, graph_t *graph, idx_t *order, idx_t *sizes)
+{
+  idx_t i, nparts, nvtxs;
+
+  nparts = 2;
+  nvtxs = graph->nvtxs;
+  iset(nvtxs, -1, order);
+
+  /* graph->where = ismalloc(nvtxs, 0, "CliqOrder: graph->where"); */
+  /* If we computed an initial partition with Global_Partition, then we 
+     should run the following instead of the above ismalloc of graph->where*/
+  iset(nvtxs, 0, graph->where); 
+  gk_free((void **)&graph->match, 
+          (void **)&graph->cmap, 
+          (void **)&graph->rlens, 
+          (void **)&graph->slens, 
+          (void **)&graph->rcand, LTERM);
+
+  Order_Partition_Multiple(ctrl, graph);
+
+  CliqLabelSeparator(ctrl, graph, order, sizes);
+}
+
+void CliqLabelSeparator
+(ctrl_t *ctrl, graph_t *graph, idx_t *order, idx_t *sizes)
+{ 
+  idx_t i, nvtxs, nparts, sid; 
+  idx_t *where, *lpwgts, *gpwgts, *sizescan;
+
+  nparts = 2;
+
+  nvtxs  = graph->nvtxs;
+  where  = graph->where;
+  lpwgts = graph->lpwgts;
+  gpwgts = graph->gpwgts;
+
+  /* Compute the local size of the separator. This is required in case the 
+     graph has vertex weights */
+  iset(2*nparts, 0, lpwgts);
+  for (i=0; i<nvtxs; i++) 
+    lpwgts[where[i]]++;
+
+  sizescan = imalloc(2*nparts, "CliqLabelSeparator: sizescan");
+
+  /* Perform a Prefix scan of the separator size to determine the boundaries */
+  gkMPI_Scan
+  ((void *)lpwgts, (void *)sizescan, 2*nparts, IDX_T, MPI_SUM, ctrl->comm);
+  gkMPI_Allreduce
+  ((void *)lpwgts, (void *)gpwgts, 2*nparts, IDX_T, MPI_SUM, ctrl->comm);
+
+  /* Fill in the size of the partition */
+  sizes[0] = gpwgts[0];
+  sizes[1] = gpwgts[1];
+  sizes[2] = gpwgts[2];
+
+  for (i=0; i<2*nparts; i++)
+    sizescan[i] -= lpwgts[i];
+
+  /* Assign the order[] values to the separator nodes */
+  for (i=0; i<nvtxs; i++) {
+    if (where[i] >= nparts) {
+      sid = where[i];
+      sizescan[sid]++;
+      PASSERT(ctrl, order[i] == -1);
+      order[i] = graph->gnvtxs - sizescan[sid];
+    }
+  }
+
+  gk_free((void **)&sizescan, LTERM);
+}
 
 /***********************************************************************************/
 /*! This function is the entry point of the parallel ordering algorithm. 
@@ -285,10 +418,7 @@ void Order_Partition_Multiple(ctrl_t *ctrl, graph_t *graph)
   CommSetup(ctrl, graph);
 
   nparts = ctrl->nparts;
-
   nvtxs  = graph->nvtxs;
-  xadj   = graph->xadj;
-  adjncy = graph->adjncy;
 
   bestseps  = ismalloc(2*nparts, -1, "Order_Partition_Multiple: bestseps");
   bestwhere = imalloc(nvtxs+graph->nrecv, "Order_Partition_Multiple: bestwhere");

@@ -100,7 +100,6 @@ int ParMETIS_V3_PartKway(idx_t *vtxdist, idx_t *xadj, idx_t *adjncy, idx_t *vwgt
 
   STOPTIMER(ctrl, ctrl->TotalTmr);
 
-
   /* Print out stats */
   IFSET(ctrl->dbglvl, DBG_TIME, PrintTimingInfo(ctrl));
   IFSET(ctrl->dbglvl, DBG_TIME, gkMPI_Barrier(ctrl->gcomm));

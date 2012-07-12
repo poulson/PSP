@@ -17,12 +17,31 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef CLIQUE_CONFIG_HPP
-#define CLIQUE_CONFIG_HPP 1
+#ifndef CLIQUE_DIST_SEPARATOR_TREE_HPP
+#define CLIQUE_DIST_SEPARATOR_TREE_HPP 1
 
-#define Clique_VERSION_MAJOR @Clique_VERSION_MAJOR@
-#define Clique_VERSION_MINOR @Clique_VERSION_MINOR@
+namespace cliq {
 
-#cmakedefine HAVE_PARMETIS
+struct LocalSepOrLeaf
+{
+    int localParent; // -1 if local root
+    std::vector<int> indices;
+};
 
-#endif /* CLIQUE_CONFIG_HPP */
+struct DistSeparator
+{
+    mpi::Comm comm;
+    std::vector<int> indices;
+};
+
+struct DistSeparatorTree
+{
+    // Full local binary tree
+    std::vector<LocalSepOrLeaf> localSepsAndLeaves;
+    // One path through top of binary tree (does not include local separator)
+    std::vector<DistSeparator> distSeps;
+};
+
+} // namespace cliq
+
+#endif /* CLIQUE_DIST_SEPARATOR_TREE_HPP */
