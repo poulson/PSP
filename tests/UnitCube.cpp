@@ -59,9 +59,9 @@ int
 main( int argc, char* argv[] )
 {
     psp::Initialize( argc, argv );
-    psp::mpi::Comm comm = psp::mpi::COMM_WORLD;
-    const int commSize = psp::mpi::CommSize( comm );
-    const int commRank = psp::mpi::CommRank( comm );
+    mpi::Comm comm = mpi::COMM_WORLD;
+    const int commSize = mpi::CommSize( comm );
+    const int commRank = mpi::CommRank( comm );
 
     if( argc < 4 )
     {
@@ -78,7 +78,7 @@ main( int argc, char* argv[] )
     const int numPlanesPerPanel = ( argc >= 6 ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
         ( argc >= 7 ? (PanelScheme)atoi(argv[argNum++]) 
-                    : psp::CLIQUE_FAST_2D_LDL );
+                    : CLIQUE_FAST_2D_LDL );
     const bool fullVisualize = ( argc >= 8 ? atoi(argv[argNum++]) : true );
     const int factBlocksize = ( argc >= 9 ? atoi( argv[argNum++] ) : 96 );
     const int solveBlocksize = ( argc >= 10 ? atoi( argv[argNum++] ) : 64 );
@@ -448,11 +448,11 @@ main( int argc, char* argv[] )
         elem::SetBlocksize( factBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
-        psp::mpi::Barrier( comm );
-        const double initialStartTime = psp::mpi::Time(); 
+        mpi::Barrier( comm );
+        const double initialStartTime = mpi::Time(); 
         helmholtz.Initialize( velocity, panelScheme );
-        psp::mpi::Barrier( comm );
-        const double initialStopTime = psp::mpi::Time();
+        mpi::Barrier( comm );
+        const double initialStopTime = mpi::Time();
         const double initialTime = initialStopTime - initialStartTime;
         if( commRank == 0 )
             std::cout << "Finished initialization: " << initialTime 
@@ -515,11 +515,11 @@ main( int argc, char* argv[] )
         elem::SetBlocksize( solveBlocksize );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
-        psp::mpi::Barrier( comm );
-        const double solveStartTime = psp::mpi::Time();
+        mpi::Barrier( comm );
+        const double solveStartTime = mpi::Time();
         helmholtz.SolveWithGMRES( B );
-        psp::mpi::Barrier( comm );
-        const double solveStopTime = psp::mpi::Time();
+        mpi::Barrier( comm );
+        const double solveStopTime = mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
         if( commRank == 0 )
             std::cout << "Finished solve: " << solveTime << " seconds." 

@@ -27,8 +27,17 @@ set(PSP_VERSION_MINOR 1)
 
 option(BUILD_TESTS "Build a collection of test executables" OFF)
 
+# TODO: Think of how to avoid this mess...
 add_subdirectory(external/clique)
 include_directories("${PROJECT_BINARY_DIR}/external/clique/include")
+if(HAVE_PARMETIS)
+  include_directories(
+    "${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/include"
+  )
+  include_directories(
+    "${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/metis/include"
+  )
+endif(HAVE_PARMETIS)
 include_directories(
   "${PROJECT_BINARY_DIR}/external/clique/external/elemental/include")
 include_directories(${MPI_CXX_INCLUDE_PATH})

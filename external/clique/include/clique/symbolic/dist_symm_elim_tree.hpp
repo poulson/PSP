@@ -35,15 +35,37 @@ struct LocalSymmNode
 
 struct DistSymmNode
 {
+    mpi::Comm comm;
     int size, offset;
     std::vector<int> lowerStruct;
-    mpi::Comm comm;
 };
 
 struct DistSymmElimTree
 {
-    std::vector<LocalSymmNode> localNodes;
+    // NOTE: This is an array of pointers, as we will not know how many 
+    //       are needed during construction
+    std::vector<LocalSymmNode*> localNodes;
     std::vector<DistSymmNode> distNodes;
+
+    ~DistSymmElimTree()
+    {
+        if( std::uncaught_exception() )
+        {
+            std::cerr << "Uncaught exception in ~DistSymmElimTree" << std::endl;
+#ifndef RELEASE            
+            DumpCallStack();
+#endif
+            return;
+        }
+
+        const int numLocal = localNodes.size();
+        for( int i=0; i<numLocal; ++i )
+            delete localNodes[i];
+
+        const int numDist = distNodes.size();
+        for( int i=0; i<numDist; ++i )
+            mpi::CommFree( distNodes[i].comm );
+    }
 };
 
 } // namespace cliq

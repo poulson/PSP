@@ -1827,14 +1827,15 @@ DistHelmholtz<R>::FillPanelLocalElimTree
         Box box = boxStack.top();
         boxStack.pop();
 
-        cliq::LocalSymmNode& node = eTree.localNodes[s];
+        eTree.localNodes[s] = new cliq::LocalSymmNode;
+        cliq::LocalSymmNode& node = *eTree.localNodes[s];
         node.parent = box.parentIndex;
         if( node.parent != -1 )
         {
             if( box.leftChild )
-                eTree.localNodes[node.parent].children[0] = s;
+                eTree.localNodes[node.parent]->children[0] = s;
             else
-                eTree.localNodes[node.parent].children[1] = s;
+                eTree.localNodes[node.parent]->children[1] = s;
         }
 
         if( box.nx*box.ny <= cutoff )

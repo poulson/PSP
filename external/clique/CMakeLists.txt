@@ -95,7 +95,7 @@ if(BUILD_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(TESTS FileSpeed PanelLDL)
   if(HAVE_PARMETIS)
-    list(APPEND TESTS NestedDissection)
+    list(APPEND TESTS Bisection NestedDissection)
   endif(HAVE_PARMETIS)
 
   # Build the tests
@@ -118,6 +118,7 @@ endif(BUILD_TESTS)
 # Uncomment if including Clique as a subproject in another build system        #
 ################################################################################
 set(USE_CUSTOM_ALLTOALLV ${USE_CUSTOM_ALLTOALLV} PARENT_SCOPE)
+set(HAVE_PARMETIS ${HAVE_PARMETIS} PARENT_SCOPE)
 
 set(LIBRARY_TYPE ${LIBRARY_TYPE} PARENT_SCOPE)
 set(MPI_C_COMPILER ${MPI_C_COMPILER} PARENT_SCOPE)
