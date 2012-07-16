@@ -93,6 +93,7 @@ private:
 
     friend class Graph;
     template<typename F> friend class DistSparseMatrix;
+    template<typename F> friend class DistSymmFrontTree;
 };
 
 //----------------------------------------------------------------------------//
@@ -104,9 +105,6 @@ DistGraph::DistGraph()
 : numSources_(0), numTargets_(0)
 {
     SetComm( mpi::COMM_WORLD );
-    blocksize_ = 0;
-    firstLocalSource_ = 0;
-    numLocalSources_ = 0;
 }
 
 inline
@@ -114,39 +112,20 @@ DistGraph::DistGraph( mpi::Comm comm )
 : numSources_(0), numTargets_(0)
 {
     SetComm( comm );
-    blocksize_ = 0;
-    firstLocalSource_ = 0;
-    numLocalSources_ = 0;
 }
 
 inline 
 DistGraph::DistGraph( int numVertices, mpi::Comm comm )
 : numSources_(numVertices), numTargets_(numVertices)
 {
-    const int commRank = mpi::CommRank( comm );
-    const int commSize = mpi::CommSize( comm );
     SetComm( comm );
-    blocksize_ = numVertices/commSize;
-    firstLocalSource_ = commRank*blocksize_;
-    if( commRank != commSize-1 )
-        numLocalSources_ = blocksize_;
-    else
-        numLocalSources_ = numVertices - (commSize-1)*blocksize_;
 }
 
 inline 
 DistGraph::DistGraph( int numSources, int numTargets, mpi::Comm comm )
 : numSources_(numSources), numTargets_(numTargets)
 {
-    const int commRank = mpi::CommRank( comm );
-    const int commSize = mpi::CommSize( comm );
     SetComm( comm );
-    blocksize_ = numSources/commSize;
-    firstLocalSource_ = commRank*blocksize_;
-    if( commRank != commSize-1 )
-        numLocalSources_ = blocksize_;
-    else
-        numLocalSources_ = numSources - (commSize-1)*blocksize_;
 }
 
 inline
@@ -184,9 +163,6 @@ DistGraph::SetComm( mpi::Comm comm )
 {
     sources_.clear();
     targets_.clear();
-    blocksize_ = 0;
-    firstLocalSource_ = 0;
-    numLocalSources_ = 0;
     sorted_ = true;
     assembling_ = false;
     localEdgeOffsets_.clear();
@@ -195,6 +171,15 @@ DistGraph::SetComm( mpi::Comm comm )
         comm_ = comm;
     else
         mpi::CommDup( comm, comm_ );
+
+    const int commRank = mpi::CommRank( comm );
+    const int commSize = mpi::CommSize( comm );
+    blocksize_ = numSources_/commSize;
+    firstLocalSource_ = commRank*blocksize_;
+    if( commRank < commSize-1 )
+        numLocalSources_ = blocksize_;
+    else
+        numLocalSources_ = numSources_ - (commSize-1)*blocksize_;
 }
 
 inline mpi::Comm 
@@ -241,7 +226,7 @@ DistGraph::Source( int localEdge ) const
 {
 #ifndef RELEASE
     PushCallStack("DistGraph::Source");
-    if( localEdge < 0 || localEdge >= sources_.size() )
+    if( localEdge < 0 || localEdge >= (int)sources_.size() )
         throw std::logic_error("Edge number out of bounds");
 #endif
     EnsureNotAssembling();
@@ -256,7 +241,7 @@ DistGraph::Target( int localEdge ) const
 {
 #ifndef RELEASE
     PushCallStack("DistGraph::Target");
-    if( localEdge < 0 || localEdge >= targets_.size() )
+    if( localEdge < 0 || localEdge >= (int)targets_.size() )
         throw std::logic_error("Edge number out of bounds");
 #endif
     EnsureNotAssembling();
@@ -307,14 +292,10 @@ DistGraph::operator=( const DistGraph& graph )
 #ifndef RELEASE
     PushCallStack("DistGraph::operator=");
 #endif
-    SetComm( graph.comm_ );
-
     numSources_ = graph.numSources_;
     numTargets_ = graph.numTargets_;
 
-    blocksize_ = graph.blocksize_;
-    firstLocalSource_ = graph.firstLocalSource_;
-    numLocalSources_ = graph.numLocalSources_;
+    SetComm( graph.comm_ );
 
     sources_ = graph.sources_;
     targets_ = graph.targets_;
@@ -484,7 +465,7 @@ DistGraph::ResizeTo( int numSources, int numTargets )
     numTargets_ = numTargets;
     blocksize_ = numSources/commSize;
     firstLocalSource_ = commRank*blocksize_;
-    if( commRank != commSize-1 )
+    if( commRank < commSize-1 )
         numLocalSources_ = blocksize_;
     else
         numLocalSources_ = numSources - (commSize-1)*blocksize_;

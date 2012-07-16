@@ -32,6 +32,7 @@ public:
     DistSparseMatrix();
     DistSparseMatrix( mpi::Comm comm );
     DistSparseMatrix( int height, int width, mpi::Comm comm );
+    // TODO: Constructor for building from another DistSparseMatrix
     ~DistSparseMatrix();
 
     int Height() const;
@@ -81,6 +82,7 @@ private:
     void EnsureConsistentCapacities() const;
 
     template<typename U> friend class SparseMatrix;
+    template<typename U> friend class DistSymmFrontTree;
 };
 
 //----------------------------------------------------------------------------//
@@ -239,7 +241,7 @@ DistSparseMatrix<F>::Value( int localEntry ) const
 { 
 #ifndef RELEASE 
     PushCallStack("DistSparseMatrix::Value");
-    if( localEntry < 0 || localEntry >= values_.size() )
+    if( localEntry < 0 || localEntry >= (int)values_.size() )
         throw std::logic_error("Entry number out of bounds");
     PopCallStack();
 #endif
@@ -348,7 +350,7 @@ inline void
 DistSparseMatrix<F>::EnsureConsistentSizes() const
 { 
     graph_.EnsureConsistentSizes();
-    if( graph_.NumLocalEdges() != values_.size() )
+    if( graph_.NumLocalEdges() != (int)values_.size() )
         throw std::logic_error("Inconsistent sparsity sizes");
 }
 

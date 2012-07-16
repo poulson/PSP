@@ -24,18 +24,19 @@ namespace cliq {
 namespace internal {
 
 inline void GetLowerStructFromPartner
-( int leftChildTeamSize, 
-  int& theirChildSize, std::vector<int>& theirChildLowerStruct,
+( int& theirChildSize, std::vector<int>& theirChildLowerStruct,
   const DistSymmNode& node, const DistSymmNodeInfo& childNodeInfo )
 {
-    // Determine our partner's rank for this exchange in node's 
-    // communicator
+    // Determine our partner's rank for this exchange in node's communicator
     const int teamRank = mpi::CommRank( node.comm );
     const int teamSize = mpi::CommSize( node.comm );
-    const bool onLeft = ( teamRank < leftChildTeamSize );
+    const int childTeamRank = mpi::CommRank( childNodeInfo.comm );
+    const int myChildTeamSize = mpi::CommSize( childNodeInfo.comm );
+    const int otherChildTeamSize = teamSize - myChildTeamSize;
+    const bool inFirstTeam = ( teamRank == childTeamRank );
     const int partner =
-        ( onLeft ? teamRank+leftChildTeamSize
-                 : teamRank-leftChildTeamSize );
+        ( inFirstTeam ? teamRank+myChildTeamSize
+                      : teamRank-otherChildTeamSize );
 
     // SendRecv the message lengths
     const int myChildSize = childNodeInfo.size;
@@ -57,20 +58,22 @@ inline void GetLowerStructFromPartner
 }
 
 inline void GetLowerStruct
-( int leftChildTeamSize, 
-  int& theirChildSize, std::vector<int>& theirChildLowerStruct,
+( int& theirChildSize, std::vector<int>& theirChildLowerStruct,
   const DistSymmNode& node, const DistSymmNodeInfo& childNodeInfo )
 {
-    // Determine our partner's rank for this exchange in node's 
-    // communicator
+    // Determine our partner's rank for this exchange in node's communicator
     const int teamRank = mpi::CommRank( node.comm );
     const int teamSize = mpi::CommSize( node.comm );
     const int childTeamRank = mpi::CommRank( childNodeInfo.comm );
-    const bool onLeft = ( teamRank < leftChildTeamSize );
+    const int myChildTeamSize = mpi::CommSize( childNodeInfo.comm );
+    const int otherChildTeamSize = teamSize - myChildTeamSize;
+    const bool inFirstTeam = ( teamRank == childTeamRank );
 
     if( childTeamRank == 0 )
     {
-        const int partner = ( onLeft ? leftChildTeamSize : 0 );
+        const int partner =
+            ( inFirstTeam ? teamRank+myChildTeamSize
+                          : teamRank-otherChildTeamSize );
 
         // SendRecv the message lengths
         const int myChildSize = childNodeInfo.size;
@@ -115,8 +118,7 @@ inline void GetLowerStruct
 }
 
 inline void ComputeStructAndRelIndices
-( int leftChildTeamSize, 
-  int theirChildSize, const std::vector<int>& theirChildLowerStruct,
+( int theirChildSize, const std::vector<int>& theirChildLowerStruct,
   const DistSymmNode& node,         const DistSymmNode& childNode, 
         DistSymmNodeInfo& nodeInfo, const DistSymmNodeInfo& childNodeInfo )
 {
@@ -131,11 +133,40 @@ inline void ComputeStructAndRelIndices
     // Union the two child lower structures
 #ifndef RELEASE
     for( int i=1; i<myChildLowerStructSize; ++i )
-        if( myChildLowerStruct[i] <= myChildLowerStruct[i-1] )
-            throw std::runtime_error("Child's lower struct was not sorted");
+    {
+        const int thisIndex = myChildLowerStruct[i];
+        const int lastIndex = myChildLowerStruct[i-1];
+        if( thisIndex < lastIndex )
+        {
+            std::ostringstream msg;
+            msg << "My child's lower struct was not sorted";
+            throw std::logic_error( msg.str().c_str() );
+        }
+        else if( thisIndex == lastIndex )
+        {
+            std::ostringstream msg;
+            msg << "My child's lower struct had repeated index, " << thisIndex;
+            throw std::logic_error( msg.str().c_str() );
+        }
+    }
     for( int i=1; i<theirChildLowerStructSize; ++i )
-        if( theirChildLowerStruct[i] <= theirChildLowerStruct[i-1] )
-            throw std::runtime_error("Child's lower struct was not sorted");
+    {
+        const int thisIndex = theirChildLowerStruct[i];
+        const int lastIndex = theirChildLowerStruct[i-1];
+        if( thisIndex < lastIndex )
+        {
+            std::ostringstream msg;
+            msg << "Their child's lower struct was not sorted";
+            throw std::logic_error( msg.str().c_str() );
+        }
+        else if( thisIndex == lastIndex )
+        {
+            std::ostringstream msg;
+            msg << "Their child's lower struct had repeated index, "
+                << thisIndex;
+            throw std::logic_error( msg.str().c_str() );
+        }
+    }
 #endif
     childrenStruct.resize
     ( myChildLowerStructSize+theirChildLowerStructSize );
@@ -149,8 +180,22 @@ inline void ComputeStructAndRelIndices
     // Union the lower structure of this node
 #ifndef RELEASE
     for( unsigned i=1; i<node.lowerStruct.size(); ++i )
-        if( node.lowerStruct[i] <= node.lowerStruct[i-1] )
-            throw std::runtime_error("Original struct was not sorted");
+    {
+        const int thisIndex = node.lowerStruct[i];
+        const int lastIndex = node.lowerStruct[i-1];
+        if( thisIndex < lastIndex )
+        {
+            std::ostringstream msg;
+            msg << "Original struct was not sorted";
+            throw std::logic_error( msg.str().c_str() );
+        }
+        else if( thisIndex == lastIndex )
+        {
+            std::ostringstream msg;
+            msg << "Original struct had repeated index, " << thisIndex;
+            throw std::logic_error( msg.str().c_str() );
+        }
+    }
 #endif
     partialStruct.resize( childrenStructSize + node.lowerStruct.size() );
     it = std::set_union
@@ -187,10 +232,11 @@ inline void ComputeStructAndRelIndices
         nodeInfo.origLowerRelIndices[i] = int(it-fullStruct.begin());
     }
 
-    // Construct the relative indices of the children
     const int teamRank = mpi::CommRank( node.comm );
     const int teamSize = mpi::CommSize( node.comm );
-    const bool onLeft = ( teamRank < leftChildTeamSize );
+    const bool onLeft = childNode.onLeft;
+
+    // Construct the relative indices of the children
     int numLeftIndices, numRightIndices;
     const int *leftIndices, *rightIndices;
     if( onLeft )
@@ -304,6 +350,7 @@ void DistSymmetricAnalysis
     // The bottom node was analyzed locally, so just copy its results over
     const LocalSymmNodeInfo& topLocal = info.localNodes.back();
     DistSymmNodeInfo& bottomDist = info.distNodes[0];
+    bottomDist.onLeft = eTree.distNodes[0].onLeft;
     mpi::CommDup( eTree.distNodes[0].comm, bottomDist.comm );
     bottomDist.grid = new Grid( bottomDist.comm );
     bottomDist.size = topLocal.size;
@@ -338,6 +385,7 @@ void DistSymmetricAnalysis
         const DistSymmNode& childNode = eTree.distNodes[s-1];
         const DistSymmNodeInfo& childNodeInfo = info.distNodes[s-1];
         DistSymmNodeInfo& nodeInfo = info.distNodes[s];
+        nodeInfo.onLeft = node.onLeft;
         nodeInfo.size = node.size;
         nodeInfo.offset = node.offset;
         nodeInfo.myOffset = myOffset;
@@ -354,24 +402,26 @@ void DistSymmetricAnalysis
         const int teamRank = mpi::CommRank( node.comm );
         const int childTeamRank = mpi::CommRank( childNode.comm );
         const int childTeamSize = mpi::CommSize( childNode.comm );
-        const bool onLeft = ( teamRank == childTeamRank );
+        const bool onLeft = childNode.onLeft;
         const int leftChildTeamSize = 
             ( onLeft ? childTeamSize : teamSize-childTeamSize );
         const int rightChildTeamSize = teamSize - leftChildTeamSize;
+        const bool inFirstTeam = ( childTeamRank == teamRank );
+        const bool leftIsFirst = ( onLeft==inFirstTeam );
+        const int leftTeamOffset = ( leftIsFirst ? 0 : rightChildTeamSize );
+        const int rightTeamOffset = ( leftIsFirst ? leftChildTeamSize : 0 );
         if( leftChildTeamSize == rightChildTeamSize )
             internal::GetLowerStructFromPartner
-            ( leftChildTeamSize, theirChildSize, theirChildLowerStruct, 
-              node, childNodeInfo );
+            ( theirChildSize, theirChildLowerStruct, node, childNodeInfo );
         else
             internal::GetLowerStruct
-            ( leftChildTeamSize, theirChildSize, theirChildLowerStruct, 
-              node, childNodeInfo );
+            ( theirChildSize, theirChildLowerStruct, node, childNodeInfo );
 
         // Perform one level of symbolic factorization and then compute
         // a wide variety of relative indices
         internal::ComputeStructAndRelIndices
-        ( leftChildTeamSize, theirChildSize, theirChildLowerStruct, 
-          node, childNode, nodeInfo, childNodeInfo );
+        ( theirChildSize, theirChildLowerStruct, node, childNode, 
+          nodeInfo, childNodeInfo );
 
         // Fill numChildFactSendIndices so that we can reuse it for many facts.
         const unsigned gridHeight = nodeInfo.grid->Height();
@@ -463,7 +513,7 @@ void DistSymmetricAnalysis
 
             const int childRank = 
                 (iChild+leftUpdateAlignment) % leftChildTeamSize;
-            const int frontRank = childRank;
+            const int frontRank = leftTeamOffset + childRank;
             nodeInfo.childSolveRecvIndices[frontRank].push_back(iFrontLocal);
         }
 
@@ -479,7 +529,7 @@ void DistSymmetricAnalysis
 
             const int childRank = 
                 (iChild+rightUpdateAlignment) % rightChildTeamSize;
-            const int frontRank = leftChildTeamSize + childRank;
+            const int frontRank = rightTeamOffset + childRank;
             nodeInfo.childSolveRecvIndices[frontRank].push_back(iFrontLocal);
         }
 
@@ -508,8 +558,8 @@ void ComputeFactRecvIndices
 #ifndef RELEASE
     PushCallStack("ComputeFactRecvIndices");
 #endif
-    const int teamRank = mpi::CommRank( node.comm );
     const int teamSize = mpi::CommSize( node.comm );
+    const int teamRank = mpi::CommRank( node.comm );
     const int gridHeight = node.grid->Height();
     const int gridWidth = node.grid->Width();
     const int gridRow = node.grid->Row();
@@ -518,9 +568,14 @@ void ComputeFactRecvIndices
     const int childGridWidth = childNode.grid->Width();
     const int childTeamRank = mpi::CommRank( childNode.comm );
     const int childTeamSize = mpi::CommSize( childNode.comm );
-    const bool onLeft = ( teamRank == childTeamRank );
+    const bool onLeft = childNode.onLeft;
     const int leftChildTeamSize =
         ( onLeft ? childTeamSize : teamSize-childTeamSize );
+    const int rightChildTeamSize = teamSize - leftChildTeamSize;
+    const bool inFirstTeam = ( childTeamRank == teamRank );
+    const bool leftIsFirst = ( onLeft==inFirstTeam );
+    const int leftTeamOffset = ( leftIsFirst ? 0 : rightChildTeamSize );
+    const int rightTeamOffset = ( leftIsFirst ? leftChildTeamSize : 0 );
 
     // Communicate to get the grid sizes
     int childGridDims[4] = { 0, 0, 0, 0 };
@@ -542,14 +597,7 @@ void ComputeFactRecvIndices
 
 #ifndef RELEASE
     if( leftChildTeamSize != leftGridHeight*leftGridWidth )
-    {
-        std::cerr << "childGridDims: " 
-                  << childGridDims[0] << " " << childGridDims[1] << " "
-                  << childGridDims[2] << " " << childGridDims[3] << "\n"
-                  << "leftChildTeamSize: " << leftChildTeamSize << std::endl;
         throw std::runtime_error("Computed left grid incorrectly");
-    }
-    const int rightChildTeamSize = teamSize - leftChildTeamSize;
     if( rightChildTeamSize != rightGridHeight*rightGridWidth )
         throw std::runtime_error("Computed right grid incorrectly");
 #endif
@@ -591,7 +639,7 @@ void ComputeFactRecvIndices
             const int childRow = (iChild+node.leftChildSize) % leftGridHeight;
             const int childRank = childRow + childCol*leftGridHeight;
 
-            const int frontRank = childRank;
+            const int frontRank = leftTeamOffset + childRank;
             node.childFactRecvIndices[frontRank].push_back(iFrontLocal);
             node.childFactRecvIndices[frontRank].push_back(jFrontLocal);
         }
@@ -630,7 +678,7 @@ void ComputeFactRecvIndices
             const int childRow = (iChild+node.rightChildSize) % rightGridHeight;
             const int childRank = childRow + childCol*rightGridHeight;
 
-            const int frontRank = leftChildTeamSize + childRank;
+            const int frontRank = rightTeamOffset + childRank;
             node.childFactRecvIndices[frontRank].push_back(iFrontLocal);
             node.childFactRecvIndices[frontRank].push_back(jFrontLocal);
         }

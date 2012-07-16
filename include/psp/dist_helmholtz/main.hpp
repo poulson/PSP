@@ -1565,6 +1565,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
         const int childNodeCommRank = 
             ( onLeft ? nodeCommRank : nodeCommRank-leftTeamSize );
         mpi::CommSplit( node.comm, onLeft, childNodeCommRank, childNode.comm );
+        childNode.onLeft = onLeft;
 
         if( nxSub >= nySub )
         {

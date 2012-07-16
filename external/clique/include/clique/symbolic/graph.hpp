@@ -166,7 +166,7 @@ Graph::Source( int edge ) const
 {
 #ifndef RELEASE
     PushCallStack("Graph::Source");
-    if( edge < 0 || edge >= sources_.size() )
+    if( edge < 0 || edge >= (int)sources_.size() )
         throw std::logic_error("Edge number out of bounds");
 #endif
     EnsureNotAssembling();
@@ -181,7 +181,7 @@ Graph::Target( int edge ) const
 {
 #ifndef RELEASE
     PushCallStack("Graph::Target");
-    if( edge < 0 || edge >= targets_.size() )
+    if( edge < 0 || edge >= (int)targets_.size() )
         throw std::logic_error("Edge number out of bounds");
 #endif
     EnsureNotAssembling();
@@ -196,8 +196,15 @@ Graph::EdgeOffset( int source ) const
 {
 #ifndef RELEASE
     PushCallStack("Graph::EdgeOffset");
-    if( source < 0 || source > numSources_ )
-        throw std::logic_error("Out of bounds source index");
+    if( source < 0 )
+        throw std::logic_error("Negative source index");
+    if( source > numSources_ )
+    {
+        std::ostringstream msg;
+        msg << "Source index was too large: " << source << " is not in "
+            << "[0," << numSources_ << "]";
+        throw std::logic_error( msg.str().c_str() );
+    }
 #endif
     EnsureNotAssembling();
     const int edgeOffset = edgeOffsets_[source];
