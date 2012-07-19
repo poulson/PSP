@@ -37,7 +37,7 @@ if(HAVE_PARMETIS)
   include_directories(
     "${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/metis/include"
   )
-endif(HAVE_PARMETIS)
+endif()
 include_directories(
   "${PROJECT_BINARY_DIR}/external/clique/external/elemental/include")
 include_directories(${MPI_CXX_INCLUDE_PATH})
@@ -51,11 +51,20 @@ check_function_exists(mkdir HAVE_MKDIR)
 
 # Create the PSP configuration header
 configure_file( 
-  ${PROJECT_SOURCE_DIR}/include/psp/config.h.cmake
+  ${PROJECT_SOURCE_DIR}/cmake/config.h.cmake
   ${PROJECT_BINARY_DIR}/include/psp/config.h 
 ) 
 install(FILES ${PROJECT_BINARY_DIR}/include/psp/config.h 
         DESTINATION include/psp)
+
+# Create a file which can be included in Makefile's.
+# This is meant to be analogous to PETSc's 'conf/petscvariables' file
+configure_file(
+  ${PROJECT_SOURCE_DIR}/cmake/pspvariables.cmake
+  ${PROJECT_BINARY_DIR}/conf/pspvariables @ONLY
+)
+install(FILES ${PROJECT_BINARY_DIR}/conf/pspvariables
+        DESTINATION conf)
 
 # Grab all of the .c, .cpp, .h, and .hpp PSP files
 file(GLOB_RECURSE PSP_CPP RELATIVE ${PROJECT_SOURCE_DIR} 
@@ -83,7 +92,7 @@ foreach(HEADER ${PSP_HEADERS})
 
   get_filename_component(HEADER_PATH ${HEADER} PATH)
   install(FILES ${PROJECT_BINARY_DIR}/${HEADER} DESTINATION ${HEADER_PATH})
-endforeach(HEADER)
+endforeach()
 add_custom_target(prepare_psp_headers DEPENDS ${PREPARED_HEADERS})
 add_dependencies(psp prepare_psp_headers)
 
@@ -99,17 +108,17 @@ if(BUILD_TESTS)
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/tests")
   foreach(TEST ${TESTS})
     add_executable(tests-${TEST} ${TEST_DIR}/${TEST}.cpp)
-    target_link_libraries(tests-${TEST} psp cmake-dummy-lib)
+    target_link_libraries(tests-${TEST} psp)
     set_target_properties(tests-${TEST} PROPERTIES
                           OUTPUT_NAME ${TEST}
                           RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
     if(MPI_LINK_FLAGS)
       set_target_properties(tests-${TEST} PROPERTIES
                             LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif(MPI_LINK_FLAGS)
+    endif()
     install(TARGETS tests-${TEST} DESTINATION bin/tests)
-  endforeach(TEST)
-endif(BUILD_TESTS)
+  endforeach()
+endif()
 
 ################################################################################
 # Uncomment if including PSP as a subproject in another build system           #
