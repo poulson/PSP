@@ -43,12 +43,12 @@ enum PlaneType {
 //                 _______________ (wx,wy,0)
 //                /              /|
 //            x  /              / |
-// sweep dir    /              /  |
-//     /\      /______________/   |
-//     ||      |              |   |
-//     ||      |              |   / (wx,wy,wz)
-//     ||    z |              |  /  
-//     ||      |              | /  
+//              /              /  |
+//             /______________/   |
+//             |              |   |
+//             |              |   / (wx,wy,wz)
+//           z |              |  /  
+//             |              | /  
 //             |______________|/
 //          (0,0,wz)    y    (0,wy,wz)
 //
@@ -85,6 +85,7 @@ public:
     int NumScalars() const;
     int LocalIndex( int naturalIndex ) const;
     int LocalIndex( int x, int y, int z ) const;
+    int NaturalIndex( int x, int y, int z ) const;
     T* LocalBuffer();
     const T* LockedLocalBuffer() const;
 
@@ -98,6 +99,10 @@ public:
     int YLocalSize() const;
     int ZLocalSize() const;
     GridDataOrder Order() const;
+
+    // Linearly interpolate the grid to the specified dimensions
+    // NOTE: This is not yet finished
+    void InterpolateTo( int nx, int ny, int nz );
 
     void WritePlane
     ( PlaneType planeType, int whichPlane, const std::string baseName ) const;
@@ -153,7 +158,8 @@ private:
 //----------------------------------------------------------------------------//
 
 template<typename T>
-inline DistUniformGrid<T>::DistUniformGrid
+inline 
+DistUniformGrid<T>::DistUniformGrid
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
   int px, int py, int pz, mpi::Comm comm )
@@ -178,7 +184,8 @@ inline DistUniformGrid<T>::DistUniformGrid
 }
 
 template<typename T>
-inline DistUniformGrid<T>::DistUniformGrid
+inline 
+DistUniformGrid<T>::DistUniformGrid
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
   mpi::Comm comm )
@@ -186,6 +193,9 @@ inline DistUniformGrid<T>::DistUniformGrid
   nx_(nx), ny_(ny), nz_(nz), order_(order),
   comm_(comm)
 {
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::DistUniformGrid");
+#endif
     const int commRank = mpi::CommRank( comm );
     const int commSize = mpi::CommSize( comm );
 
@@ -212,74 +222,94 @@ inline DistUniformGrid<T>::DistUniformGrid
     yLocalSize_ = LocalLength( ny, yShift_, py_ );
     zLocalSize_ = LocalLength( nz, zShift_, pz_ );
     localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename T>
-inline int DistUniformGrid<T>::XSize() const
+inline int 
+DistUniformGrid<T>::XSize() const
 { return nx_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::YSize() const
+inline int 
+DistUniformGrid<T>::YSize() const
 { return ny_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::ZSize() const
+inline int 
+DistUniformGrid<T>::ZSize() const
 { return nz_; }
 
 template<typename T>
-inline mpi::Comm DistUniformGrid<T>::Comm() const
+inline mpi::Comm 
+DistUniformGrid<T>::Comm() const
 { return comm_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::XShift() const
+inline int 
+DistUniformGrid<T>::XShift() const
 { return xShift_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::YShift() const
+inline int 
+DistUniformGrid<T>::YShift() const
 { return yShift_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::ZShift() const
+inline int 
+DistUniformGrid<T>::ZShift() const
 { return zShift_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::XStride() const
+inline int 
+DistUniformGrid<T>::XStride() const
 { return px_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::YStride() const
+inline int 
+DistUniformGrid<T>::YStride() const
 { return py_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::ZStride() const
+inline int 
+DistUniformGrid<T>::ZStride() const
 { return pz_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::XLocalSize() const
+inline int 
+DistUniformGrid<T>::XLocalSize() const
 { return xLocalSize_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::YLocalSize() const
+inline int 
+DistUniformGrid<T>::YLocalSize() const
 { return yLocalSize_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::ZLocalSize() const
+inline int 
+DistUniformGrid<T>::ZLocalSize() const
 { return zLocalSize_; }
 
 template<typename T>
-inline T* DistUniformGrid<T>::LocalBuffer()
+inline T* 
+DistUniformGrid<T>::LocalBuffer()
 { return &localData_[0]; }
 
 template<typename T>
-inline const T* DistUniformGrid<T>::LockedLocalBuffer() const
+inline const T* 
+DistUniformGrid<T>::LockedLocalBuffer() const
 { return &localData_[0]; }
 
 template<typename T>
-inline int DistUniformGrid<T>::NumScalars() const
+inline int 
+DistUniformGrid<T>::NumScalars() const
 { return numScalars_; }
 
 template<typename T>
-inline int DistUniformGrid<T>::OwningProcess( int naturalIndex ) const
+inline int 
+DistUniformGrid<T>::OwningProcess( int naturalIndex ) const
 {
     const int x = naturalIndex % nx_;
     const int y = (naturalIndex/nx_) % ny_;
@@ -288,7 +318,8 @@ inline int DistUniformGrid<T>::OwningProcess( int naturalIndex ) const
 }
 
 template<typename T>
-inline int DistUniformGrid<T>::OwningProcess( int x, int y, int z ) const
+inline int 
+DistUniformGrid<T>::OwningProcess( int x, int y, int z ) const
 {
     const int xProc = x % px_;
     const int yProc = y % py_;
@@ -297,7 +328,8 @@ inline int DistUniformGrid<T>::OwningProcess( int x, int y, int z ) const
 }
 
 template<typename T>
-inline int DistUniformGrid<T>::LocalIndex( int naturalIndex ) const
+inline int 
+DistUniformGrid<T>::LocalIndex( int naturalIndex ) const
 {
     const int x = naturalIndex % nx_;
     const int y = (naturalIndex/nx_) % ny_;
@@ -306,7 +338,8 @@ inline int DistUniformGrid<T>::LocalIndex( int naturalIndex ) const
 }
 
 template<typename T>
-inline int DistUniformGrid<T>::LocalIndex( int x, int y, int z ) const
+inline int 
+DistUniformGrid<T>::LocalIndex( int x, int y, int z ) const
 { 
     const int xLocal = (x-xShift_) / px_;
     const int yLocal = (y-yShift_) / py_;
@@ -338,16 +371,106 @@ inline int DistUniformGrid<T>::LocalIndex( int x, int y, int z ) const
 }
 
 template<typename T>
-inline void DistUniformGrid<T>::WritePlane
+inline int
+DistUniformGrid<T>::NaturalIndex( int x, int y, int z ) const
+{ return x + y*nx_ + z*nx_*ny_; }
+
+template<typename T>
+inline void
+DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
+{
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::InterpolateTo");
+#endif
+    const int nxOld = nx_;
+    const int nyOld = ny_;
+    const int nzOld = nz_;
+    if( nx < nxOld || ny < nyOld || nz < nzOld )
+        throw std::logic_error("Cannot coarsen with InterpolateTo");
+
+    // Compute the new local dimensions
+    const int xLocalNewSize = LocalLength( nx, xShift_, px_ );
+    const int yLocalNewSize = LocalLength( ny, yShift_, py_ );
+    const int zLocalNewSize = LocalLength( nz, zShift_, pz_ );
+    const double xRatio = (1.*(nx-1)) / (nxOld-1);
+    const double yRatio = (1.*(ny-1)) / (nyOld-1);
+    const double zRatio = (1.*(nz-1)) / (nzOld-1);
+
+    // Compute the list of natural indices of the old model which we will
+    // interpolate between
+    std::set<int> surroundingSet;
+    for( int zLocal=0; zLocal<zLocalNewSize; ++zLocal )
+    {
+        const int z = zShift_ + zLocal*pz_;
+        const double zOld = z / zRatio;
+        const int zLower = floor( zOld );
+        const int zUpper = zLower+1;
+#ifndef RELEASE
+        if( zLower < 0 || zUpper >= zLocalSize_ )
+            throw std::logic_error("z interpolation out of bounds");
+#endif
+        for( int yLocal=0; yLocal<yLocalNewSize; ++yLocal )
+        {
+            const int y = yShift_ + yLocal*py_;
+            const double yOld = y / yRatio;
+            const int yLower = floor( yOld );
+            const int yUpper = yLower+1;
+#ifndef RELEASE
+            if( yLower < 0 || yUpper >= yLocalSize_ )
+                throw std::logic_error("y interpolation out of bounds");
+#endif
+            for( int xLocal=0; xLocal<xLocalNewSize; ++xLocal )
+            {
+                const int x = xShift_ + xLocal*px_;
+                const double xOld = x / xRatio;
+                const int xLower = floor( xOld );
+                const int xUpper = xLower+1;
+#ifndef RELEASE
+                if( xLower < 0 || xUpper >= xLocalSize_ )
+                    throw std::logic_error("x interpolation out of bounds");
+#endif
+                surroundingSet.insert( NaturalIndex(xLower,yLower,zLower) );
+                surroundingSet.insert( NaturalIndex(xLower,yLower,zUpper) );
+                surroundingSet.insert( NaturalIndex(xLower,yUpper,zLower) );
+                surroundingSet.insert( NaturalIndex(xLower,yUpper,zUpper) );
+                surroundingSet.insert( NaturalIndex(xUpper,yLower,zLower) );
+                surroundingSet.insert( NaturalIndex(xUpper,yLower,zUpper) );
+                surroundingSet.insert( NaturalIndex(xUpper,yUpper,zLower) );
+                surroundingSet.insert( NaturalIndex(xUpper,yUpper,zUpper) );
+            }
+        }
+    }
+
+    // Extract the vector of surrounding natural indices
+    std::vector<int> surrounding
+    ( surroundingSet.begin(), surroundingSet.end() );
+
+    // TODO: Map the surrounding indices to their owning processes
+
+    // TODO: Run an AllToAll to communicate the values (remember numScalars!)
+
+    // TODO: Interpolate to generate the new grid
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename T>
+inline void 
+DistUniformGrid<T>::WritePlane
 ( PlaneType planeType, int whichPlane, const std::string baseName ) const
 { return WritePlaneHelper<T>::Func( *this, planeType, whichPlane, baseName ); }
 
 template<typename T>
 template<typename R>
-inline void DistUniformGrid<T>::WritePlaneHelper<R>::Func
+inline void 
+DistUniformGrid<T>::WritePlaneHelper<R>::Func
 ( const DistUniformGrid<R>& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::WritePlaneHelper");
+#endif
     const int commRank = mpi::CommRank( parent.comm_ );
     const int commSize = mpi::CommSize( parent.comm_ );
     const int nx = parent.nx_;
@@ -458,21 +581,6 @@ inline void DistUniformGrid<T>::WritePlaneHelper<R>::Func
             {
                 const T* plane = &planes[k*planeSize];
 
-                // For writing raw ASCII data
-                /*
-                std::ostringstream os;
-                os << baseName << "_" << k << ".dat";
-                std::ofstream file( os.str().c_str(), std::ios::out );
-                for( int j=0; j<ny; ++j )       
-                {
-                    for( int i=0; i<nx; ++i )
-                        file << plane[i+j*nx] << " ";
-                    file << "\n";
-                }
-                file << std::endl;
-                file.close();
-                */
-                
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,ny);
                 const R h = 1./(maxPoints+1.0);
@@ -610,21 +718,6 @@ inline void DistUniformGrid<T>::WritePlaneHelper<R>::Func
             {
                 const T* plane = &planes[k*planeSize];
 
-                // For writing raw ASCII data
-                /*
-                std::ostringstream os;
-                os << baseName << "_" << k << ".dat";
-                std::ofstream file( os.str().c_str(), std::ios::out );
-                for( int j=0; j<nz; ++j )       
-                {
-                    for( int i=0; i<nx; ++i )
-                        file << plane[i+j*nx] << " ";
-                    file << "\n";
-                }
-                file << std::endl;
-                file.close();
-                */
-                
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,nz);
                 const R h = 1./(maxPoints+1.0);
@@ -760,21 +853,6 @@ inline void DistUniformGrid<T>::WritePlaneHelper<R>::Func
             {
                 const T* plane = &planes[k*planeSize];
 
-                // For writing raw ASCII data
-                /*
-                std::ostringstream os;
-                os << baseName << "_" << k << ".dat";
-                std::ofstream file( os.str().c_str(), std::ios::out );
-                for( int j=0; j<nz; ++j )       
-                {
-                    for( int i=0; i<ny; ++i )
-                        file << plane[i+j*ny] << " ";
-                    file << "\n";
-                }
-                file << std::endl;
-                file.close();
-                */
-                
                 // For writing a VTK file
                 const int maxPoints = std::max(ny,nz);
                 const R h = 1./(maxPoints+1.0);
@@ -814,11 +892,15 @@ inline void DistUniformGrid<T>::WritePlaneHelper<R>::Func
             }
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename T>
 template<typename R>
-inline void DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
+inline void 
+DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
@@ -933,21 +1015,6 @@ inline void DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             {
                 const T* plane = &planes[k*planeSize];
 
-                // For writing raw ASCII data
-                /*
-                std::ostringstream os;
-                os << baseName << "_" << k << ".dat";
-                std::ofstream file( os.str().c_str(), std::ios::out );
-                for( int j=0; j<ny; ++j )       
-                {
-                    for( int i=0; i<nx; ++i )
-                        file << plane[i+j*nx] << " ";
-                    file << "\n";
-                }
-                file << std::endl;
-                file.close();
-                */
-                
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,ny);
                 const R h = 1./(maxPoints+1.0);
@@ -1100,21 +1167,6 @@ inline void DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             {
                 const T* plane = &planes[k*planeSize];
 
-                // For writing raw ASCII data
-                /*
-                std::ostringstream os;
-                os << baseName << "_" << k << ".dat";
-                std::ofstream file( os.str().c_str(), std::ios::out );
-                for( int j=0; j<nz; ++j )       
-                {
-                    for( int i=0; i<nx; ++i )
-                        file << plane[i+j*nx] << " ";
-                    file << "\n";
-                }
-                file << std::endl;
-                file.close();
-                */
-                
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,nz);
                 const R h = 1./(maxPoints+1.0);
@@ -1266,21 +1318,6 @@ inline void DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             {
                 const T* plane = &planes[k*planeSize];
 
-                // For writing raw ASCII data
-                /*
-                std::ostringstream os;
-                os << baseName << "_" << k << ".dat";
-                std::ofstream file( os.str().c_str(), std::ios::out );
-                for( int j=0; j<nz; ++j )       
-                {
-                    for( int i=0; i<ny; ++i )
-                        file << plane[i+j*ny] << " ";
-                    file << "\n";
-                }
-                file << std::endl;
-                file.close();
-                */
-                
                 // For writing a VTK file
                 const int maxPoints = std::max(ny,nz);
                 const R h = 1./(maxPoints+1.0);
@@ -1339,9 +1376,12 @@ inline void DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
 }
 
 template<typename T>
-inline void DistUniformGrid<T>::RedistributeForVtk
-( std::vector<T>& localBox ) const
+inline void 
+DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 {
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::RedistributeForVtk");
+#endif
     const int commSize = mpi::CommSize( comm_ );
 
     // Compute our local box
@@ -1491,17 +1531,25 @@ inline void DistUniformGrid<T>::RedistributeForVtk
             }
         }
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename T>
-inline void DistUniformGrid<T>::WriteVolume( const std::string baseName ) const
+inline void 
+DistUniformGrid<T>::WriteVolume( const std::string baseName ) const
 { return WriteVolumeHelper<T>::Func( *this, baseName ); }
 
 template<typename T>
 template<typename R>
-inline void DistUniformGrid<T>::WriteVolumeHelper<R>::Func
+inline void 
+DistUniformGrid<T>::WriteVolumeHelper<R>::Func
 ( const DistUniformGrid<R>& parent, const std::string baseName )
 {
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::WriteVolumeHelper");
+#endif
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
@@ -1675,6 +1723,9 @@ inline void DistUniformGrid<T>::WriteVolumeHelper<R>::Func
         files[k]->close();
         delete files[k];
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 template<typename T>
@@ -1683,6 +1734,9 @@ inline void
 DistUniformGrid<T>::WriteVolumeHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, const std::string baseName )
 {
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::WriteVolumeHelper");
+#endif
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
@@ -1901,6 +1955,9 @@ DistUniformGrid<T>::WriteVolumeHelper<Complex<R> >::Func
         delete realFiles[k];
         delete imagFiles[k];
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
 }
 
 } // namespace psp
