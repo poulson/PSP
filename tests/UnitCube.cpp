@@ -43,7 +43,7 @@ void Usage()
               << "1) Gaussian perturbation of unity\n"
               << "2) Wave guide\n"
               << "3) Two layers\n"
-              << "4) Cavity\n"
+              << "4) Cavity (will not converge quickly!)\n"
               << "5) Reverse cavity\n"
               << "6) Top half of cavity\n"
               << "7) Bottom half of cavity\n"
@@ -92,7 +92,7 @@ main( int argc, char* argv[] )
                       << "1) Gaussian perturbation of unity\n"
                       << "2) Wave guide\n"
                       << "3) Two layers\n"
-                      << "4) Cavity\n"
+                      << "4) Cavity (will not converge quickly!)\n"
                       << "5) Reverse cavity\n"
                       << "6) Top half of cavity\n"
                       << "7) Bottom half of cavity\n"
@@ -135,11 +135,15 @@ main( int argc, char* argv[] )
         switch( velocityModel )
         {
         case 0:
+            if( commRank == 0 )
+                std::cout << "Unit velocity model" << std::endl;
             // Unit velocity
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
                 localVelocity[i] = 1.;
             break;
         case 1:
+            if( commRank == 0 )
+                std::cout << "Converging lens velocity model" << std::endl;
             // Converging lens
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -168,6 +172,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 2:
+            if( commRank == 0 )
+                std::cout << "Wave guide velocity model" << std::endl;
             // Wave guide
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -193,6 +199,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 3:
+            if( commRank == 0 )
+                std::cout << "Two layer velocity model" << std::endl;
             // Two layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -205,6 +213,9 @@ main( int argc, char* argv[] )
             }
             break;
         case 4:
+            if( commRank == 0 )
+                std::cout << "Cavity velocity model (might not converge!)"
+                          << std::endl;
             // Cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -234,6 +245,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 5:
+            if( commRank == 0 )
+                std::cout << "Reverse-cavity velocity model" << std::endl;
             // Reverse-cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -263,6 +276,9 @@ main( int argc, char* argv[] )
             }
             break;
         case 6:
+            if( commRank == 0 )
+                std::cout << "Bottom half of cavity velocity model" 
+                          << std::endl;
             // Bottom half of cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -294,6 +310,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 7:
+            if( commRank == 0 )
+                std::cout << "Top half of cavity velocity model" << std::endl;
             // Top half of cavity
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -325,6 +343,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 8:
+            if( commRank == 0 )
+                std::cout << "Increasing layers velocity model" << std::endl;
             // Increasing layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -347,6 +367,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 9:
+            if( commRank == 0 )
+                std::cout << "Decreasing layers velocity model" << std::endl;
             // Decreasing layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -369,6 +391,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 10:
+            if( commRank == 0 )
+                std::cout << "Sideways layers velocity model" << std::endl;
             // Sideways layers
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -397,6 +421,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 11:
+            if( commRank == 0 )
+                std::cout << "Wedge velocity model" << std::endl;
             // Wedge
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -421,6 +447,8 @@ main( int argc, char* argv[] )
             }
             break;
         case 12:
+            if( commRank == 0 )
+                std::cout << "Uniform over [1,3] velocity model" << std::endl;
             // Uniform perturbation of unity (between 1 and 3)
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
                 localVelocity[i] = 2.+plcg::ParallelUniform<double>();
