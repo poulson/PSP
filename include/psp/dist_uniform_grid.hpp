@@ -56,13 +56,13 @@ enum PlaneType {
 // cyclically distributed over each of the three dimensions, x first, y second,
 // and z third.
 //
-template<typename T>
+template<typename F>
 class DistUniformGrid
 {
 public:
 
     // Generate an nx x ny x nz grid, where each node contains 'numScalars' 
-    // entries of type 'T' and the grid is distributed over a px x py x pz grid 
+    // entries of type 'F' and the grid is distributed over a px x py x pz grid 
     // over the specified communicator.
     DistUniformGrid
     ( int numScalars,
@@ -86,8 +86,8 @@ public:
     int LocalIndex( int naturalIndex ) const;
     int LocalIndex( int x, int y, int z ) const;
     int NaturalIndex( int x, int y, int z ) const;
-    T* LocalBuffer();
-    const T* LockedLocalBuffer() const;
+    F* LocalBuffer();
+    const F* LockedLocalBuffer() const;
 
     int XShift() const;
     int YShift() const;
@@ -101,7 +101,6 @@ public:
     GridDataOrder Order() const;
 
     // Linearly interpolate the grid to the specified dimensions
-    // NOTE: This is not yet finished
     void InterpolateTo( int nx, int ny, int nz );
 
     void WritePlane
@@ -148,18 +147,18 @@ private:
 
     int xShift_, yShift_, zShift_;
     int xLocalSize_, yLocalSize_, zLocalSize_;
-    std::vector<T> localData_;
+    std::vector<F> localData_;
 
-    void RedistributeForVtk( std::vector<T>& localBox ) const;
+    void RedistributeForVtk( std::vector<F>& localBox ) const;
 };
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
 //----------------------------------------------------------------------------//
 
-template<typename T>
+template<typename F>
 inline 
-DistUniformGrid<T>::DistUniformGrid
+DistUniformGrid<F>::DistUniformGrid
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
   int px, int py, int pz, mpi::Comm comm )
@@ -183,9 +182,9 @@ DistUniformGrid<T>::DistUniformGrid
     localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
 
-template<typename T>
+template<typename F>
 inline 
-DistUniformGrid<T>::DistUniformGrid
+DistUniformGrid<F>::DistUniformGrid
 ( int numScalars,
   int nx, int ny, int nz, GridDataOrder order,
   mpi::Comm comm )
@@ -227,89 +226,89 @@ DistUniformGrid<T>::DistUniformGrid
 #endif
 }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::XSize() const
+DistUniformGrid<F>::XSize() const
 { return nx_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::YSize() const
+DistUniformGrid<F>::YSize() const
 { return ny_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::ZSize() const
+DistUniformGrid<F>::ZSize() const
 { return nz_; }
 
-template<typename T>
+template<typename F>
 inline mpi::Comm 
-DistUniformGrid<T>::Comm() const
+DistUniformGrid<F>::Comm() const
 { return comm_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::XShift() const
+DistUniformGrid<F>::XShift() const
 { return xShift_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::YShift() const
+DistUniformGrid<F>::YShift() const
 { return yShift_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::ZShift() const
+DistUniformGrid<F>::ZShift() const
 { return zShift_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::XStride() const
+DistUniformGrid<F>::XStride() const
 { return px_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::YStride() const
+DistUniformGrid<F>::YStride() const
 { return py_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::ZStride() const
+DistUniformGrid<F>::ZStride() const
 { return pz_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::XLocalSize() const
+DistUniformGrid<F>::XLocalSize() const
 { return xLocalSize_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::YLocalSize() const
+DistUniformGrid<F>::YLocalSize() const
 { return yLocalSize_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::ZLocalSize() const
+DistUniformGrid<F>::ZLocalSize() const
 { return zLocalSize_; }
 
-template<typename T>
-inline T* 
-DistUniformGrid<T>::LocalBuffer()
+template<typename F>
+inline F* 
+DistUniformGrid<F>::LocalBuffer()
 { return &localData_[0]; }
 
-template<typename T>
-inline const T* 
-DistUniformGrid<T>::LockedLocalBuffer() const
+template<typename F>
+inline const F* 
+DistUniformGrid<F>::LockedLocalBuffer() const
 { return &localData_[0]; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::NumScalars() const
+DistUniformGrid<F>::NumScalars() const
 { return numScalars_; }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::OwningProcess( int naturalIndex ) const
+DistUniformGrid<F>::OwningProcess( int naturalIndex ) const
 {
     const int x = naturalIndex % nx_;
     const int y = (naturalIndex/nx_) % ny_;
@@ -317,9 +316,9 @@ DistUniformGrid<T>::OwningProcess( int naturalIndex ) const
     return OwningProcess( x, y, z );
 }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::OwningProcess( int x, int y, int z ) const
+DistUniformGrid<F>::OwningProcess( int x, int y, int z ) const
 {
     const int xProc = x % px_;
     const int yProc = y % py_;
@@ -327,9 +326,9 @@ DistUniformGrid<T>::OwningProcess( int x, int y, int z ) const
     return xProc + yProc*px_ + zProc*px_*py_;
 }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::LocalIndex( int naturalIndex ) const
+DistUniformGrid<F>::LocalIndex( int naturalIndex ) const
 {
     const int x = naturalIndex % nx_;
     const int y = (naturalIndex/nx_) % ny_;
@@ -337,10 +336,20 @@ DistUniformGrid<T>::LocalIndex( int naturalIndex ) const
     return LocalIndex( x, y, z );
 }
 
-template<typename T>
+template<typename F>
 inline int 
-DistUniformGrid<T>::LocalIndex( int x, int y, int z ) const
+DistUniformGrid<F>::LocalIndex( int x, int y, int z ) const
 { 
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::LocalIndex");
+    if( x % px_ != xShift_ )
+        throw std::logic_error("x coordinate not owned by this process");
+    if( y % py_ != yShift_ )
+        throw std::logic_error("y coordinate not owned by this process");
+    if( z % pz_ != zShift_ )
+        throw std::logic_error("z coordinate not owned by this process");
+    PopCallStack();
+#endif
     const int xLocal = (x-xShift_) / px_;
     const int yLocal = (y-yShift_) / py_;
     const int zLocal = (z-zShift_) / pz_;
@@ -370,14 +379,14 @@ DistUniformGrid<T>::LocalIndex( int x, int y, int z ) const
     return index*numScalars_;
 }
 
-template<typename T>
+template<typename F>
 inline int
-DistUniformGrid<T>::NaturalIndex( int x, int y, int z ) const
+DistUniformGrid<F>::NaturalIndex( int x, int y, int z ) const
 { return x + y*nx_ + z*nx_*ny_; }
 
-template<typename T>
+template<typename F>
 inline void
-DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
+DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::InterpolateTo");
@@ -389,6 +398,9 @@ DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
         throw std::logic_error("Cannot coarsen with InterpolateTo");
 
     // Compute the new local dimensions
+    const int xLocalOldSize = xLocalSize_;
+    const int yLocalOldSize = yLocalSize_;
+    const int zLocalOldSize = zLocalSize_;
     const int xLocalNewSize = LocalLength( nx, xShift_, px_ );
     const int yLocalNewSize = LocalLength( ny, yShift_, py_ );
     const int zLocalNewSize = LocalLength( nz, zShift_, pz_ );
@@ -404,9 +416,9 @@ DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
         const int z = zShift_ + zLocal*pz_;
         const double zOld = z / zRatio;
         const int zLower = floor( zOld );
-        const int zUpper = zLower+1;
+        const int zUpper = ( zLower!=nzOld-1 ? zLower+1 : zLower );
 #ifndef RELEASE
-        if( zLower < 0 || zUpper >= zLocalSize_ )
+        if( zLower < 0 || zUpper >= nzOld )
             throw std::logic_error("z interpolation out of bounds");
 #endif
         for( int yLocal=0; yLocal<yLocalNewSize; ++yLocal )
@@ -414,9 +426,9 @@ DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
             const int y = yShift_ + yLocal*py_;
             const double yOld = y / yRatio;
             const int yLower = floor( yOld );
-            const int yUpper = yLower+1;
+            const int yUpper = ( yLower!=nyOld-1 ? yLower+1 : yLower );
 #ifndef RELEASE
-            if( yLower < 0 || yUpper >= yLocalSize_ )
+            if( yLower < 0 || yUpper >= nyOld )
                 throw std::logic_error("y interpolation out of bounds");
 #endif
             for( int xLocal=0; xLocal<xLocalNewSize; ++xLocal )
@@ -424,9 +436,9 @@ DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
                 const int x = xShift_ + xLocal*px_;
                 const double xOld = x / xRatio;
                 const int xLower = floor( xOld );
-                const int xUpper = xLower+1;
+                const int xUpper = ( xLower!=nxOld-1 ? xLower+1 : xLower );
 #ifndef RELEASE
-                if( xLower < 0 || xUpper >= xLocalSize_ )
+                if( xLower < 0 || xUpper >= nxOld )
                     throw std::logic_error("x interpolation out of bounds");
 #endif
                 surroundingSet.insert( NaturalIndex(xLower,yLower,zLower) );
@@ -442,29 +454,187 @@ DistUniformGrid<T>::InterpolateTo( int nx, int ny, int nz )
     }
 
     // Extract the vector of surrounding natural indices
-    std::vector<int> surrounding
-    ( surroundingSet.begin(), surroundingSet.end() );
+    const int numSurrounding = surroundingSet.size();
+    std::vector<int> surrounding( numSurrounding );
+    std::copy
+    ( surroundingSet.begin(), surroundingSet.end(), surrounding.begin() );
 
-    // TODO: Map the surrounding indices to their owning processes
+    // Map the surrounding indices to their owning processes
+    const int commSize = mpi::CommSize( comm_ );
+    std::vector<int> recvSizes( commSize, 0 );
+    std::vector<int> owningProcs( numSurrounding );
+    for( int s=0; s<numSurrounding; ++s )
+    {
+        const int q = OwningProcess( surrounding[s] );
+        owningProcs[s] = q;
+        ++recvSizes[q];
+    }
+    int numRecvs=0;
+    std::vector<int> recvOffsets( commSize );
+    for( int q=0; q<commSize; ++q )
+    {
+        recvOffsets[q] = numRecvs;
+        numRecvs += recvSizes[q];
+    }
 
-    // TODO: Run an AllToAll to communicate the values (remember numScalars!)
+    // Run an AllToAll to coordinate the send sizes
+    std::vector<int> sendSizes( commSize );
+    mpi::AllToAll( &recvSizes[0], 1, &sendSizes[0], 1, comm_ );
 
-    // TODO: Interpolate to generate the new grid
+    // Pack the indices from the original grid which we need
+    std::vector<int> recvIndices( numRecvs );
+    std::vector<int> offsets = recvOffsets;
+    for( int s=0; s<numSurrounding; ++s )
+        recvIndices[offsets[owningProcs[s]]++] = surrounding[s];
+
+    // Exchange the indices
+    int numSends=0;
+    std::vector<int> sendOffsets( commSize );
+    for( int q=0; q<commSize; ++q )
+    {
+        sendOffsets[q] = numSends;
+        numSends += sendSizes[q];
+    }
+    std::vector<int> sendIndices( numSends );
+    mpi::AllToAll
+    ( &recvIndices[0], &recvSizes[0], &recvOffsets[0],
+      &sendIndices[0], &sendSizes[0], &sendOffsets[0], comm_ );
+
+    // Pack the requested indices
+    std::vector<F> sendValues( numSends*numScalars_ );
+    for( int s=0; s<numSends; ++s )
+    {
+        const int localIndex = LocalIndex( sendIndices[s] );
+        for( int t=0; t<numScalars_; ++t )
+            sendValues[s*numScalars_+t] = localData_[localIndex+t];
+    }
+    for( int q=0; q<commSize; ++q )
+    {
+        sendSizes[q] *= numScalars_;
+        recvSizes[q] *= numScalars_;
+        sendOffsets[q] *= numScalars_;
+        recvOffsets[q] *= numScalars_;
+    }
+
+    // Perform the exchange
+    std::vector<F> recvValues( numRecvs*numScalars_ );
+    mpi::AllToAll
+    ( &sendValues[0], &sendSizes[0], &sendOffsets[0],
+      &recvValues[0], &recvSizes[0], &recvOffsets[0], comm_ );
+    sendValues.clear();
+
+    // Interpolate to generate the new grid
+    nx_ = nx;
+    ny_ = ny;
+    nz_ = nz;
+    xLocalSize_ = xLocalNewSize;
+    yLocalSize_ = yLocalNewSize;
+    zLocalSize_ = zLocalNewSize;
+    localData_.resize( xLocalNewSize*yLocalNewSize*zLocalNewSize*numScalars_ );
+    F values[2][2][2];
+    int indices[2][2][2], offs[2][2][2];
+    for( int zLocal=0; zLocal<zLocalNewSize; ++zLocal )
+    {
+        const int z = zShift_ + zLocal*pz_;
+        const double zOld = z / zRatio;
+        const int zLower = floor( zOld );
+        const int zUpper = ( zLower!=nzOld-1 ? zLower+1 : zLower );
+        for( int yLocal=0; yLocal<yLocalNewSize; ++yLocal )
+        {
+            const int y = yShift_ + yLocal*py_;
+            const double yOld = y / yRatio;
+            const int yLower = floor( yOld );
+            const int yUpper = ( yLower!=nyOld-1 ? yLower+1 : yLower );
+            for( int xLocal=0; xLocal<xLocalNewSize; ++xLocal )
+            {
+                const int x = xShift_ + xLocal*px_;
+                const double xOld = x / xRatio;
+                const int xLower = floor( xOld );
+                const int xUpper = ( xLower!=nxOld-1 ? xLower+1 : xLower);
+
+                indices[0][0][0] = xLower + yLower*nxOld + zLower*nxOld*nyOld;
+                indices[0][0][1] = xLower + yLower*nxOld + zUpper*nxOld*nyOld;
+                indices[0][1][0] = xLower + yUpper*nxOld + zLower*nxOld*nyOld;
+                indices[0][1][1] = xLower + yUpper*nxOld + zUpper*nxOld*nyOld;
+                indices[1][0][0] = xUpper + yLower*nxOld + zLower*nxOld*nyOld;
+                indices[1][0][1] = xUpper + yLower*nxOld + zUpper*nxOld*nyOld;
+                indices[1][1][0] = xUpper + yUpper*nxOld + zLower*nxOld*nyOld;
+                indices[1][1][1] = xUpper + yUpper*nxOld + zUpper*nxOld*nyOld;
+
+                // Find the location of the surrounding indices
+                const int* pointer;
+                for( int i=0; i<2; ++i )
+                {
+                    for( int j=0; j<2; ++j )
+                    {
+                        for( int k=0; k<2; ++k )
+                        {
+                            const int index = indices[i][j][k];
+                            const int xIndex = index % nxOld;
+                            const int yIndex = (index/nxOld) % nyOld;
+                            const int zIndex = index/(nxOld*nyOld);
+                            const int q = OwningProcess( xIndex, yIndex, zIndex );
+                            const int* beg = 
+                                &recvIndices[recvOffsets[q]/numScalars_];
+                            const int* end = 
+                                beg + recvSizes[q]/numScalars_;
+                            pointer = std::lower_bound( beg, end, index );
+#ifndef RELEASE
+                            if( pointer == end )
+                                throw std::logic_error
+                                ("Could not find surrounding index");
+#endif
+                            const int offset = pointer - &recvIndices[0];
+                            offs[i][j][k] = offset;
+                        }
+                    }
+                }
+
+                const int localIndex = LocalIndex( x, y, z );
+                for( int s=0; s<numScalars_; ++s )
+                {
+                    for( int i=0; i<2; ++i )
+                        for( int j=0; j<2; ++j )
+                            for( int k=0; k<2; ++k )
+                                values[i][j][k] = 
+                                    recvValues[offs[i][j][k]*numScalars_+s];
+
+                    // Interpolate in the z dimension
+                    F t = zOld-floor(zOld);
+                    for( int i=0; i<2; ++i )
+                        for( int j=0; j<2; ++j )
+                            values[i][j][0] = 
+                                (1.-t)*values[i][j][0]+t*values[i][j][1];
+
+                    // Interpolate in the y dimension
+                    t = yOld-floor(yOld);
+                    for( int i=0; i<2; ++i )
+                        values[i][0][0] = 
+                            (1.-t)*values[i][0][0]+t*values[i][1][0];
+
+                    // Interpolate in the x dimension
+                    t = xOld-floor(xOld);
+                    const F average = (1.-t)*values[0][0][0]+t*values[1][0][0];
+                    localData_[localIndex+s] = average;
+                }
+            }
+        }
+    }
 #ifndef RELEASE
     PopCallStack();
 #endif
 }
 
-template<typename T>
+template<typename F>
 inline void 
-DistUniformGrid<T>::WritePlane
+DistUniformGrid<F>::WritePlane
 ( PlaneType planeType, int whichPlane, const std::string baseName ) const
-{ return WritePlaneHelper<T>::Func( *this, planeType, whichPlane, baseName ); }
+{ return WritePlaneHelper<F>::Func( *this, planeType, whichPlane, baseName ); }
 
-template<typename T>
+template<typename F>
 template<typename R>
 inline void 
-DistUniformGrid<T>::WritePlaneHelper<R>::Func
+DistUniformGrid<F>::WritePlaneHelper<R>::Func
 ( const DistUniformGrid<R>& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
@@ -523,7 +693,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
         }
 
         // Pack the send buffer
-        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        std::vector<F> sendBuffer( std::max(sendCount,1) );
         if( sendCount != 0 )
         {
             int offset=0;
@@ -542,7 +712,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
             }
         }
 
-        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        std::vector<F> recvBuffer( std::max(totalRecvSize,1) );
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
@@ -551,7 +721,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
         if( commRank == 0 )
         {
             // Unpack the data
-            std::vector<T> planes( totalRecvSize );
+            std::vector<F> planes( totalRecvSize );
             const int planeSize = nx*ny;
             for( int yProc=0; yProc<py; ++yProc )
             {
@@ -579,7 +749,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
             {
-                const T* plane = &planes[k*planeSize];
+                const F* plane = &planes[k*planeSize];
 
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,ny);
@@ -660,7 +830,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
         }
 
         // Pack the send buffer
-        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        std::vector<F> sendBuffer( std::max(sendCount,1) );
         if( sendCount != 0 )
         {
             int offset=0;
@@ -679,7 +849,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
             }
         }
 
-        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        std::vector<F> recvBuffer( std::max(totalRecvSize,1) );
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
@@ -688,7 +858,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
         if( commRank == 0 )
         {
             // Unpack the data
-            std::vector<T> planes( totalRecvSize );
+            std::vector<F> planes( totalRecvSize );
             const int planeSize = nx*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
@@ -716,7 +886,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
             {
-                const T* plane = &planes[k*planeSize];
+                const F* plane = &planes[k*planeSize];
 
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,nz);
@@ -795,7 +965,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
         }
 
         // Pack the send buffer
-        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        std::vector<F> sendBuffer( std::max(sendCount,1) );
         if( sendCount != 0 )
         {
             int offset=0;
@@ -814,7 +984,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
             }
         }
 
-        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        std::vector<F> recvBuffer( std::max(totalRecvSize,1) );
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
@@ -823,7 +993,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
         if( commRank == 0 )
         {
             // Unpack the data
-            std::vector<T> planes( totalRecvSize );
+            std::vector<F> planes( totalRecvSize );
             const int planeSize = ny*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
@@ -851,7 +1021,7 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
             {
-                const T* plane = &planes[k*planeSize];
+                const F* plane = &planes[k*planeSize];
 
                 // For writing a VTK file
                 const int maxPoints = std::max(ny,nz);
@@ -897,10 +1067,10 @@ DistUniformGrid<T>::WritePlaneHelper<R>::Func
 #endif
 }
 
-template<typename T>
+template<typename F>
 template<typename R>
 inline void 
-DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
+DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, 
   PlaneType planeType, int whichPlane, const std::string baseName )
 {
@@ -957,7 +1127,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
         }
 
         // Pack the send buffer
-        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        std::vector<F> sendBuffer( std::max(sendCount,1) );
         if( sendCount != 0 )
         {
             int offset=0;
@@ -976,7 +1146,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             }
         }
 
-        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        std::vector<F> recvBuffer( std::max(totalRecvSize,1) );
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
@@ -985,7 +1155,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
         if( commRank == 0 )
         {
             // Unpack the data
-            std::vector<T> planes( totalRecvSize );
+            std::vector<F> planes( totalRecvSize );
             const int planeSize = nx*ny;
             for( int yProc=0; yProc<py; ++yProc )
             {
@@ -1013,7 +1183,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
             {
-                const T* plane = &planes[k*planeSize];
+                const F* plane = &planes[k*planeSize];
 
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,ny);
@@ -1109,7 +1279,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
         }
 
         // Pack the send buffer
-        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        std::vector<F> sendBuffer( std::max(sendCount,1) );
         if( sendCount != 0 )
         {
             int offset=0;
@@ -1128,7 +1298,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             }
         }
 
-        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        std::vector<F> recvBuffer( std::max(totalRecvSize,1) );
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
@@ -1137,7 +1307,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
         if( commRank == 0 )
         {
             // Unpack the data
-            std::vector<T> planes( totalRecvSize );
+            std::vector<F> planes( totalRecvSize );
             const int planeSize = nx*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
@@ -1165,7 +1335,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
             {
-                const T* plane = &planes[k*planeSize];
+                const F* plane = &planes[k*planeSize];
 
                 // For writing a VTK file
                 const int maxPoints = std::max(nx,nz);
@@ -1260,7 +1430,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
         }
 
         // Pack the send buffer
-        std::vector<T> sendBuffer( std::max(sendCount,1) );
+        std::vector<F> sendBuffer( std::max(sendCount,1) );
         if( sendCount != 0 )
         {
             int offset=0;
@@ -1279,7 +1449,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             }
         }
 
-        std::vector<T> recvBuffer( std::max(totalRecvSize,1) );
+        std::vector<F> recvBuffer( std::max(totalRecvSize,1) );
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
@@ -1288,7 +1458,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
         if( commRank == 0 )
         {
             // Unpack the data
-            std::vector<T> planes( totalRecvSize );
+            std::vector<F> planes( totalRecvSize );
             const int planeSize = ny*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
@@ -1316,7 +1486,7 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
             {
-                const T* plane = &planes[k*planeSize];
+                const F* plane = &planes[k*planeSize];
 
                 // For writing a VTK file
                 const int maxPoints = std::max(ny,nz);
@@ -1375,9 +1545,9 @@ DistUniformGrid<T>::WritePlaneHelper<Complex<R> >::Func
     }
 }
 
-template<typename T>
+template<typename F>
 inline void 
-DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
+DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::RedistributeForVtk");
@@ -1455,7 +1625,7 @@ DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 #endif
 
     // Pack the send buffer
-    std::vector<T> sendBuffer( totalSendSize );
+    std::vector<F> sendBuffer( totalSendSize );
     std::vector<int> offsets = sendDispls;
     for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
     {
@@ -1480,7 +1650,7 @@ DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
     }
 
     // Perform AllToAllv
-    std::vector<T> recvBuffer( totalRecvSize );
+    std::vector<F> recvBuffer( totalRecvSize );
     mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
@@ -1506,8 +1676,8 @@ DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
                 const int localOffset = 
                     (xOffset + yOffset*xBoxSize + zOffset*xBoxSize*yBoxSize)*
                     numScalars_;
-                T* offsetLocal = &localBox[localOffset];
-                const T* procRecv = &recvBuffer[recvDispls[proc]];
+                F* offsetLocal = &localBox[localOffset];
+                const F* procRecv = &recvBuffer[recvDispls[proc]];
                 for( int zLocal=0; zLocal<zLength; ++zLocal )
                 {
                     for( int yLocal=0; yLocal<yLength; ++yLocal )
@@ -1517,14 +1687,13 @@ DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
                             numScalars_;
                         const int procRowIndex = 
                             (yLocal + zLocal*yLength)*xLength*numScalars_;
-                        T* localRow = &offsetLocal[localRowIndex];
-                        const T* procRow = &procRecv[procRowIndex];
+                        F* localRow = &offsetLocal[localRowIndex];
+                        const F* procRow = &procRecv[procRowIndex];
                         for( int xLocal=0; xLocal<xLength; ++xLocal )
                         {
-                            std::memcpy
+                            elem::MemCopy
                             ( &localRow[xLocal*px_*numScalars_],
-                              &procRow[xLocal*numScalars_],
-                              numScalars_*sizeof(T) );
+                              &procRow[xLocal*numScalars_], numScalars_ );
                         }
                     }
                 }
@@ -1536,15 +1705,15 @@ DistUniformGrid<T>::RedistributeForVtk( std::vector<T>& localBox ) const
 #endif
 }
 
-template<typename T>
+template<typename F>
 inline void 
-DistUniformGrid<T>::WriteVolume( const std::string baseName ) const
-{ return WriteVolumeHelper<T>::Func( *this, baseName ); }
+DistUniformGrid<F>::WriteVolume( const std::string baseName ) const
+{ return WriteVolumeHelper<F>::Func( *this, baseName ); }
 
-template<typename T>
+template<typename F>
 template<typename R>
 inline void 
-DistUniformGrid<T>::WriteVolumeHelper<R>::Func
+DistUniformGrid<F>::WriteVolumeHelper<R>::Func
 ( const DistUniformGrid<R>& parent, const std::string baseName )
 {
 #ifndef RELEASE
@@ -1728,10 +1897,10 @@ DistUniformGrid<T>::WriteVolumeHelper<R>::Func
 #endif
 }
 
-template<typename T>
+template<typename F>
 template<typename R>
 inline void 
-DistUniformGrid<T>::WriteVolumeHelper<Complex<R> >::Func
+DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, const std::string baseName )
 {
 #ifndef RELEASE
