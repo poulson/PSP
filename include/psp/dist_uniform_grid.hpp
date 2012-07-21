@@ -100,40 +100,43 @@ public:
     int ZLocalSize() const;
     GridDataOrder Order() const;
 
+    // Load the distributed data from a sequential file
+    void SequentialLoad( std::string filename );
+
     // Linearly interpolate the grid to the specified dimensions
     void InterpolateTo( int nx, int ny, int nz );
 
     void WritePlane
-    ( PlaneType planeType, int whichPlane, const std::string baseName ) const;
+    ( PlaneType planeType, int whichPlane, const std::string basename ) const;
     template<typename R>
     struct WritePlaneHelper
     {
         static void Func
         ( const DistUniformGrid<R>& parent, 
-          PlaneType planeType, int whichPlane, const std::string baseName );
+          PlaneType planeType, int whichPlane, const std::string basename );
     };
     template<typename R>
     struct WritePlaneHelper<Complex<R> >
     {
         static void Func
         ( const DistUniformGrid<Complex<R> >& parent, 
-          PlaneType planeType, int whichPlane, const std::string baseName );
+          PlaneType planeType, int whichPlane, const std::string basename );
     };
     template<typename R> friend struct WritePlaneHelper;
 
-    void WriteVolume( const std::string baseName ) const;
+    void WriteVolume( const std::string basename ) const;
     template<typename R>
     struct WriteVolumeHelper
     {
         static void Func
-        ( const DistUniformGrid<R>& parent, const std::string baseName );
+        ( const DistUniformGrid<R>& parent, const std::string basename );
     };
     template<typename R>
     struct WriteVolumeHelper<Complex<R> >
     {
         static void Func
         ( const DistUniformGrid<Complex<R> >& parent, 
-          const std::string baseName );
+          const std::string basename );
     };
     template<typename R> friend struct WriteVolumeHelper;
 
@@ -386,6 +389,137 @@ DistUniformGrid<F>::NaturalIndex( int x, int y, int z ) const
 
 template<typename F>
 inline void
+DistUniformGrid<F>::SequentialLoad( std::string filename )
+{
+#ifndef RELEASE
+    PushCallStack("DistUniformGrid::SequentialLoad");
+#endif
+    std::ifstream is;
+    is.open( filename.c_str(), std::ios::in|std::ios::binary );
+    switch( order_ )
+    {
+    case XYZ:
+        for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
+        {
+            const int z = zShift_ + zLocal*pz_;
+            for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
+            {
+                const int y = yShift_ + yLocal*py_;
+                for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
+                {
+                    const int x = xShift_ + xLocal*px_;
+                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const std::streamoff pos = i*numScalars_*sizeof(F);
+                    is.seekg( pos );             
+                    const int localIndex = LocalIndex( x, y, z );
+                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                }
+            }
+        }
+        break;
+    case XZY:
+        for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
+        {
+            const int y = yShift_ + yLocal*py_;
+            for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
+            {
+                const int z = zShift_ + zLocal*pz_;
+                for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
+                {
+                    const int x = xShift_ + xLocal*px_;
+                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const std::streamoff pos = i*numScalars_*sizeof(F);
+                    is.seekg( pos );             
+                    const int localIndex = LocalIndex( x, y, z );
+                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                }
+            }
+        }
+        break;
+    case YXZ:
+        for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
+        {
+            const int z = zShift_ + zLocal*pz_;
+            for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
+            {
+                const int x = xShift_ + xLocal*px_;
+                for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
+                {
+                    const int y = yShift_ + yLocal*py_;
+                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const std::streamoff pos = i*numScalars_*sizeof(F);
+                    is.seekg( pos );             
+                    const int localIndex = LocalIndex( x, y, z );
+                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                }
+            }
+        }
+        break;
+    case YZX:
+        for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
+        {
+            const int x = xShift_ + xLocal*px_;
+            for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
+            {
+                const int z = zShift_ + zLocal*pz_;
+                for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
+                {
+                    const int y = yShift_ + yLocal*py_;
+                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const std::streamoff pos = i*numScalars_*sizeof(F);
+                    is.seekg( pos );             
+                    const int localIndex = LocalIndex( x, y, z );
+                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                }
+            }
+        }
+        break;
+    case ZXY:
+        for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
+        {
+            const int y = yShift_ + yLocal*py_;
+            for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
+            {
+                const int x = xShift_ + xLocal*px_;
+                for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
+                {
+                    const int z = zShift_ + zLocal*pz_;
+                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const std::streamoff pos = i*numScalars_*sizeof(F);
+                    is.seekg( pos );             
+                    const int localIndex = LocalIndex( x, y, z );
+                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                }
+            }
+        }
+        break;
+    case ZYX:
+        for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
+        {
+            const int x = xShift_ + xLocal*px_;
+            for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
+            {
+                const int y = yShift_ + yLocal*py_;
+                for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
+                {
+                    const int z = zShift_ + zLocal*pz_;
+                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const std::streamoff pos = i*numScalars_*sizeof(F);
+                    is.seekg( pos );             
+                    const int localIndex = LocalIndex( x, y, z );
+                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                }
+            }
+        }
+        break;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename F>
+inline void
 DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
 {
 #ifndef RELEASE
@@ -394,8 +528,6 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     const int nxOld = nx_;
     const int nyOld = ny_;
     const int nzOld = nz_;
-    if( nx < nxOld || ny < nyOld || nz < nzOld )
-        throw std::logic_error("Cannot coarsen with InterpolateTo");
 
     // Compute the new local dimensions
     const int xLocalOldSize = xLocalSize_;
@@ -628,15 +760,15 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
 template<typename F>
 inline void 
 DistUniformGrid<F>::WritePlane
-( PlaneType planeType, int whichPlane, const std::string baseName ) const
-{ return WritePlaneHelper<F>::Func( *this, planeType, whichPlane, baseName ); }
+( PlaneType planeType, int whichPlane, const std::string basename ) const
+{ return WritePlaneHelper<F>::Func( *this, planeType, whichPlane, basename ); }
 
 template<typename F>
 template<typename R>
 inline void 
 DistUniformGrid<F>::WritePlaneHelper<R>::Func
 ( const DistUniformGrid<R>& parent, 
-  PlaneType planeType, int whichPlane, const std::string baseName )
+  PlaneType planeType, int whichPlane, const std::string basename )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::WritePlaneHelper");
@@ -755,7 +887,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                 const int maxPoints = std::max(nx,ny);
                 const R h = 1./(maxPoints+1.0);
                 std::ostringstream os;
-                os << baseName << "_" << k << ".vti";
+                os << basename << "_" << k << ".vti";
                 std::ofstream file( os.str().c_str(), std::ios::out );
 
                 os.clear(); os.str("");
@@ -892,7 +1024,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                 const int maxPoints = std::max(nx,nz);
                 const R h = 1./(maxPoints+1.0);
                 std::ostringstream os;
-                os << baseName << "_" << k << ".vti";
+                os << basename << "_" << k << ".vti";
                 std::ofstream file( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
                 os << "<?xml version=\"1.0\"?>\n"
@@ -1027,7 +1159,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                 const int maxPoints = std::max(ny,nz);
                 const R h = 1./(maxPoints+1.0);
                 std::ostringstream os;
-                os << baseName << "_" << k << ".vti";
+                os << basename << "_" << k << ".vti";
                 std::ofstream file( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
                 os << "<?xml version=\"1.0\"?>\n"
@@ -1072,7 +1204,7 @@ template<typename R>
 inline void 
 DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, 
-  PlaneType planeType, int whichPlane, const std::string baseName )
+  PlaneType planeType, int whichPlane, const std::string basename )
 {
     const int commRank = mpi::CommRank( parent.comm_ );
     const int commSize = mpi::CommSize( parent.comm_ );
@@ -1189,10 +1321,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 const int maxPoints = std::max(nx,ny);
                 const R h = 1./(maxPoints+1.0);
                 std::ostringstream os;
-                os << baseName << "_" << k << "_real.vti";
+                os << basename << "_" << k << "_real.vti";
                 std::ofstream realFile( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
-                os << baseName << "_" << k << "_imag.vti";
+                os << basename << "_" << k << "_imag.vti";
                 std::ofstream imagFile( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
                 os << "<?xml version=\"1.0\"?>\n"
@@ -1341,10 +1473,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 const int maxPoints = std::max(nx,nz);
                 const R h = 1./(maxPoints+1.0);
                 std::ostringstream os;
-                os << baseName << "_" << k << "_real.vti";
+                os << basename << "_" << k << "_real.vti";
                 std::ofstream realFile( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
-                os << baseName << "_" << k << "_imag.vti";
+                os << basename << "_" << k << "_imag.vti";
                 std::ofstream imagFile( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
                 os << "<?xml version=\"1.0\"?>\n"
@@ -1492,10 +1624,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 const int maxPoints = std::max(ny,nz);
                 const R h = 1./(maxPoints+1.0);
                 std::ostringstream os;
-                os << baseName << "_" << k << "_real.vti";
+                os << basename << "_" << k << "_real.vti";
                 std::ofstream realFile( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
-                os << baseName << "_" << k << "_imag.vti";
+                os << basename << "_" << k << "_imag.vti";
                 std::ofstream imagFile( os.str().c_str(), std::ios::out );
                 os.clear(); os.str("");
                 os << "<?xml version=\"1.0\"?>\n"
@@ -1707,14 +1839,14 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
 
 template<typename F>
 inline void 
-DistUniformGrid<F>::WriteVolume( const std::string baseName ) const
-{ return WriteVolumeHelper<F>::Func( *this, baseName ); }
+DistUniformGrid<F>::WriteVolume( const std::string basename ) const
+{ return WriteVolumeHelper<F>::Func( *this, basename ); }
 
 template<typename F>
 template<typename R>
 inline void 
 DistUniformGrid<F>::WriteVolumeHelper<R>::Func
-( const DistUniformGrid<R>& parent, const std::string baseName )
+( const DistUniformGrid<R>& parent, const std::string basename )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::WriteVolumeHelper");
@@ -1755,12 +1887,12 @@ DistUniformGrid<F>::WriteVolumeHelper<R>::Func
         for( int k=0; k<numScalars; ++k )
         {
             std::ostringstream os;
-            os << baseName << "_" << k << ".pvti";
+            os << basename << "_" << k << ".pvti";
             files[k] = new std::ofstream;
             files[k]->open( os.str().c_str() );
 #ifdef HAVE_MKDIR
             os.clear(); os.str("");
-            os << baseName << "_" << k;
+            os << basename << "_" << k;
             EnsureDirExists( os.str().c_str() );
 #endif
         }
@@ -1796,7 +1928,7 @@ DistUniformGrid<F>::WriteVolumeHelper<R>::Func
                        << xStart << " " << xStart+xBoxSize << " "
                        << yStart << " " << yStart+yBoxSize << " "
                        << zStart << " " << zStart+zBoxSize << "\" "
-                       << "Source=\"" << baseName << "_";
+                       << "Source=\"" << basename << "_";
                     for( int k=0; k<numScalars; ++k )
                         *files[k] << os.str();
                     os.clear(); os.str("");
@@ -1837,9 +1969,9 @@ DistUniformGrid<F>::WriteVolumeHelper<R>::Func
     {
         std::ostringstream os;    
 #ifdef HAVE_MKDIR
-        os << baseName << "_" << k << "/" << commRank << ".vti";
+        os << basename << "_" << k << "/" << commRank << ".vti";
 #else
-        os << baseName << "_" << k << "_" << commRank << ".vti";
+        os << basename << "_" << k << "_" << commRank << ".vti";
 #endif
         files[k] = new std::ofstream;
         files[k]->open( os.str().c_str() );
@@ -1901,7 +2033,7 @@ template<typename F>
 template<typename R>
 inline void 
 DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
-( const DistUniformGrid<Complex<R> >& parent, const std::string baseName )
+( const DistUniformGrid<Complex<R> >& parent, const std::string basename )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::WriteVolumeHelper");
@@ -1942,24 +2074,24 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
         for( int k=0; k<numScalars; ++k )
         {
             std::ostringstream os;
-            os << baseName << "_" << k << "_real.pvti";
+            os << basename << "_" << k << "_real.pvti";
             realFiles[k] = new std::ofstream;
             realFiles[k]->open( os.str().c_str() );
 #ifdef HAVE_MKDIR
             os.clear(); os.str("");
-            os << baseName << "_" << k << "_real";
+            os << basename << "_" << k << "_real";
             EnsureDirExists( os.str().c_str() );
 #endif
         }
         for( int k=0; k<numScalars; ++k )
         {
             std::ostringstream os;
-            os << baseName << "_" << k << "_imag.pvti";
+            os << basename << "_" << k << "_imag.pvti";
             imagFiles[k] = new std::ofstream;
             imagFiles[k]->open( os.str().c_str() );
 #ifdef HAVE_MKDIR
             os.clear(); os.str("");
-            os << baseName << "_" << k << "_imag";
+            os << basename << "_" << k << "_imag";
             EnsureDirExists( os.str().c_str() );
 #endif
         }
@@ -1995,7 +2127,7 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
                        << xStart << " " << xStart+xBoxSize << " "
                        << yStart << " " << yStart+yBoxSize << " "
                        << zStart << " " << zStart+zBoxSize << "\" "
-                       << "Source=\"" << baseName << "_";
+                       << "Source=\"" << basename << "_";
                     for( int k=0; k<numScalars; ++k )
                     {
                         *realFiles[k] << os.str();
@@ -2044,9 +2176,9 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
     {
         std::ostringstream os;    
 #ifdef HAVE_MKDIR
-        os << baseName << "_" << k << "_real/" << commRank << ".vti";
+        os << basename << "_" << k << "_real/" << commRank << ".vti";
 #else
-        os << baseName << "_" << k << "_real_" << commRank << ".vti";
+        os << basename << "_" << k << "_real_" << commRank << ".vti";
 #endif
         realFiles[k] = new std::ofstream;
         realFiles[k]->open( os.str().c_str() );
@@ -2055,9 +2187,9 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
     {
         std::ostringstream os;
 #ifdef HAVE_MKDIR
-        os << baseName << "_" << k << "_imag/" << commRank << ".vti";
+        os << basename << "_" << k << "_imag/" << commRank << ".vti";
 #else
-        os << baseName << "_" << k << "_imag_" << commRank << ".vti";
+        os << basename << "_" << k << "_imag_" << commRank << ".vti";
 #endif
         imagFiles[k] = new std::ofstream;
         imagFiles[k]->open( os.str().c_str() );
