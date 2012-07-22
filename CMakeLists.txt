@@ -26,6 +26,7 @@ set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 1)
 
 option(BUILD_TESTS "Build a collection of test executables" OFF)
+option(BUILD_EXAMPLES "Build one or more example executables" OFF)
 
 # TODO: Think of how to avoid this mess...
 add_subdirectory(external/clique)
@@ -117,6 +118,27 @@ if(BUILD_TESTS)
                             LINK_FLAGS ${MPI_LINK_FLAGS})
     endif()
     install(TARGETS tests-${TEST} DESTINATION bin/tests)
+  endforeach()
+endif()
+
+# Build the example drivers if necessary
+if(BUILD_EXAMPLES)
+  set(EXAMPLE_DIR ${PROJECT_SOURCE_DIR}/examples)
+  set(EXAMPLES Overthrust)
+
+  # Build the examples
+  set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/examples")
+  foreach(EXAMPLE ${EXAMPLES})
+    add_executable(examples-${EXAMPLE} ${EXAMPLE_DIR}/${EXAMPLE}.cpp)
+    target_link_libraries(examples-${EXAMPLE} psp)
+    set_target_properties(examples-${EXAMPLE} PROPERTIES
+                          OUTPUT_NAME ${EXAMPLE}
+                          RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
+    if(MPI_LINK_FLAGS)
+      set_target_properties(examples-${EXAMPLE} PROPERTIES
+                            LINK_FLAGS ${MPI_LINK_FLAGS})
+    endif()
+    install(TARGETS examples-${EXAMPLE} DESTINATION bin/examples)
   endforeach()
 endif()
 

@@ -23,18 +23,20 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "Overthrust <omega> <damping> <numPlanesPerPanel> "
-                 "<fact blocksize> <solve blocksize> <panelScheme> <SQMR?> "
-                 "<viz?>\n"
-              << "  <omega>: Frequency (in rad/sec) of problem\n"
-              << "  <damping>: imaginary shift [2 pi is standard]\n"
-              << "  <numPlanesPerPanel>: depth of sparse-direct solves\n"
-              << "  <fact blocksize>: factorization algorithmic blocksize\n"
-              << "  <solve blocksize>: solve algorithmic blocksize\n"
-              << "  <panel scheme>: NORMAL_1D=0, FAST_2D_LDL=1, "
-                 "COMPRESSED_2D_BLOCK_LDL=2\n"
-              << "  <SQMR?>: GMRES iff 0, SQMR otherwise\n"
-              << "  <full viz?>: Full visualization iff != 0\n"
+    std::cout << "Overthrust <nx> <ny> <nz> <omega> "
+                 "[PML on top=false] [damping=7] [# planes/panel=4] "
+                 "[panel scheme=1] [viz=0] "
+                 "[fact blocksize=96] [solve blocksize=64]\n"
+              << "\n"
+              << "  <nx,ny,nz>: size of grid in each dimension\n"
+              << "  <omega>: frequency (in rad/sec) of problem\n"
+              << "  [PML on top=false]: PML or Dirichlet b.c. on top?\n"
+              << "  [damping=7]: imaginary freq shift for preconditioner\n"
+              << "  [# of planes/panel=4]: number of planes per subdomain\n"
+              << "  [panel scheme=1]: NORMAL_1D=0, FAST_2D_LDL=1\n"
+              << "  [full viz=0]: full volume visualization iff != 0\n" 
+              << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
+              << "  [solve blocksize=64]: solve algorithmic blocksize\n"
               << std::endl;
 }
 
@@ -46,7 +48,7 @@ main( int argc, char* argv[] )
     const int commSize = psp::mpi::CommSize( comm );
     const int commRank = psp::mpi::CommRank( comm );
 
-    if( argc < 9 )
+    if( argc < 5 )
     {
         if( commRank == 0 )
             Usage();
@@ -54,73 +56,53 @@ main( int argc, char* argv[] )
         return 0;
     }
     int argNum=1;
-    const double omega = atof( argv[argNum++] );
-    const double damping = atof( argv[argNum++] );
-    const int numPlanesPerPanel = atoi( argv[argNum++] );
-    const int factBlocksize = atoi( argv[argNum++] );
-    const int solveBlocksize = atoi( argv[argNum++] );
-    const PanelScheme panelScheme = (PanelScheme)atoi( argv[argNum++] );
-    const bool useSQMR = atoi( argv[argNum++] );
-    const bool fullVisualize = atoi( argv[argNum++] );
-
-    const int Nx = 801;
-    const int Ny = 801;
-    const int Nz = 187;
-
-    if( commRank == 0 )
-    {
-        std::cout << "Running with omega=" << omega 
-                  << ", numPlanesPerPanel=" << numPlanesPerPanel
-                  << ", and damping=" << damping << std::endl;
-    }
-    
-    Discretization<double> disc
-    ( omega, Nx, Ny, Nz, 20., 20., 4.65, 
-      PML, PML, PML, PML, DIRICHLET, 5, 5, 5 );
+    const int nx = atoi(argv[argNum++]);
+    const int ny = atoi(argv[argNum++]);
+    const int nz = atoi(argv[argNum++]);
+    const double omega = atof(argv[argNum++]);
+    const bool pmlOnTop = ( argc>=6 ? atoi(argv[argNum++]) : false );
+    const double damping = ( argc>=7 ? atof(argv[argNum++]) : 7. );
+    const int numPlanesPerPanel = ( argc>=8 ? atoi(argv[argNum++]) : 4 );
+    const PanelScheme panelScheme = 
+        ( argc>=9 ? (PanelScheme)atoi(argv[argNum++]) : CLIQUE_FAST_2D_LDL );
+    const bool fullVisualize = ( argc>=10 ? atoi(argv[argNum++]) : true );
+    const int factBlocksize = ( argc>=11 ? atoi(argv[argNum++]) : 96 );
+    const int solveBlocksize = ( argc>=12 ? atoi(argv[argNum++]) : 64 );
 
     try 
     {
+        const double wx = 20.;
+        const double wy = 20.;
+        const double wz = 4.65;
+        const int pmlWidth = 5;
+        Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
+        Discretization<double> disc
+        ( omega, nx, ny, nz, wx, wy, wz, 
+          PML, PML, PML, PML, topBC, pmlWidth, pmlWidth, pmlWidth );
+
         DistHelmholtz<double> helmholtz
-        ( control, comm, damping, numPlanesPerPanel );
+        ( disc, comm, damping, numPlanesPerPanel );
 
-        const int cubeRoot = 
-            std::max(1,(int)std::floor(pow((double)commSize,0.333)));
-        int px = cubeRoot;
-        while( commSize % px != 0 )
-            ++px;
-        const int reduced = commSize / px;
-        const int sqrtReduced = 
-            std::max(1,(int)std::floor(sqrt((double)reduced)));
-        int py = sqrtReduced;
-        while( reduced % py != 0 )
-            ++py;
-        const int pz = reduced / py;
-        if( px*py*pz != commSize )
-            throw std::logic_error("Nonsensical process grid");
-        else if( commRank == 0 )
-            std::cout << "px=" << px << ", py=" << py << ", pz=" << pz 
+        const int nxOrig = 801;
+        const int nyOrig = 801;
+        const int nzOrig = 187;
+        if( commRank == 0 )
+            std::cout << "Loading sequential " 
+                      << nxOrig << " x " << nyOrig << " x " << nzOrig 
+                      << " overthrust data..." << std::endl;
+        DistUniformGrid<double> velocity
+        ( 1, nxOrig, nyOrig, nzOrig, XYZ, comm );
+        velocity.SequentialLoad("overthrust.dat");
+
+        if( commRank == 0 )
+            std::cout << "Interpolating to "
+                      << nx << " x " << ny << " x " << nz << " grid..." 
                       << std::endl;
+        velocity.InterpolateTo( nx, ny, nz );
 
-        GridData<double> velocity( 1, Nx, Ny, Nz, XYZ, px, py, pz, comm );
-        double* localVelocity = velocity.LocalBuffer();
-        const int xLocalSize = velocity.XLocalSize();
-        const int yLocalSize = velocity.YLocalSize();
-        const int zLocalSize = velocity.ZLocalSize();
-        const int xShift = velocity.XShift();
-        const int yShift = velocity.YShift();
-        const int zShift = velocity.ZShift();
-        std::ostringstream os;
-        os << "overthrust_" << commRank << ".dat";
-        std::ifstream velocityFile;
-        velocityFile.open( os.str().c_str(), std::ios::in|std::ios::binary );
-        velocityFile.read
-        ( (char*)localVelocity, 
-          xLocalSize*yLocalSize*zLocalSize*sizeof(double) );
-        velocityFile.close();
-
-        velocity.WritePlane( XY, Nz/2, "velocity-middleXY" );
-        velocity.WritePlane( XZ, Ny/2, "velocity-middleXZ" );
-        velocity.WritePlane( YZ, Nx/2, "velocity-middleYZ" );
+        velocity.WritePlane( XY, nz/2, "velocity-middleXY" );
+        velocity.WritePlane( XZ, ny/2, "velocity-middleXZ" );
+        velocity.WritePlane( YZ, nx/2, "velocity-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -147,9 +129,17 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        GridData<std::complex<double> > 
-            B( 3, Nx, Ny, Nz, XYZ, px, py, pz, comm );
-        std::complex<double>* localB = B.LocalBuffer();
+        DistUniformGrid<Complex<double> > B( 3, nx, ny, nz, XYZ, comm );
+        const int px = B.XStride();
+        const int py = B.YStride();
+        const int pz = B.ZStride();
+        const int xShift = B.XShift();
+        const int yShift = B.YShift();
+        const int zShift = B.ZShift();
+        const int xLocalSize = B.XLocalSize();
+        const int yLocalSize = B.YLocalSize();
+        const int zLocalSize = B.ZLocalSize();
+        Complex<double>* localB = B.LocalBuffer();
         const double center0[] = { 0.5, 0.5, 0.1 };
         const double center1[] = { 0.25, 0.25, 0.1 };
         const double center2[] = { 0.75, 0.75, 0.1 };
@@ -157,22 +147,22 @@ main( int argc, char* argv[] )
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
-            const double zSqueeze = control.wz / control.wx;
-            const double Z = zSqueeze * z / (Nz+1.0);
+            const double zSqueeze = disc.wz / disc.wx;
+            const double Z = zSqueeze * z / (nz+1.0);
             arg0[2] = (Z-center0[2]*zSqueeze)*(Z-center0[2]*zSqueeze);
             arg1[2] = (Z-center1[2]*zSqueeze)*(Z-center1[2]*zSqueeze);
             arg2[2] = (Z-center2[2]*zSqueeze)*(Z-center2[2]*zSqueeze);
             for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
                 const int y = yShift + yLocal*py;
-                const double Y = y / (Ny+1.0);
+                const double Y = y / (ny+1.0);
                 arg0[1] = (Y-center0[1])*(Y-center0[1]);
                 arg1[1] = (Y-center1[1])*(Y-center1[1]);
                 arg2[1] = (Y-center2[1])*(Y-center2[1]);
                 for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                 {
                     const int x = xShift + xLocal*px;
-                    const double X = x / (Nx+1.0);
+                    const double X = x / (nx+1.0);
                     arg0[0] = (X-center0[0])*(X-center0[0]);
                     arg1[0] = (X-center1[0])*(X-center1[0]);
                     arg2[0] = (X-center2[0])*(X-center2[0]);
@@ -180,12 +170,12 @@ main( int argc, char* argv[] )
                     const int localIndex = 
                         3*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
-                    const std::complex<double> f0 = 
-                        Nx*std::exp(-10*Nx*(arg0[0]+arg0[1]+arg0[2]));
-                    const std::complex<double> f1 = 
-                        Nx*std::exp(-10*Nx*(arg1[0]+arg1[1]+arg1[2]));
-                    const std::complex<double> f2 = 
-                        Nx*std::exp(-10*Nx*(arg2[0]+arg2[1]+arg2[2]));
+                    const Complex<double> f0 = 
+                        nx*Exp(-10*nx*(arg0[0]+arg0[1]+arg0[2]));
+                    const Complex<double> f1 = 
+                        nx*Exp(-10*nx*(arg1[0]+arg1[1]+arg1[2]));
+                    const Complex<double> f2 = 
+                        nx*Exp(-10*nx*(arg2[0]+arg2[1]+arg2[2]));
                     localB[localIndex+0] = f0;
                     localB[localIndex+1] = f1;
                     localB[localIndex+2] = f2;
@@ -193,9 +183,9 @@ main( int argc, char* argv[] )
             }
         }
 
-        B.WritePlane( XY, Nz/2, "source-middleXY" );
-        B.WritePlane( XZ, Ny/2, "source-middleXZ" );
-        B.WritePlane( YZ, Nx/2, "source-middleYZ" );
+        B.WritePlane( XY, nz/2, "source-middleXY" );
+        B.WritePlane( XZ, ny/2, "source-middleXZ" );
+        B.WritePlane( YZ, nx/2, "source-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -213,10 +203,7 @@ main( int argc, char* argv[] )
             std::cout << "Beginning solve..." << std::endl;
         psp::mpi::Barrier( comm );
         const double solveStartTime = psp::mpi::Time();
-        if( useSQMR )
-            helmholtz.SolveWithSQMR( B );
-        else
-            helmholtz.SolveWithGMRES( B, 20, 1e-5 );
+        helmholtz.SolveWithGMRES( B, 20, 1e-5 );
         psp::mpi::Barrier( comm );
         const double solveStopTime = psp::mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
@@ -224,9 +211,9 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        B.WritePlane( XY, Nz/2, "solution-middleXY" );
-        B.WritePlane( XZ, Ny/2, "solution-middleXZ" );
-        B.WritePlane( YZ, Nx/2, "solution-middleYZ" );
+        B.WritePlane( XY, nz/2, "solution-middleXY" );
+        B.WritePlane( XZ, ny/2, "solution-middleXZ" );
+        B.WritePlane( YZ, nx/2, "solution-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )

@@ -23,16 +23,19 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "UnitCube <velocity> <N> <omega> "
-                 "[damping=7] [# planes/panel=4] [panel scheme=1] [viz=0] "
+    std::cout << "UnitCube <velocity> <n> <omega> "
+                 "[PML on top=false] [damping=7] [# planes/panel=4] "
+                 "[panel scheme=1] [viz=0] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
-              << "  <velocity>: Which velocity field to use, {0,...,12}\n"
-              << "  <N>: Size of grid in each dimension\n"
-              << "  <omega>: Frequency (in rad/sec) of problem\n"
+              << "\n"
+              << "  <velocity>: which velocity field to use, {0,...,12}\n"
+              << "  <n>: size of grid in each dimension\n"
+              << "  <omega>: frequency (in rad/sec) of problem\n"
+              << "  [PML on top=false]: PML or Dirichlet b.c. on top?\n"
               << "  [damping=7]: imaginary freq shift for preconditioner\n"
               << "  [# planes/panel=4]: number of planes per subdomain\n"
               << "  [panel scheme=1]: NORMAL_1D=0, FAST_2D_LDL=1\n"
-              << "  [full viz=0]:  Full visualization iff != 0\n"
+              << "  [full viz=0]: full volume visualization iff != 0\n"
               << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
               << "  [solve blocksize=64]: solve algorithmic blocksize\n"
               << "\n"
@@ -72,16 +75,17 @@ main( int argc, char* argv[] )
     }
     int argNum=1;
     const int velocityModel = atoi(argv[argNum++]);
-    const int N = atoi(argv[argNum++]);
+    const int n = atoi(argv[argNum++]);
     const double omega = atof(argv[argNum++]);
-    const double damping = ( argc >= 5 ? atof(argv[argNum++]) : 7. );
-    const int numPlanesPerPanel = ( argc >= 6 ? atoi(argv[argNum++]) : 4 );
+    const bool pmlOnTop = ( argc>=5 ? atoi(argv[argNum++]) : false );
+    const double damping = ( argc>=6 ? atof(argv[argNum++]) : 7. );
+    const int numPlanesPerPanel = ( argc>=7 ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
-        ( argc >= 7 ? (PanelScheme)atoi(argv[argNum++]) 
-                    : CLIQUE_FAST_2D_LDL );
-    const bool fullVisualize = ( argc >= 8 ? atoi(argv[argNum++]) : true );
-    const int factBlocksize = ( argc >= 9 ? atoi( argv[argNum++] ) : 96 );
-    const int solveBlocksize = ( argc >= 10 ? atoi( argv[argNum++] ) : 64 );
+        ( argc>=8 ? (PanelScheme)atoi(argv[argNum++]) 
+                  : CLIQUE_FAST_2D_LDL );
+    const bool fullVisualize = ( argc>=9 ? atoi(argv[argNum++]) : true );
+    const int factBlocksize = ( argc>=10 ? atoi( argv[argNum++] ) : 96 );
+    const int solveBlocksize = ( argc>=11 ? atoi( argv[argNum++] ) : 64 );
 
     if( velocityModel < 0 || velocityModel > 12 )
     {
@@ -108,20 +112,21 @@ main( int argc, char* argv[] )
 
     if( commRank == 0 )
     {
-        std::cout << "Running with N=" << N << ", omega=" << omega 
+        std::cout << "Running with n=" << n << ", omega=" << omega 
                   << ", and numPlanesPerPanel=" << numPlanesPerPanel
                   << " with velocity model " << velocityModel << std::endl;
     }
-    
-    Discretization<double> disc
-    ( omega, N, N, N, 1., 1., 1., PML, PML, PML, PML, DIRICHLET );
 
     try 
     {
+        Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
+        Discretization<double> disc
+        ( omega, n, n, n, 1., 1., 1., PML, PML, PML, PML, topBC );
+
         DistHelmholtz<double> helmholtz
         ( disc, comm, damping, numPlanesPerPanel );
 
-        DistUniformGrid<double> velocity( 1, N, N, N, XYZ, comm );
+        DistUniformGrid<double> velocity( 1, n, n, n, XYZ, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
@@ -148,24 +153,24 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 const double argZ = (Z-0.5)*(Z-0.5);
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     const double argY = (Y-0.5)*(Y-0.5);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         const double argX = (X-0.5)*(X-0.5);
                         
                         const int localIndex = 
                             xLocal + yLocal*xLocalSize + 
                             zLocal*xLocalSize*yLocalSize;
                         const double speed =
-                            1.0 - 0.4*std::exp(-32.*(argX+argY+argZ));
+                            1.0 - 0.4*Exp(-32.*(argX+argY+argZ));
                         localVelocity[localIndex] = speed / 0.8;
                     }
                 }
@@ -180,19 +185,19 @@ main( int argc, char* argv[] )
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     const double argY = (Y-0.5)*(Y-0.5);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         const double argX = (X-0.5)*(X-0.5);
                         
                         const int localIndex = 
                             xLocal + yLocal*xLocalSize + 
                             zLocal*xLocalSize*yLocalSize;
                         const double speed =
-                            1.0 - 0.4*std::exp(-32.*(argX+argY));
+                            1.0 - 0.4*Exp(-32.*(argX+argY));
                         localVelocity[localIndex] = speed / 0.8;
                     }
                 }
@@ -205,7 +210,7 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 const double speed = ( Z >= 0.5 ? 8.0 : 1.0 );
                 const int localOffset = zLocal*xLocalSize*yLocalSize;
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
@@ -220,15 +225,15 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         double speed;
                         if( X > 0.2 && X < 0.8 && 
                             Y > 0.2 && Y < 0.8 && 
@@ -251,15 +256,15 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         double speed;
                         if( X > 0.2 && X < 0.8 && 
                             Y > 0.2 && Y < 0.8 && 
@@ -283,15 +288,15 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         double speed;
                         if( X > 0.2 && X < 0.8 && 
                             Y > 0.2 && Y < 0.8 && 
@@ -316,15 +321,15 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         double speed;
                         if( X > 0.2 && X < 0.8 && 
                             Y > 0.2 && Y < 0.8 && 
@@ -349,7 +354,7 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 double speed;
                 if( Z < 0.2 )
                     speed = 1;
@@ -373,7 +378,7 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 double speed;
                 if( Z < 0.2 )
                     speed = 5;
@@ -401,7 +406,7 @@ main( int argc, char* argv[] )
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
                         const int x = xShift + xLocal*px;
-                        const double X = x / (N+1.0);
+                        const double X = x / (n+1.0);
                         double speed;
                         if( X < 0.2 )
                             speed = 5;
@@ -427,11 +432,11 @@ main( int argc, char* argv[] )
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
-                const double Z = z / (N+1.0);
+                const double Z = z / (n+1.0);
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
-                    const double Y = y / (N+1.0);
+                    const double Y = y / (n+1.0);
                     double speed;
                     if( Z <= 0.4+0.1*Y )
                         speed = 2.;
@@ -457,9 +462,9 @@ main( int argc, char* argv[] )
             throw std::runtime_error("Invalid velocity model");
         }
 
-        velocity.WritePlane( XY, N/2, "velocity-middleXY" );
-        velocity.WritePlane( XZ, N/2, "velocity-middleXZ" );
-        velocity.WritePlane( YZ, N/2, "velocity-middleYZ" );
+        velocity.WritePlane( XY, n/2, "velocity-middleXY" );
+        velocity.WritePlane( XZ, n/2, "velocity-middleXZ" );
+        velocity.WritePlane( YZ, n/2, "velocity-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -486,7 +491,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<Complex<double> > B( 2, N, N, N, XYZ, comm );
+        DistUniformGrid<Complex<double> > B( 2, n, n, n, XYZ, comm );
         Complex<double>* localB = B.LocalBuffer();
         const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
         const double center0[] = { 0.5, 0.5, 0.25 };
@@ -497,19 +502,19 @@ main( int argc, char* argv[] )
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
-            const double Z = z / (N+1.0);
+            const double Z = z / (n+1.0);
             arg0[2] = (Z-center0[2])*(Z-center0[2]);
             arg1[2] = (Z-center1[2])*(Z-center1[2]);
             for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
                 const int y = yShift + yLocal*py;
-                const double Y = y / (N+1.0);
+                const double Y = y / (n+1.0);
                 arg0[1] = (Y-center0[1])*(Y-center0[1]);
                 arg1[1] = (Y-center1[1])*(Y-center1[1]);
                 for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                 {
                     const int x = xShift + xLocal*px;
-                    const double X = x / (N+1.0);
+                    const double X = x / (n+1.0);
                     arg0[0] = (X-center0[0])*(X-center0[0]);
                     arg1[0] = (X-center1[0])*(X-center1[0]);
                     
@@ -517,17 +522,17 @@ main( int argc, char* argv[] )
                         2*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
                     localB[localIndex+0] =
-                        N*Exp(-N*N*(arg0[0]+arg0[1]+arg0[2]));
+                        n*Exp(-n*n*(arg0[0]+arg0[1]+arg0[2]));
                     localB[localIndex+1] = 
-                        N*Exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
+                        n*Exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
                         Exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
                 }
             }
         }
 
-        B.WritePlane( XY, N/2, "source-middleXY" );
-        B.WritePlane( XZ, N/2, "source-middleXZ" );
-        B.WritePlane( YZ, N/2, "source-middleYZ" );
+        B.WritePlane( XY, n/2, "source-middleXY" );
+        B.WritePlane( XZ, n/2, "source-middleXZ" );
+        B.WritePlane( YZ, n/2, "source-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )
@@ -553,9 +558,9 @@ main( int argc, char* argv[] )
             std::cout << "Finished solve: " << solveTime << " seconds." 
                       << std::endl;
 
-        B.WritePlane( XY, N/2, "solution-middleXY" );
-        B.WritePlane( XZ, N/2, "solution-middleXZ" );
-        B.WritePlane( YZ, N/2, "solution-middleYZ" );
+        B.WritePlane( XY, n/2, "solution-middleXY" );
+        B.WritePlane( XZ, n/2, "solution-middleXZ" );
+        B.WritePlane( YZ, n/2, "solution-middleYZ" );
         if( fullVisualize )
         {
             if( commRank == 0 )

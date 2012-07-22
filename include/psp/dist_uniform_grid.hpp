@@ -396,6 +396,13 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
 #endif
     std::ifstream is;
     is.open( filename.c_str(), std::ios::in|std::ios::binary );
+    if( !is.is_open() )
+    {
+        std::ostringstream os;
+        os << "Could not open " << filename;
+        throw std::logic_error( os.str().c_str() );
+    }
+
     switch( order_ )
     {
     case XYZ:
@@ -412,7 +419,8 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
-                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                    is.read
+                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -431,7 +439,8 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
-                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                    is.read
+                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -450,7 +459,8 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
-                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                    is.read
+                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -469,7 +479,8 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
-                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                    is.read
+                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -488,7 +499,8 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
-                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                    is.read
+                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -507,7 +519,8 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
-                    is.read( &localData_[localIndex], numScalars_*sizeof(F) );
+                    is.read
+                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }

@@ -21,8 +21,6 @@
 #ifndef PSP_DISCRETIZATION_HPP
 #define PSP_DISCRETIZATION_HPP 1
 
-#include "elemental.hpp"
-
 namespace psp {
 
 enum Boundary { PML, DIRICHLET };
