@@ -25,7 +25,7 @@ void Usage()
 {
     std::cout << "Overthrust <nx> <ny> <nz> <omega> "
                  "[PML on top=false] [damping=7] [# planes/panel=4] "
-                 "[panel scheme=1] [viz=0] "
+                 "[panel scheme=1] [viz=1] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
               << "\n"
               << "  <nx,ny,nz>: size of grid in each dimension\n"
@@ -34,7 +34,7 @@ void Usage()
               << "  [damping=7]: imaginary freq shift for preconditioner\n"
               << "  [# of planes/panel=4]: number of planes per subdomain\n"
               << "  [panel scheme=1]: NORMAL_1D=0, FAST_2D_LDL=1\n"
-              << "  [full viz=0]: full volume visualization iff != 0\n" 
+              << "  [full viz=1]: full volume visualization iff != 0\n" 
               << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
               << "  [solve blocksize=64]: solve algorithmic blocksize\n"
               << std::endl;
