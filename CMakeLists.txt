@@ -25,8 +25,8 @@ project(PSP)
 set(PSP_VERSION_MAJOR 0)
 set(PSP_VERSION_MINOR 1)
 
-option(BUILD_TESTS "Build a collection of test executables" OFF)
-option(BUILD_EXAMPLES "Build one or more example executables" OFF)
+option(PSP_TESTS "Build a collection of test executables" OFF)
+option(PSP_EXAMPLES "Build one or more example executables" OFF)
 
 # TODO: Think of how to avoid this mess...
 add_subdirectory(external/clique)
@@ -101,7 +101,7 @@ add_dependencies(psp prepare_psp_headers)
 include_directories("${PROJECT_BINARY_DIR}/include")
 
 # Build the test drivers if necessary
-if(BUILD_TESTS)
+if(PSP_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
   set(TESTS Interpolate UnitCube)
 
@@ -122,7 +122,7 @@ if(BUILD_TESTS)
 endif()
 
 # Build the example drivers if necessary
-if(BUILD_EXAMPLES)
+if(PSP_EXAMPLES)
   set(EXAMPLE_DIR ${PROJECT_SOURCE_DIR}/examples)
   set(EXAMPLES Overthrust)
 
