@@ -145,9 +145,8 @@ endif()
 ################################################################################
 # Uncomment if including PSP as a subproject in another build system           #
 ################################################################################
-#set(USE_CUSTOM_ALLTOALLV_FOR_FACT ${USE_CUSTOM_ALLTOALLV_FOR_FACT} PARENT_SCOPE)
-#set(USE_CUSTOM_ALLTOALLV_FOR_MULT ${USE_CUSTOM_ALLTOALLV_FOR_MULT} PARENT_SCOPE)
-#set(USE_CUSTOM_ALLTOALLV_FOR_SOLVE ${USE_CUSTOM_ALLTOALLV_FOR_SOLVE} PARENT_SCOPE)
+#set(USE_CUSTOM_ALLTOALLV ${USE_CUSTOM_ALLTOALLV} PARENT_SCOPE)
+#set(HAVE_PARMETIS ${HAVE_PARMETIS} PARENT_SCOPE)
 #
 #set(LIBRARY_TYPE ${LIBRARY_TYPE} PARENT_SCOPE)
 #set(MPI_C_COMPILER ${MPI_C_COMPILER} PARENT_SCOPE)
