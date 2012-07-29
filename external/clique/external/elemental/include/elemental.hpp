@@ -33,13 +33,17 @@
 #ifndef ELEMENTAL_H
 #define ELEMENTAL_H 1
 
-#include "elemental/core/matrix.hpp"
-#include "elemental/core/dist_matrix.hpp"
-#include "elemental/core/axpy_interface.hpp"
+#include "elemental/config.h"
+#ifdef HAVE_F90_INTERFACE
+# include "elemental/FCMangle.h"
+#endif
 
+#include "elemental/core.hpp"
 #include "elemental/special_matrices.hpp"
 
-#include "elemental/blas-like.hpp"
-#include "elemental/lapack-like.hpp"
+#include "elemental/blas-like_decl.hpp"
+#include "elemental/blas-like_impl.hpp"
+#include "elemental/lapack-like_decl.hpp"
+#include "elemental/lapack-like_impl.hpp"
 
 #endif // ELEMENTAL_H

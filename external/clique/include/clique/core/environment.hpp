@@ -17,15 +17,6 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef CLIQUE_CORE_ENVIRONMENT_HPP
-#define CLIQUE_CORE_ENVIRONMENT_HPP 1
-
-#include "elemental.hpp"
-#include <algorithm>
-#include <map>
-#include <set>
-
-#include "clique/config.h"
 
 namespace cliq {
 
@@ -47,24 +38,22 @@ namespace lapack = elem::lapack;
 namespace mpi = elem::mpi;
 
 // Pull in a number of useful enums from Elemental
-using namespace elem::unit_or_non_unit_wrapper;
 using namespace elem::distribution_wrapper;
-using namespace elem::orientation_wrapper;
-using namespace elem::upper_or_lower_wrapper;
 using namespace elem::left_or_right_wrapper;
+using namespace elem::orientation_wrapper;
+using namespace elem::unit_or_non_unit_wrapper;
+using namespace elem::upper_or_lower_wrapper;
 
-// Pull in a few classes from Elemental
+// For scalar operations
+using elem::Base;
 using elem::Complex;
-using elem::Matrix;
-using elem::Grid;
-using elem::DistMatrix;
-
-// A few useful scalar operations
 using elem::Abs;
 using elem::Sqrt;
 
-// For extracting the underlying real datatype of a field
-using elem::Base;
+// Pull in a few classes from Elemental
+using elem::Matrix;
+using elem::Grid;
+using elem::DistMatrix;
 
 // Pull in a few indexing routines
 using elem::Shift;
@@ -145,5 +134,3 @@ SparseAllToAll
 }
 
 } // namespace cliq
-
-#endif /* CLIQUE_CORE_ENVIRONMENT_HPP */
