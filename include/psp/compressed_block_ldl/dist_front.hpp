@@ -109,13 +109,11 @@ inline void DistBlockCompression
             for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
             {
                 const int j = ARowShift + jLocal*ARowStride;
-                const int j2 = j / s2;
                 const int i2 = j % s2;
 
                 for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
                 {
                     const int i = AColShift + iLocal*AColStride;
-                    const int j1 = i / s1;
                     const int i1 = i % s1;
 
                     const int newProc = (i1+i2*s1) % gridSize;
@@ -178,13 +176,11 @@ inline void DistBlockCompression
             for( int jLocal=0; jLocal<ALocalWidth; ++jLocal )
             {
                 const int j = ARowShift + jLocal*ARowStride;
-                const int j2 = j / s2;
                 const int i2 = j % s2;
 
                 for( int iLocal=0; iLocal<ALocalHeight; ++iLocal )
                 {
                     const int i = AColShift + iLocal*AColStride;
-                    const int j1 = i / s1;
                     const int i1 = i % s1;
 
                     const int newProc = (i1+i2*s1) % gridSize;

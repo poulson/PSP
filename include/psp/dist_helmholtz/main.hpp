@@ -34,8 +34,8 @@ DistHelmholtz<R>::DistHelmholtz
   initialized_(false)
 {
     // Pull out some information about our communicator
-    const unsigned commRank = mpi::CommRank( comm );
-    const unsigned commSize = mpi::CommSize( comm );
+    const int commRank = mpi::CommRank( comm );
+    const int commSize = mpi::CommSize( comm );
     distDepth_ = DistributedDepth( commRank, commSize );
 
     // Decide if the domain is sufficiently deep to warrant sweeping
@@ -55,7 +55,7 @@ DistHelmholtz<R>::DistHelmholtz
     // full inner panels.
     //
     //    -----------   sweep dir
-    //   | Top       |     /\
+    //   | Top       |     /\ 
     //   | Leftover? |     ||
     //       ...           ||
     //   | Inner     |     ||
@@ -150,7 +150,7 @@ DistHelmholtz<R>::DistHelmholtz
     int totalSendCount=0, totalRecvCount=0;
     globalSendDispls_.resize( commSize );
     globalRecvDispls_.resize( commSize );
-    for( unsigned proc=0; proc<commSize; ++proc )
+    for( int proc=0; proc<commSize; ++proc )
     {
         globalSendDispls_[proc] = totalSendCount;
         globalRecvDispls_[proc] = totalRecvCount;
@@ -241,7 +241,7 @@ DistHelmholtz<R>::DistHelmholtz
     subdiagRecvCounts_.resize( (numPanels_-1)*commSize );
     supdiagSendCounts_.resize( (numPanels_-1)*commSize );
     supdiagRecvCounts_.resize( (numPanels_-1)*commSize );
-    for( unsigned proc=0; proc<commSize; ++proc )
+    for( int proc=0; proc<commSize; ++proc )
     {
         for( int i=0; i<numPanels_-1; ++i )
         {
@@ -275,7 +275,7 @@ DistHelmholtz<R>::DistHelmholtz
     supdiagPanelRecvDispls_.resize( numPanels_-1 );
     for( int i=0; i<numPanels_-1; ++i )
     {
-        for( unsigned proc=0; proc<commSize; ++proc )
+        for( int proc=0; proc<commSize; ++proc )
         {
             const int index = i*commSize + proc;
             subdiagSendDispls_[index] = subdiagPanelSendCounts_[i];
@@ -305,7 +305,7 @@ DistHelmholtz<R>::DistHelmholtz
     {
         const int subdiagOffset = subdiagPanelRecvDispls_[i];
         const int supdiagOffset = supdiagPanelRecvDispls_[i];
-        for( unsigned proc=0; proc<commSize; ++proc ) 
+        for( int proc=0; proc<commSize; ++proc ) 
         {
             const int index = i*commSize + proc;
             subdiagOffsets[index] = subdiagRecvDispls_[index]+subdiagOffset;
@@ -454,7 +454,7 @@ DistHelmholtz<R>::~DistHelmholtz()
 template<typename R>
 int
 DistHelmholtz<R>::LocalPanelHeight
-( int vSize, int vPadding, unsigned commRank, unsigned commSize ) const
+( int vSize, int vPadding, int commRank, int commSize ) const
 {
     int localHeight = 0;
     LocalPanelHeightRecursion
@@ -467,7 +467,7 @@ template<typename R>
 void
 DistHelmholtz<R>::LocalPanelHeightRecursion
 ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
-  unsigned teamRank, unsigned teamSize, int& localHeight ) 
+  int teamRank, int teamSize, int& localHeight ) 
 {
     if( teamSize == 1 && xSize*ySize <= cutoff )
     {
@@ -574,7 +574,7 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
 
 template<typename R>
 int
-DistHelmholtz<R>::NumLocalNodes( unsigned commRank, unsigned commSize ) const
+DistHelmholtz<R>::NumLocalNodes( int commRank, int commSize ) const
 {
     int numLocalNodes = 0;
     NumLocalNodesRecursion
@@ -586,8 +586,7 @@ DistHelmholtz<R>::NumLocalNodes( unsigned commRank, unsigned commSize ) const
 template<typename R>
 void
 DistHelmholtz<R>::NumLocalNodesRecursion
-( int xSize, int ySize, int cutoff, unsigned teamRank, unsigned teamSize, 
-  int& numLocal ) 
+( int xSize, int ySize, int cutoff, int teamRank, int teamSize, int& numLocal )
 {
     if( teamSize == 1 && xSize*ySize <= cutoff )
     {
@@ -863,7 +862,7 @@ DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 template<typename R>
 void
 DistHelmholtz<R>::MapLocalPanelIndices
-( unsigned commRank, unsigned commSize, int whichPanel ) 
+( int commRank, int commSize, int whichPanel ) 
 {
     const int vSize = PanelDepth( whichPanel );
     const int vPadding = PanelPadding( whichPanel );
@@ -880,7 +879,7 @@ void
 DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
   int xOffset, int yOffset, int vOffset, int cutoff, 
-  unsigned teamRank, unsigned teamSize,
+  int teamRank, int teamSize,
   std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
   int& localOffset )
 {
@@ -1104,7 +1103,7 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 template<typename R>
 void
 DistHelmholtz<R>::MapLocalConnectionIndices
-( unsigned commRank, unsigned commSize, 
+( int commRank, int commSize, 
   std::vector<int>& localConnections, int whichPanel ) const
 {
     const int vSize = PanelDepth( whichPanel );
@@ -1123,7 +1122,7 @@ void
 DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
   int xOffset, int yOffset, int vOffset, int cutoff, 
-  unsigned teamRank, unsigned teamSize,
+  int teamRank, int teamSize,
   std::vector<int>& localConnections, int& localOffset )
 {
     if( teamSize == 1 && xSize*ySize <= cutoff )
@@ -1325,7 +1324,7 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
 
 template<typename R>
 int
-DistHelmholtz<R>::OwningProcess( int naturalIndex, unsigned commSize ) const
+DistHelmholtz<R>::OwningProcess( int naturalIndex, int commSize ) const
 {
     const int nx = disc_.nx;
     const int ny = disc_.ny;
@@ -1344,7 +1343,7 @@ DistHelmholtz<R>::OwningProcess( int naturalIndex, unsigned commSize ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::OwningProcess( int x, int y, int v, unsigned commSize ) const
+DistHelmholtz<R>::OwningProcess( int x, int y, int v, int commSize ) const
 {
     const int nx = disc_.nx;
     const int ny = disc_.ny;
@@ -1358,8 +1357,7 @@ DistHelmholtz<R>::OwningProcess( int x, int y, int v, unsigned commSize ) const
 template<typename R>
 void
 DistHelmholtz<R>::OwningProcessRecursion
-( int x, int y, int vLocal, int xSize, int ySize, unsigned teamSize, 
-  int& proc )
+( int x, int y, int vLocal, int xSize, int ySize, int teamSize, int& proc )
 {
     if( teamSize == 1 )
         return;
@@ -1424,10 +1422,10 @@ DistHelmholtz<R>::OwningProcessRecursion
 }
 
 template<typename R>
-unsigned
-DistHelmholtz<R>::DistributedDepth( unsigned commRank, unsigned commSize ) 
+int
+DistHelmholtz<R>::DistributedDepth( int commRank, int commSize ) 
 {
-    unsigned distDepth = 0;
+    int distDepth = 0;
     DistributedDepthRecursion( commRank, commSize, distDepth );
     return distDepth;
 }
@@ -1435,14 +1433,14 @@ DistHelmholtz<R>::DistributedDepth( unsigned commRank, unsigned commSize )
 template<typename R>
 void
 DistHelmholtz<R>::DistributedDepthRecursion
-( unsigned commRank, unsigned commSize, unsigned& distDepth )
+( int commRank, int commSize, int& distDepth )
 {
     if( commSize == 1 )
         return;
 
     ++distDepth;
-    const unsigned leftTeamSize = commSize/2;
-    const unsigned rightTeamSize = commSize - leftTeamSize;
+    const int leftTeamSize = commSize/2;
+    const int rightTeamSize = commSize - leftTeamSize;
     if( commRank < leftTeamSize )
         DistributedDepthRecursion
         ( commRank, leftTeamSize, distDepth );
@@ -1547,7 +1545,6 @@ DistHelmholtz<R>::FillPanelDistElimTree
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int cutoff = nestedCutoff_;
-    const unsigned commRank = mpi::CommRank( comm_ );
     mpi::CommDup( comm_, eTree.distNodes.back().comm );
 
     // Fill the distributed nodes
@@ -1559,7 +1556,6 @@ DistHelmholtz<R>::FillPanelDistElimTree
         const int nodeCommRank = mpi::CommRank( node.comm );
         const int nodeCommSize = mpi::CommSize( node.comm );
         const int leftTeamSize = nodeCommSize/2;
-        const int rightTeamSize = nodeCommSize - leftTeamSize;
 
         const bool onLeft = ( nodeCommRank < leftTeamSize );
         const int childNodeCommRank = 

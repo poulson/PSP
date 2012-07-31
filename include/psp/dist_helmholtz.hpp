@@ -56,7 +56,7 @@ public:
 private:
     PanelScheme panelScheme_;
     mpi::Comm comm_;
-    unsigned distDepth_;
+    int distDepth_;
     const Discretization<R> disc_;
     const R hx_, hy_, hz_; // grid spacings
     const R damping_;
@@ -205,10 +205,10 @@ private:
     C s3Inv( int v ) const;
     C s3InvArtificial( int v, int vOffset ) const;
 
-    int NumLocalNodes( unsigned commRank, unsigned commSize ) const;
+    int NumLocalNodes( int commRank, int commSize ) const;
     static void NumLocalNodesRecursion
     ( int xSize, int ySize, int cutoff, 
-      unsigned teamRank, unsigned teamSize, int& numLocal );
+      int teamRank, int teamSize, int& numLocal );
 
     //
     // Global sparse helper routines
@@ -241,44 +241,44 @@ private:
     void FormGlobalRow( R alpha, int x, int y, int v, int row );
 
     int LocalPanelHeight
-    ( int vSize, int vPadding, unsigned commRank, unsigned commSize ) const;
+    ( int vSize, int vPadding, int commRank, int commSize ) const;
     static void LocalPanelHeightRecursion
     ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
-      unsigned teamRank, unsigned teamSize, int& localHeight );
+      int teamRank, int teamSize, int& localHeight );
 
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
     void MapLocalPanelIndices
-    ( unsigned commRank, unsigned commSize, int whichPanel );
+    ( int commRank, int commSize, int whichPanel );
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
-      unsigned teamRank, unsigned teamSize,
+      int teamRank, int teamSize,
       std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( unsigned commRank, unsigned commSize,  
+    ( int commRank, int commSize,  
       std::vector<int>& localConnections, int whichPanel ) const;
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
-      unsigned teamRank, unsigned teamSize,
+      int teamRank, int teamSize,
       std::vector<int>& localConnections, int& localOffset );
 
-    int OwningProcess( int naturalIndex, unsigned commSize ) const;
-    int OwningProcess( int x, int y, int v, unsigned commSize ) const;
+    int OwningProcess( int naturalIndex, int commSize ) const;
+    int OwningProcess( int x, int y, int v, int commSize ) const;
     static void OwningProcessRecursion
     ( int x, int y, int vLocal, int xSize, int ySize, 
-      unsigned teamSize, int& process );
+      int teamSize, int& process );
 
     //
     // Helpers for the PML-padded sparse-direct portion
     //
 
-    static unsigned DistributedDepth( unsigned commRank, unsigned commSize );
+    static int DistributedDepth( int commRank, int commSize );
     static void DistributedDepthRecursion
-    ( unsigned commRank, unsigned commSize, unsigned& distDepth );
+    ( int commRank, int commSize, int& distDepth );
 
     void GetPanelVelocity
     ( int vOffset, int vSize, 
@@ -320,7 +320,7 @@ private:
     static void LocalReorderingRecursion
     ( std::map<int,int>& reordering, int offset, 
       int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-      int depthTilSerial, int cutoff, unsigned commRank, unsigned commSize );
+      int depthTilSerial, int cutoff, int commRank, int commSize );
 
     int ReorderedIndex( int x, int y, int vLocal, int vSize ) const;
     static int ReorderedIndexRecursion

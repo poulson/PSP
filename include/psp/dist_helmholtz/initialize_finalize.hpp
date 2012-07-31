@@ -1137,7 +1137,7 @@ template<typename R>
 void DistHelmholtz<R>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-  int depthTilSerial, int cutoff, unsigned commRank, unsigned commSize )
+  int depthTilSerial, int cutoff, int commRank, int commSize )
 {
     const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
     if( depthTilSerial == 0 && xSize*ySize <= cutoff )

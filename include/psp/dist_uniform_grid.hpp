@@ -543,9 +543,6 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     const int nzOld = nz_;
 
     // Compute the new local dimensions
-    const int xLocalOldSize = xLocalSize_;
-    const int yLocalOldSize = yLocalSize_;
-    const int zLocalOldSize = zLocalSize_;
     const int xLocalNewSize = LocalLength( nx, xShift_, px_ );
     const int yLocalNewSize = LocalLength( ny, yShift_, py_ );
     const int zLocalNewSize = LocalLength( nz, zShift_, pz_ );
