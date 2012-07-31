@@ -28,6 +28,7 @@ void Usage()
       << "  n1: first dimension of n1 x n2 x n3 mesh\n"
       << "  n2: second dimension of n1 x n2 x n3 mesh\n"
       << "  n3: third dimension of n1 x n2 x n3 mesh\n"
+      << "  numRhs: the number of random right-hand sides to solve against\n"
       << "  cutoff: maximum size of leaf node\n"
       << "  numDistSeps: number of distributed separators to try\n"
       << "  numSeqSeps: number of sequential separators to try\n"
@@ -129,11 +130,10 @@ main( int argc, char* argv[] )
         const DistGraph& graph = A.Graph();
         DistSymmInfo info;
         DistSeparatorTree sepTree;
-        std::vector<int> localMap;
+        DistMap map, inverseMap;
         NestedDissection
-        ( graph, localMap, sepTree, info, cutoff, numDistSeps, numSeqSeps );
-        std::vector<int> inverseLocalMap;
-        InvertMap( localMap, inverseLocalMap, N, comm );
+        ( graph, map, sepTree, info, cutoff, numDistSeps, numSeqSeps );
+        map.FormInverse( inverseMap );
         mpi::Barrier( comm );
         const double nestedStop = mpi::Time();
         if( commRank == 0 )
@@ -161,8 +161,7 @@ main( int argc, char* argv[] )
         }
         mpi::Barrier( comm );
         const double buildStart = mpi::Time();
-        DistSymmFrontTree<double> 
-            frontTree( TRANSPOSE, A, localMap, sepTree, info );
+        DistSymmFrontTree<double> frontTree( TRANSPOSE, A, map, sepTree, info );
         mpi::Barrier( comm );
         const double buildStop = mpi::Time();
         if( commRank == 0 )
@@ -191,9 +190,9 @@ main( int argc, char* argv[] )
         }
         const double solveStart = mpi::Time();
         DistNodalMultiVector<double> YNodal;
-        YNodal.Pull( inverseLocalMap, info, Y );
+        YNodal.Pull( inverseMap, info, Y );
         LDLSolve( TRANSPOSE, info, frontTree, YNodal.localMultiVec );
-        YNodal.Push( inverseLocalMap, info, Y );
+        YNodal.Push( inverseMap, info, Y );
         mpi::Barrier( comm );
         const double solveStop = mpi::Time();
         if( commRank == 0 )
