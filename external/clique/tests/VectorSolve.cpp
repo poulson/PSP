@@ -24,10 +24,11 @@ void Usage()
 {
     std::cout
       << "VectorSolve <n1> <n2> <n3> "
-      << "[cutoff=128] [numDistSeps=10] [numSeqSeps=5]\n"
+      << "[sequential=true] [cutoff=128] [numDistSeps=1] [numSeqSeps=1]\n"
       << "  n1: first dimension of n1 x n2 x n3 mesh\n"
       << "  n2: second dimension of n1 x n2 x n3 mesh\n"
       << "  n3: third dimension of n1 x n2 x n3 mesh\n"
+      << "  sequential: if nonzero, then run a sequential symbolic reordering\n"
       << "  cutoff: maximum size of leaf node\n"
       << "  numDistSeps: number of distributed separators to try\n"
       << "  numSeqSeps: number of sequential separators to try\n"
@@ -51,9 +52,10 @@ main( int argc, char* argv[] )
     const int n1 = atoi( argv[1] );
     const int n2 = atoi( argv[2] );
     const int n3 = atoi( argv[3] );
-    const int cutoff = ( argc >= 5 ? atoi( argv[4] ) : 128 );
-    const int numDistSeps = ( argc >= 6 ? atoi( argv[5] ) : 10 );
-    const int numSeqSeps = ( argc >= 7 ? atoi( argv[6] ) : 5 );
+    const bool sequential = ( argc >= 5 ? atoi( argv[4] ) : true );
+    const int cutoff = ( argc >= 6 ? atoi( argv[5] ) : 128 );
+    const int numDistSeps = ( argc >= 7 ? atoi( argv[6] ) : 1 );
+    const int numSeqSeps = ( argc >= 8 ? atoi( argv[7] ) : 1 );
 
     try
     {
@@ -129,7 +131,8 @@ main( int argc, char* argv[] )
         DistSeparatorTree sepTree;
         DistMap map, inverseMap;
         NestedDissection
-        ( graph, map, sepTree, info, cutoff, numDistSeps, numSeqSeps );
+        ( graph, map, sepTree, info, 
+          sequential, cutoff, numDistSeps, numSeqSeps );
         map.FormInverse( inverseMap );
         mpi::Barrier( comm );
         const double nestedStop = mpi::Time();
@@ -167,13 +170,13 @@ main( int argc, char* argv[] )
 
         if( commRank == 0 )
         {
-            std::cout << "Running LDL^T and selective inversion...";
+            std::cout << "Running LDL^T and redistribution...";
             std::cout.flush();
         }
         mpi::Barrier( comm );
         const double ldlStart = mpi::Time();
         LDL( TRANSPOSE, info, frontTree );
-        SetSolveMode( frontTree, FAST_2D_LDL );
+        SetSolveMode( frontTree, NORMAL_1D );
         mpi::Barrier( comm );
         const double ldlStop = mpi::Time();
         if( commRank == 0 )

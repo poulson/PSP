@@ -29,9 +29,10 @@ void NestedDissection
         DistMap& map,
         DistSeparatorTree& sepTree, 
         DistSymmInfo& info,
+        bool sequential=true,
         int cutoff=128, 
-        int numDistSeps=10, 
-        int numSeqSeps=5, 
+        int numDistSeps=1, 
+        int numSeqSeps=1, 
         bool storeFactRecvIndices=false );
 
 int Bisect
@@ -47,8 +48,9 @@ int Bisect
         DistGraph& child, 
         DistMap& perm,
         bool& onLeft,
-        int numDistSeps=10, 
-        int numSeqSeps=5 );
+        bool sequential=true,
+        int numDistSeps=1, 
+        int numSeqSeps=1 );
 
 void BuildMap
 ( const DistGraph& graph, 
@@ -225,9 +227,10 @@ NestedDissectionRecursion
         int depth, 
         int offset, 
         bool onLeft,
+        bool sequential=true,
         int cutoff=128, 
-        int numDistSeps=10, 
-        int numSeqSeps=5 )
+        int numDistSeps=1, 
+        int numSeqSeps=1 )
 {
 #ifndef RELEASE
     PushCallStack("NestedDissectionRecursion");
@@ -241,7 +244,9 @@ NestedDissectionRecursion
         bool childIsOnLeft;
         DistMap map;
         const int sepSize = 
-            Bisect( graph, child, map, childIsOnLeft, numDistSeps, numSeqSeps );
+            Bisect
+            ( graph, child, map, childIsOnLeft, 
+              sequential, numDistSeps, numSeqSeps );
         const int numSources = graph.NumSources();
         const int childSize = child.NumSources();
         const int leftChildSize = 
@@ -334,7 +339,7 @@ NestedDissectionRecursion
         const int newOffset = ( childIsOnLeft ? offset : offset+leftChildSize );
         NestedDissectionRecursion
         ( child, newPerm, sepTree, eTree, depth+1, newOffset, 
-          childIsOnLeft, cutoff, numDistSeps, numSeqSeps );
+          childIsOnLeft, sequential, cutoff, numDistSeps, numSeqSeps );
     }
     else if( graph.NumSources() <= cutoff )
     {
@@ -475,6 +480,7 @@ NestedDissection
         DistMap& map,
         DistSeparatorTree& sepTree, 
         DistSymmInfo& info,
+        bool sequential,
         int cutoff, 
         int numDistSeps, 
         int numSeqSeps, 
@@ -501,7 +507,7 @@ NestedDissection
     for( int s=0; s<numLocalSources; ++s )
         perm.SetLocal( s, s+firstLocalSource );
     NestedDissectionRecursion
-    ( graph, perm, sepTree, eTree, 0, 0, false, cutoff, 
+    ( graph, perm, sepTree, eTree, 0, 0, false, sequential, cutoff, 
       numDistSeps, numSeqSeps );
 
     // Reverse the order of the pointers and indices in the elimination and 
@@ -788,16 +794,9 @@ Bisect
 #ifndef RELEASE
     PushCallStack("Bisect");
 #endif
-    // TODO: Use a wrapper to METIS instead of ParMETIS
-
-    // Describe the source distribution
-    const int numSources = graph.NumSources();
-    std::vector<idx_t> vtxDist( 2 );
-    vtxDist[0] = 0;
-    vtxDist[1] = numSources;
-
-    // ParMETIS assumes that there are no self-connections or connections 
+    // METIS assumes that there are no self-connections or connections 
     // outside the sources, so we must manually remove them from our graph
+    const int numSources = graph.NumSources();
     const int numEdges = graph.NumEdges();
     int numValidEdges = 0;
     for( int i=0; i<numEdges; ++i )
@@ -838,15 +837,13 @@ Bisect
     // Create space for the result
     map.resize( numSources );
 
-    // Use the custom ParMETIS interface
-    mpi::Comm comm = mpi::COMM_SELF;
-    idx_t nparseps = 1;
-    idx_t nseqseps = numSeps;
+    // Use the custom METIS interface
+    idx_t nvtxs = numSources;
+    idx_t nseps = numSeps;
     real_t imbalance = 1.1;
     idx_t sizes[3];
     CliqBisect
-    ( &vtxDist[0], &xAdj[0], &adjacency[0], &nparseps, &nseqseps, 
-      &imbalance, NULL, &map[0], sizes, &comm );
+    ( &nvtxs, &xAdj[0], &adjacency[0], &nseps, &imbalance, &map[0], sizes );
 #ifndef RELEASE
     std::vector<int> timesMapped( numSources, 0 );
     for( int i=0; i<numSources; ++i )
@@ -944,6 +941,7 @@ Bisect
         DistGraph& child, 
         DistMap& perm,
         bool& onLeft, 
+        bool sequential,
         int numDistSeps, 
         int numSeqSeps )
 {
@@ -958,13 +956,6 @@ Bisect
         ("This routine assumes at least two processes are used, "
          "otherwise one child will be lost");
 
-    // Describe the source distribution
-    const int blocksize = graph.Blocksize();
-    std::vector<idx_t> vtxDist( commSize+1 );
-    for( int i=0; i<commSize; ++i )
-        vtxDist[i] = i*blocksize;
-    vtxDist[commSize] = graph.NumSources();
-
     // ParMETIS assumes that there are no self-connections or connections 
     // outside the sources, so we must manually remove them from our graph
     const int numSources = graph.NumSources();
@@ -975,6 +966,7 @@ Bisect
             ++numLocalValidEdges;
 
     // Fill our local connectivity (ignoring self and too-large connections)
+    const int blocksize = graph.Blocksize();
     const int numLocalSources = graph.NumLocalSources();
     const int firstLocalSource = graph.FirstLocalSource();
     std::vector<idx_t> xAdj( numLocalSources+1 );
@@ -1007,19 +999,127 @@ Bisect
 #endif
     xAdj[numLocalSources] = numLocalValidEdges;
 
-    // Create space for the result
-    perm.SetComm( comm );
-    perm.ResizeTo( numSources );
-
-    // Use the custom ParMETIS interface
     idx_t nparseps = numDistSeps;
     idx_t nseqseps = numSeqSeps;
     real_t imbalance = 1.1;
     idx_t sizes[3];
-    CliqBisect
-    ( &vtxDist[0], &xAdj[0], &adjacency[0], &nparseps, &nseqseps, 
-      &imbalance, NULL, perm.LocalBuffer(), sizes, &comm );
+    if( sequential )
+    {
+        // Gather the number of local valid edges on the root process
+        std::vector<int> edgeSizes( commSize ), edgeOffsets;
+        mpi::AllGather( &numLocalValidEdges, 1, &edgeSizes[0], 1, comm );
+        int numEdges;
+        if( commRank == 0 )
+        {
+            edgeOffsets.resize( commSize );
+            numEdges=0;
+            for( int q=0; q<commSize; ++q )
+            {
+                edgeOffsets[q] = numEdges;
+                numEdges += edgeSizes[q];
+            }
+        }
+
+        // Gather the edges on the root process (with padding)
+        int maxLocalValidEdges=0;
+        for( int q=0; q<commSize; ++q )
+            maxLocalValidEdges = 
+                std::max( maxLocalValidEdges, edgeSizes[q] );
+        adjacency.resize( maxLocalValidEdges );
+        std::vector<int> globalAdj;
+        if( commRank == 0 )
+            globalAdj.resize( maxLocalValidEdges*commSize, 0 );
+        mpi::Gather
+        ( &adjacency[0], maxLocalValidEdges, 
+          &globalAdj[0], maxLocalValidEdges, 0, comm );
+
+        if( commRank == 0 )
+        {
+            // Remove the padding
+            for( int q=1; q<commSize; ++q )
+            {
+                const int edgeOffset = q*maxLocalValidEdges;
+                for( int j=0; j<edgeSizes[q]; ++j )
+                    globalAdj[edgeOffsets[q]+j] = globalAdj[edgeOffset+j];
+            }
+            globalAdj.resize( numEdges );
+        }
+
+        // Set up the global xAdj vector
+        std::vector<int> globalXAdj;
+        // Set up the first commSize*blocksize entries
+        if( commRank == 0 )
+            globalXAdj.resize( numSources+1 );
+        mpi::Gather( &xAdj[0], blocksize, &globalXAdj[0], blocksize, 0, comm );
+        if( commRank == 0 )
+            for( int q=1; q<commSize; ++q )
+                for( int j=0; j<blocksize; ++j )
+                    globalXAdj[q*blocksize+j] += edgeOffsets[q];
+        // Fix the remaining entries
+        const int numRemaining = numSources - commSize*blocksize;
+        if( commRank == commSize-1 )
+            mpi::Send( &xAdj[blocksize], numRemaining, 0, 0, comm );
+        if( commRank == 0 )
+        {
+            mpi::Recv
+            ( &globalXAdj[commSize*blocksize], numRemaining, 
+              commSize-1, 0, comm );
+            for( int j=0; j<numRemaining; ++j )
+                globalXAdj[commSize*blocksize+j] += edgeOffsets[commSize-1];
+            globalXAdj[numSources] = numEdges;
+        }
+
+        std::vector<int> seqPerm;
+        if( commRank == 0 )
+        {
+            // Use the custom METIS interface
+            idx_t nvtxs = numSources;
+            idx_t sizes[3];
+            CliqBisect
+            ( &nvtxs, &globalXAdj[0], &globalAdj[0], &nseqseps,
+              &imbalance, &seqPerm[0], sizes );
+        }
+
+        // Set up space for the distributed permutation
+        perm.SetComm( comm );
+        perm.ResizeTo( numSources );
+
+        // Distribute the first commSize*blocksize values of the permutation
+        mpi::Scatter
+        ( &seqPerm[0], blocksize, perm.LocalBuffer(), blocksize, 0, comm );
+
+        // Make sure the last process gets the straggling entries
+        if( commRank == 0 )
+            mpi::Send
+            ( &seqPerm[commSize*blocksize], numRemaining, commSize-1, 0, comm );
+        if( commRank == commSize-1 )
+            mpi::Recv
+            ( perm.LocalBuffer()+blocksize, numLocalSources-blocksize, 0, 
+              0, comm );
+
+        // Broadcast the sizes information from the root
+        mpi::Broadcast( (byte*)sizes, 3*sizeof(idx_t), 0, comm );
+    }
+    else
+    {
+        // Describe the source distribution
+        std::vector<idx_t> vtxDist( commSize+1 );
+        for( int i=0; i<commSize; ++i )
+            vtxDist[i] = i*blocksize;
+        vtxDist[commSize] = graph.NumSources();
+
+        // Create space for the result
+        perm.SetComm( comm );
+        perm.ResizeTo( numSources );
+
+        // Use the custom ParMETIS interface
+        CliqParallelBisect
+        ( &vtxDist[0], &xAdj[0], &adjacency[0], &nparseps, &nseqseps, 
+          &imbalance, NULL, perm.LocalBuffer(), sizes, &comm );
+    }
+
 #ifndef RELEASE
+    // Check for a consistent permutation
     std::vector<int> timesMapped( numSources, 0 );
     for( int iLocal=0; iLocal<numLocalSources; ++iLocal )
         ++timesMapped[perm.GetLocal(iLocal)];
