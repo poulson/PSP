@@ -33,7 +33,7 @@ void Usage()
               << "  [PML on top=false]: PML or Dirichlet b.c. on top?\n"
               << "  [damping=7]: imaginary freq shift for preconditioner\n"
               << "  [# of planes/panel=4]: number of planes per subdomain\n"
-              << "  [panel scheme=1]: NORMAL_1D=0, FAST_2D_LDL=1\n"
+              << "  [panel scheme=1]: LDL_1D=0, LDL_SELINV_2D=1\n"
               << "  [full viz=1]: full volume visualization iff != 0\n" 
               << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
               << "  [solve blocksize=64]: solve algorithmic blocksize\n"
@@ -64,7 +64,7 @@ main( int argc, char* argv[] )
     const double damping = ( argc>=7 ? atof(argv[argNum++]) : 7. );
     const int numPlanesPerPanel = ( argc>=8 ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
-        ( argc>=9 ? (PanelScheme)atoi(argv[argNum++]) : CLIQUE_FAST_2D_LDL );
+        ( argc>=9 ? (PanelScheme)atoi(argv[argNum++]) : CLIQUE_LDL_SELINV_2D );
     const bool fullVisualize = ( argc>=10 ? atoi(argv[argNum++]) : true );
     const int factBlocksize = ( argc>=11 ? atoi(argv[argNum++]) : 96 );
     const int solveBlocksize = ( argc>=12 ? atoi(argv[argNum++]) : 64 );
@@ -203,7 +203,7 @@ main( int argc, char* argv[] )
             std::cout << "Beginning solve..." << std::endl;
         mpi::Barrier( comm );
         const double solveStartTime = mpi::Time();
-        helmholtz.SolveWithGMRES( B, 20, 1e-5 );
+        helmholtz.Solve( B, 20, 1e-5 );
         mpi::Barrier( comm );
         const double solveStopTime = mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;
