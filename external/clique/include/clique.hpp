@@ -74,6 +74,7 @@ namespace cliq {
 #include "clique/symbolic/dist_symm_info.hpp"
 #include "clique/symbolic/symm_analysis.hpp"
 #include "clique/symbolic/nested_dissection.hpp"
+#include "clique/symbolic/natural_nested_dissection.hpp"
 
 //
 // Numerical computation
@@ -87,18 +88,16 @@ namespace cliq {
 #include "clique/numeric/dist_nodal_multi_vector_decl.hpp"
 #include "clique/numeric/dist_nodal_multi_vector_impl.hpp"
 
+#include "clique/numeric/dist_front_tree_decl.hpp"
+#include "clique/numeric/dist_front_tree_impl.hpp"
 #include "clique/numeric/dist_symm_front_tree_decl.hpp"
 #include "clique/numeric/dist_symm_front_tree_impl.hpp"
-#include "clique/numeric/set_solve_mode.hpp"
+#include "clique/numeric/change_front_type.hpp"
 
 #include "clique/numeric/ldl.hpp"
-#include "clique/numeric/ldl_solve.hpp"
 #include "clique/numeric/lower_solve.hpp"
 #include "clique/numeric/diagonal_solve.hpp"
+#include "clique/numeric/solve.hpp"
 #include "clique/numeric/lower_multiply.hpp"
-
-#include "clique/numeric/block_lower_solve.hpp"
-#include "clique/numeric/block_ldl.hpp"
-#include "clique/numeric/block_ldl_solve.hpp"
 
 #endif // CLIQUE_HPP

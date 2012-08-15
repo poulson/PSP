@@ -25,9 +25,8 @@ namespace psp {
 
 template<typename F> 
 void DistCompressedBlockLDL
-( Orientation orientation, 
-  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR=true );
+( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
+  bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -35,14 +34,11 @@ void DistCompressedBlockLDL
 
 template<typename F> 
 inline void DistCompressedBlockLDL
-( Orientation orientation, 
-  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
+( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
   bool useQR )
 {
 #ifndef RELEASE
     PushCallStack("DistCompressedBlockLDL");
-    if( orientation == NORMAL )
-        throw std::logic_error("LDL must be (conjugate-)transposed");
 #endif
     // The bottom front is already compressed, so just view the relevant data
     LocalCompressedFront<F>& topLocalFront = L.localFronts.back();
@@ -206,7 +202,10 @@ inline void DistCompressedBlockLDL
             node.childFactRecvIndices.clear();
 
         // Now that the frontal matrix is set up, perform the factorization
-        cliq::DistFrontBlockLDL( orientation, front.frontL, front.work2d );
+        if( L.isHermitian )
+            cliq::DistFrontBlockLDL( ADJOINT, front.frontL, front.work2d );
+        else
+            cliq::DistFrontBlockLDL( TRANSPOSE, front.frontL, front.work2d );
 
         // Separately compress the A and B blocks 
         DistFrontCompression( front, depth, useQR );

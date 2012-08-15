@@ -31,7 +31,20 @@
    POSSIBILITY OF SUCH DAMAGE.
 */
 
+#include "./level1/Adjoint.hpp"
+#include "./level1/Axpy.hpp"
+#include "./level1/Conjugate.hpp"
+#include "./level1/Copy.hpp"
+#include "./level1/DiagonalScale.hpp"
+#include "./level1/DiagonalSolve.hpp"
 #include "./level1/Dot.hpp"
 #include "./level1/Dotu.hpp"
+#include "./level1/MakeHermitian.hpp"
+#include "./level1/MakeReal.hpp"
+#include "./level1/MakeSymmetric.hpp"
+#include "./level1/MakeTrapezoidal.hpp"
 #include "./level1/Nrm2.hpp"
-
+#include "./level1/Scale.hpp"
+#include "./level1/ScaleTrapezoid.hpp"
+#include "./level1/Transpose.hpp"
+#include "./level1/Zero.hpp"

@@ -23,7 +23,7 @@ namespace psp {
 
 template<typename R>
 void
-DistHelmholtz<R>::SolveWithGMRES
+DistHelmholtz<R>::Solve
 ( DistUniformGrid<C>& gridB, int m, R relTol ) const
 {
     if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
@@ -49,51 +49,6 @@ DistHelmholtz<R>::SolveWithGMRES
 
     // Solve the systems of equations
     InternalSolveWithGMRES( B, m, relTol );
-
-    // Restore the solutions back into the original form
-    {
-        if( commRank == 0 )
-        {
-            std::cout << "  pushing right-hand sides...";
-            std::cout.flush();
-        }
-        const double startTime = mpi::Time();
-
-        PushRightHandSides( gridB, B );
-
-        const double stopTime = mpi::Time();
-        if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
-    }
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::SolveWithSQMR( DistUniformGrid<C>& gridB, R bcgRelTol ) const
-{
-    if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
-        throw std::logic_error("B does not have a congruent comm");
-    const int commRank = mpi::CommRank( comm_ );
-
-    // Convert B into custom nested-dissection based ordering
-    Matrix<C> B;
-    {
-        if( commRank == 0 )
-        {
-            std::cout << "  pulling right-hand sides...";
-            std::cout.flush();
-        }
-        const double startTime = mpi::Time();
-
-        PullRightHandSides( gridB, B );
-
-        const double stopTime = mpi::Time();
-        if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
-    }
-
-    // Solve the systems of equations
-    InternalSolveWithSQMR( B, bcgRelTol );
 
     // Restore the solutions back into the original form
     {
@@ -641,233 +596,6 @@ DistHelmholtz<R>::InternalSolveWithGMRES
     bList = xList;
 }
 
-// Based on several different papers from R. Freund et al. on preconditioned QMR
-// for complex symmetric matrices.
-template<typename R>
-void
-DistHelmholtz<R>::InternalSolveWithSQMR
-( Matrix<C>& bList, R bcgRelTol ) const
-{
-    const R one = 1;
-    const int numRhs = bList.Width();
-    const int localHeight = bList.Height();
-    const int commRank = mpi::CommRank( comm_ );
-
-    Matrix<C> vList( localHeight, numRhs ),
-              tList( localHeight, numRhs ),
-              qList( localHeight, numRhs ),
-              pList( localHeight, numRhs );
-    std::vector<C> cList( numRhs ),
-                   tauList( numRhs ),
-                   rhoList( numRhs ),
-                   betaList( numRhs ),
-                   thetaList( numRhs ),
-                   alphaList( numRhs ),
-                   sigmaList( numRhs ),
-                   rhoLastList( numRhs ),
-                   thetaLastList( numRhs ),
-                   tempList( numRhs );
-    std::vector<R> origResidNormList( numRhs ), 
-                   bcgResidNormList( numRhs ),
-                   relBcgResidNormList( numRhs );
-
-    // v := b
-    // origResidNorm := ||v||_2
-    vList = bList;
-    Norms( vList, origResidNormList );
-    const bool origResidHasNaN = CheckForNaN( origResidNormList );
-    if( origResidHasNaN )
-        throw std::runtime_error("Original resid has NaN");
-
-    // t := inv(M) v 
-    // tau := sqrt(t^T t)
-    tList = vList;
-    {
-#ifndef RELEASE
-        mpi::Barrier( comm_ );
-#endif
-        if( commRank == 0 )
-        {
-            std::cout << "  initial preconditioner application...";
-            std::cout.flush();
-        }
-        const double startTime = mpi::Time();
-        Precondition( tList );
-#ifndef RELEASE
-        mpi::Barrier( comm_ );
-#endif
-        const double stopTime = mpi::Time();
-        if( commRank == 0 )
-            std::cout << stopTime-startTime << " secs" << std::endl;
-    }
-    PseudoNorms( tList, tauList );
-    const bool tauListHasNaN = CheckForNaN( tauList );
-    if( tauListHasNaN )
-        throw std::runtime_error("tau list has NaN");
-
-    // q := t
-    // x := 0 (use the B matrix for storing the x vectors)
-    // p := 0
-    // theta := 0
-    // rho := v^T q
-    qList = tList;
-    elem::MakeZeros( bList );
-    elem::MakeZeros( pList );
-    for( int k=0; k<numRhs; ++k )
-        thetaList[k] = 0;
-    PseudoInnerProducts( vList, qList, rhoList );
-    const bool rhoListHasNaN = CheckForNaN( rhoList );
-    if( rhoListHasNaN )
-        throw std::runtime_error("rho list has NaN");
-
-    int it=0;
-    while( true )
-    {
-        if( commRank == 0 )
-            std::cout << "  starting iteration " << it << "..." << std::endl;
-        // t := A q
-        tList = qList;
-        {
-#ifndef RELEASE
-            mpi::Barrier( comm_ );
-#endif
-            if( commRank == 0 )
-            {
-                std::cout << "  multiplying...";
-                std::cout.flush();
-            }
-            const double startTime = mpi::Time();
-            Multiply( tList );
-#ifndef RELEASE
-            mpi::Barrier( comm_ );
-#endif
-            const double stopTime = mpi::Time();
-            if( commRank == 0 )
-                std::cout << stopTime-startTime << " secs" << std::endl;
-        }
-
-        // sigma := q^T t
-        // alpha := rho / sigma
-        // v := v - alpha t
-        PseudoInnerProducts( qList, tList, sigmaList );
-        const bool sigmaListHasNaN = CheckForNaN( sigmaList );
-        if( sigmaListHasNaN )
-            throw std::runtime_error("sigma list has NaN");
-        const bool zeroSigma = CheckForZero( sigmaList );
-        if( zeroSigma )
-        {
-            if( commRank == 0 ) 
-                std::cout << "SQMR stopped due to a zero sigma" << std::endl;
-            break;
-        }
-        for( int k=0; k<numRhs; ++k )
-            alphaList[k] = rhoList[k] / sigmaList[k];
-        const bool alphaListHasNaN = CheckForNaN( alphaList );
-        if( alphaListHasNaN )
-            throw std::runtime_error("alpha list has NaN");
-        SubtractScaledColumns( alphaList, tList, vList );
-
-        // t         := inv(M) v
-        // thetaLast := theta
-        // theta     := sqrt(t^T t) / tau
-        // c         := 1 / sqrt(1+theta^2)
-        // tau       := tau theta c
-        // p         := c^2 thetaLast^2 p + c^2 alpha q
-        // x         := x + p
-        tList = vList;
-        {
-#ifndef RELEASE
-            mpi::Barrier( comm_ );
-#endif
-            if( commRank == 0 )
-            {
-                std::cout << "  preconditioning...";
-                std::cout.flush();
-            }
-            const double startTime = mpi::Time();
-            Precondition( tList );
-#ifndef RELEASE
-            mpi::Barrier( comm_ );
-#endif
-            const double stopTime = mpi::Time();
-            if( commRank == 0 )
-                std::cout << stopTime-startTime << " secs" << std::endl;
-        }
-        thetaLastList = thetaList;
-        PseudoNorms( tList, thetaList );
-        for( int k=0; k<numRhs; ++k )
-        {
-            thetaList[k] /= tauList[k];
-            cList[k]      = one/Sqrt(one+thetaList[k]*thetaList[k]);
-            tauList[k]    = tauList[k]*thetaList[k]*cList[k];
-        }
-        for( int k=0; k<numRhs; ++k ) 
-            tempList[k] = cList[k]*cList[k]*thetaLastList[k]*thetaLastList[k];
-        MultiplyColumns( pList, tempList );
-        for( int k=0; k<numRhs; ++k )
-            tempList[k] = cList[k]*cList[k]*alphaList[k];
-        AddScaledColumns( tempList, qList, pList );
-        elem::Axpy( (C)1, pList, bList );
-        const bool thetaListHasNaN = CheckForNaN( thetaList );
-        if( thetaListHasNaN )
-            throw std::runtime_error("theta list has NaN");
-        const bool zeroTheta = CheckForZero( thetaList );
-        if( zeroTheta )
-        {
-            if( commRank == 0 )
-                std::cout << "SQMR stopped due to a zero theta" << std::endl;
-            break;
-        }
-
-        // Residual checks
-        Norms( vList, bcgResidNormList );
-        const bool bcgResidHasNaN = CheckForNaN( bcgResidNormList );
-        if( bcgResidHasNaN )
-            throw std::runtime_error("BCG residuals have NaN");
-        for( int k=0; k<numRhs; ++k )
-            relBcgResidNormList[k] = 
-                bcgResidNormList[k]/origResidNormList[k];
-        R maxRelBcgResidNorm = 0;
-        for( int k=0; k<numRhs; ++k )
-            maxRelBcgResidNorm = 
-                std::max(maxRelBcgResidNorm,relBcgResidNormList[k]);
-        if( maxRelBcgResidNorm < bcgRelTol )
-        {
-            if( commRank == 0 )
-                std::cout << "  converged with BCG relative tolerance: " 
-                          << maxRelBcgResidNorm << std::endl;
-            break;
-        }
-        else
-        {
-            if( commRank == 0 )
-                std::cout << "  finished iteration " << it << " with "
-                          << "maxRelBcgResidNorm=" << maxRelBcgResidNorm 
-                          << std::endl;
-        }
-
-        // rhoLast := rho
-        // rho     := v^T t
-        // beta    := rho / rhoLast
-        // q       := t + beta q
-        const bool zeroRho = CheckForZero( rhoList );
-        if( zeroRho )
-        {
-            if( commRank == 0 ) 
-                std::cout << "SQMR stopped due to a zero rho" << std::endl;
-            break;
-        }
-        rhoLastList = rhoList;
-        PseudoInnerProducts( vList, tList, rhoList );
-        for( int k=0; k<numRhs; ++k )
-            betaList[k] = rhoList[k] / rhoLastList[k];
-        MultiplyColumns( qList, betaList );
-        elem::Axpy( (C)1, tList, qList );
-
-        ++it;
-    }
-}
-
 template<typename R>
 bool
 DistHelmholtz<R>::CheckForNaN( R alpha ) const
@@ -947,27 +675,6 @@ DistHelmholtz<R>::Norms
 
 template<typename R>
 void
-DistHelmholtz<R>::PseudoNorms
-( const Matrix<C>& xList, std::vector<C>& alphaList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    std::vector<C> localAlphaList( numCols );
-    for( int j=0; j<numCols; ++j )
-        localAlphaList[j] = 
-            blas::Dotu
-            ( localHeight, xList.LockedBuffer(0,j), 1,
-                           xList.LockedBuffer(0,j), 1 );
-    alphaList.resize( numCols );
-    // TODO: Think about avoiding overflow?
-    mpi::AllReduce
-    ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
-    for( int j=0; j<numCols; ++j )
-        alphaList[j] = Sqrt(alphaList[j]);
-}
-
-template<typename R>
-void
 DistHelmholtz<R>::InnerProducts
 ( const Matrix<C>& xList, const Matrix<C>& yList,
   std::vector<C>& alphaList ) const
@@ -978,25 +685,6 @@ DistHelmholtz<R>::InnerProducts
     for( int j=0; j<numCols; ++j )
         localAlphaList[j] = 
             blas::Dot
-            ( localHeight, xList.LockedBuffer(0,j), 1,
-                           yList.LockedBuffer(0,j), 1 );
-    alphaList.resize( numCols );
-    mpi::AllReduce
-    ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::PseudoInnerProducts
-( const Matrix<C>& xList, const Matrix<C>& yList,
-  std::vector<C>& alphaList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    std::vector<C> localAlphaList( numCols );
-    for( int j=0; j<numCols; ++j )
-        localAlphaList[j] = 
-            blas::Dotu
             ( localHeight, xList.LockedBuffer(0,j), 1,
                            yList.LockedBuffer(0,j), 1 );
     alphaList.resize( numCols );
@@ -1034,24 +722,6 @@ DistHelmholtz<R>::MultiplyColumns
         C* x = xList.Buffer(0,j);
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
             x[iLocal] *= delta;
-    }
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::AddScaledColumns
-( const std::vector<C>& deltaList, 
-  const Matrix<C>& xList, Matrix<C>& yList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    for( int j=0; j<numCols; ++j )
-    {
-        const C delta = deltaList[j];
-        const C* x = xList.LockedBuffer(0,j);
-        C* y = yList.Buffer(0,j);
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            y[iLocal] += delta*x[iLocal];
     }
 }
 
@@ -1273,10 +943,9 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     // Solve against the panel
     if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
         CompressedBlockLDLSolve
-        ( TRANSPOSE, info, PanelCompressedFactorization( i ), localPanelB );
+        ( info, PanelCompressedFactorization( i ), localPanelB );
     else
-        cliq::LDLSolve
-        ( TRANSPOSE, info, PanelFactorization( i ), localPanelB );
+        cliq::Solve( info, PanelFactorization( i ), localPanelB );
 
     // For each node, extract each right-hand side with memcpy
     BOffset = LocalPanelOffset( i );

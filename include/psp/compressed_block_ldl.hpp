@@ -30,9 +30,8 @@ namespace psp {
 // the Divide and Conquer version, even in LAPACK 3.3.1.
 template<typename F>
 void CompressedBlockLDL
-( Orientation orientation, 
-  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR=true );
+( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
+  bool useQR=false );
 
 } // namespace psp
 
@@ -50,15 +49,14 @@ namespace psp {
 
 template<typename F>
 inline void CompressedBlockLDL
-( Orientation orientation, 
-  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
+( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
   bool useQR )
 {
 #ifndef RELEASE
     PushCallStack("CompressedBlockLDL");
 #endif
-    LocalCompressedBlockLDL( orientation, info, L, depth, useQR );
-    DistCompressedBlockLDL( orientation, info, L, depth, useQR );
+    LocalCompressedBlockLDL( info, L, depth, useQR );
+    DistCompressedBlockLDL( info, L, depth, useQR );
 #ifndef RELEASE
     PopCallStack();
 #endif

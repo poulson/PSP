@@ -142,7 +142,7 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             FillPanelFronts
             ( vOffset, vSize, topInfo_, topCompressedFact_,
               velocity, myPanelVelocity, offsets, 
@@ -154,24 +154,18 @@ DistHelmholtz<R>::Initialize
               panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
-        // Compute the sparse-direct LDL^T factorization
+        // Compute the sparse-direct LDL^T factorization 
+        // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressedBlockLDL
-            ( TRANSPOSE, topInfo_, topCompressedFact_, vSize );
-        else
-            cliq::LDL( TRANSPOSE, topInfo_, topFact_ );
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
+            CompressedBlockLDL( topInfo_, topCompressedFact_, vSize );
+        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
+            cliq::LDL( topInfo_, topFact_, cliq::LDL_SELINV_2D );
+        else if( panelScheme == CLIQUE_LDL_1D )
+            cliq::LDL( topInfo_, topFact_, cliq::LDL_1D );
         const double ldlStopTime = mpi::Time();
 
-        // Redistribute the LDL^T factorization for faster solves
-        const double redistStartTime = ldlStopTime;
-        if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::SetSolveMode( topFact_, cliq::FAST_2D_LDL );
-        else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::SetSolveMode( topFact_, cliq::NORMAL_1D );
-        const double redistStopTime = mpi::Time();
-
-        const double stopTime = redistStopTime;
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
         {
             std::cout << "    gather: " << gatherStopTime-gatherStartTime 
@@ -179,8 +173,6 @@ DistHelmholtz<R>::Initialize
                       << "    fill:   " << fillStopTime-fillStartTime 
                       << " secs\n"
                       << "    ldl:    " << ldlStopTime-ldlStartTime 
-                      << " secs\n"
-                      << "    redist: " << redistStopTime-redistStartTime
                       << " secs\n"
                       << "    total:  " << stopTime-startTime 
                       << " secs\n" 
@@ -210,7 +202,7 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             FillPanelFronts
             ( vOffset, vSize, bottomInfo_, bottomCompressedFact_,
               velocity, myPanelVelocity, offsets,
@@ -223,31 +215,23 @@ DistHelmholtz<R>::Initialize
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
+        // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
-            CompressedBlockLDL
-            ( TRANSPOSE, bottomInfo_, bottomCompressedFact_, vSize );
-        else
-            cliq::LDL( TRANSPOSE, bottomInfo_, bottomFact_ );
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
+            CompressedBlockLDL( bottomInfo_, bottomCompressedFact_, vSize );
+        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
+            cliq::LDL( bottomInfo_, bottomFact_, cliq::LDL_SELINV_2D );
+        else if( panelScheme == CLIQUE_LDL_1D )
+            cliq::LDL( bottomInfo_, bottomFact_, cliq::LDL_1D );
         const double ldlStopTime = mpi::Time();
 
-        // Redistribute and/or compress the LDL^T factorization
-        const double redistStartTime = ldlStopTime;
-        if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::SetSolveMode( bottomFact_, cliq::FAST_2D_LDL );
-        else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::SetSolveMode( bottomFact_, cliq::NORMAL_1D );
-        const double redistStopTime = mpi::Time();
-
-        const double stopTime = redistStopTime;
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
         {
             std::cout << "    gather: " << gatherStopTime-gatherStartTime     
                       << " secs\n"
                       << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
                       << "    ldl:    " << ldlStopTime-ldlStartTime
-                      << " secs\n"
-                      << "    redist: " << redistStopTime-redistStartTime
                       << " secs\n"
                       << "    total:  " << stopTime-startTime 
                       << " secs\n"
@@ -258,7 +242,7 @@ DistHelmholtz<R>::Initialize
     //
     // Initialize and factor the full inner panels
     //
-    if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+    if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
         fullInnerCompressedFacts_.resize( numFullInnerPanels_ );
     else
         fullInnerFacts_.resize( numFullInnerPanels_ );
@@ -284,7 +268,7 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
         {
             fullInnerCompressedFacts_[k] = new DistCompressedFrontTree<C>;
             FillPanelFronts
@@ -304,24 +288,18 @@ DistHelmholtz<R>::Initialize
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
+        // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             CompressedBlockLDL
-            ( TRANSPOSE, bottomInfo_, 
-              *fullInnerCompressedFacts_[k], vSize );
-        else
-            cliq::LDL( TRANSPOSE, bottomInfo_, *fullInnerFacts_[k] );
+            ( bottomInfo_, *fullInnerCompressedFacts_[k], vSize );
+        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
+            cliq::LDL( bottomInfo_, *fullInnerFacts_[k], cliq::LDL_SELINV_2D );
+        else if( panelScheme == CLIQUE_LDL_1D )
+            cliq::LDL( bottomInfo_, *fullInnerFacts_[k], cliq::LDL_1D );
         const double ldlStopTime = mpi::Time();
 
-        // Redistribute and/or compress the LDL^T factorization
-        const double redistStartTime = ldlStopTime;
-        if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::SetSolveMode( *fullInnerFacts_[k], cliq::FAST_2D_LDL );
-        else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::SetSolveMode( *fullInnerFacts_[k], cliq::NORMAL_1D );
-        const double redistStopTime = mpi::Time();
-
-        const double stopTime = redistStopTime;
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
         {
             std::cout << "    gather: " << gatherStopTime-gatherStartTime     
@@ -329,8 +307,6 @@ DistHelmholtz<R>::Initialize
                       << "    fill:   " << fillStopTime-fillStartTime 
                       << " secs\n"
                       << "    ldl:    " << ldlStopTime-ldlStartTime
-                      << " secs\n"
-                      << "    redist: " << redistStopTime-redistStartTime
                       << " secs\n"
                       << "    total:  " << stopTime-startTime 
                       << " secs\n"
@@ -363,7 +339,7 @@ DistHelmholtz<R>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             FillPanelFronts
             ( vOffset, vSize, leftoverInnerInfo_, 
               leftoverInnerCompressedFact_,
@@ -377,32 +353,27 @@ DistHelmholtz<R>::Initialize
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
+        // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_2D_BLOCK_LDL )
+        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             CompressedBlockLDL
-            ( TRANSPOSE,
-              leftoverInnerInfo_, leftoverInnerCompressedFact_, vSize );
-        else
-            cliq::LDL( TRANSPOSE, leftoverInnerInfo_, leftoverInnerFact_ );
+            ( leftoverInnerInfo_, leftoverInnerCompressedFact_, vSize );
+        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
+            cliq::LDL
+            ( leftoverInnerInfo_, leftoverInnerFact_, cliq::LDL_SELINV_2D );
+        else if( panelScheme == CLIQUE_LDL_1D )
+            cliq::LDL
+            ( leftoverInnerInfo_, leftoverInnerFact_, cliq::LDL_1D );
         const double ldlStopTime = mpi::Time();
 
-        // Redistribute and/or compress the LDL^T factorization
-        const double redistStartTime = ldlStopTime;
-        if( panelScheme == CLIQUE_FAST_2D_LDL )
-            cliq::SetSolveMode( leftoverInnerFact_, cliq::FAST_2D_LDL );
-        else if( panelScheme == CLIQUE_NORMAL_1D )
-            cliq::SetSolveMode( leftoverInnerFact_, cliq::NORMAL_1D );
-        const double redistStopTime = mpi::Time();
-
-        const double stopTime = redistStopTime;
+        const double stopTime = mpi::Time();
         if( commRank == 0 )
         {
             std::cout << "    gather: " << gatherStopTime-gatherStartTime     
                       << " secs\n"
-                      << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
-                      << "    ldl:    " << ldlStopTime-ldlStartTime
+                      << "    fill:   " << fillStopTime-fillStartTime 
                       << " secs\n"
-                      << "    redist: " << redistStopTime-redistStartTime
+                      << "    ldl:    " << ldlStopTime-ldlStartTime
                       << " secs\n"
                       << "    total:  " << stopTime-startTime 
                       << " secs\n"
@@ -457,7 +428,7 @@ DistHelmholtz<R>::Finalize()
     localEntries_.clear();
 
     // Release the padded panel memory
-    if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
+    if( panelScheme_ == COMPRESSED_BLOCK_LDL_2D )
     {
         bottomCompressedFact_.localFronts.clear();
         bottomCompressedFact_.distFronts.clear();
@@ -1264,6 +1235,7 @@ DistHelmholtz<R>::FillPanelFronts
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int nz = disc_.nz;
+    fact.isHermitian = false;
 
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;
@@ -1306,7 +1278,7 @@ DistHelmholtz<R>::FillPanelFronts
 
     // Initialize the distributed part of the panel
     const int numDistNodes = info.distNodes.size();
-    fact.mode = cliq::NORMAL_2D;
+    fact.frontType = cliq::SYMM_2D;
     fact.distFronts.resize( numDistNodes );
     cliq::InitializeDistLeaf( info, fact );
     for( int t=1; t<numDistNodes; ++t )
@@ -1375,6 +1347,7 @@ DistHelmholtz<R>::FillPanelFronts
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int nz = disc_.nz;
+    fact.isHermitian = false;
 
     // Initialize the local portion of the panel
     std::vector<int> frontIndices;

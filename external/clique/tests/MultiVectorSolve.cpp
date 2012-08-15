@@ -24,15 +24,15 @@ void Usage()
 {
     std::cout
       << "MultiVectorSolve <n1> <n2> <n3> <numRhs> "
-      << "[sequential=true] [cutoff=128] [numDistSeps=1] [numSeqSeps=1]\n"
+      << "[sequential=true] [numDistSeps=1] [numSeqSeps=1] [cutoff=128]\n"
       << "  n1: first dimension of n1 x n2 x n3 mesh\n"
       << "  n2: second dimension of n1 x n2 x n3 mesh\n"
       << "  n3: third dimension of n1 x n2 x n3 mesh\n"
       << "  numRhs: the number of random right-hand sides to solve against\n"
       << "  sequential: use a sequential symbolic reordering if nonzero\n"
-      << "  cutoff: maximum size of leaf node\n"
       << "  numDistSeps: number of distributed separators to try\n"
       << "  numSeqSeps: number of sequential separators to try\n"
+      << "  cutoff: maximum size of leaf node\n"
       << std::endl;
 }
 
@@ -55,17 +55,14 @@ main( int argc, char* argv[] )
     const int n3 = atoi( argv[3] );
     const int numRhs = atoi( argv[4] );
     const bool sequential = ( argc >= 6 ? atoi( argv[5] ) : true );
-    const int cutoff = ( argc >= 7 ? atoi( argv[6] ) : 128 );
-    const int numDistSeps = ( argc >= 8 ? atoi( argv[7] ) : 1 );
-    const int numSeqSeps = ( argc >= 9 ? atoi( argv[8] ) : 1 );
+    const int numDistSeps = ( argc >= 7 ? atoi( argv[6] ) : 1 );
+    const int numSeqSeps = ( argc >= 8 ? atoi( argv[7] ) : 1 );
+    const int cutoff = ( argc >= 9 ? atoi( argv[8] ) : 128 );
 
     try
     {
         const int N = n1*n2*n3;
         DistSparseMatrix<double> A( N, comm );
-
-        const int firstLocalRow = A.FirstLocalRow();
-        const int localHeight = A.LocalHeight();
 
         // Fill our portion of the 3D negative Laplacian using a n1 x n2 x n3
         // 7-point stencil in natural ordering: (x,y,z) at x + y*n1 + z*n1*n2
@@ -75,6 +72,8 @@ main( int argc, char* argv[] )
             std::cout.flush();
         }
         const double fillStart = mpi::Time();
+        const int firstLocalRow = A.FirstLocalRow();
+        const int localHeight = A.LocalHeight();
         A.StartAssembly();
         A.Reserve( 7*localHeight );
         for( int iLocal=0; iLocal<localHeight; ++iLocal )
@@ -135,7 +134,7 @@ main( int argc, char* argv[] )
         DistMap map, inverseMap;
         NestedDissection
         ( graph, map, sepTree, info, 
-          sequential, cutoff, numDistSeps, numSeqSeps );
+          sequential, numDistSeps, numSeqSeps, cutoff );
         map.FormInverse( inverseMap );
         mpi::Barrier( comm );
         const double nestedStop = mpi::Time();
@@ -178,8 +177,7 @@ main( int argc, char* argv[] )
         }
         mpi::Barrier( comm );
         const double ldlStart = mpi::Time();
-        LDL( TRANSPOSE, info, frontTree );
-        SetSolveMode( frontTree, NORMAL_1D );
+        LDL( info, frontTree, LDL_1D );
         mpi::Barrier( comm );
         const double ldlStop = mpi::Time();
         if( commRank == 0 )
@@ -194,7 +192,7 @@ main( int argc, char* argv[] )
         const double solveStart = mpi::Time();
         DistNodalMultiVector<double> YNodal;
         YNodal.Pull( inverseMap, info, Y );
-        LDLSolve( TRANSPOSE, info, frontTree, YNodal.localMultiVec );
+        Solve( info, frontTree, YNodal.localMultiVec );
         YNodal.Push( inverseMap, info, Y );
         mpi::Barrier( comm );
         const double solveStop = mpi::Time();

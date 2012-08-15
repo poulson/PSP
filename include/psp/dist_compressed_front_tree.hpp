@@ -65,6 +65,7 @@ struct DistCompressedFront
 template<typename F>
 struct DistCompressedFrontTree
 {
+    bool isHermitian;
     std::vector<LocalCompressedFront<F> > localFronts;
     std::vector<DistCompressedFront<F> > distFronts;
 };

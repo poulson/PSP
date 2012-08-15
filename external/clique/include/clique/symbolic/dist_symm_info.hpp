@@ -84,6 +84,60 @@ struct DistSymmInfo
 {
     std::vector<LocalSymmNodeInfo> localNodes;
     std::vector<DistSymmNodeInfo> distNodes;
+    ~DistSymmInfo();
+
+    void StoreReordered( std::vector<int>& reordered ) const;
 };
+
+//----------------------------------------------------------------------------//
+// Implementation begins here                                                 //
+//----------------------------------------------------------------------------//
+
+inline
+DistSymmInfo::~DistSymmInfo()
+{
+    const int numDist = distNodes.size();
+    for( int s=0; s<numDist; ++s )
+    {
+        delete distNodes[s].grid;
+        mpi::CommFree( distNodes[s].comm );
+    }
+}
+
+inline void
+DistSymmInfo::StoreReordered( std::vector<int>& reordered ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistSymmInfo::StoreReordered");
+#endif
+    const int localSize = distNodes.back().localOffset1d +
+                          distNodes.back().localSize1d;
+    reordered.resize( localSize );
+
+    int localOffset=0;
+    const int numDistNodes = distNodes.size();
+    const int numLocalNodes = localNodes.size();
+    for( int s=0; s<numLocalNodes; ++s )
+    {
+        const int size = localNodes[s].size;
+        const int offset = localNodes[s].offset;
+        for( int j=0; j<size; ++j )
+            reordered[localOffset++] = j+offset;
+    }
+    for( int s=1; s<numDistNodes; ++s )
+    {
+        const int size = distNodes[s].size;
+        const int offset = distNodes[s].offset;
+        const Grid& grid = *distNodes[s].grid;
+        const int gridSize = grid.Size();
+        const int gridRank = grid.Rank();
+        // ASSUMPTION: The alignment is zero
+        for( int j=gridRank; j<size; j+=gridSize )
+            reordered[localOffset++] = j+offset;
+    }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
 } // namespace cliq

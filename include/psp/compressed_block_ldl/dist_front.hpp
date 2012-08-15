@@ -25,7 +25,7 @@ namespace psp {
 
 template<typename R>
 void DistFrontCompression
-( DistCompressedFront<Complex<R> >& front, int depth, bool useQR=true );
+( DistCompressedFront<Complex<R> >& front, int depth, bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //

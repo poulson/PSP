@@ -21,23 +21,29 @@
 namespace cliq {
 
 template<typename F>
+inline
 DistSymmFrontTree<F>::DistSymmFrontTree()
 { }
 
 template<typename F>
-DistSymmFrontTree<F>::DistSymmFrontTree
+inline void
+DistSymmFrontTree<F>::Initialize
 ( Orientation orientation,
   const DistSparseMatrix<F>& A, 
-  const DistMap& map,
+  const DistMap& reordering,
   const DistSeparatorTree& sepTree, 
   const DistSymmInfo& info )
-: mode(NORMAL_2D)
 {
 #ifndef RELEASE
-    PushCallStack("DistSymmFrontTree::DistSymmFrontTree");
-    if( A.LocalHeight() != map.NumLocalSources() )
+    PushCallStack("DistSymmFrontTree::Initialize");
+    if( orientation == NORMAL )
+        throw std::logic_error("Matrix must be symmetric or Hermitian");
+    if( A.LocalHeight() != reordering.NumLocalSources() )
         throw std::logic_error("Local mapping was not the right size");
 #endif
+    isHermitian = ( orientation != TRANSPOSE );
+    frontType = SYMM_2D;
+    
     mpi::Comm comm = A.Comm();
     const DistGraph& graph = A.Graph();
     const int blocksize = A.Blocksize();
@@ -52,7 +58,7 @@ DistSymmFrontTree<F>::DistSymmFrontTree
     std::vector<int> targets( targetSet.size() );
     std::copy( targetSet.begin(), targetSet.end(), targets.begin() );
     std::vector<int> mappedTargets = targets;
-    map.Translate( mappedTargets );
+    reordering.Translate( mappedTargets );
 
     // Set up the indices for the rows we need from each process
     std::vector<int> recvRowSizes( commSize, 0 );
@@ -178,10 +184,8 @@ DistSymmFrontTree<F>::DistSymmFrontTree
             sendRowLengths[s+offset] = numConnections;
         }
     }
-    const bool conjugate = ( orientation == ADJOINT ? true : false );
     std::vector<F> sendEntries( numSendEntries );
     std::vector<int> sendTargets( numSendEntries );
-    std::vector<int>::const_iterator vecIt;
     for( int q=0; q<commSize; ++q )
     {
         int index = sendEntriesOffsets[q];
@@ -197,19 +201,13 @@ DistSymmFrontTree<F>::DistSymmFrontTree
             {
                 const F value = A.Value( localEntryOffset+t );
                 const int col = A.Col( localEntryOffset+t );
-                vecIt = std::lower_bound
-                    ( targets.begin(), targets.end(), col );
-#ifndef RELEASE
-                if( vecIt == targets.end() )
-                    throw std::logic_error("Could not find target");
-#endif
-                const int targetOffset = vecIt - targets.begin();
+                const int targetOffset = Find( targets, col );
                 const int mappedTarget = mappedTargets[targetOffset];
 #ifndef RELEASE
                 if( index >= numSendEntries )
                     throw std::logic_error("send entry index got too big");
 #endif
-                sendEntries[index] = ( conjugate ? elem::Conj(value) : value );
+                sendEntries[index] = (isHermitian ? elem::Conj(value) : value);
                 sendTargets[index] = mappedTarget;
                 ++index;
             }
@@ -290,14 +288,7 @@ DistSymmFrontTree<F>::DistSymmFrontTree
                 }
                 else
                 {
-                    vecIt = std::lower_bound
-                        ( origLowerStruct.begin(), 
-                          origLowerStruct.end(), target );
-#ifndef RELEASE
-                    if( vecIt == origLowerStruct.end() )
-                        throw std::logic_error("No match in origLowerStruct");
-#endif
-                    const int origOffset = vecIt - origLowerStruct.begin();
+                    const int origOffset = Find( origLowerStruct, target );
 #ifndef RELEASE
                     if( origOffset >= (int)node.origLowerRelIndices.size() )
                         throw std::logic_error("origLowerRelIndices too small");
@@ -362,14 +353,7 @@ DistSymmFrontTree<F>::DistSymmFrontTree
                 }
                 else 
                 {
-                    vecIt = std::lower_bound
-                        ( origLowerStruct.begin(),
-                          origLowerStruct.end(), target );
-#ifndef RELEASE
-                    if( vecIt == origLowerStruct.end() )
-                        throw std::logic_error("No match in origLowerStruct");
-#endif
-                    const int origOffset = vecIt - origLowerStruct.begin();
+                    const int origOffset = Find( origLowerStruct, target );
 #ifndef RELEASE
                     if( origOffset >= (int)node.origLowerRelIndices.size() )
                         throw std::logic_error("origLowerRelIndices too small");
@@ -399,6 +383,24 @@ DistSymmFrontTree<F>::DistSymmFrontTree
         ( topLocal.Height(), topLocal.Width(), 0, 0,
           topLocal.LockedBuffer(), topLocal.LDim(), *node.grid );
     }
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename F>
+inline
+DistSymmFrontTree<F>::DistSymmFrontTree
+( Orientation orientation,
+  const DistSparseMatrix<F>& A, 
+  const DistMap& reordering,
+  const DistSeparatorTree& sepTree, 
+  const DistSymmInfo& info )
+{
+#ifndef RELEASE
+    PushCallStack("DistSymmFrontTree::DistSymmFrontTree");
+#endif
+    Initialize( orientation, A, reordering, sepTree, info );
 #ifndef RELEASE
     PopCallStack();
 #endif

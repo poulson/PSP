@@ -26,7 +26,7 @@ namespace psp {
 template<typename R>
 void LocalFrontCompression
 ( LocalCompressedFront<Complex<R> >& front, 
-  int depth, bool isLeaf, bool useQR=true );
+  int depth, bool isLeaf, bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //

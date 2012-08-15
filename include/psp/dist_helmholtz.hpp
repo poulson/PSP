@@ -24,9 +24,9 @@
 namespace psp {
 
 enum PanelScheme {
-  CLIQUE_NORMAL_1D=0, 
-  CLIQUE_FAST_2D_LDL=1,
-  COMPRESSED_2D_BLOCK_LDL=2
+  CLIQUE_LDL_1D=0, 
+  CLIQUE_LDL_SELINV_2D=1,
+  COMPRESSED_BLOCK_LDL_2D=2
 };
 
 template<typename R>
@@ -37,7 +37,7 @@ public:
 
     DistHelmholtz
     ( const Discretization<R>& disc, mpi::Comm comm, 
-      R damping=7.5, int numPlanesPerPanel=4, int cutoff=96 );
+      R damping=7.5, int numPlanesPerPanel=4, int cutoff=128 );
 
     ~DistHelmholtz();
 
@@ -47,8 +47,7 @@ public:
       PanelScheme panelScheme=CLIQUE_FAST_2D_LDL );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
-    void SolveWithSQMR( DistUniformGrid<C>& B, R bcgRelTol=1e-4 ) const;
-    void SolveWithGMRES( DistUniformGrid<C>& B, int m=20, R relTol=1e-3 ) const;
+    void Solve( DistUniformGrid<C>& B, int m=20, R relTol=1e-4 ) const;
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
@@ -77,7 +76,6 @@ private:
     ( DistUniformGrid<C>& gridB, const Matrix<C>& B ) const;
 
     void InternalSolveWithGMRES( Matrix<C>& B, int m, R relTol ) const;
-    void InternalSolveWithSQMR( Matrix<C>& B, R bcgRelTol ) const;
 
     bool CheckForNaN( R alpha ) const;
     bool CheckForNaN( C alpha ) const;
@@ -91,19 +89,10 @@ private:
     ( const Matrix<C>& xList, const Matrix<C>& yList,
       std::vector<C>& alphaList ) const;
 
-    void PseudoNorms
-    ( const Matrix<C>& xList, std::vector<C>& pseudoNormList ) const;
-    void PseudoInnerProducts
-    ( const Matrix<C>& xList, const Matrix<C>& yList,
-      std::vector<C>& alphaList ) const;
-
     void MultiplyColumns
     ( Matrix<C>& xList, const std::vector<C>& deltaList ) const;
     void DivideColumns
     ( Matrix<C>& xList, const std::vector<R>& deltaList ) const;
-    void AddScaledColumns
-    ( const std::vector<C>& deltaList,
-      const Matrix<C>& xList, Matrix<C>& yList ) const;
     void SubtractScaledColumns
     ( const std::vector<C>& deltaList,
       const Matrix<C>& xList, Matrix<C>& yList ) const;

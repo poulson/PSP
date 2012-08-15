@@ -20,12 +20,23 @@
 
 namespace cliq {
 
-enum SolveMode { NORMAL_1D, NORMAL_2D, FAST_1D_LDL, FAST_2D_LDL };
-
-inline bool 
-ModeIs1d( SolveMode mode )
+enum SymmFrontType
 {
-    if( mode == NORMAL_1D || mode == FAST_1D_LDL )
+  SYMM_1D,
+  SYMM_2D,
+  LDL_1D,
+  LDL_2D,
+  LDL_SELINV_1D,
+  LDL_SELINV_2D,
+  BLOCK_LDL_2D
+};
+
+inline bool
+FrontsAre1d( SymmFrontType frontType )
+{
+    if( frontType == SYMM_1D ||
+        frontType == LDL_1D || 
+        frontType == LDL_SELINV_1D )
         return true;
     else
         return false;
@@ -45,10 +56,8 @@ struct LocalSymmFront
 template<typename F>
 struct DistSymmFront
 {
-    // The 'SolveMode' member variable of the parent 'DistSymmFrontTree' 
+    // The 'frontType' member variable of the parent 'DistSymmFrontTree' 
     // determines which of the following fronts is active.
-    //   {NORMAL_1D,FAST_1D_LDL} -> front1d
-    //   {NORMAL_2D,FAST_2D_LDL} -> front2d
     //
     // Split each front into a left and right piece such that the right piece
     // is not needed after the factorization (and can be freed).
@@ -67,7 +76,8 @@ struct DistSymmFront
 template<typename F>
 struct DistSymmFrontTree
 {
-    SolveMode mode;
+    bool isHermitian;
+    SymmFrontType frontType;
     std::vector<LocalSymmFront<F> > localFronts;
     std::vector<DistSymmFront<F> > distFronts;
 
@@ -76,7 +86,14 @@ struct DistSymmFrontTree
     DistSymmFrontTree
     ( Orientation orientation,
       const DistSparseMatrix<F>& A, 
-      const DistMap& map,
+      const DistMap& reordering,
+      const DistSeparatorTree& sepTree,
+      const DistSymmInfo& info );
+
+    void Initialize
+    ( Orientation orientation,
+      const DistSparseMatrix<F>& A,
+      const DistMap& reordering,
       const DistSeparatorTree& sepTree,
       const DistSymmInfo& info );
 };

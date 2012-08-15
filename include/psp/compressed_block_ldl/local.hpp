@@ -25,9 +25,8 @@ namespace psp {
 
 template<typename F> 
 void LocalCompressedBlockLDL
-( Orientation orientation, 
-  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR=true );
+( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
+  bool useQR=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -35,14 +34,11 @@ void LocalCompressedBlockLDL
 
 template<typename F> 
 inline void LocalCompressedBlockLDL
-( Orientation orientation, 
-  cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, 
+( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, 
   int depth, bool useQR )
 {
 #ifndef RELEASE
     PushCallStack("LocalCompressedBlockLDL");
-    if( orientation == NORMAL )
-        throw std::logic_error("LDL must be (conjugate-)transposed");
 #endif
     const int numLocalNodes = info.localNodes.size();
     for( int s=0; s<numLocalNodes; ++s )
@@ -107,7 +103,10 @@ inline void LocalCompressedBlockLDL
         }
 
         // Call the custom partial block LDL
-        cliq::LocalFrontBlockLDL( orientation, frontL, frontBR );
+        if( L.isHermitian )
+            cliq::LocalFrontBlockLDL( ADJOINT, frontL, frontBR );
+        else
+            cliq::LocalFrontBlockLDL( TRANSPOSE, frontL, frontBR );
 
         // Separately compress the A and B portions of the front
         //LocalFrontCompression( front, depth, numChildren==0, useQR );
