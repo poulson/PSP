@@ -460,18 +460,18 @@ DistHelmholtz<R>::s1Inv( int x ) const
 {
     const int bx = disc_.bx;
     const R etax = bx*hx_;
-    if( x+1 < bx && disc_.frontBC==PML )
+    if( x < bx && disc_.frontBC==PML )
     {
-        const R delta = bx - (x+1);
+        const R delta = bx - x;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( x > (disc_.nx-bx) && disc_.backBC==PML )
+    else if( x > (disc_.nx-1-bx) && disc_.backBC==PML )
     {
-        const R delta = x-(disc_.nx-bx);
+        const R delta = x-(disc_.nx-1-bx);
         const R realPart = 1;
         const R imagPart =
             (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
@@ -488,18 +488,18 @@ DistHelmholtz<R>::s2Inv( int y ) const
 {
     const int by = disc_.by;
     const R etay = by*hy_;
-    if( y+1 < by && disc_.leftBC==PML )
+    if( y < by && disc_.leftBC==PML )
     {
-        const R delta = by - (y+1);
+        const R delta = by - y;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cy/etay)*(delta/by)*(delta/by)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( y > (disc_.ny-by) && disc_.rightBC==PML )
+    else if( y > (disc_.ny-1-by) && disc_.rightBC==PML )
     {
-        const R delta = y-(disc_.ny-by);
+        const R delta = y-(disc_.ny-1-by);
         const R realPart = 1;
         const R imagPart =
             (disc_.Cy/etay)*(delta/by)*(delta/by)*
@@ -516,18 +516,18 @@ DistHelmholtz<R>::s3Inv( int v ) const
 {
     const int bz = disc_.bz;
     const R etaz = bz*hz_;
-    if( v+1 < bz )
+    if( v < bz )
     {
-        const R delta = bz - (v+1);
+        const R delta = bz - v;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (disc_.nz-bz) && disc_.topBC==PML )
+    else if( v > (disc_.nz-1-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (disc_.nz-bz);
+        const R delta = v - (disc_.nz-1-bz);
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
@@ -544,18 +544,18 @@ DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
     const int bz = disc_.bz;
     const R etaz = bz*hz_;
-    if( v+1 < vOffset+bz )
+    if( v < vOffset+bz )
     {
-        const R delta = vOffset + bz - (v+1);
+        const R delta = vOffset + bz - v;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (disc_.nz-bz) && disc_.topBC==PML )
+    else if( v > (disc_.nz-1-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (disc_.nz-bz);
+        const R delta = v - (disc_.nz-1-bz);
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*

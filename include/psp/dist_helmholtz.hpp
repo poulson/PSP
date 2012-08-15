@@ -44,7 +44,7 @@ public:
     // Build the sparse matrix and the preconditioner
     void Initialize
     ( const DistUniformGrid<R>& velocity, 
-      PanelScheme panelScheme=CLIQUE_FAST_2D_LDL );
+      PanelScheme panelScheme=CLIQUE_LDL_SELINV_2D );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
     void Solve( DistUniformGrid<C>& B, int m=20, R relTol=1e-4 ) const;

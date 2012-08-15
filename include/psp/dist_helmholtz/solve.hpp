@@ -941,7 +941,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 #endif
 
     // Solve against the panel
-    if( panelScheme_ == COMPRESSED_2D_BLOCK_LDL )
+    if( panelScheme_ == COMPRESSED_BLOCK_LDL_2D )
         CompressedBlockLDLSolve
         ( info, PanelCompressedFactorization( i ), localPanelB );
     else
