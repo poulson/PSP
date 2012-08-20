@@ -77,15 +77,15 @@ main( int argc, char* argv[] )
     const int velocityModel = atoi(argv[argNum++]);
     const int n = atoi(argv[argNum++]);
     const double omega = atof(argv[argNum++]);
-    const bool pmlOnTop = ( argc>=5 ? atoi(argv[argNum++]) : false );
-    const double damping = ( argc>=6 ? atof(argv[argNum++]) : 7. );
-    const int numPlanesPerPanel = ( argc>=7 ? atoi(argv[argNum++]) : 4 );
+    const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : false );
+    const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
+    const int numPlanesPerPanel = ( argc>argNum ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
-        ( argc>=8 ? (PanelScheme)atoi(argv[argNum++]) 
-                  : CLIQUE_LDL_SELINV_2D );
-    const bool fullVisualize = ( argc>=9 ? atoi(argv[argNum++]) : true );
-    const int factBlocksize = ( argc>=10 ? atoi( argv[argNum++] ) : 96 );
-    const int solveBlocksize = ( argc>=11 ? atoi( argv[argNum++] ) : 64 );
+        ( argc>argNum ? (PanelScheme)atoi(argv[argNum++]) 
+                      : CLIQUE_LDL_SELINV_2D );
+    const bool fullVisualize = ( argc>argNum ? atoi(argv[argNum++]) : true );
+    const int factBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 96 );
+    const int solveBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 64 );
 
     if( velocityModel < 0 || velocityModel > 12 )
     {

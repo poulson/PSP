@@ -23,13 +23,14 @@ using namespace psp;
 
 void Usage()
 {
-    std::cout << "Overthrust <nx> <ny> <nz> <omega> "
+    std::cout << "Overthrust <nx> <ny> <nz> <omega> <px> <py> <pz> "
                  "[PML on top=false] [damping=7] [# planes/panel=4] "
                  "[panel scheme=1] [viz=1] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
               << "\n"
               << "  <nx,ny,nz>: size of grid in each dimension\n"
               << "  <omega>: frequency (in rad/sec) of problem\n"
+              << "  <px,py,pz>: 3D process grid dimensions\n"
               << "  [PML on top=false]: PML or Dirichlet b.c. on top?\n"
               << "  [damping=7]: imaginary freq shift for preconditioner\n"
               << "  [# of planes/panel=4]: number of planes per subdomain\n"
@@ -60,14 +61,18 @@ main( int argc, char* argv[] )
     const int ny = atoi(argv[argNum++]);
     const int nz = atoi(argv[argNum++]);
     const double omega = atof(argv[argNum++]);
-    const bool pmlOnTop = ( argc>=6 ? atoi(argv[argNum++]) : false );
-    const double damping = ( argc>=7 ? atof(argv[argNum++]) : 7. );
-    const int numPlanesPerPanel = ( argc>=8 ? atoi(argv[argNum++]) : 4 );
+    const int px = atoi(argv[argNum++]);
+    const int py = atoi(argv[argNum++]);
+    const int pz = atoi(argv[argNum++]);
+    const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : false );
+    const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
+    const int numPlanesPerPanel = ( argc>argNum ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
-        ( argc>=9 ? (PanelScheme)atoi(argv[argNum++]) : CLIQUE_LDL_SELINV_2D );
-    const bool fullVisualize = ( argc>=10 ? atoi(argv[argNum++]) : true );
-    const int factBlocksize = ( argc>=11 ? atoi(argv[argNum++]) : 96 );
-    const int solveBlocksize = ( argc>=12 ? atoi(argv[argNum++]) : 64 );
+        ( argc>argNum ? (PanelScheme)atoi(argv[argNum++]) 
+                      : CLIQUE_LDL_SELINV_2D );
+    const bool fullVisualize = ( argc>argNum ? atoi(argv[argNum++]) : true );
+    const int factBlocksize = ( argc>argNum ? atoi(argv[argNum++]) : 96 );
+    const int solveBlocksize = ( argc>argNum ? atoi(argv[argNum++]) : 64 );
 
     try 
     {
@@ -91,7 +96,7 @@ main( int argc, char* argv[] )
                       << nxOrig << " x " << nyOrig << " x " << nzOrig 
                       << " overthrust data..." << std::endl;
         DistUniformGrid<double> velocity
-        ( 1, nxOrig, nyOrig, nzOrig, XYZ, comm );
+        ( 1, nxOrig, nyOrig, nzOrig, XYZ, px, py, pz, comm );
         velocity.SequentialLoad("overthrust.dat");
 
         if( commRank == 0 )
@@ -129,10 +134,8 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<Complex<double> > B( 3, nx, ny, nz, XYZ, comm );
-        const int px = B.XStride();
-        const int py = B.YStride();
-        const int pz = B.ZStride();
+        DistUniformGrid<Complex<double> > 
+            B( 3, nx, ny, nz, XYZ, px, py, pz, comm );
         const int xShift = B.XShift();
         const int yShift = B.YShift();
         const int zShift = B.ZShift();
