@@ -24,20 +24,22 @@ using namespace psp;
 void Usage()
 {
     std::cout << "UnitCube <velocity> <n> <omega> "
-                 "[PML on top=false] [damping=7] [# planes/panel=4] "
-                 "[panel scheme=1] [viz=1] "
+                 "[PML on top=false] [pmlSize=5] [sigma=1.5] [damping=7] "
+                 "[# planes/panel=4] [panel scheme=1] [viz=1] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
               << "\n"
-              << "  <velocity>: which velocity field to use, {0,...,12}\n"
-              << "  <n>: size of grid in each dimension\n"
-              << "  <omega>: frequency (in rad/sec) of problem\n"
-              << "  [PML on top=false]: PML or Dirichlet b.c. on top?\n"
-              << "  [damping=7]: imaginary freq shift for preconditioner\n"
-              << "  [# planes/panel=4]: number of planes per subdomain\n"
-              << "  [panel scheme=1]: LDL_1D=0, LDL_SELINV_2D=1\n"
-              << "  [full viz=1]: full volume visualization iff != 0\n"
-              << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
-              << "  [solve blocksize=64]: solve algorithmic blocksize\n"
+              << "  velocity: which velocity field to use, {0,...,12}\n"
+              << "  n: size of grid in each dimension\n"
+              << "  omega: frequency (in rad/sec) of problem\n"
+              << "  PML on top: PML or Dirichlet b.c. on top?\n"
+              << "  PML size: number of grid points of PML\n"
+              << "  sigma: maximum height of complex coordinate stretching\n"
+              << "  damping: imaginary freq shift for preconditioner\n"
+              << "  # planes/panel: number of planes per subdomain\n"
+              << "  panel scheme: LDL_1D=0, LDL_SELINV_2D=1\n"
+              << "  full viz: full volume visualization iff != 0\n"
+              << "  fact blocksize: factorization algorithmic blocksize\n"
+              << "  solve blocksize: solve algorithmic blocksize\n"
               << "\n"
               << "\n"
               << "velocity model:\n"
@@ -78,6 +80,8 @@ main( int argc, char* argv[] )
     const int n = atoi(argv[argNum++]);
     const double omega = atof(argv[argNum++]);
     const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : false );
+    const int pmlSize = ( argc>argNum ? atoi(argv[argNum++]) : 5 );
+    const double sigma = ( argc>argNum ? atof(argv[argNum++]) : 1.5 );
     const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
     const int numPlanesPerPanel = ( argc>argNum ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
@@ -120,8 +124,11 @@ main( int argc, char* argv[] )
     try 
     {
         Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
+        const int pmlSize = 5;
+        const double sigma = 1.5;
         Discretization<double> disc
-        ( omega, n, n, n, 1., 1., 1., PML, PML, PML, PML, topBC );
+        ( omega, n, n, n, 1., 1., 1., PML, PML, PML, PML, topBC, 
+          pmlSize, sigma );
 
         DistHelmholtz<double> helmholtz
         ( disc, comm, damping, numPlanesPerPanel );

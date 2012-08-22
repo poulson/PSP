@@ -37,7 +37,7 @@ public:
 
     DistHelmholtz
     ( const Discretization<R>& disc, mpi::Comm comm, 
-      R damping=7.5, int numPlanesPerPanel=4, int cutoff=128 );
+      R damping=7.5, int numPlanesPerPanel=4, int cutoff=12 );
 
     ~DistHelmholtz();
 

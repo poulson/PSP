@@ -24,20 +24,22 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Overthrust <nx> <ny> <nz> <omega> <px> <py> <pz> "
-                 "[PML on top=false] [damping=7] [# planes/panel=4] "
-                 "[panel scheme=1] [viz=1] "
+                 "[PML on top=false] [pmlSize=5] [sigma=1.5*20] [damping=7] "
+                 "[# planes/panel=4] [panel scheme=1] [viz=1] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
               << "\n"
-              << "  <nx,ny,nz>: size of grid in each dimension\n"
-              << "  <omega>: frequency (in rad/sec) of problem\n"
-              << "  <px,py,pz>: 3D process grid dimensions\n"
-              << "  [PML on top=false]: PML or Dirichlet b.c. on top?\n"
-              << "  [damping=7]: imaginary freq shift for preconditioner\n"
-              << "  [# of planes/panel=4]: number of planes per subdomain\n"
-              << "  [panel scheme=1]: LDL_1D=0, LDL_SELINV_2D=1\n"
-              << "  [full viz=1]: full volume visualization iff != 0\n" 
-              << "  [fact blocksize=96]: factorization algorithmic blocksize\n"
-              << "  [solve blocksize=64]: solve algorithmic blocksize\n"
+              << "  nx,ny,nz: size of grid in each dimension\n"
+              << "  omega: frequency (in rad/sec) of problem\n"
+              << "  px,py,pz: 3D process grid dimensions\n"
+              << "  PML on top: PML or Dirichlet b.c. on top?\n"
+              << "  pmlSize: width of PML in grid points\n"
+              << "  sigma: maximum height of imaginary coordinate stretching\n"
+              << "  damping: imaginary freq shift for preconditioner\n"
+              << "  # of planes/panel: number of planes per subdomain\n"
+              << "  panel scheme: LDL_1D=0, LDL_SELINV_2D=1\n"
+              << "  full viz: full volume visualization iff != 0\n" 
+              << "  fact blocksize: factorization algorithmic blocksize\n"
+              << "  solve blocksize: solve algorithmic blocksize\n"
               << std::endl;
 }
 
@@ -65,6 +67,8 @@ main( int argc, char* argv[] )
     const int py = atoi(argv[argNum++]);
     const int pz = atoi(argv[argNum++]);
     const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : false );
+    const int pmlSize = ( argc>argNum ? atoi(argv[argNum++]) : 5 );
+    const double sigma = ( argc>argNum ? atof(argv[argNum++]) : 1.5*20 );
     const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
     const int numPlanesPerPanel = ( argc>argNum ? atoi(argv[argNum++]) : 4 );
     const PanelScheme panelScheme = 
@@ -76,14 +80,13 @@ main( int argc, char* argv[] )
 
     try 
     {
+        Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
         const double wx = 20.;
         const double wy = 20.;
         const double wz = 4.65;
-        const int pmlWidth = 5;
-        Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
         Discretization<double> disc
-        ( omega, nx, ny, nz, wx, wy, wz, 
-          PML, PML, PML, PML, topBC, pmlWidth, pmlWidth, pmlWidth );
+        ( omega, nx, ny, nz, wx, wy, wz, PML, PML, PML, PML, topBC,
+          pmlSize, sigma );
 
         DistHelmholtz<double> helmholtz
         ( disc, comm, damping, numPlanesPerPanel );

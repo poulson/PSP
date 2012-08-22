@@ -484,7 +484,7 @@ DistHelmholtz<R>::s1Inv( int x ) const
         const R delta = (bx-1) - x;
         const R realPart = 1;
         const R imagPart = 
-            (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
+            (disc_.sigmax/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -493,7 +493,7 @@ DistHelmholtz<R>::s1Inv( int x ) const
         const R delta = x-(disc_.nx-bx);
         const R realPart = 1;
         const R imagPart =
-            (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
+            (disc_.sigmax/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -512,7 +512,7 @@ DistHelmholtz<R>::s2Inv( int y ) const
         const R delta = (by-1) - y;
         const R realPart = 1;
         const R imagPart = 
-            (disc_.Cy/etay)*(delta/by)*(delta/by)*
+            (disc_.sigmay/etay)*(delta/by)*(delta/by)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -521,7 +521,7 @@ DistHelmholtz<R>::s2Inv( int y ) const
         const R delta = y-(disc_.ny-by);
         const R realPart = 1;
         const R imagPart =
-            (disc_.Cy/etay)*(delta/by)*(delta/by)*
+            (disc_.sigmay/etay)*(delta/by)*(delta/by)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -540,7 +540,7 @@ DistHelmholtz<R>::s3Inv( int v ) const
         const R delta = (bz-1) - v;
         const R realPart = 1;
         const R imagPart = 
-            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -549,7 +549,7 @@ DistHelmholtz<R>::s3Inv( int v ) const
         const R delta = v - (disc_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
-            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -568,7 +568,7 @@ DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
         const R delta = (vOffset+bz-1) - v;
         const R realPart = 1;
         const R imagPart = 
-            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
@@ -577,7 +577,7 @@ DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
         const R delta = v - (disc_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
-            (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
+            (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }

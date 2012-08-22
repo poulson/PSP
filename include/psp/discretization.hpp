@@ -58,7 +58,7 @@ struct Discretization
     // NOTE: the bottom boundary condition must be PML since we are 
     //       sweeping from it.
     int bx, by, bz; // number of grid points of PML in each direction
-    R Cx, Cy, Cz;   // coefficient for PML in each direction
+    R sigmax, sigmay, sigmaz;   // coefficient for PML in each direction
 
     Discretization
     ( R frequency, 
@@ -70,7 +70,7 @@ struct Discretization
       bx(5), by(5), bz(5)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
-        Cx = Cy = Cz = 1.5*maxDim;
+        sigmax = sigmay = sigmaz = 1.5*maxDim;
     }
     
     Discretization
@@ -85,7 +85,7 @@ struct Discretization
       bx(5), by(5), bz(5)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
-        Cx = Cy = Cz = 1.5*maxDim;
+        sigmax = sigmay = sigmaz = 1.5*maxDim;
     }
 
     Discretization
@@ -101,8 +101,23 @@ struct Discretization
       bx(xPMLSize), by(yPMLSize), bz(zPMLSize)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
-        Cx = Cy = Cz = 1.5*maxDim;
+        sigmax = sigmay = sigmaz = 1.5*maxDim;
     }
+
+    Discretization
+    ( R frequency,
+      int xSize, int ySize, int zSize, 
+      R xWidth, R yWidth, R zWidth,
+      Boundary front, Boundary right, Boundary back,
+      Boundary left, Boundary top,
+      int pmlSize, double sigma )
+    : stencil(SEVEN_POINT), omega(frequency), 
+      nx(xSize), ny(ySize), nz(zSize),
+      wx(xWidth), wy(yWidth), wz(zWidth),
+      frontBC(front), rightBC(right), backBC(back), leftBC(left), topBC(top),
+      bx(pmlSize), by(pmlSize), bz(pmlSize),
+      sigmax(sigma), sigmay(sigma), sigmaz(sigma)
+    { }
 };
 
 } // namespace psp
