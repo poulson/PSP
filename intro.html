@@ -1,0 +1,133 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    
+    <title>Introduction &mdash; Parallel Sweeping Preconditioner 0.1 documentation</title>
+    
+    <link rel="stylesheet" href="_static/haiku.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/print.css" type="text/css" />
+    
+    <script type="text/javascript">
+      var DOCUMENTATION_OPTIONS = {
+        URL_ROOT:    '',
+        VERSION:     '0.1',
+        COLLAPSE_INDEX: false,
+        FILE_SUFFIX: '.html',
+        HAS_SOURCE:  true
+      };
+    </script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="http://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/javascript" src="_static/theme_extras.js"></script>
+    <link rel="top" title="Parallel Sweeping Preconditioner 0.1 documentation" href="index.html" />
+    <link rel="next" title="Build system" href="build.html" />
+    <link rel="prev" title="Welcome to Parallel Sweeping Preconditioner’s documentation!" href="index.html" /> 
+  </head>
+  <body>
+      <div class="header"><h1 class="heading"><a href="index.html">
+          <span>Parallel Sweeping Preconditioner 0.1 documentation</span></a></h1>
+        <h2 class="heading"><span>Introduction</span></h2>
+      </div>
+      <div class="topnav">
+      
+        <p>
+        «&#160;&#160;<a href="index.html">Welcome to Parallel Sweeping Preconditioner&#8217;s documentation!</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="build.html">Build system</a>&#160;&#160;»
+        </p>
+
+      </div>
+      <div class="content">
+        
+        
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overview">
+<h2>Overview<a class="headerlink" href="#overview" title="Permalink to this headline">¶</a></h2>
+<p>Parallel Sweeping Preconditioner (PSP) is a...**TODO**</p>
+</div>
+<div class="section" id="dependencies">
+<h2>Dependencies<a class="headerlink" href="#dependencies" title="Permalink to this headline">¶</a></h2>
+<p>PSP is built on top of <a class="reference external" href="http://github.com/poulson/Clique">Clique</a>, which
+is in turn based on <a class="reference external" href="http://code.google.com/p/elemental">Elemental</a> and
+<a class="reference external" href="http://glaros.dtc.umn.edu/gkhome/metis/parmetis/overview/">ParMETIS</a>
+(which are both distributed with Clique).</p>
+</div>
+<div class="section" id="license-and-copyright">
+<h2>License and copyright<a class="headerlink" href="#license-and-copyright" title="Permalink to this headline">¶</a></h2>
+<p>All files in PSP (other than Elemental and ParMETIS) are made available under
+<a class="reference external" href="http://www.opensource.org/licenses/gpl-3.0">GPLv3</a>. The vast majority of
+files contain the following copyright notice:</p>
+<div class="highlight-python"><pre>Parallel Sweeping Preconditioner (PSP): a distributed-memory implementation
+of a sweeping preconditioner for 3d Helmholtz equations.
+
+Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and
+The University of Texas at Austin
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.</pre>
+</div>
+<p>Again, Elemental and ParMETIS are not distributed under the GPL; Elemental is
+distributed under the more permissive
+<a class="reference external" href="http://www.opensource.org/licenses/bsd-license.php">New BSD License</a>,
+and ParMETIS is distributed under the following license:</p>
+<div class="highlight-python"><pre>The ParMETIS/METIS package is copyrighted by the Regents of the
+University of Minnesota. It can be freely used for educational and
+research purposes by non-profit institutions and US government
+agencies only. Other organizations are allowed to use ParMETIS/METIS
+only for evaluation purposes, and any further uses will require prior
+approval. The software may not be sold or redistributed without prior
+approval. One may make copies of the software for their use provided
+that the copies, are not sold or distributed, are used under the same
+terms and conditions.
+
+As unestablished research software, this code is provided on an
+``as is'' basis without warranty of any kind, either expressed or
+implied. The downloading, or executing any part of this software
+constitutes an implicit agreement to these terms. These terms and
+conditions are subject to change at any time without prior notice.</pre>
+</div>
+</div>
+</div>
+
+
+      </div>
+      <div class="bottomnav">
+      
+        <p>
+        «&#160;&#160;<a href="index.html">Welcome to Parallel Sweeping Preconditioner&#8217;s documentation!</a>
+        &#160;&#160;::&#160;&#160;
+        <a class="uplink" href="index.html">Contents</a>
+        &#160;&#160;::&#160;&#160;
+        <a href="build.html">Build system</a>&#160;&#160;»
+        </p>
+
+      </div>
+
+    <div class="footer">
+        &copy; Copyright 2012, Jack Poulson.
+      Created using <a href="http://sphinx.pocoo.org/">Sphinx</a> 1.1.3.
+    </div>
+  </body>
+</html>

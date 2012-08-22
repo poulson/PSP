@@ -1,0 +1,3 @@
+The ``DistUniformGrid`` class
+=============================
+**TODO**
