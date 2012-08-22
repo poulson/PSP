@@ -26,6 +26,8 @@ void
 DistHelmholtz<R>::Initialize
 ( const DistUniformGrid<R>& velocity, PanelScheme panelScheme )
 {
+    if( disc_.omega == (R)0 )
+        throw std::logic_error("PML does not work at zero frequency");
     if( panelScheme < 0 || panelScheme > 2 )
     {
         std::ostringstream msg;
@@ -454,24 +456,41 @@ DistHelmholtz<R>::Finalize()
     }
 }
 
+//
+// With zero dirichlet boundary conditions, the right-most grid point is 
+// implicitly zero. With PML, the takeoff function starts at this implicit
+// grid point (NOT at the last physical grid point) and reaches all the way 
+// to the last (implicit) grid point. Thus, the diagrams for the two situations
+// look like this:
+//
+//    ... x o
+//
+//    ... x p p p o
+//
+// where the former uses 'x' to mark a physical grid point, and the 'o' 
+// denotes the implicit zero-Dirichlet node. In the second case, we have 
+// three PML grid points added, and the take-off function only begins as the 
+// left-most 'p' grid point, where it is zero.
+//
+
 template<typename R>
 Complex<R>
 DistHelmholtz<R>::s1Inv( int x ) const
 {
     const int bx = disc_.bx;
     const R etax = bx*hx_;
-    if( x < bx && disc_.frontBC==PML )
+    if( x < (bx-1) && disc_.frontBC==PML )
     {
-        const R delta = bx - x;
+        const R delta = (bx-1) - x;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( x > (disc_.nx-1-bx) && disc_.backBC==PML )
+    else if( x > (disc_.nx-bx) && disc_.backBC==PML )
     {
-        const R delta = x-(disc_.nx-1-bx);
+        const R delta = x-(disc_.nx-bx);
         const R realPart = 1;
         const R imagPart =
             (disc_.Cx/etax)*(delta/bx)*(delta/bx)*
@@ -488,18 +507,18 @@ DistHelmholtz<R>::s2Inv( int y ) const
 {
     const int by = disc_.by;
     const R etay = by*hy_;
-    if( y < by && disc_.leftBC==PML )
+    if( y < (by-1) && disc_.leftBC==PML )
     {
-        const R delta = by - y;
+        const R delta = (by-1) - y;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cy/etay)*(delta/by)*(delta/by)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( y > (disc_.ny-1-by) && disc_.rightBC==PML )
+    else if( y > (disc_.ny-by) && disc_.rightBC==PML )
     {
-        const R delta = y-(disc_.ny-1-by);
+        const R delta = y-(disc_.ny-by);
         const R realPart = 1;
         const R imagPart =
             (disc_.Cy/etay)*(delta/by)*(delta/by)*
@@ -516,18 +535,18 @@ DistHelmholtz<R>::s3Inv( int v ) const
 {
     const int bz = disc_.bz;
     const R etaz = bz*hz_;
-    if( v < bz )
+    if( v < bz-1 )
     {
-        const R delta = bz - v;
+        const R delta = (bz-1) - v;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (disc_.nz-1-bz) && disc_.topBC==PML )
+    else if( v > (disc_.nz-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (disc_.nz-1-bz);
+        const R delta = v - (disc_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
@@ -544,18 +563,18 @@ DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
 {
     const int bz = disc_.bz;
     const R etaz = bz*hz_;
-    if( v < vOffset+bz )
+    if( v < vOffset+bz-1 )
     {
-        const R delta = vOffset + bz - v;
+        const R delta = (vOffset+bz-1) - v;
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
-    else if( v > (disc_.nz-1-bz) && disc_.topBC==PML )
+    else if( v > (disc_.nz-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (disc_.nz-1-bz);
+        const R delta = v - (disc_.nz-bz);
         const R realPart = 1;
         const R imagPart = 
             (disc_.Cz/etaz)*(delta/bz)*(delta/bz)*
@@ -583,23 +602,26 @@ DistHelmholtz<R>::FormGlobalRow
     const C s3InvR = s3Inv( v+1 );
 
     // Compute all of the x-shifted terms
-    const C xTempL = s2InvM*s3InvM/s1InvL;
-    const C xTempM = s2InvM*s3InvM/s1InvM;
-    const C xTempR = s2InvM*s3InvM/s1InvR;
+    const C xTop = s2InvM*s3InvM;
+    const C xTempL = xTop/s1InvL;
+    const C xTempM = xTop/s1InvM;
+    const C xTempR = xTop/s1InvR;
     const C xTermL = (xTempL+xTempM) / (2*hx_*hx_);
     const C xTermR = (xTempR+xTempM) / (2*hx_*hx_);
 
     // Compute all of the y-shifted terms
-    const C yTempL = s1InvM*s3InvM/s2InvL;
-    const C yTempM = s1InvM*s3InvM/s2InvM;
-    const C yTempR = s1InvM*s3InvM/s2InvR;
+    const C yTop = s1InvM*s3InvM;
+    const C yTempL = yTop/s2InvL;
+    const C yTempM = yTop/s2InvM;
+    const C yTempR = yTop/s2InvR;
     const C yTermL = (yTempL+yTempM) / (2*hy_*hy_);
     const C yTermR = (yTempR+yTempM) / (2*hy_*hy_);
 
     // Compute all of the v-shifted terms
-    const C vTempL = s1InvM*s2InvM/s3InvL;
-    const C vTempM = s1InvM*s2InvM/s3InvM;
-    const C vTempR = s1InvM*s2InvM/s3InvR;
+    const C zTop = s1InvM*s2InvM;
+    const C vTempL = zTop/s3InvL;
+    const C vTempM = zTop/s3InvM;
+    const C vTempR = zTop/s3InvR;
     const C vTermL = (vTempL+vTempM) / (2*hz_*hz_);
     const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 

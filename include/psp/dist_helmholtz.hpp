@@ -47,7 +47,9 @@ public:
       PanelScheme panelScheme=CLIQUE_LDL_SELINV_2D );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
-    void Solve( DistUniformGrid<C>& B, int m=20, R relTol=1e-4 ) const;
+    void Solve
+    ( DistUniformGrid<C>& B, int m=20, R relTol=1e-4, 
+      bool viewIterates=false ) const;
 
     // Destroy the sparse matrix and the preconditioner
     void Finalize();
@@ -75,7 +77,9 @@ private:
     void PushRightHandSides
     ( DistUniformGrid<C>& gridB, const Matrix<C>& B ) const;
 
-    void InternalSolveWithGMRES( Matrix<C>& B, int m, R relTol ) const;
+    void InternalSolveWithGMRES
+    ( DistUniformGrid<C>& gridB, Matrix<C>& B, int m, R relTol, 
+      bool viewIteratees ) const;
 
     bool CheckForNaN( R alpha ) const;
     bool CheckForNaN( C alpha ) const;

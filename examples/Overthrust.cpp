@@ -206,7 +206,10 @@ main( int argc, char* argv[] )
             std::cout << "Beginning solve..." << std::endl;
         mpi::Barrier( comm );
         const double solveStartTime = mpi::Time();
-        helmholtz.Solve( B, 20, 1e-5 );
+        const int m = 20;
+        const double relTol = 1e-5;
+        const bool viewIterates = false;
+        helmholtz.Solve( B, m, relTol, viewIterates );
         mpi::Barrier( comm );
         const double solveStopTime = mpi::Time();
         const double solveTime = solveStopTime - solveStartTime;

@@ -24,7 +24,7 @@ namespace psp {
 template<typename R>
 void
 DistHelmholtz<R>::Solve
-( DistUniformGrid<C>& gridB, int m, R relTol ) const
+( DistUniformGrid<C>& gridB, int m, R relTol, bool viewIterates ) const
 {
     if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
         throw std::logic_error("B does not have a congruent comm");
@@ -48,7 +48,7 @@ DistHelmholtz<R>::Solve
     }
 
     // Solve the systems of equations
-    InternalSolveWithGMRES( B, m, relTol );
+    InternalSolveWithGMRES( gridB, B, m, relTol, viewIterates );
 
     // Restore the solutions back into the original form
     {
@@ -257,7 +257,8 @@ DistHelmholtz<R>::PushRightHandSides
 template<typename R>
 void
 DistHelmholtz<R>::InternalSolveWithGMRES
-( Matrix<C>& bList, int m, R relTol ) const
+( DistUniformGrid<C>& gridB, Matrix<C>& bList, int m, R relTol,
+  bool viewIterates ) const
 {
     const int numRhs = bList.Width();
     const int localHeight = bList.Height();
@@ -589,6 +590,13 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "  finished iteration " << it << " with "
                               << "maxRelResidNorm=" << maxRelResidNorm 
                               << std::endl;
+            }
+            if( viewIterates )
+            {
+                PushRightHandSides( gridB, xList );
+                std::ostringstream os;
+                os << "iterates-" << it;
+                gridB.WriteVolume( os.str() );
             }
             ++it;
         }
