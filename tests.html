@@ -30,7 +30,7 @@
     <script type="text/javascript" src="_static/theme_extras.js"></script>
     <link rel="top" title="Parallel Sweeping Preconditioner 0.1 documentation" href="index.html" />
     <link rel="next" title="Example driver(s)" href="examples.html" />
-    <link rel="prev" title="Build system" href="build.html" /> 
+    <link rel="prev" title="The DistHelmholtz class" href="dist_helmholtz.html" /> 
   </head>
   <body>
       <div class="header"><h1 class="heading"><a href="index.html">
@@ -40,7 +40,7 @@
       <div class="topnav">
       
         <p>
-        «&#160;&#160;<a href="build.html">Build system</a>
+        «&#160;&#160;<a href="dist_helmholtz.html">The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
@@ -53,7 +53,21 @@
         
   <div class="section" id="test-drivers">
 <h1>Test drivers<a class="headerlink" href="#test-drivers" title="Permalink to this headline">¶</a></h1>
-<p><strong>TODO: Describe ``tests/UnitCube.cpp`` and ``tests/Interpolate.cpp``</strong></p>
+<div class="section" id="unitcube">
+<h2>UnitCube<a class="headerlink" href="#unitcube" title="Permalink to this headline">¶</a></h2>
+<p>This section describes the driver
+<a class="reference external" href="https://github.com/poulson/PSP/blob/master/tests/UnitCube.cpp">tests/UnitCube.cpp</a>, which is designed for quickly testing the performance of the sweeping
+preconditioner on a variety of different velocity models.</p>
+<p><strong>TODO</strong></p>
+</div>
+<div class="section" id="interpolate">
+<h2>Interpolate<a class="headerlink" href="#interpolate" title="Permalink to this headline">¶</a></h2>
+<p>The <a class="reference external" href="https://github.com/poulson/PSP/blob/master/tests/Interpolate.cpp">tests/Interpolate.cpp driver</a>
+is meant to exercise the routine
+<a class="reference internal" href="dist_uniform_grid.html#DistUniformGrid:F:::InterpolateTo__i.i.i" title="DistUniformGrid&lt;F&gt;::InterpolateTo"><tt class="xref cpp cpp-func docutils literal"><span class="pre">DistUniformGrid&lt;F&gt;::InterpolateTo()</span></tt></a>, which provides a means of
+linearly interpolating a velocity model into a different grid size in parallel.</p>
+<p><strong>TODO</strong></p>
+</div>
 </div>
 
 
@@ -61,7 +75,7 @@
       <div class="bottomnav">
       
         <p>
-        «&#160;&#160;<a href="build.html">Build system</a>
+        «&#160;&#160;<a href="dist_helmholtz.html">The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
