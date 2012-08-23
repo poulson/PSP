@@ -1,9 +1,24 @@
 The ``DistUniformGrid`` class
 =============================
+The purpose of this class is to provide a convenient mechanism for manipulating
+and visualizing scalar fields defined on three-dimensional uniform grids 
+and distributed over large numbers of processes. The basic strategy is 
+straightforward: given :math:`p` processes and a factorization 
+:math:`p_x p_y p_z = p`, grid-point :math:`(x,y,z)` is assigned to the process
+in the :math:`(x \bmod p_x,y \bmod p_y,z \bmod p_z)` position in the grid.
+By default, an XYZ lexicographical ordering is used, but any of the other 
+five permutations may be used.
+
+The two visualization subroutines, :cpp:func:`DistUniformGrid\<F>::WritePlane`
+and :cpp:func:`DistUniformGrid\<F>::WriteVolume`, output (parallel) VTK image 
+files, which the author typically views using 
+`ParaView <http://www.paraview.org>`__.
 
 .. cpp:type:: enum GridDataOrder
 
-   Specifies the lexicographical order in which the data is to be stored:
+   Specifies the lexicographical order in which the data is to be stored. 
+   The choices are
+
    * XYZ
    * XZY
    * YXZ
@@ -13,7 +28,9 @@ The ``DistUniformGrid`` class
 
 .. cpp:type:: enum PlaneType
 
-   Specifies a plane type based upon the dimensions it includes:
+   Specifies a plane type based upon the dimensions it includes. The choices
+   are
+
    * XY
    * XZ
    * YZ
@@ -149,13 +166,16 @@ The ``DistUniformGrid`` class
       Each process reads in its portion of the data from the sequential 
       data stores in the specified file. Note that the data must use the 
       lexicographical ordering specified by 
-      :cpp:func::`DistUniformGrid<F>::Order`, and the model must be over a
+      :cpp:func:`DistUniformGrid\<F>::Order`, and the model must be over a
       grid which matches that of the parent class.
 
    .. cpp:function:: void InterpolateTo( int nx, int ny, int nz )
 
       The existing grid data is linearly interpolated into a new grid with 
-      the specified dimensions.
+      the specified dimensions. This is particularly useful in conjunction 
+      with :cpp:func:`DistUniformGrid\<F>::SequentialLoad`, as a predefined
+      velocity model can be loaded and interpolated in parallel with two 
+      lines of code.
 
    .. cpp:function:: void WritePlane( PlaneType planeType, int whichPlane, std::string basename ) const
 
