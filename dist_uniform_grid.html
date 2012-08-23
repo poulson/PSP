@@ -44,7 +44,7 @@
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
-        <a href="dist_helmholtz.html">The <tt class="docutils literal docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>&#160;&#160;»
+        <a href="dist_helmholtz.html">The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>&#160;&#160;»
         </p>
 
       </div>
@@ -53,7 +53,177 @@
         
   <div class="section" id="the-distuniformgrid-class">
 <h1>The <tt class="docutils literal"><span class="pre">DistUniformGrid</span></tt> class<a class="headerlink" href="#the-distuniformgrid-class" title="Permalink to this headline">¶</a></h1>
-<p><strong>TODO</strong></p>
+<dl class="type">
+<dt id="GridDataOrder__enum">
+<em class="property">type </em>enum <tt class="descname">GridDataOrder</tt><a class="headerlink" href="#GridDataOrder__enum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Specifies the lexicographical order in which the data is to be stored:
+* XYZ
+* XZY
+* YXZ
+* YZX
+* ZXY
+* ZYX</p>
+</dd></dl>
+
+<dl class="type">
+<dt id="PlaneType__enum">
+<em class="property">type </em>enum <tt class="descname">PlaneType</tt><a class="headerlink" href="#PlaneType__enum" title="Permalink to this definition">¶</a></dt>
+<dd><p>Specifies a plane type based upon the dimensions it includes:
+* XY
+* XZ
+* YZ</p>
+</dd></dl>
+
+<dl class="type">
+<dt id="DistUniformGrid:F:__class">
+<em class="property">type </em>class <tt class="descname">DistUniformGrid&lt;F&gt;</tt><a class="headerlink" href="#DistUniformGrid:F:__class" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="function">
+<dt id="DistUniformGrid:F:::DistUniformGrid__i.i.i.i.i.i.mpi::Comm.i.GridDataOrder">
+ <tt class="descname">DistUniformGrid</tt><big>(</big>int <em>nx</em>, int <em>ny</em>, int <em>nz</em>, int <em>px</em>, int <em>py</em>, int <em>pz</em>, mpi::Comm <em>comm</em>, int <em>numScalars</em><em>=1</em>, <a class="reference internal" href="#GridDataOrder__enum" title="GridDataOrder">GridDataOrder</a> <em>order</em><em>=XYZ </em><big>)</big><a class="headerlink" href="#DistUniformGrid:F:::DistUniformGrid__i.i.i.i.i.i.mpi::Comm.i.GridDataOrder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Generates an <span class="math">\(n_x \times n_y \times n_z\)</span> grid, where each node
+contains <cite>numScalars</cite> entries of type <cite>F</cite>, and the grid is distributed
+over a <span class="math">\(p_x \times p_y \times p_z\)</span> logical grid of processes
+using the specified communicator.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::DistUniformGrid__i.i.i.mpi::Comm.i.GridDataOrder">
+ <tt class="descname">DistUniformGrid</tt><big>(</big>int <em>nx</em>, int <em>ny</em>, int <em>nz</em>, mpi::Comm <em>comm</em>, int <em>numScalars</em><em>=1</em>, <a class="reference internal" href="#GridDataOrder__enum" title="GridDataOrder">GridDataOrder</a> <em>order</em><em>=XYZ </em><big>)</big><a class="headerlink" href="#DistUniformGrid:F:::DistUniformGrid__i.i.i.mpi::Comm.i.GridDataOrder" title="Permalink to this definition">¶</a></dt>
+<dd><p>Same as above, but the 3D process grid is determined automatically.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::XSizeC">
+int <tt class="descname">XSize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::XSizeC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::YSizeC">
+int <tt class="descname">YSize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::YSizeC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::ZSizeC">
+int <tt class="descname">ZSize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::ZSizeC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::CommC">
+mpi::Comm <tt class="descname">Comm</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::CommC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::OwningProcess__iC">
+int <tt class="descname">OwningProcess</tt><big>(</big>int <em>naturalIndex</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::OwningProcess__iC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::OwningProcess__i.i.iC">
+int <tt class="descname">OwningProcess</tt><big>(</big>int <em>x</em>, int <em>y</em>, int <em>z</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::OwningProcess__i.i.iC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::NumScalarsC">
+int <tt class="descname">NumScalars</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::NumScalarsC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::LocalIndex__iC">
+int <tt class="descname">LocalIndex</tt><big>(</big>int <em>naturalIndex</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::LocalIndex__iC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::LocalIndex__i.i.iC">
+int <tt class="descname">LocalIndex</tt><big>(</big>int <em>x</em>, int <em>y</em>, int <em>z</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::LocalIndex__i.i.iC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::NaturalIndex__i.i.iC">
+int <tt class="descname">NaturalIndex</tt><big>(</big>int <em>x</em>, int <em>y</em>, int <em>z</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::NaturalIndex__i.i.iC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::LocalBuffer">
+F* <tt class="descname">LocalBuffer</tt><big>(</big><big>)</big><a class="headerlink" href="#DistUniformGrid:F:::LocalBuffer" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::LockedLocalBufferC">
+const F* <tt class="descname">LockedLocalBuffer</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::LockedLocalBufferC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::XShiftC">
+int <tt class="descname">XShift</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::XShiftC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::YShiftC">
+int <tt class="descname">YShift</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::YShiftC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::ZShiftC">
+int <tt class="descname">ZShift</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::ZShiftC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::XStrideC">
+int <tt class="descname">XStride</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::XStrideC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::YStrideC">
+int <tt class="descname">YStride</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::YStrideC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::ZStrideC">
+int <tt class="descname">ZStride</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::ZStrideC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::XLocalSizeC">
+ <tt class="descname">XLocalSize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::XLocalSizeC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::YLocalSizeC">
+ <tt class="descname">YLocalSize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::YLocalSizeC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::ZLocalSizeC">
+ <tt class="descname">ZLocalSize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::ZLocalSizeC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::OrderC">
+<a class="reference internal" href="#GridDataOrder__enum" title="GridDataOrder">GridDataOrder</a> <tt class="descname">Order</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::OrderC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::SequentialLoad__ss">
+void <tt class="descname">SequentialLoad</tt><big>(</big>std::string <em>filename</em><big>)</big><a class="headerlink" href="#DistUniformGrid:F:::SequentialLoad__ss" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::InterpolateTo__i.i.i">
+void <tt class="descname">InterpolateTo</tt><big>(</big>int <em>nx</em>, int <em>ny</em>, int <em>nz</em><big>)</big><a class="headerlink" href="#DistUniformGrid:F:::InterpolateTo__i.i.i" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::WritePlane__PlaneType.i.ssC">
+void <tt class="descname">WritePlane</tt><big>(</big><a class="reference internal" href="#PlaneType__enum" title="PlaneType">PlaneType</a> <em>planeType</em>, int <em>whichPlane</em>, std::string <em>basename</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::WritePlane__PlaneType.i.ssC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="function">
+<dt id="DistUniformGrid:F:::WriteVolume__ssC">
+void <tt class="descname">WriteVolume</tt><big>(</big>std::string <em>basename</em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistUniformGrid:F:::WriteVolume__ssC" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
 </div>
 
 
@@ -65,7 +235,7 @@
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
-        <a href="dist_helmholtz.html">The <tt class="docutils literal docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>&#160;&#160;»
+        <a href="dist_helmholtz.html">The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>&#160;&#160;»
         </p>
 
       </div>
