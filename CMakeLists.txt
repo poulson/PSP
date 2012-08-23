@@ -146,6 +146,7 @@ endif()
 # Uncomment if including PSP as a subproject in another build system           #
 ################################################################################
 #set(USE_CUSTOM_ALLTOALLV ${USE_CUSTOM_ALLTOALLV} PARENT_SCOPE)
+#set(BARRIER_IN_ALLTOALLV ${BARRIER_IN_ALLTOALLV} PARENT_SCOPE)
 #set(HAVE_PARMETIS ${HAVE_PARMETIS} PARENT_SCOPE)
 #
 #set(LIBRARY_TYPE ${LIBRARY_TYPE} PARENT_SCOPE)

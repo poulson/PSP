@@ -24,7 +24,7 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Overthrust <nx> <ny> <nz> <omega> <px> <py> <pz> "
-                 "[PML on top=false] [pmlSize=5] [sigma=1.5*20] [damping=7] "
+                 "[PML on top=true] [pmlSize=5] [sigma=1.5*20] [damping=7] "
                  "[# planes/panel=4] [panel scheme=1] [viz=1] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
               << "\n"
@@ -66,7 +66,7 @@ main( int argc, char* argv[] )
     const int px = atoi(argv[argNum++]);
     const int py = atoi(argv[argNum++]);
     const int pz = atoi(argv[argNum++]);
-    const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : false );
+    const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : true );
     const int pmlSize = ( argc>argNum ? atoi(argv[argNum++]) : 5 );
     const double sigma = ( argc>argNum ? atof(argv[argNum++]) : 1.5*20 );
     const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
