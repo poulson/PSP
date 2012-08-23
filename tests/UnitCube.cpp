@@ -133,7 +133,7 @@ main( int argc, char* argv[] )
         DistHelmholtz<double> helmholtz
         ( disc, comm, damping, numPlanesPerPanel );
 
-        DistUniformGrid<double> velocity( 1, n, n, n, XYZ, comm );
+        DistUniformGrid<double> velocity( n, n, n, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
@@ -498,7 +498,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<Complex<double> > B( 2, n, n, n, XYZ, comm );
+        DistUniformGrid<Complex<double> > B( n, n, n, comm, 2 );
         Complex<double>* localB = B.LocalBuffer();
         const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
         const double center0[] = { 0.5, 0.5, 0.25 };

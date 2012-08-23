@@ -96,7 +96,7 @@ main( int argc, char* argv[] )
 
     try 
     {
-        DistUniformGrid<double> velocity( 1, m1, m2, m3, XYZ, comm );
+        DistUniformGrid<double> velocity( m1, m2, m3, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();

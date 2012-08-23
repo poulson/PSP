@@ -60,20 +60,18 @@ template<typename F>
 class DistUniformGrid
 {
 public:
-
     // Generate an nx x ny x nz grid, where each node contains 'numScalars' 
     // entries of type 'F' and the grid is distributed over a px x py x pz grid 
     // over the specified communicator.
     DistUniformGrid
-    ( int numScalars,
-      int nx, int ny,int nz, GridDataOrder order,
-      int px, int py, int pz, mpi::Comm comm );
+    ( int nx, int ny, int nz, 
+      int px, int py, int pz, 
+      mpi::Comm comm, int numScalars=1, GridDataOrder order=XYZ );
 
     // Same as above, but automatically determine the process grid dimensions
     DistUniformGrid
-    ( int numScalars,
-      int nx, int ny,int nz, GridDataOrder order, 
-      mpi::Comm comm );
+    ( int nx, int ny,int nz, mpi::Comm comm, 
+      int numScalars=1, GridDataOrder order=XYZ );
 
     int XSize() const;
     int YSize() const;
@@ -107,52 +105,51 @@ public:
     void InterpolateTo( int nx, int ny, int nz );
 
     void WritePlane
-    ( PlaneType planeType, int whichPlane, const std::string basename ) const;
-    template<typename R>
-    struct WritePlaneHelper
-    {
-        static void Func
-        ( const DistUniformGrid<R>& parent, 
-          PlaneType planeType, int whichPlane, const std::string basename );
-    };
-    template<typename R>
-    struct WritePlaneHelper<Complex<R> >
-    {
-        static void Func
-        ( const DistUniformGrid<Complex<R> >& parent, 
-          PlaneType planeType, int whichPlane, const std::string basename );
-    };
-    template<typename R> friend struct WritePlaneHelper;
+    ( PlaneType planeType, int whichPlane, std::string basename ) const;
 
-    void WriteVolume( const std::string basename ) const;
-    template<typename R>
-    struct WriteVolumeHelper
-    {
-        static void Func
-        ( const DistUniformGrid<R>& parent, const std::string basename );
-    };
-    template<typename R>
-    struct WriteVolumeHelper<Complex<R> >
-    {
-        static void Func
-        ( const DistUniformGrid<Complex<R> >& parent, 
-          const std::string basename );
-    };
-    template<typename R> friend struct WriteVolumeHelper;
-
+    void WriteVolume( std::string basename ) const;
 private:
-    int numScalars_;
     int nx_, ny_, nz_;
-    GridDataOrder order_;
-
     int px_, py_, pz_;
     mpi::Comm comm_;
+    int numScalars_;
+    GridDataOrder order_;
 
     int xShift_, yShift_, zShift_;
     int xLocalSize_, yLocalSize_, zLocalSize_;
     std::vector<F> localData_;
 
     void RedistributeForVtk( std::vector<F>& localBox ) const;
+    
+    template<typename R>
+    struct WritePlaneHelper
+    {
+        static void Func
+        ( const DistUniformGrid<R>& parent, 
+          PlaneType planeType, int whichPlane, std::string basename );
+    };
+    template<typename R>
+    struct WritePlaneHelper<Complex<R> >
+    {
+        static void Func
+        ( const DistUniformGrid<Complex<R> >& parent, 
+          PlaneType planeType, int whichPlane, std::string basename );
+    };
+    template<typename R> friend struct WritePlaneHelper;
+
+    template<typename R>
+    struct WriteVolumeHelper
+    {
+        static void Func
+        ( const DistUniformGrid<R>& parent, std::string basename );
+    };
+    template<typename R>
+    struct WriteVolumeHelper<Complex<R> >
+    {
+        static void Func
+        ( const DistUniformGrid<Complex<R> >& parent, std::string basename );
+    };
+    template<typename R> friend struct WriteVolumeHelper;
 };
 
 //----------------------------------------------------------------------------//
@@ -162,12 +159,12 @@ private:
 template<typename F>
 inline 
 DistUniformGrid<F>::DistUniformGrid
-( int numScalars,
-  int nx, int ny, int nz, GridDataOrder order,
-  int px, int py, int pz, mpi::Comm comm )
-: numScalars_(numScalars), 
-  nx_(nx), ny_(ny), nz_(nz), order_(order),
-  px_(px), py_(py), pz_(pz), comm_(comm)
+( int nx, int ny, int nz,
+  int px, int py, int pz, mpi::Comm comm,
+  int numScalars, GridDataOrder order )
+: nx_(nx), ny_(ny), nz_(nz), 
+  px_(px), py_(py), pz_(pz), comm_(comm),
+  numScalars_(numScalars), order_(order)
 {
     const int commRank = mpi::CommRank( comm );
     const int commSize = mpi::CommSize( comm );
@@ -188,12 +185,10 @@ DistUniformGrid<F>::DistUniformGrid
 template<typename F>
 inline 
 DistUniformGrid<F>::DistUniformGrid
-( int numScalars,
-  int nx, int ny, int nz, GridDataOrder order,
-  mpi::Comm comm )
-: numScalars_(numScalars), 
-  nx_(nx), ny_(ny), nz_(nz), order_(order),
-  comm_(comm)
+( int nx, int ny, int nz, mpi::Comm comm,
+  int numScalars, GridDataOrder order )
+: nx_(nx), ny_(ny), nz_(nz), comm_(comm),
+  numScalars_(numScalars), order_(order)
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::DistUniformGrid");
@@ -770,7 +765,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
 template<typename F>
 inline void 
 DistUniformGrid<F>::WritePlane
-( PlaneType planeType, int whichPlane, const std::string basename ) const
+( PlaneType planeType, int whichPlane, std::string basename ) const
 { return WritePlaneHelper<F>::Func( *this, planeType, whichPlane, basename ); }
 
 template<typename F>
@@ -778,7 +773,7 @@ template<typename R>
 inline void 
 DistUniformGrid<F>::WritePlaneHelper<R>::Func
 ( const DistUniformGrid<R>& parent, 
-  PlaneType planeType, int whichPlane, const std::string basename )
+  PlaneType planeType, int whichPlane, std::string basename )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::WritePlaneHelper");
@@ -1214,7 +1209,7 @@ template<typename R>
 inline void 
 DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, 
-  PlaneType planeType, int whichPlane, const std::string basename )
+  PlaneType planeType, int whichPlane, std::string basename )
 {
     const int commRank = mpi::CommRank( parent.comm_ );
     const int commSize = mpi::CommSize( parent.comm_ );
@@ -1849,14 +1844,14 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
 
 template<typename F>
 inline void 
-DistUniformGrid<F>::WriteVolume( const std::string basename ) const
+DistUniformGrid<F>::WriteVolume( std::string basename ) const
 { return WriteVolumeHelper<F>::Func( *this, basename ); }
 
 template<typename F>
 template<typename R>
 inline void 
 DistUniformGrid<F>::WriteVolumeHelper<R>::Func
-( const DistUniformGrid<R>& parent, const std::string basename )
+( const DistUniformGrid<R>& parent, std::string basename )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::WriteVolumeHelper");
@@ -2043,7 +2038,7 @@ template<typename F>
 template<typename R>
 inline void 
 DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
-( const DistUniformGrid<Complex<R> >& parent, const std::string basename )
+( const DistUniformGrid<Complex<R> >& parent, std::string basename )
 {
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::WriteVolumeHelper");

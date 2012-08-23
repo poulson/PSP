@@ -2,10 +2,10 @@ The ``DistHelmholtz`` class
 ===========================
 **TODO**
 
-.. cpp:class:: Discretization
+.. cpp:type:: struct Discretization<R>
 
    **TODO**
 
-.. cpp:class:: DistHelmholtz
+.. cpp:type:: class DistHelmholtz<R>
 
    **TODO**

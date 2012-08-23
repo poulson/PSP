@@ -99,7 +99,7 @@ main( int argc, char* argv[] )
                       << nxOrig << " x " << nyOrig << " x " << nzOrig 
                       << " overthrust data..." << std::endl;
         DistUniformGrid<double> velocity
-        ( 1, nxOrig, nyOrig, nzOrig, XYZ, px, py, pz, comm );
+        ( nxOrig, nyOrig, nzOrig, px, py, pz, comm );
         velocity.SequentialLoad("overthrust.dat");
 
         if( commRank == 0 )
@@ -137,8 +137,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<Complex<double> > 
-            B( 3, nx, ny, nz, XYZ, px, py, pz, comm );
+        DistUniformGrid<Complex<double> > B( nx, ny, nz, px, py, pz, comm, 3 );
         const int xShift = B.XShift();
         const int yShift = B.YShift();
         const int zShift = B.ZShift();
