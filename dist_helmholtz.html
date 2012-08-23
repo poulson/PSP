@@ -53,17 +53,238 @@
         
   <div class="section" id="the-disthelmholtz-class">
 <h1>The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class<a class="headerlink" href="#the-disthelmholtz-class" title="Permalink to this headline">¶</a></h1>
-<p><strong>TODO</strong></p>
+<p>The <a class="reference internal" href="#DistHelmholtz:R:__class" title="DistHelmholtz&lt;R&gt;"><tt class="xref cpp cpp-type docutils literal"><span class="pre">DistHelmholtz&lt;R&gt;</span></tt></a> class is responsible for abstracting the
+formation and usage of the parallel sweeping preconditioner (where <cite>R</cite> is the
+underlying real datatype, usually <tt class="docutils literal"><span class="pre">double</span></tt>). For simplicity, this
+implementation uses a 7-point finite-difference stencil over a three-dimensional
+uniform grid. Without loss of generality (at least one face must have PML for
+the sweeping preconditioner to apply), PML is required on the bottom face
+of the domain, and the sweeps proceed from the bottom to the top of the domain.
+The other five boundary conditions may each be chosen to be either PML or
+zero Dirichlet.</p>
+<dl class="type">
+<dt id="Boundary__enum">
+<em class="property">type </em>enum <tt class="descname">Boundary</tt><a class="headerlink" href="#Boundary__enum" title="Permalink to this definition">¶</a></dt>
+<dd><ul class="simple">
+<li>PML</li>
+<li>DIRICHLET</li>
+</ul>
+</dd></dl>
+
 <dl class="type">
 <dt id="Discretization:R:__struct">
 <em class="property">type </em>struct <tt class="descname">Discretization&lt;R&gt;</tt><a class="headerlink" href="#Discretization:R:__struct" title="Permalink to this definition">¶</a></dt>
-<dd><p><strong>TODO</strong></p>
+<dd><dl class="member">
+<dt id="Discretization:R:::omega__R">
+R <tt class="descname">omega</tt><a class="headerlink" href="#Discretization:R:::omega__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The frequency of the Helmholtz problem in
+<span class="math">\(\frac{\mbox{rad}}{\mbox{sec}}\)</span>, where</p>
+<div class="math">
+\[\left[-\Delta - \frac{\omega^2}{c^2(x)}\right]u = f(x),\]</div>
+<p><span class="math">\(c(x)\)</span> is the spatially varying wave propagation speed (usually
+in <span class="math">\(\frac{\mbox{km}}{\mbox{sec}}\)</span> for seismic problems), and
+<span class="math">\(f(x)\)</span> is the forcing function (which is implicitly equal to the
+physical forcing function scaled by the inverse of the spatially varying
+stiffness).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::nx__i">
+int <tt class="descname">nx</tt><a class="headerlink" href="#Discretization:R:::nx__i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of grid points in the <span class="math">\(X\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::ny__i">
+int <tt class="descname">ny</tt><a class="headerlink" href="#Discretization:R:::ny__i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of grid points in the <span class="math">\(Y\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::nz__i">
+int <tt class="descname">nz</tt><a class="headerlink" href="#Discretization:R:::nz__i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of grid points in the <span class="math">\(Z\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::wx__R">
+R <tt class="descname">wx</tt><a class="headerlink" href="#Discretization:R:::wx__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The physical length of the domain in the <span class="math">\(X\)</span> direction (usually in
+kilometers for seismic problems).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::wy__R">
+R <tt class="descname">wy</tt><a class="headerlink" href="#Discretization:R:::wy__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The physical length of the domain in the <span class="math">\(Y\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::wz__R">
+R <tt class="descname">wz</tt><a class="headerlink" href="#Discretization:R:::wz__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The physical length of the domain in the <span class="math">\(Z\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::frontBC__Boundary">
+<a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <tt class="descname">frontBC</tt><a class="headerlink" href="#Discretization:R:::frontBC__Boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which boundary condition is to be applied on the front face of the
+domain (i.e., <span class="math">\(x=0\)</span>).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::backBC__Boundary">
+<a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <tt class="descname">backBC</tt><a class="headerlink" href="#Discretization:R:::backBC__Boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which boundary condition is to be applied on the back face of the
+domain (i.e., <span class="math">\(x=w_x\)</span>).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::leftBC__Boundary">
+<a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <tt class="descname">leftBC</tt><a class="headerlink" href="#Discretization:R:::leftBC__Boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which boundary condition is to be applied on the right face of the
+domain (i.e., <span class="math">\(y=0\)</span>).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::rightBC__Boundary">
+<a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <tt class="descname">rightBC</tt><a class="headerlink" href="#Discretization:R:::rightBC__Boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which boundary condition is to be applied on the right face of the
+domain (i.e., <span class="math">\(y=w_y\)</span>).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::topBC__Boundary">
+<a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <tt class="descname">topBC</tt><a class="headerlink" href="#Discretization:R:::topBC__Boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>Which boundary condition is to be applied to the top face of the
+domain (i.e., <span class="math">\(z=0\)</span>).</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::bx__i">
+int <tt class="descname">bx</tt><a class="headerlink" href="#Discretization:R:::bx__i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of grid points of PML to be used for each boundary condition
+in the <span class="math">\(X\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::by__i">
+int <tt class="descname">by</tt><a class="headerlink" href="#Discretization:R:::by__i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of grid points of PML to be used for each boundary condition
+in the <span class="math">\(Y\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::bz__i">
+int <tt class="descname">bz</tt><a class="headerlink" href="#Discretization:R:::bz__i" title="Permalink to this definition">¶</a></dt>
+<dd><p>The number of grid points of PML to be used for each boundary condition
+in the <span class="math">\(Z\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::sigmax__R">
+R <tt class="descname">sigmax</tt><a class="headerlink" href="#Discretization:R:::sigmax__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The maximum imaginary value of the complex coordinate-stretching for
+applying PML in the <span class="math">\(X\)</span> direction. As a rule of thumb,
+<span class="math">\(1.5\, \mbox{diam}(\Omega)\)</span> is a decent first guess.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::sigmay__R">
+R <tt class="descname">sigmay</tt><a class="headerlink" href="#Discretization:R:::sigmay__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The maximum imaginary value of the complex coordinate-stretching for
+applying PML in the <span class="math">\(Y\)</span> direction.</p>
+</dd></dl>
+
+<dl class="member">
+<dt id="Discretization:R:::sigmaz__R">
+R <tt class="descname">sigmaz</tt><a class="headerlink" href="#Discretization:R:::sigmaz__R" title="Permalink to this definition">¶</a></dt>
+<dd><p>The maximum imaginary value of the complex coordinate-stretching for
+applying PML in the <span class="math">\(Y\)</span> direction.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="Discretization:R:::Discretization__R.i.i.i.R.R.R">
+ <tt class="descname">Discretization</tt><big>(</big>R <em>frequency</em>, int <em>xSize</em>, int <em>ySize</em>, int <em>zSize</em>, R <em>xWidth</em>, R <em>yWidth</em>, R <em>zWidth</em><big>)</big><a class="headerlink" href="#Discretization:R:::Discretization__R.i.i.i.R.R.R" title="Permalink to this definition">¶</a></dt>
+<dd><p>A constructor which assumes PML on all boundaries and attempts to select
+decent choices for the PML sizes (5 grid points) and
+coordinate-stretching magnitudes (<span class="math">\(1.5 \max\{w_x,w_y,w_z\}\)</span>).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="Discretization:R:::Discretization__R.i.i.i.R.R.R.Boundary.Boundary.Boundary.Boundary.Boundary">
+ <tt class="descname">Discretization</tt><big>(</big>R <em>frequency</em>, int <em>xSize</em>, int <em>ySize</em>, int <em>zSize</em>, R <em>xWidth</em>, R <em>yWidth</em>, R <em>zWidth</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>front</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>right</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>back</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>left</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>top</em><big>)</big><a class="headerlink" href="#Discretization:R:::Discretization__R.i.i.i.R.R.R.Boundary.Boundary.Boundary.Boundary.Boundary" title="Permalink to this definition">¶</a></dt>
+<dd><p>A constructor which attempts to select decent choices for the PML sizes
+(5 grid points) and coordinate-stretching magnitudes
+(<span class="math">\(1.5 \max\{w_x,w_y,w_z\}\)</span>).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="Discretization:R:::Discretization__R.i.i.i.R.R.R.Boundary.Boundary.Boundary.Boundary.Boundary.i.i.i">
+ <tt class="descname">Discretization</tt><big>(</big>R <em>frequency</em>, int <em>xSize</em>, int <em>ySize</em>, int <em>zSize</em>, R <em>xWidth</em>, R <em>yWidth</em>, R <em>zWidth</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>front</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>right</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>back</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>left</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>top</em>, int <em>xPMLSize</em>, int <em>yPMLSize</em>, int <em>zPMLSize</em><big>)</big><a class="headerlink" href="#Discretization:R:::Discretization__R.i.i.i.R.R.R.Boundary.Boundary.Boundary.Boundary.Boundary.i.i.i" title="Permalink to this definition">¶</a></dt>
+<dd><p>A constructor which attempts to select decent choices for the complex
+coordinate-stretching magnitudes (<span class="math">\(1.5 \max\{w_x,w_y,w_z\}\)</span>).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="Discretization:R:::Discretization__R.i.i.i.R.R.R.Boundary.Boundary.Boundary.Boundary.Boundary.i.double">
+ <tt class="descname">Discretization</tt><big>(</big>R <em>frequency</em>, int <em>xSize</em>, int <em>ySize</em>, int <em>zSize</em>, R <em>xWidth</em>, R <em>yWidth</em>, R <em>zWidth</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>front</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>right</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>back</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>left</em>, <a class="reference internal" href="#Boundary__enum" title="Boundary">Boundary</a> <em>top</em>, int <em>pmlSize</em>, double <em>sigma</em><big>)</big><a class="headerlink" href="#Discretization:R:::Discretization__R.i.i.i.R.R.R.Boundary.Boundary.Boundary.Boundary.Boundary.i.double" title="Permalink to this definition">¶</a></dt>
+<dd><p>A constructor which accepts a fixed value for the PML sizes and
+coordinate-stretching magnitudes
+(and applies each in all three directions).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="type">
+<dt id="PanelScheme__enum">
+<em class="property">type </em>enum <tt class="descname">PanelScheme</tt><a class="headerlink" href="#PanelScheme__enum" title="Permalink to this definition">¶</a></dt>
+<dd><ul class="simple">
+<li>CLIQUE_LDL_1D: Uses triangular solves with one-dimensional frontal distributions for each of the sparse-direct subdomain solves. This is significantly slower than the next option on parallel machines.</li>
+<li>CLIQUE_LDL_SELINV_2D: Uses selective inversion (Raghavan et al.) for each of the subdomains in order to allow for fast subdomain solves. This is slightly less stable than <tt class="docutils literal"><span class="pre">CLIQUE_LDL_1D</span></tt>, but it increases the performance of the subdomain solves by orders of magnitude on large numbers of processes (with a small penalty in the setup time).</li>
+</ul>
 </dd></dl>
 
 <dl class="type">
 <dt id="DistHelmholtz:R:__class">
 <em class="property">type </em>class <tt class="descname">DistHelmholtz&lt;R&gt;</tt><a class="headerlink" href="#DistHelmholtz:R:__class" title="Permalink to this definition">¶</a></dt>
-<dd><p><strong>TODO</strong></p>
+<dd><dl class="function">
+<dt id="DistHelmholtz:R:::DistHelmholtz__Discretization:R:CR.mpi::Comm.R.i.i">
+ <tt class="descname">DistHelmholtz</tt><big>(</big><a class="reference internal" href="#Discretization:R:__struct" title="Discretization&lt;R&gt;">const Discretization&lt;R&gt;&amp;</a> <em>disc</em>, mpi::Comm <em>comm</em>, R <em>damping</em><em>=7.5</em>, int <em>numPlanesPerPanel</em><em>=4</em>, int <em>cutoff</em><em>=12 </em><big>)</big><a class="headerlink" href="#DistHelmholtz:R:::DistHelmholtz__Discretization:R:CR.mpi::Comm.R.i.i" title="Permalink to this definition">¶</a></dt>
+<dd><p>Constructs a <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> instance using the specified discretization
+scheme, communicator, positive imaginary shift (<cite>damping</cite>), subdomain
+size (<cite>numPlanesPerPanel</cite>), and maximum two-dimensional subdomain size
+for the analytical nested dissection (<cite>cutoff</cite>). Keep in mind that
+modifying <cite>damping</cite> will effect the effectiveness of the preconditioner,
+and <cite>numPlanesPerPanel</cite> is essentially a memory and performance tuning
+parameter (though it can have a minor effect on convergence rates).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="DistHelmholtz:R:::Initialize__DistUniformGrid:R:CR.PanelScheme">
+void <tt class="descname">Initialize</tt><big>(</big>const DistUniformGrid&lt;R&gt;&amp; <em>velocity</em>, <a class="reference internal" href="#PanelScheme__enum" title="PanelScheme">PanelScheme</a> <em>panelScheme</em><em>=CLIQUE_LDL_SELINV_2D </em><big>)</big><a class="headerlink" href="#DistHelmholtz:R:::Initialize__DistUniformGrid:R:CR.PanelScheme" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs the subdomain factorizations so that the preconditioner can be
+quickly applied.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="DistHelmholtz:R:::Solve__DistUniformGrid:Complex:R::R.i.R.bC">
+void <tt class="descname">Solve</tt><big>(</big>DistUniformGrid&lt;Complex&lt;R&gt;&gt;&amp; <em>B</em>, int <em>m</em><em>=20</em>, R <em>relTol</em><em>=1e-4</em>, bool <em>viewIterates</em><em>=false </em><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistHelmholtz:R:::Solve__DistUniformGrid:Complex:R::R.i.R.bC" title="Permalink to this definition">¶</a></dt>
+<dd><p>Overwrites each of the right-hand sides stored in <cite>B</cite> with their
+approximate solution via GMRES(<cite>m</cite>) with the specified relative residual
+tolerance. Thus, GMRES will restart every <cite>m</cite> iterations and will
+continue until</p>
+<div class="math">
+\[\|A x_i - b_i\|_2 \le \mbox{relTol}\|b_i\|_2\]</div>
+<p>for every right-hand side, <span class="math">\(b_i\)</span>.</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="DistHelmholtz:R:::FinalizeC">
+void <tt class="descname">Finalize</tt><big>(</big><big>)</big><tt class="descclassname"> const</tt><a class="headerlink" href="#DistHelmholtz:R:::FinalizeC" title="Permalink to this definition">¶</a></dt>
+<dd><p>Frees up all significant resources allocated by the class.</p>
+</dd></dl>
+
 </dd></dl>
 
 </div>
