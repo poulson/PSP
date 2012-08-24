@@ -1,6 +1,61 @@
 Test drivers
 ============
 
+Analytical velocity models
+--------------------------
+
+Uniform
+^^^^^^^
+.. image:: velocity-uniform.png
+
+Gaussian perturbation
+^^^^^^^^^^^^^^^^^^^^^
+.. image:: velocity-gaussian.png
+
+Wave guide
+^^^^^^^^^^
+.. image:: velocity-guide.png
+
+Two layers
+^^^^^^^^^^
+.. image:: velocity-twoLayers.png
+
+Cavity
+^^^^^^
+.. image:: velocity-cavity.png
+
+Reverse cavity
+^^^^^^^^^^^^^^
+.. image:: velocity-reverseCavity.png
+
+Top half of cavity
+^^^^^^^^^^^^^^^^^^
+.. image:: velocity-topHalfCavity.png
+
+Bottom half of cavity
+^^^^^^^^^^^^^^^^^^^^^
+.. image:: velocity-bottomHalfCavity.png
+
+Increasing layers
+^^^^^^^^^^^^^^^^^
+.. image:: velocity-incLayers.png
+
+Decreasing layers
+^^^^^^^^^^^^^^^^^
+.. image:: velocity-decLayers.png
+
+Sideways layers
+^^^^^^^^^^^^^^^
+.. image:: velocity-sidewaysLayers.png
+
+Wedge
+^^^^^
+.. image:: velocity-wedge.png
+
+Random
+^^^^^^
+.. image:: velocity-random.png
+
 UnitCube
 --------
 This section describes the driver 
