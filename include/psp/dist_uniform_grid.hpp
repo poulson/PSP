@@ -530,6 +530,8 @@ template<typename F>
 inline void
 DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
 {
+    if( nx == nx_ && ny == ny_ && nz == nz_ )
+        return;
 #ifndef RELEASE
     PushCallStack("DistUniformGrid::InterpolateTo");
 #endif
