@@ -63,6 +63,8 @@ void Usage()
 int
 main( int argc, char* argv[] )
 {
+    typedef Complex<double> C;
+
     psp::Initialize( argc, argv );
     mpi::Comm comm = mpi::COMM_WORLD;
     const int commSize = mpi::CommSize( comm );
@@ -498,41 +500,61 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<Complex<double> > B( n, n, n, comm, 2 );
-        Complex<double>* localB = B.LocalBuffer();
-        const double dir[] = { 0., sqrt(2.)/2., sqrt(2.)/2. };
-        const double center0[] = { 0.5, 0.5, 0.25 };
-        const double center1[] = { 0.5, 0.25, 0.25 };
-        double arg0[3];
-        double arg1[3];
-        const Complex<double> imagOne( 0.0, 1.0 );
+        DistUniformGrid<C> B( n, n, n, comm, 4 );
+        C* localB = B.LocalBuffer();
+        const double center0[] = { 0.5, 0.5, 0.1 };
+        const double center1[] = { 0.25, 0.25, 0.1 };
+        const double center2[] = { 0.75, 0.75, 0.5 };
+        const double dir[] = { 0.57735, 0.57735, -0.57735 };
+        double arg0[3], arg1[3], arg2[3];
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
             const int z = zShift + zLocal*pz;
             const double Z = z / (n+1.0);
             arg0[2] = (Z-center0[2])*(Z-center0[2]);
             arg1[2] = (Z-center1[2])*(Z-center1[2]);
+            arg2[2] = (Z-center2[2])*(Z-center2[2]);
             for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
                 const int y = yShift + yLocal*py;
                 const double Y = y / (n+1.0);
                 arg0[1] = (Y-center0[1])*(Y-center0[1]);
                 arg1[1] = (Y-center1[1])*(Y-center1[1]);
+                arg2[1] = (Y-center2[1])*(Y-center2[1]);
                 for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                 {
                     const int x = xShift + xLocal*px;
                     const double X = x / (n+1.0);
                     arg0[0] = (X-center0[0])*(X-center0[0]);
                     arg1[0] = (X-center1[0])*(X-center1[0]);
-                    
-                    const int localIndex = 
-                        2*(xLocal + yLocal*xLocalSize + 
+                    arg2[0] = (X-center2[0])*(X-center2[0]);
+
+                    // Point sources
+                    const C f0 = n*Exp(-10*n*(arg0[0]+arg0[1]+arg0[2]));
+                    const C f1 = n*Exp(-10*n*(arg1[0]+arg1[1]+arg1[2]));
+                    const C f2 = n*Exp(-10*n*(arg2[0]+arg2[1]+arg2[2]));
+
+                    // Plane wave in direction 'dir' (away from PML)
+                    const C planeWave =
+                        Exp(C(0,omega*(X*dir[0]+Y*dir[1]+Z*dir[2])));
+
+                    // Gaussian beam in direction 'dir'
+                    const C fBeam =
+                        Exp(-4*omega*(arg2[0]+arg2[1]+arg2[2]))*planeWave;
+
+                    const int localIndex =
+                        4*(xLocal + yLocal*xLocalSize +
                            zLocal*xLocalSize*yLocalSize);
-                    localB[localIndex+0] =
-                        n*Exp(-n*n*(arg0[0]+arg0[1]+arg0[2]));
-                    localB[localIndex+1] = 
-                        n*Exp(-2*omega*(arg1[0]+arg1[1]+arg1[2]))*
-                        Exp(omega*imagOne*(X*dir[0]+Y*dir[1]+Z*dir[2]));
+
+                    localB[localIndex+0] = f0;
+                    localB[localIndex+1] = f0+f1+f2;
+                    localB[localIndex+2] = fBeam;
+                    if( x >= pmlSize && x < n-pmlSize &&
+                        y >= pmlSize && y < n-pmlSize &&
+                        (!pmlOnTop || z >= pmlSize) && z < n-pmlSize )
+                        localB[localIndex+3] = planeWave;
+                    else
+                        localB[localIndex+3] = 0;
                 }
             }
         }

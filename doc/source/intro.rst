@@ -8,7 +8,7 @@ moving-PML preconditioner for large 3D Helmholtz equations with at least one
 PML boundary condition. So far, the main focus has been on its application to
 seismic exploration, but the preconditioner works well for most velocity 
 models where there are no large-scale internal resonances (e.g., large cavities
-are known to be problematic). 
+are known to be problematic).  
 
 The main motivation behind releasing this software in its current state is 
 reproducibility. While the current discretization uses simple seven-point 
@@ -17,6 +17,13 @@ pollution when using a fixed number of grid points per wavelength for
 problems spanning many wavelengths, the performance of the preconditioner 
 should be qualitatively similar to more sophisticated discretizations 
 (e.g., spectral elements, which will be added soon). 
+
+.. note::
+
+   To emphasize the above point about the preconditioner being meant for 
+   *large* problems, roughly speaking, if your domain is smaller than about 
+   50 or 60 grid points in each direction, then it will be more practical to 
+   simply use a sparse-direct solver.
 
 Dependencies
 ============

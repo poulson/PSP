@@ -587,9 +587,14 @@ DistHelmholtz<R>::InternalSolveWithGMRES
             else
             {
                 if( commRank == 0 )
+                {
                     std::cout << "  finished iteration " << it << " with "
-                              << "maxRelResidNorm=" << maxRelResidNorm 
-                              << std::endl;
+                              << "maxRelResidNorm=" << maxRelResidNorm << "\n";
+                    for( int k=0; k<numRhs; ++k )
+                        std::cout << "    rel. residual " << k << ": " 
+                                  << relResidNormList[k] << "\n";
+                    std::cout.flush();
+                }
             }
             if( viewIterates )
             {

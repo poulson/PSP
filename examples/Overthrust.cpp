@@ -46,6 +46,8 @@ void Usage()
 int
 main( int argc, char* argv[] )
 {
+    typedef Complex<double> C;
+
     psp::Initialize( argc, argv );
     mpi::Comm comm = mpi::COMM_WORLD;
     const int commSize = mpi::CommSize( comm );
@@ -137,17 +139,18 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<Complex<double> > B( nx, ny, nz, px, py, pz, comm, 3 );
+        DistUniformGrid<C> B( nx, ny, nz, px, py, pz, comm, 4 );
         const int xShift = B.XShift();
         const int yShift = B.YShift();
         const int zShift = B.ZShift();
         const int xLocalSize = B.XLocalSize();
         const int yLocalSize = B.YLocalSize();
         const int zLocalSize = B.ZLocalSize();
-        Complex<double>* localB = B.LocalBuffer();
+        C* localB = B.LocalBuffer();
         const double center0[] = { 0.5, 0.5, 0.1 };
         const double center1[] = { 0.25, 0.25, 0.1 };
-        const double center2[] = { 0.75, 0.75, 0.1 };
+        const double center2[] = { 0.75, 0.75, 0.5 };
+        const double dir[] = { 0.57735, 0.57735, -0.57735 };
         double arg0[3], arg1[3], arg2[3];
         for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
         {
@@ -171,19 +174,33 @@ main( int argc, char* argv[] )
                     arg0[0] = (X-center0[0])*(X-center0[0]);
                     arg1[0] = (X-center1[0])*(X-center1[0]);
                     arg2[0] = (X-center2[0])*(X-center2[0]);
-                    
+
+                    // Point sources
+                    const C f0 = nx*Exp(-10*nx*(arg0[0]+arg0[1]+arg0[2]));
+                    const C f1 = nx*Exp(-10*nx*(arg1[0]+arg1[1]+arg1[2]));
+                    const C f2 = nx*Exp(-10*nx*(arg2[0]+arg2[1]+arg2[2]));
+
+                    // Plane wave in direction 'dir' (away from PML)
+                    const C planeWave = 
+                        Exp(C(0,omega*(X*dir[0]+Y*dir[1]+Z*dir[2])));
+
+                    // Gaussian beam in direction 'dir'
+                    const C fBeam = 
+                        Exp(-4*omega*(arg2[0]+arg2[1]+arg2[2]))*planeWave;
+                   
                     const int localIndex = 
-                        3*(xLocal + yLocal*xLocalSize + 
+                        4*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
-                    const Complex<double> f0 = 
-                        nx*Exp(-10*nx*(arg0[0]+arg0[1]+arg0[2]));
-                    const Complex<double> f1 = 
-                        nx*Exp(-10*nx*(arg1[0]+arg1[1]+arg1[2]));
-                    const Complex<double> f2 = 
-                        nx*Exp(-10*nx*(arg2[0]+arg2[1]+arg2[2]));
+
                     localB[localIndex+0] = f0;
-                    localB[localIndex+1] = f1;
-                    localB[localIndex+2] = f2;
+                    localB[localIndex+1] = f0+f1+f2;
+                    localB[localIndex+2] = fBeam;
+                    if( x >= pmlSize && x < nx-pmlSize &&
+                        y >= pmlSize && y < ny-pmlSize && 
+                        (!pmlOnTop || z >= pmlSize) && z < nz-pmlSize )
+                        localB[localIndex+3] = planeWave;
+                    else
+                        localB[localIndex+3] = 0;
                 }
             }
         }
