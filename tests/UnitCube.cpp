@@ -57,6 +57,7 @@ void Usage()
               << "10) Sideways layers\n"
               << "11) Wedge\n"
               << "12) Random\n"
+              << "13) Separator\n"
               << std::endl;
 }
 
@@ -93,7 +94,7 @@ main( int argc, char* argv[] )
     const int factBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 96 );
     const int solveBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 64 );
 
-    if( velocityModel < 0 || velocityModel > 12 )
+    if( velocityModel < 0 || velocityModel > 13 )
     {
         if( commRank == 0 )
             std::cout << "Invalid velocity model, must be in {0,...,12}\n"
@@ -111,6 +112,7 @@ main( int argc, char* argv[] )
                       << "10) Sideways layers\n"
                       << "11) Wedge\n"
                       << "12) Random\n"
+                      << "13) Separator\n"
                       << std::endl;
         psp::Finalize();
         return 0;
@@ -466,6 +468,28 @@ main( int argc, char* argv[] )
             // Uniform perturbation of unity (between 1 and 3)
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
                 localVelocity[i] = 2.+plcg::ParallelUniform<double>();
+            break;
+        case 13:
+            if( commRank == 0 )
+                std::cout << "High-velocity separator" << std::endl;
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (n+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    double speed;
+                    if( y >= n/2-6 && y < n/2-4 && z <= 3*n/4 )
+                        speed = 1e10;
+                    else
+                        speed = 1.;
+                    const int localOffset = 
+                        yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                        localVelocity[localOffset+xLocal] = speed;
+                }
+            }
             break;
         default:
             throw std::runtime_error("Invalid velocity model");
