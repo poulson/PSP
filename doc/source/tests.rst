@@ -100,7 +100,7 @@ Each velocity entry is drawn from a uniform distribution over :math:`[2,3]`.
 
 Separator
 ^^^^^^^^^
-A separator with a velocity six orders of magnitude higher than the rest 
+A separator with a velocity ten orders of magnitude higher than the rest 
 of the medium is inserted to test the robustness of the preconditioner.
 Convergence seems to be unaffected by the separator.
 
