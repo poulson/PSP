@@ -98,6 +98,14 @@ Each velocity entry is drawn from a uniform distribution over :math:`[2,3]`.
 
 .. image:: velocity-random.png
 
+Separator
+^^^^^^^^^
+A separator with a velocity ten orders of magnitude higher than the rest 
+of the medium is inserted to test the robustness of the preconditioner.
+Convergence seems to be unaffected by the separator.
+
+.. image:: velocity-separator.png
+
 UnitCube
 --------
 This section describes the driver 
