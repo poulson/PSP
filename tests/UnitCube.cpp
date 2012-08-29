@@ -222,7 +222,7 @@ main( int argc, char* argv[] )
             {
                 const int z = zShift + zLocal*pz;
                 const double Z = z / (n+1.0);
-                const double speed = ( Z >= 0.5 ? 8.0 : 1.0 );
+                const double speed = ( Z >= 0.5 ? 4.0 : 1.0 );
                 const int localOffset = zLocal*xLocalSize*yLocalSize;
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
                     localVelocity[localOffset+i] = speed;
