@@ -24,7 +24,7 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Interpolate <velocity> <m1> <m2> <m3> <n1> <n2> <n3>"
-              << "  <velocity>: Which velocity field to use, {0,...,12}\n"
+              << "  <velocity>: Which velocity field to use, {0,...,15}\n"
               << "  <m1,m2,m3>: dimensions of original velocity field\n"
               << "  <n1,n2,n3>: dimensions of interpolated velocity field\n"
               << "\n"
@@ -34,16 +34,19 @@ void Usage()
               << "0) Unity\n"
               << "1) Gaussian perturbation of unity\n"
               << "2) Wave guide\n"
-              << "3) Two layers\n"
-              << "4) Cavity (will not converge quickly!)\n"
-              << "5) Reverse cavity\n"
-              << "6) Top half of cavity\n"
-              << "7) Bottom half of cavity\n"
-              << "8) Increasing layers\n"
-              << "9) Decreasing layers\n"
-              << "10) Sideways layers\n"
-              << "11) Wedge\n"
-              << "12) Random\n"
+              << "3) Two decreasing layers\n"
+              << "4) Two increasing layers\n"
+              << "5) Two sideways layers\n"
+              << "6) Five decreasing layers\n"
+              << "7) Five Increasing layers\n"
+              << "8) Five sideways layers\n"
+              << "9) Wedge\n"
+              << "10) Random\n"
+              << "11) Separator\n"
+              << "12) Cavity (will not converge quickly!)\n"
+              << "13) Reverse cavity\n"
+              << "14) Bottom half of cavity\n"
+              << "15) Top half of cavity\n"
               << std::endl;
 }
 
@@ -71,24 +74,27 @@ main( int argc, char* argv[] )
     const int n2 = atoi(argv[argNum++]);
     const int n3 = atoi(argv[argNum++]);
 
-    if( velocityModel < 0 || velocityModel > 12 )
+    if( velocityModel < 0 || velocityModel > 15 )
     {
         if( commRank == 0 )
-            std::cout << "Invalid velocity model, must be in {0,...,12}\n"
+            std::cout << "Invalid velocity model, must be in {0,...,15}\n"
                       << "---------------------------------------------\n"
                       << "0) Unity\n"
                       << "1) Gaussian perturbation of unity\n"
                       << "2) Wave guide\n"
-                      << "3) Two layers\n"
-                      << "4) Cavity (will not converge quickly!)\n"
-                      << "5) Reverse cavity\n"
-                      << "6) Top half of cavity\n"
-                      << "7) Bottom half of cavity\n"
-                      << "8) Increasing layers\n"
-                      << "9) Decreasing layers\n"
-                      << "10) Sideways layers\n"
-                      << "11) Wedge\n"
-                      << "12) Random\n"
+                      << "3) Two decreasing layers\n"
+                      << "4) Two increasing layers\n"
+                      << "5) Two sideways layers\n"
+                      << "6) Five decreasing layers\n"
+                      << "7) Five Increasing layers\n"
+                      << "8) Five sideways layers\n"
+                      << "9) Wedge\n"
+                      << "10) Random\n"
+                      << "11) Separator\n"
+                      << "12) Cavity (will not converge quickly!)\n"
+                      << "13) Reverse cavity\n"
+                      << "14) Bottom half of cavity\n"
+                      << "15) Top half of cavity\n"
                       << std::endl;
         psp::Finalize();
         return 0;
@@ -111,15 +117,13 @@ main( int argc, char* argv[] )
         {
         case 0:
             if( commRank == 0 )
-                std::cout << "Unit velocity model" << std::endl;
-            // Unit velocity
+                std::cout << "Unit" << std::endl;
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
                 localVelocity[i] = 1.;
             break;
         case 1:
             if( commRank == 0 )
-                std::cout << "Converging lens velocity model" << std::endl;
-            // Converging lens
+                std::cout << "Converging lens" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
@@ -135,12 +139,12 @@ main( int argc, char* argv[] )
                         const int x = xShift + xLocal*px;
                         const double X = x / (m1+1.0);
                         const double argX = (X-0.5)*(X-0.5);
-                        
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
+
+                        const int localIndex =
+                            xLocal + yLocal*xLocalSize +
                             zLocal*xLocalSize*yLocalSize;
                         const double speed =
-                            1.0 - 0.4*std::exp(-32.*(argX+argY+argZ));
+                            1.0 - 0.4*Exp(-32.*(argX+argY+argZ));
                         localVelocity[localIndex] = speed / 0.8;
                     }
                 }
@@ -148,8 +152,7 @@ main( int argc, char* argv[] )
             break;
         case 2:
             if( commRank == 0 )
-                std::cout << "Wave guide velocity model" << std::endl;
-            // Wave guide
+                std::cout << "Wave guide" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
@@ -162,12 +165,12 @@ main( int argc, char* argv[] )
                         const int x = xShift + xLocal*px;
                         const double X = x / (m1+1.0);
                         const double argX = (X-0.5)*(X-0.5);
-                        
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
+
+                        const int localIndex =
+                            xLocal + yLocal*xLocalSize +
                             zLocal*xLocalSize*yLocalSize;
                         const double speed =
-                            1.0 - 0.4*std::exp(-32.*(argX+argY));
+                            1.0 - 0.4*Exp(-32.*(argX+argY));
                         localVelocity[localIndex] = speed / 0.8;
                     }
                 }
@@ -175,13 +178,12 @@ main( int argc, char* argv[] )
             break;
         case 3:
             if( commRank == 0 )
-                std::cout << "Two layer velocity model" << std::endl;
-            // Two layers
+                std::cout << "Two decreasing layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
                 const double Z = z / (m3+1.0);
-                const double speed = ( Z >= 0.5 ? 8.0 : 1.0 );
+                const double speed = ( Z >= 0.5 ? 4.0 : 1.0 );
                 const int localOffset = zLocal*xLocalSize*yLocalSize;
                 for( int i=0; i<xLocalSize*yLocalSize; ++i )
                     localVelocity[localOffset+i] = speed;
@@ -189,62 +191,32 @@ main( int argc, char* argv[] )
             break;
         case 4:
             if( commRank == 0 )
-                std::cout << "Cavity velocity model (might not converge!)"
-                          << std::endl;
-            // Cavity
+                std::cout << "Two increasing layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
                 const double Z = z / (m3+1.0);
-                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
-                {
-                    const int y = yShift + yLocal*py;
-                    const double Y = y / (m2+1.0);
-                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
-                    {
-                        const int x = xShift + xLocal*px;
-                        const double X = x / (m1+1.0);
-                        double speed;
-                        if( X > 0.2 && X < 0.8 && 
-                            Y > 0.2 && Y < 0.8 && 
-                            Z > 0.2 && Z < 0.8 )
-                            speed = 1;
-                        else
-                            speed = 8;
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
-                            zLocal*xLocalSize*yLocalSize;
-                        localVelocity[localIndex] = speed;
-                    }
-                }
+                const double speed = ( Z < 0.5 ? 4.0 : 1.0 );
+                const int localOffset = zLocal*xLocalSize*yLocalSize;
+                for( int i=0; i<xLocalSize*yLocalSize; ++i )
+                    localVelocity[localOffset+i] = speed;
             }
             break;
         case 5:
             if( commRank == 0 )
-                std::cout << "Reverse-cavity velocity model" << std::endl;
-            // Reverse-cavity
-            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+                std::cout << "Two sideways layers" << std::endl;
+            for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
             {
-                const int z = zShift + zLocal*pz;
-                const double Z = z / (m3+1.0);
-                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                const int y = yShift + yLocal*py;
+                const double Y = y / (m2+1.0);
+                const double speed = ( Y < 0.5 ? 4.0 : 1.0 );
+                const int localOffset = yLocal*xLocalSize;
+                for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
                 {
-                    const int y = yShift + yLocal*py;
-                    const double Y = y / (m2+1.0);
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                     {
-                        const int x = xShift + xLocal*px;
-                        const double X = x / (m1+1.0);
-                        double speed;
-                        if( X > 0.2 && X < 0.8 && 
-                            Y > 0.2 && Y < 0.8 && 
-                            Z > 0.2 && Z < 0.8 )
-                            speed = 8;
-                        else
-                            speed = 1;
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
-                            zLocal*xLocalSize*yLocalSize;
+                        const int localIndex = xLocal + yLocal*xLocalSize +
+                                               zLocal*xLocalSize*yLocalSize;
                         localVelocity[localIndex] = speed;
                     }
                 }
@@ -252,123 +224,53 @@ main( int argc, char* argv[] )
             break;
         case 6:
             if( commRank == 0 )
-                std::cout << "Bottom half of cavity velocity model" 
-                          << std::endl;
-            // Bottom half of cavity
+                std::cout << "Five decreasing layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
                 const double Z = z / (m3+1.0);
-                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
-                {
-                    const int y = yShift + yLocal*py;
-                    const double Y = y / (m2+1.0);
-                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
-                    {
-                        const int x = xShift + xLocal*px;
-                        const double X = x / (m1+1.0);
-                        double speed;
-                        if( X > 0.2 && X < 0.8 && 
-                            Y > 0.2 && Y < 0.8 && 
-                            Z > 0.2 && Z < 0.8 )
-                            speed = 1;
-                        else if( Z > 0.5 )
-                            speed = 1;
-                        else
-                            speed = 8;
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
-                            zLocal*xLocalSize*yLocalSize;
-                        localVelocity[localIndex] = speed;
-                    }
-                }
+                double speed;
+                if( Z < 0.2 )
+                    speed = 1;
+                else if( Z < 0.4 )
+                    speed = 1.75;
+                else if( Z < 0.6 )
+                    speed = 2.5;
+                else if( Z < 0.8 )
+                    speed = 3.25;
+                else
+                    speed = 4;
+                const int localOffset = zLocal*xLocalSize*yLocalSize;
+                for( int i=0; i<xLocalSize*yLocalSize; ++i )
+                    localVelocity[i+localOffset] = speed;
             }
             break;
         case 7:
             if( commRank == 0 )
-                std::cout << "Top half of cavity velocity model" << std::endl;
-            // Top half of cavity
+                std::cout << "Five increasing layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
                 const double Z = z / (m3+1.0);
-                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
-                {
-                    const int y = yShift + yLocal*py;
-                    const double Y = y / (m2+1.0);
-                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
-                    {
-                        const int x = xShift + xLocal*px;
-                        const double X = x / (m1+1.0);
-                        double speed;
-                        if( X > 0.2 && X < 0.8 && 
-                            Y > 0.2 && Y < 0.8 && 
-                            Z > 0.2 && Z < 0.8 )
-                            speed = 1;
-                        else if( Z < 0.5 )
-                            speed = 1;
-                        else
-                            speed = 8;
-                        const int localIndex = 
-                            xLocal + yLocal*xLocalSize + 
-                            zLocal*xLocalSize*yLocalSize;
-                        localVelocity[localIndex] = speed;
-                    }
-                }
+                double speed;
+                if( Z < 0.2 )
+                    speed = 4;
+                else if( Z < 0.4 )
+                    speed = 3.25;
+                else if( Z < 0.6 )
+                    speed = 2.5;
+                else if( Z < 0.8 )
+                    speed = 1.75;
+                else
+                    speed = 1;
+                const int localOffset = zLocal*xLocalSize*yLocalSize;
+                for( int i=0; i<xLocalSize*yLocalSize; ++i )
+                    localVelocity[i+localOffset] = speed;
             }
             break;
         case 8:
             if( commRank == 0 )
-                std::cout << "Increasing layers velocity model" << std::endl;
-            // Increasing layers
-            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
-            {
-                const int z = zShift + zLocal*pz;
-                const double Z = z / (m3+1.0);
-                double speed;
-                if( Z < 0.2 )
-                    speed = 1;
-                else if( Z < 0.4 )
-                    speed = 2;
-                else if( Z < 0.6 )
-                    speed = 3;
-                else if( Z < 0.8 )
-                    speed = 4;
-                else
-                    speed = 5;
-                const int localOffset = zLocal*xLocalSize*yLocalSize;
-                for( int i=0; i<xLocalSize*yLocalSize; ++i )
-                    localVelocity[i+localOffset] = speed;
-            }
-            break;
-        case 9:
-            if( commRank == 0 )
-                std::cout << "Decreasing layers velocity model" << std::endl;
-            // Decreasing layers
-            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
-            {
-                const int z = zShift + zLocal*pz;
-                const double Z = z / (m3+1.0);
-                double speed;
-                if( Z < 0.2 )
-                    speed = 5;
-                else if( Z < 0.4 )
-                    speed = 4;
-                else if( Z < 0.6 )
-                    speed = 3;
-                else if( Z < 0.8 )
-                    speed = 2;
-                else
-                    speed = 1;
-                const int localOffset = zLocal*xLocalSize*yLocalSize;
-                for( int i=0; i<xLocalSize*yLocalSize; ++i )
-                    localVelocity[i+localOffset] = speed;
-            }
-            break;
-        case 10:
-            if( commRank == 0 )
-                std::cout << "Sideways layers velocity model" << std::endl;
-            // Sideways layers
+                std::cout << "Five sideways layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
@@ -379,26 +281,25 @@ main( int argc, char* argv[] )
                         const double X = x / (m1+1.0);
                         double speed;
                         if( X < 0.2 )
-                            speed = 5;
-                        else if( X < 0.4 )
                             speed = 4;
+                        else if( X < 0.4 )
+                            speed = 3.25;
                         else if( X < 0.6 )
-                            speed = 3;
+                            speed = 2.5;
                         else if( X < 0.8 )
-                            speed = 2;
+                            speed = 1.75;
                         else
                             speed = 1;
-                        const int localIndex = xLocal + yLocal*xLocalSize + 
+                        const int localIndex = xLocal + yLocal*xLocalSize +
                             zLocal*xLocalSize*yLocalSize;
                         localVelocity[localIndex] = speed;
                     }
                 }
             }
             break;
-        case 11:
+        case 9:
             if( commRank == 0 )
-                std::cout << "Wedge velocity model" << std::endl;
-            // Wedge
+                std::cout << "Wedge" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
                 const int z = zShift + zLocal*pz;
@@ -414,7 +315,35 @@ main( int argc, char* argv[] )
                         speed = 1.5;
                     else
                         speed = 3.;
-                    const int localOffset = 
+                    const int localOffset =
+                        yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                        localVelocity[localOffset+xLocal] = speed;
+                }
+            }
+            break;
+        case 10:
+            if( commRank == 0 )
+                std::cout << "Uniform random over [1,3]" << std::endl;
+            for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
+                localVelocity[i] = 2.+plcg::ParallelUniform<double>();
+            break;
+        case 11:
+            if( commRank == 0 )
+                std::cout << "High-velocity separator" << std::endl;
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (m3+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    double speed;
+                    if( y >= m2/2-6 && y < m2/2-4 && z <= 3*m3/4 )
+                        speed = 1e10;
+                    else
+                        speed = 1.;
+                    const int localOffset =
                         yLocal*xLocalSize + zLocal*xLocalSize*yLocalSize;
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
                         localVelocity[localOffset+xLocal] = speed;
@@ -423,10 +352,127 @@ main( int argc, char* argv[] )
             break;
         case 12:
             if( commRank == 0 )
-                std::cout << "Uniform over [1,3] velocity model" << std::endl;
-            // Uniform perturbation of unity (between 1 and 3)
-            for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
-                localVelocity[i] = 2.+plcg::ParallelUniform<double>();
+                std::cout << "Cavity (might not converge!)" << std::endl;
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (m3+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (m2+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (m1+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 &&
+                            Y > 0.2 && Y < 0.8 &&
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 1;
+                        else
+                            speed = 8;
+                        const int localIndex =
+                            xLocal + yLocal*xLocalSize +
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+            break;
+        case 13:
+            if( commRank == 0 )
+                std::cout << "Reverse-cavity" << std::endl;
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (m3+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (m2+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (m1+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 &&
+                            Y > 0.2 && Y < 0.8 &&
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 8;
+                        else
+                            speed = 1;
+                        const int localIndex =
+                            xLocal + yLocal*xLocalSize +
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+            break;
+        case 14:
+            if( commRank == 0 )
+                std::cout << "Bottom half of cavity" << std::endl;
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (m3+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (m2+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (m1+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 &&
+                            Y > 0.2 && Y < 0.8 &&
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 1;
+                        else if( Z < 0.5 )
+                            speed = 1;
+                        else
+                            speed = 8;
+                        const int localIndex =
+                            xLocal + yLocal*xLocalSize +
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+            break;
+        case 15:
+            if( commRank == 0 )
+                std::cout << "Top half of cavity" << std::endl;
+            for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+            {
+                const int z = zShift + zLocal*pz;
+                const double Z = z / (m3+1.0);
+                for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+                {
+                    const int y = yShift + yLocal*py;
+                    const double Y = y / (m2+1.0);
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int x = xShift + xLocal*px;
+                        const double X = x / (m1+1.0);
+                        double speed;
+                        if( X > 0.2 && X < 0.8 &&
+                            Y > 0.2 && Y < 0.8 &&
+                            Z > 0.2 && Z < 0.8 )
+                            speed = 1;
+                        else if( Z > 0.5 )
+                            speed = 1;
+                        else
+                            speed = 8;
+                        const int localIndex =
+                            xLocal + yLocal*xLocalSize +
+                            zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
             break;
         default:
             throw std::runtime_error("Invalid velocity model");

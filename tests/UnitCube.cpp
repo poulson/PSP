@@ -28,7 +28,7 @@ void Usage()
                  "[# planes/panel=4] [panel scheme=1] [viz=1] "
                  "[fact blocksize=96] [solve blocksize=64]\n"
               << "\n"
-              << "  velocity: which velocity field to use, {0,...,12}\n"
+              << "  velocity: which velocity field to use, {0,...,15}\n"
               << "  n: size of grid in each dimension\n"
               << "  omega: frequency (in rad/sec) of problem\n"
               << "  PML on top: PML or Dirichlet b.c. on top?\n"
@@ -49,16 +49,17 @@ void Usage()
               << "2) Wave guide\n"
               << "3) Two decreasing layers\n"
               << "4) Two increasing layers\n"
-              << "5) Five decreasing layers\n"
-              << "6) Five Increasing layers\n"
-              << "7) Five sideways layers\n"
-              << "8) Wedge\n"
-              << "9) Random\n"
-              << "10) Separator\n"
-              << "11) Cavity (will not converge quickly!)\n"
-              << "12) Reverse cavity\n"
-              << "13) Bottom half of cavity\n"
-              << "14) Top half of cavity\n"
+              << "5) Two sideways layers\n"
+              << "6) Five decreasing layers\n"
+              << "7) Five Increasing layers\n"
+              << "8) Five sideways layers\n"
+              << "9) Wedge\n"
+              << "10) Random\n"
+              << "11) Separator\n"
+              << "12) Cavity (will not converge quickly!)\n"
+              << "13) Reverse cavity\n"
+              << "14) Bottom half of cavity\n"
+              << "15) Top half of cavity\n"
               << std::endl;
 }
 
@@ -95,26 +96,27 @@ main( int argc, char* argv[] )
     const int factBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 96 );
     const int solveBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 64 );
 
-    if( velocityModel < 0 || velocityModel > 14 )
+    if( velocityModel < 0 || velocityModel > 15 )
     {
         if( commRank == 0 )
-            std::cout << "Invalid velocity model, must be in {0,...,14}\n"
+            std::cout << "Invalid velocity model, must be in {0,...,15}\n"
                       << "---------------------------------------------\n"
                       << "0) Unity\n"
                       << "1) Gaussian perturbation of unity\n"
                       << "2) Wave guide\n"
                       << "3) Two decreasing layers\n"
                       << "4) Two increasing layers\n"
-                      << "5) Five decreasing layers\n"
-                      << "6) Five Increasing layers\n"
-                      << "7) Five sideways layers\n"
-                      << "8) Wedge\n"
-                      << "9) Random\n"
-                      << "10) Separator\n"
-                      << "11) Cavity (will not converge quickly!)\n"
-                      << "12) Reverse cavity\n"
-                      << "13) Bottom half of cavity\n"
-                      << "14) Top half of cavity\n"
+                      << "5) Two sideways layers\n"
+                      << "6) Five decreasing layers\n"
+                      << "7) Five Increasing layers\n"
+                      << "8) Five sideways layers\n"
+                      << "9) Wedge\n"
+                      << "10) Random\n"
+                      << "11) Separator\n"
+                      << "12) Cavity (will not converge quickly!)\n"
+                      << "13) Reverse cavity\n"
+                      << "14) Bottom half of cavity\n"
+                      << "15) Top half of cavity\n"
                       << std::endl;
         psp::Finalize();
         return 0;
@@ -241,6 +243,26 @@ main( int argc, char* argv[] )
             break;
         case 5:
             if( commRank == 0 )
+                std::cout << "Two sideways layers" << std::endl;
+            for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
+            {
+                const int y = yShift + yLocal*py;
+                const double Y = y / (n+1.0);
+                const double speed = ( Y < 0.5 ? 4.0 : 1.0 );
+                const int localOffset = yLocal*xLocalSize;
+                for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
+                {
+                    for( int xLocal=0; xLocal<xLocalSize; ++xLocal )
+                    {
+                        const int localIndex = xLocal + yLocal*xLocalSize + 
+                                               zLocal*xLocalSize*yLocalSize;
+                        localVelocity[localIndex] = speed;
+                    }
+                }
+            }
+            break;
+        case 6:
+            if( commRank == 0 )
                 std::cout << "Five decreasing layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
             {
@@ -262,7 +284,7 @@ main( int argc, char* argv[] )
                     localVelocity[i+localOffset] = speed;
             }
             break;
-        case 6:
+        case 7:
             if( commRank == 0 )
                 std::cout << "Five increasing layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -285,7 +307,7 @@ main( int argc, char* argv[] )
                     localVelocity[i+localOffset] = speed;
             }
             break;
-        case 7:
+        case 8:
             if( commRank == 0 )
                 std::cout << "Five sideways layers" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -314,7 +336,7 @@ main( int argc, char* argv[] )
                 }
             }
             break;
-        case 8:
+        case 9:
             if( commRank == 0 )
                 std::cout << "Wedge" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -339,13 +361,13 @@ main( int argc, char* argv[] )
                 }
             }
             break;
-        case 9:
+        case 10:
             if( commRank == 0 )
                 std::cout << "Uniform random over [1,3]" << std::endl;
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
                 localVelocity[i] = 2.+plcg::ParallelUniform<double>();
             break;
-        case 10:
+        case 11:
             if( commRank == 0 )
                 std::cout << "High-velocity separator" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -367,7 +389,7 @@ main( int argc, char* argv[] )
                 }
             }
             break;
-        case 11:
+        case 12:
             if( commRank == 0 )
                 std::cout << "Cavity (might not converge!)" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -397,7 +419,7 @@ main( int argc, char* argv[] )
                 }
             }
             break;
-        case 12:
+        case 13:
             if( commRank == 0 )
                 std::cout << "Reverse-cavity" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -427,7 +449,7 @@ main( int argc, char* argv[] )
                 }
             }
             break;
-        case 13:
+        case 14:
             if( commRank == 0 )
                 std::cout << "Bottom half of cavity" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -447,7 +469,7 @@ main( int argc, char* argv[] )
                             Y > 0.2 && Y < 0.8 && 
                             Z > 0.2 && Z < 0.8 )
                             speed = 1;
-                        else if( Z > 0.5 )
+                        else if( Z < 0.5 )
                             speed = 1;
                         else
                             speed = 8;
@@ -459,7 +481,7 @@ main( int argc, char* argv[] )
                 }
             }
             break;
-        case 14:
+        case 15:
             if( commRank == 0 )
                 std::cout << "Top half of cavity" << std::endl;
             for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
@@ -479,7 +501,7 @@ main( int argc, char* argv[] )
                             Y > 0.2 && Y < 0.8 && 
                             Z > 0.2 && Z < 0.8 )
                             speed = 1;
-                        else if( Z < 0.5 )
+                        else if( Z > 0.5 )
                             speed = 1;
                         else
                             speed = 8;
