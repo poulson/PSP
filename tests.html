@@ -73,58 +73,41 @@ the Helmholtz equation: moving Perfectly Matched Layers</em>.</p>
 the Helmholtz equation: moving Perfectly Matched Layers</em>.</p>
 <img alt="_images/velocity-guide.png" src="_images/velocity-guide.png" />
 </div>
-<div class="section" id="two-layers">
-<h3>Two layers<a class="headerlink" href="#two-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="two-decreasing-layers">
+<h3>Two decreasing layers<a class="headerlink" href="#two-decreasing-layers" title="Permalink to this headline">¶</a></h3>
 <p>Two layers stacked on top of each other, where the bottom layer has a velocity
 which is eight times higher than in the top layer.</p>
-<img alt="_images/velocity-twoLayers.png" src="_images/velocity-twoLayers.png" />
+<img alt="_images/velocity-twoDecLayers.png" src="_images/velocity-twoDecLayers.png" />
 </div>
-<div class="section" id="cavity">
-<h3>Cavity<a class="headerlink" href="#cavity" title="Permalink to this headline">¶</a></h3>
-<p>A high-velocity outer layer surrounding a low-velocity interior region.
-Interior rays become trapped within the low-velocity region and cause resonance
-(resulting in poor performance of the preconditioner).</p>
-<img alt="_images/velocity-cavity.png" src="_images/velocity-cavity.png" />
+<div class="section" id="two-increasing-layers">
+<h3>Two increasing layers<a class="headerlink" href="#two-increasing-layers" title="Permalink to this headline">¶</a></h3>
+<p>Same as above, but the sweep proceeds from the low to high velocity (instead of
+high to low).</p>
+<img alt="_images/velocity-twoIncLayers.png" src="_images/velocity-twoIncLayers.png" />
 </div>
-<div class="section" id="reverse-cavity">
-<h3>Reverse cavity<a class="headerlink" href="#reverse-cavity" title="Permalink to this headline">¶</a></h3>
-<p>Meant to show that high velocity contrasts are not the problem: since rays
-do not become trapped, the preconditioner performs very well on this velocity
-model.</p>
-<img alt="_images/velocity-reverseCavity.png" src="_images/velocity-reverseCavity.png" />
+<div class="section" id="two-sideways-layers">
+<h3>Two sideways layers<a class="headerlink" href="#two-sideways-layers" title="Permalink to this headline">¶</a></h3>
+<p>Same as the above two models, but there is no gradient in the velocity model
+in the sweep direction.</p>
+<img alt="_images/velocity-twoSidewaysLayers.png" src="_images/velocity-twoSidewaysLayers.png" />
 </div>
-<div class="section" id="top-half-of-cavity">
-<h3>Top half of cavity<a class="headerlink" href="#top-half-of-cavity" title="Permalink to this headline">¶</a></h3>
-<p>Since PSP sweeps upward from the bottom of the domain to the top, this model
-should not pose a significant problem since the approximated lower half-space
-problems do not replace strong with PML.</p>
-<img alt="_images/velocity-topHalfCavity.png" src="_images/velocity-topHalfCavity.png" />
+<div class="section" id="five-decreasing-layers">
+<h3>Five decreasing layers<a class="headerlink" href="#five-decreasing-layers" title="Permalink to this headline">¶</a></h3>
+<p>Test the performance of sweeping from low to high velocities.</p>
+<img alt="_images/velocity-fiveDecLayers.png" src="_images/velocity-fiveDecLayers.png" />
 </div>
-<div class="section" id="bottom-half-of-cavity">
-<h3>Bottom half of cavity<a class="headerlink" href="#bottom-half-of-cavity" title="Permalink to this headline">¶</a></h3>
-<p>On the other hand, if the cavity is on the bottom half of the domain, sweeping
-upwards uses approximations which replace the bottom half of the cavity with
-PML, which ignores strong reflections from rays attempting to jump from the
-low to high velocity region.</p>
-<img alt="_images/velocity-bottomHalfCavity.png" src="_images/velocity-bottomHalfCavity.png" />
-</div>
-<div class="section" id="increasing-layers">
-<h3>Increasing layers<a class="headerlink" href="#increasing-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="five-increasing-layers">
+<h3>Five increasing layers<a class="headerlink" href="#five-increasing-layers" title="Permalink to this headline">¶</a></h3>
 <p>Tests the performance of sweeping from high to low velocities. Ideally,
 the sweeping preconditioner should perform worse on this model than the
-next one since the approximated lower half-spaces should have more significant
-reflections.</p>
-<img alt="_images/velocity-incLayers.png" src="_images/velocity-incLayers.png" />
-</div>
-<div class="section" id="decreasing-layers">
-<h3>Decreasing layers<a class="headerlink" href="#decreasing-layers" title="Permalink to this headline">¶</a></h3>
-<p>Test the performance of sweeping from low to high velocities.</p>
-<img alt="_images/velocity-decLayers.png" src="_images/velocity-decLayers.png" />
+previous one since the approximated lower half-spaces should have more
+significant reflections.</p>
+<img alt="_images/velocity-fiveIncLayers.png" src="_images/velocity-fiveIncLayers.png" />
 </div>
 <div class="section" id="sideways-layers">
 <h3>Sideways layers<a class="headerlink" href="#sideways-layers" title="Permalink to this headline">¶</a></h3>
-<p>Tests a model where each panel is equivalent but heterogeneous.</p>
-<img alt="_images/velocity-sidewaysLayers.png" src="_images/velocity-sidewaysLayers.png" />
+<p>Tests a five layer model where each panel is equivalent but heterogeneous.</p>
+<img alt="_images/velocity-fiveSidewaysLayers.png" src="_images/velocity-fiveSidewaysLayers.png" />
 </div>
 <div class="section" id="wedge">
 <h3>Wedge<a class="headerlink" href="#wedge" title="Permalink to this headline">¶</a></h3>
@@ -142,6 +125,35 @@ reflections.</p>
 of the medium is inserted to test the robustness of the preconditioner.
 Convergence seems to be unaffected by the separator.</p>
 <img alt="_images/velocity-separator.png" src="_images/velocity-separator.png" />
+</div>
+<div class="section" id="cavity">
+<h3>Cavity<a class="headerlink" href="#cavity" title="Permalink to this headline">¶</a></h3>
+<p>A high-velocity outer layer surrounding a low-velocity interior region.
+Interior rays become trapped within the low-velocity region and cause resonance
+(resulting in poor performance of the preconditioner).</p>
+<img alt="_images/velocity-cavity.png" src="_images/velocity-cavity.png" />
+</div>
+<div class="section" id="reverse-cavity">
+<h3>Reverse cavity<a class="headerlink" href="#reverse-cavity" title="Permalink to this headline">¶</a></h3>
+<p>Meant to show that high velocity contrasts are not the problem: since rays
+do not become trapped, the preconditioner performs very well on this velocity
+model.</p>
+<img alt="_images/velocity-reverseCavity.png" src="_images/velocity-reverseCavity.png" />
+</div>
+<div class="section" id="bottom-half-of-cavity">
+<h3>Bottom half of cavity<a class="headerlink" href="#bottom-half-of-cavity" title="Permalink to this headline">¶</a></h3>
+<p>If the cavity is on the bottom half of the domain, sweeping
+upwards uses approximations which replace the bottom half of the cavity with
+PML, which ignores strong reflections from rays attempting to jump from the
+low to high velocity region.</p>
+<img alt="_images/velocity-bottomHalfCavity.png" src="_images/velocity-bottomHalfCavity.png" />
+</div>
+<div class="section" id="top-half-of-cavity">
+<h3>Top half of cavity<a class="headerlink" href="#top-half-of-cavity" title="Permalink to this headline">¶</a></h3>
+<p>Since PSP sweeps upward from the bottom of the domain to the top, this model
+should not pose a significant problem since the approximated lower half-space
+problems do not replace strong with PML.</p>
+<img alt="_images/velocity-topHalfCavity.png" src="_images/velocity-topHalfCavity.png" />
 </div>
 </div>
 <div class="section" id="unitcube">
