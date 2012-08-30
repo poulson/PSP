@@ -73,7 +73,7 @@ DistHelmholtz<R>::Initialize
     R minVelocity;
     mpi::AllReduce( &minLocalVelocity, &minVelocity, 1, mpi::MIN, comm_ );
     const R medianVelocity = (minVelocity+maxVelocity) / 2;
-    const R wavelength = 2.0*M_PI*medianVelocity/omega;
+    const R wavelength = 2.0*M_PI*minVelocity/omega;
     const R maxDimension = std::max(std::max(wx,wy),wz);
     const R numWavelengths = maxDimension / wavelength;
     const R xSizeInWavelengths = wx / wavelength;
@@ -83,12 +83,10 @@ DistHelmholtz<R>::Initialize
     const R yPPW = ny / ySizeInWavelengths;
     const R zPPW = nz / zSizeInWavelengths;
     const R minPPW = std::min(std::min(xPPW,yPPW),zPPW);
+    const R xPMLMagRule = 12.*maxDimension/minPPW;
+    const R yPMLMagRule = 12.*maxDimension/minPPW;
+    const R zPMLMagRule = 12.*maxDimension/minPPW;
     const int minPML = std::min(bx,std::min(by,bz));
-    const R xPMLPerWave = hx_*bx / wavelength;
-    const R yPMLPerWave = hy_*by / wavelength;
-    const R zPMLPerWave = hz_*bz / wavelength;
-    const R minPMLPerWave = 
-        std::min(std::min(xPMLPerWave,yPMLPerWave),zPMLPerWave);
     if( commRank == 0 )
     {
         if( minPPW < 7 || minPML < 5 )
@@ -105,12 +103,11 @@ DistHelmholtz<R>::Initialize
                       << "Min velocity:              " << minVelocity << "\n"
                       << "Max velocity:              " << maxVelocity << "\n"
                       << "Median velocity:           " << medianVelocity << "\n"
-                      << "Characteristic wavelength: " << wavelength << "\n"
+                      << "Minimum wavelength:        " << wavelength << "\n"
                       << "Max dimension:             " << maxDimension << "\n"
                       << "# of wavelengths:          " << numWavelengths << "\n"
                       << "Min points/wavelength:     " << minPPW << "\n"
                       << "Min PML-size               " << minPML << "\n"
-                      << "Min PML-size/wavelength:   " << minPMLPerWave << "\n"
                       << std::endl;
             if( minPPW < 7 )
                 std::cerr << "WARNING: minimum points/wavelength is very small"
@@ -119,6 +116,14 @@ DistHelmholtz<R>::Initialize
                 std::cerr << "WARNING: minimum PML size is very small" 
                           << std::endl;
         }
+        std::cout 
+          << "Ratio of coordinate-stretching magnitudes from rule of thumb:\n"
+          << "  sigmax ratio: " << disc_.sigmax/xPMLMagRule << " = " 
+          << disc_.sigmax << "/" << xPMLMagRule << "\n"
+          << "  sigmay ratio: " << disc_.sigmay/yPMLMagRule << " = " 
+          << disc_.sigmay << "/" << yPMLMagRule << "\n"
+          << "  sigmaz ratio: " << disc_.sigmaz/zPMLMagRule << " = " 
+          << disc_.sigmaz << "/" << zPMLMagRule << "\n" << std::endl;
     }
 
     //

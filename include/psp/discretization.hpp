@@ -70,7 +70,7 @@ struct Discretization
       bx(5), by(5), bz(5)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
-        sigmax = sigmay = sigmaz = 1.5*maxDim;
+        sigmax = sigmay = sigmaz = 1.2*maxDim;
     }
     
     Discretization
@@ -85,7 +85,7 @@ struct Discretization
       bx(5), by(5), bz(5)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
-        sigmax = sigmay = sigmaz = 1.5*maxDim;
+        sigmax = sigmay = sigmaz = 1.2*maxDim;
     }
 
     Discretization
@@ -101,7 +101,7 @@ struct Discretization
       bx(xPMLSize), by(yPMLSize), bz(zPMLSize)
     {
         const R maxDim = std::max(wx,std::max(wy,wz));
-        sigmax = sigmay = sigmaz = 1.5*maxDim;
+        sigmax = sigmay = sigmaz = 1.2*maxDim;
     }
 
     Discretization

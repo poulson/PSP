@@ -132,8 +132,6 @@ main( int argc, char* argv[] )
     try 
     {
         Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
-        const int pmlSize = 5;
-        const double sigma = 1.5;
         Discretization<double> disc
         ( omega, n, n, n, 1., 1., 1., PML, PML, PML, PML, topBC, 
           pmlSize, sigma );
