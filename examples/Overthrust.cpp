@@ -24,22 +24,22 @@ using namespace psp;
 void Usage()
 {
     std::cout << "Overthrust <nx> <ny> <nz> <omega> <px> <py> <pz> "
-                 "[PML on top=true] [pmlSize=5] [sigma=1.5*20] [damping=7] "
-                 "[# planes/panel=4] [panel scheme=1] [viz=1] "
-                 "[fact blocksize=96] [solve blocksize=64]\n"
+                 "[pmlOnTop=true] [pmlSize=5] [sigma=1.5*20] [damping=7] "
+                 "[numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] "
+                 "[factBlocksize=96] [solveBlocksize=64]\n"
               << "\n"
               << "  nx,ny,nz: size of grid in each dimension\n"
               << "  omega: frequency (in rad/sec) of problem\n"
               << "  px,py,pz: 3D process grid dimensions\n"
-              << "  PML on top: PML or Dirichlet b.c. on top?\n"
+              << "  pmlOnTop: PML or Dirichlet b.c. on top?\n"
               << "  pmlSize: width of PML in grid points\n"
               << "  sigma: maximum height of imaginary coordinate stretching\n"
               << "  damping: imaginary freq shift for preconditioner\n"
-              << "  # of planes/panel: number of planes per subdomain\n"
-              << "  panel scheme: LDL_1D=0, LDL_SELINV_2D=1\n"
-              << "  full viz: full volume visualization iff != 0\n" 
-              << "  fact blocksize: factorization algorithmic blocksize\n"
-              << "  solve blocksize: solve algorithmic blocksize\n"
+              << "  numPlanesPerPanel: number of planes per subdomain\n"
+              << "  panelScheme: LDL_1D=0, LDL_SELINV_2D=1\n"
+              << "  fullViz: full volume visualization iff != 0\n" 
+              << "  factBlocksize: factorization algorithmic blocksize\n"
+              << "  solveBlocksize: solve algorithmic blocksize\n"
               << std::endl;
 }
 
