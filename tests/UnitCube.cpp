@@ -247,7 +247,6 @@ main( int argc, char* argv[] )
                 const int y = yShift + yLocal*py;
                 const double Y = y / (n+1.0);
                 const double speed = ( Y < 0.5 ? 4.0 : 1.0 );
-                const int localOffset = yLocal*xLocalSize;
                 for( int zLocal=0; zLocal<zLocalSize; ++zLocal )
                 {
                     for( int xLocal=0; xLocal<xLocalSize; ++xLocal )

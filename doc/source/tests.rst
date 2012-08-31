@@ -146,7 +146,88 @@ Usage ::
 * `factBlocksize`: algorithmic blocksize for factorization
 * `solveBlocksize`: algorithmic blocksize for solves
 
-**TODO:** Describe sources and show some results.
+For each run of the ``UnitCube`` driver, four different sets of sources are used: 
+
+1. A single localized Gaussian centered at :math:`(0.5,0.5,0.1)`.
+2. Three localized Gaussians, centered at :math:`(0.5,0.5,0.1)`, :math:`(0.25,0.25,0.1)`, and :math:`(0.75,0.75,0.5)`.
+3. A Gaussian beam centered at :math:`(0.75,0.75,0.5)` and pointed in the direction :math:`(0.57735,0.57735,-0.57735)`.
+4. A plane wave pointed in the same direction as the Gaussian beam, but with support in the complement of PML.
+
+Uniform example
+^^^^^^^^^^^^^^^
+The following results are gathered from running at 314.16 rad/sec over the 
+uniform velocity model with a :math:`500 \times 500 \times 500` grid, via the 
+command::
+    
+    UnitCube 0 500 314.16 
+
+which converged to five digits of relative accuracy in 21 iterations of 
+GMRES(20) on 256 nodes of TACC's Lonestar.
+
+.. image:: solution-uniform-singleShot-YZ-50.png
+
+The middle YZ plane of the single-shot solution.
+
+.. image:: solution-uniform-threeShots-YZ-50-0.6.png
+
+A slightly off-center YZ plane (x=0.6) of the three-shot solution. 
+
+.. image:: solution-uniform-planeWave-YZ-50.png
+
+The middle YZ plane of the plane wave solution.
+
+Converging lense example
+^^^^^^^^^^^^^^^^^^^^^^^^
+This example used the converging lense velocity model at 235.62 rad/sec over 
+another :math:`500 \times 500 \times 500` grid, via the command::
+    
+    UnitCube 1 500 235.62
+
+and converged to five digits of relative accuracy in 53 iterations of GMRES(20)
+on 256 nodes of TACC's Lonestar.
+
+.. image:: solution-gaussian-singleShot-YZ-37.5.png
+
+The middle YZ plane of the single-shot solution.
+
+.. image:: solution-gaussian-threeShots-YZ-37.5.png
+
+The middle YZ plane of the three-shot solution.
+
+.. image:: solution-gaussian-planeWave-YZ-37.5.png
+
+The middle YZ plane of the plane wave solution.
+
+Wave guide example
+^^^^^^^^^^^^^^^^^^
+This third example uses the wave guide velocity model over a 
+:math:`500 \times 500 \times 500` grid, again at 235.62 rad/sec. The command
+was::
+
+    UnitCube 2 500 235.62
+
+and all four residuals converged to five digits of relative accuracy in 
+55 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
+
+.. image:: solution-guide-singleShot-YZ-37.5.png
+
+The middle YZ plane of the single-shot solution.
+
+.. image:: solution-guide-singleShot-YZ-37.5-0.55.png
+
+An off-center YZ plane (x=0.55) of the single-shot solution.
+
+.. image:: solution-guide-threeShots-YZ-37.5.png
+
+The middle YZ plane of the three-shot solution.
+
+.. image:: solution-guide-threeShots-YZ-37.5-0.55.png
+
+An off-center YZ plane (x=0.55) of the three-shot solution.
+
+.. image:: solution-guide-planeWave-YZ-37.5.png
+
+The middle YZ plane of the plane wave solution.
 
 Interpolate
 -----------
