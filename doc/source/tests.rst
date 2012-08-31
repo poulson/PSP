@@ -136,13 +136,13 @@ Usage ::
 * `velocity`: which velocity field to use, see `Analytical velocity models`_
 * `n`: size of grid in each dimension
 * `omega`: frequency in rad/sec of problem
-* `pmlOnTop`: PML or Dirichlet boundary condition on top?
-* `pmlSize`: number of grid points of PML
+* `pmlOnTop`: PML if nonzero, Dirichlet otherwise
+* `pmlSize`: number of grid points of per PML boundary condition
 * `sigma`: magnitude of complex coordinate-stretching for PML
 * `damping`: imaginary frequency shift for preconditioner
 * `numPlanesPerPanel`: number of planes per subdomain
-* `panelScheme`: use normal scheme if 0, selective inversion if 1
-* `fullViz`: full volume visualization if and only if nonzero
+* `panelScheme`: use traditional scheme if 0, selective inversion if 1
+* `fullViz`: full volume visualization if nonzero
 * `factBlocksize`: algorithmic blocksize for factorization
 * `solveBlocksize`: algorithmic blocksize for solves
 
