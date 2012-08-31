@@ -56,92 +56,92 @@
 <div class="section" id="analytical-velocity-models">
 <h2>Analytical velocity models<a class="headerlink" href="#analytical-velocity-models" title="Permalink to this headline">¶</a></h2>
 <div class="section" id="uniform">
-<h3>Uniform<a class="headerlink" href="#uniform" title="Permalink to this headline">¶</a></h3>
+<h3>0. Uniform<a class="headerlink" href="#uniform" title="Permalink to this headline">¶</a></h3>
 <p>A constant unit velocity field. This should be the ideal setting for the
 preconditioner.</p>
 <img alt="_images/velocity-uniform.png" src="_images/velocity-uniform.png" />
 </div>
-<div class="section" id="gaussian-perturbation">
-<h3>Gaussian perturbation<a class="headerlink" href="#gaussian-perturbation" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="converging-lense">
+<h3>1. Converging lense<a class="headerlink" href="#converging-lense" title="Permalink to this headline">¶</a></h3>
 <p>One of the models tested in Engquist and Ying&#8217;s <em>Sweeping preconditioner for
 the Helmholtz equation: moving Perfectly Matched Layers</em>.</p>
 <img alt="_images/velocity-gaussian.png" src="_images/velocity-gaussian.png" />
 </div>
 <div class="section" id="wave-guide">
-<h3>Wave guide<a class="headerlink" href="#wave-guide" title="Permalink to this headline">¶</a></h3>
+<h3>2. Wave guide<a class="headerlink" href="#wave-guide" title="Permalink to this headline">¶</a></h3>
 <p>Another model tested in Engquist and Ying&#8217;s <em>Sweeping preconditioner for
 the Helmholtz equation: moving Perfectly Matched Layers</em>.</p>
 <img alt="_images/velocity-guide.png" src="_images/velocity-guide.png" />
 </div>
 <div class="section" id="two-decreasing-layers">
-<h3>Two decreasing layers<a class="headerlink" href="#two-decreasing-layers" title="Permalink to this headline">¶</a></h3>
+<h3>3. Two decreasing layers<a class="headerlink" href="#two-decreasing-layers" title="Permalink to this headline">¶</a></h3>
 <p>Two layers stacked on top of each other, where the bottom layer has a velocity
 which is eight times higher than in the top layer.</p>
 <img alt="_images/velocity-twoDecLayers.png" src="_images/velocity-twoDecLayers.png" />
 </div>
 <div class="section" id="two-increasing-layers">
-<h3>Two increasing layers<a class="headerlink" href="#two-increasing-layers" title="Permalink to this headline">¶</a></h3>
+<h3>4. Two increasing layers<a class="headerlink" href="#two-increasing-layers" title="Permalink to this headline">¶</a></h3>
 <p>Same as above, but the sweep proceeds from the low to high velocity (instead of
 high to low).</p>
 <img alt="_images/velocity-twoIncLayers.png" src="_images/velocity-twoIncLayers.png" />
 </div>
 <div class="section" id="two-sideways-layers">
-<h3>Two sideways layers<a class="headerlink" href="#two-sideways-layers" title="Permalink to this headline">¶</a></h3>
+<h3>5. Two sideways layers<a class="headerlink" href="#two-sideways-layers" title="Permalink to this headline">¶</a></h3>
 <p>Same as the above two models, but there is no gradient in the velocity model
 in the sweep direction.</p>
 <img alt="_images/velocity-twoSidewaysLayers.png" src="_images/velocity-twoSidewaysLayers.png" />
 </div>
 <div class="section" id="five-decreasing-layers">
-<h3>Five decreasing layers<a class="headerlink" href="#five-decreasing-layers" title="Permalink to this headline">¶</a></h3>
+<h3>6. Five decreasing layers<a class="headerlink" href="#five-decreasing-layers" title="Permalink to this headline">¶</a></h3>
 <p>Test the performance of sweeping from low to high velocities.</p>
 <img alt="_images/velocity-fiveDecLayers.png" src="_images/velocity-fiveDecLayers.png" />
 </div>
 <div class="section" id="five-increasing-layers">
-<h3>Five increasing layers<a class="headerlink" href="#five-increasing-layers" title="Permalink to this headline">¶</a></h3>
+<h3>7. Five increasing layers<a class="headerlink" href="#five-increasing-layers" title="Permalink to this headline">¶</a></h3>
 <p>Tests the performance of sweeping from high to low velocities. Ideally,
 the sweeping preconditioner should perform worse on this model than the
 previous one since the approximated lower half-spaces should have more
 significant reflections.</p>
 <img alt="_images/velocity-fiveIncLayers.png" src="_images/velocity-fiveIncLayers.png" />
 </div>
-<div class="section" id="sideways-layers">
-<h3>Sideways layers<a class="headerlink" href="#sideways-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="five-sideways-layers">
+<h3>8. Five sideways layers<a class="headerlink" href="#five-sideways-layers" title="Permalink to this headline">¶</a></h3>
 <p>Tests a five layer model where each panel is equivalent but heterogeneous.</p>
 <img alt="_images/velocity-fiveSidewaysLayers.png" src="_images/velocity-fiveSidewaysLayers.png" />
 </div>
 <div class="section" id="wedge">
-<h3>Wedge<a class="headerlink" href="#wedge" title="Permalink to this headline">¶</a></h3>
+<h3>9. Wedge<a class="headerlink" href="#wedge" title="Permalink to this headline">¶</a></h3>
 <p>A 3D version of a standard benchmark problem (<strong>citation needed</strong>).</p>
 <img alt="_images/velocity-wedge.png" src="_images/velocity-wedge.png" />
 </div>
 <div class="section" id="random">
-<h3>Random<a class="headerlink" href="#random" title="Permalink to this headline">¶</a></h3>
+<h3>10. Random<a class="headerlink" href="#random" title="Permalink to this headline">¶</a></h3>
 <p>Each velocity entry is drawn from a uniform distribution over <span class="math">\([2,3]\)</span>.</p>
 <img alt="_images/velocity-random.png" src="_images/velocity-random.png" />
 </div>
 <div class="section" id="separator">
-<h3>Separator<a class="headerlink" href="#separator" title="Permalink to this headline">¶</a></h3>
+<h3>11. Separator<a class="headerlink" href="#separator" title="Permalink to this headline">¶</a></h3>
 <p>A separator with a velocity ten orders of magnitude higher than the rest
 of the medium is inserted to test the robustness of the preconditioner.
 Convergence seems to be unaffected by the separator.</p>
 <img alt="_images/velocity-separator.png" src="_images/velocity-separator.png" />
 </div>
 <div class="section" id="cavity">
-<h3>Cavity<a class="headerlink" href="#cavity" title="Permalink to this headline">¶</a></h3>
+<h3>12. Cavity<a class="headerlink" href="#cavity" title="Permalink to this headline">¶</a></h3>
 <p>A high-velocity outer layer surrounding a low-velocity interior region.
 Interior rays become trapped within the low-velocity region and cause resonance
 (resulting in poor performance of the preconditioner).</p>
 <img alt="_images/velocity-cavity.png" src="_images/velocity-cavity.png" />
 </div>
 <div class="section" id="reverse-cavity">
-<h3>Reverse cavity<a class="headerlink" href="#reverse-cavity" title="Permalink to this headline">¶</a></h3>
+<h3>13. Reverse cavity<a class="headerlink" href="#reverse-cavity" title="Permalink to this headline">¶</a></h3>
 <p>Meant to show that high velocity contrasts are not the problem: since rays
 do not become trapped, the preconditioner performs very well on this velocity
 model.</p>
 <img alt="_images/velocity-reverseCavity.png" src="_images/velocity-reverseCavity.png" />
 </div>
 <div class="section" id="bottom-half-of-cavity">
-<h3>Bottom half of cavity<a class="headerlink" href="#bottom-half-of-cavity" title="Permalink to this headline">¶</a></h3>
+<h3>14. Bottom half of cavity<a class="headerlink" href="#bottom-half-of-cavity" title="Permalink to this headline">¶</a></h3>
 <p>If the cavity is on the bottom half of the domain, sweeping
 upwards uses approximations which replace the bottom half of the cavity with
 PML, which ignores strong reflections from rays attempting to jump from the
@@ -149,7 +149,7 @@ low to high velocity region.</p>
 <img alt="_images/velocity-bottomHalfCavity.png" src="_images/velocity-bottomHalfCavity.png" />
 </div>
 <div class="section" id="top-half-of-cavity">
-<h3>Top half of cavity<a class="headerlink" href="#top-half-of-cavity" title="Permalink to this headline">¶</a></h3>
+<h3>15. Top half of cavity<a class="headerlink" href="#top-half-of-cavity" title="Permalink to this headline">¶</a></h3>
 <p>Since PSP sweeps upward from the bottom of the domain to the top, this model
 should not pose a significant problem since the approximated lower half-space
 problems do not replace strong with PML.</p>
@@ -161,7 +161,27 @@ problems do not replace strong with PML.</p>
 <p>This section describes the driver
 <a class="reference external" href="https://github.com/poulson/PSP/blob/master/tests/UnitCube.cpp">tests/UnitCube.cpp</a>, which is designed for quickly testing the performance of the sweeping
 preconditioner on a variety of different velocity models.</p>
-<p><strong>TODO</strong></p>
+<div class="section" id="parameters">
+<h3>Parameters<a class="headerlink" href="#parameters" title="Permalink to this headline">¶</a></h3>
+<p>Usage</p>
+<div class="highlight-python"><pre>UnitCube &lt;velocity&gt; &lt;n&gt; &lt;omega&gt; [pmlOnTop=true] [pmlSize=5] [sigma=1.5] [damping=7] [numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] [factBlocksize=96] [solveBlocksize=64]</pre>
+</div>
+<ul class="simple">
+<li><cite>velocity</cite>: which velocity field to use, see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a></li>
+<li><cite>n</cite>: size of grid in each dimension</li>
+<li><cite>omega</cite>: frequency in rad/sec of problem</li>
+<li><cite>pmlOnTop</cite>: PML or Dirichlet boundary condition on top?</li>
+<li><cite>pmlSize</cite>: number of grid points of PML</li>
+<li><cite>sigma</cite>: magnitude of complex coordinate-stretching for PML</li>
+<li><cite>damping</cite>: imaginary frequency shift for preconditioner</li>
+<li><cite>numPlanesPerPanel</cite>: number of planes per subdomain</li>
+<li><cite>panelScheme</cite>: use normal scheme if 0, selective inversion if 1</li>
+<li><cite>fullViz</cite>: full volume visualization if and only if nonzero</li>
+<li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
+<li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
+</ul>
+<p><strong>TODO:</strong> Describe sources and show some results.</p>
+</div>
 </div>
 <div class="section" id="interpolate">
 <h2>Interpolate<a class="headerlink" href="#interpolate" title="Permalink to this headline">¶</a></h2>
@@ -169,7 +189,18 @@ preconditioner on a variety of different velocity models.</p>
 is meant to exercise the routine
 <a class="reference internal" href="dist_uniform_grid.html#DistUniformGrid:F:::InterpolateTo__i.i.i" title="DistUniformGrid&lt;F&gt;::InterpolateTo"><tt class="xref cpp cpp-func docutils literal"><span class="pre">DistUniformGrid&lt;F&gt;::InterpolateTo()</span></tt></a>, which provides a means of
 linearly interpolating a velocity model into a different grid size in parallel.</p>
-<p><strong>TODO</strong></p>
+<div class="section" id="id1">
+<h3>Parameters<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<p>Usage</p>
+<div class="highlight-python"><pre>Interpolate &lt;velocity&gt; &lt;m1&gt; &lt;m2&gt; &lt;m3&gt; &lt;n1&gt; &lt;n2&gt; &lt;n3&gt;</pre>
+</div>
+<ul class="simple">
+<li><cite>velocity</cite>: see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a></li>
+<li><cite>m1</cite>, <cite>m2</cite>, <cite>m3</cite>: original grid size</li>
+<li><cite>n1</cite>, <cite>n2</cite>, <cite>n3</cite>: interpolated grid size</li>
+</ul>
+<p><strong>TODO:</strong> Show some results.</p>
+</div>
 </div>
 </div>
 
