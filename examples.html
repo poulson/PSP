@@ -55,6 +55,23 @@
 <h1>Example driver(s)<a class="headerlink" href="#example-driver-s" title="Permalink to this headline">¶</a></h1>
 <img alt="_images/velocity-overthrust.png" src="_images/velocity-overthrust.png" />
 <p><strong>TODO: Describe ``examples/Overthrust.cpp``</strong></p>
+<p>Usage</p>
+<div class="highlight-python"><pre>Overthrust &lt;nx&gt; &lt;ny&gt; &lt;nz&gt; &lt;omega&gt; &lt;px&gt; &lt;py&gt; &lt;pz&gt; [pmlOnTop=true] [pmlSize=5] [sigma=24] [damping=7] [numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] [factBlocksize=96] [solveBlocksize=64]</pre>
+</div>
+<ul class="simple">
+<li><cite>nx</cite>, <cite>ny</cite>, <cite>nz</cite>: size of grid in each dimension</li>
+<li><cite>omega</cite>: frequency (in rad/sec) of the problem</li>
+<li><cite>px</cite>, <cite>py</cite>, <cite>pz</cite>: 3D process grid dimensions</li>
+<li><cite>pmlOnTop</cite>: PML if nonzero, Dirichlet otherwise</li>
+<li><cite>pmlSize</cite>: number of grid points per PML boundary condition</li>
+<li><cite>sigma</cite>: magnitude of complex coordinate stretching for PML</li>
+<li><cite>damping</cite>: imaginary frequency shift for preconditioner</li>
+<li><cite>numPlanesPerPanel</cite>: number of planes per subdomain</li>
+<li><cite>panelScheme</cite>: traditional approach if zero, selective inversion if 1</li>
+<li><cite>fullViz</cite>: full volume visualization if nonzero</li>
+<li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
+<li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
+</ul>
 </div>
 
 

@@ -170,13 +170,13 @@ preconditioner on a variety of different velocity models.</p>
 <li><cite>velocity</cite>: which velocity field to use, see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a></li>
 <li><cite>n</cite>: size of grid in each dimension</li>
 <li><cite>omega</cite>: frequency in rad/sec of problem</li>
-<li><cite>pmlOnTop</cite>: PML or Dirichlet boundary condition on top?</li>
-<li><cite>pmlSize</cite>: number of grid points of PML</li>
+<li><cite>pmlOnTop</cite>: PML if nonzero, Dirichlet otherwise</li>
+<li><cite>pmlSize</cite>: number of grid points of per PML boundary condition</li>
 <li><cite>sigma</cite>: magnitude of complex coordinate-stretching for PML</li>
 <li><cite>damping</cite>: imaginary frequency shift for preconditioner</li>
 <li><cite>numPlanesPerPanel</cite>: number of planes per subdomain</li>
-<li><cite>panelScheme</cite>: use normal scheme if 0, selective inversion if 1</li>
-<li><cite>fullViz</cite>: full volume visualization if and only if nonzero</li>
+<li><cite>panelScheme</cite>: use traditional scheme if 0, selective inversion if 1</li>
+<li><cite>fullViz</cite>: full volume visualization if nonzero</li>
 <li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
 <li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
 </ul>
