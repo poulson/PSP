@@ -53,6 +53,8 @@
         
   <div class="section" id="example-driver-s">
 <h1>Example driver(s)<a class="headerlink" href="#example-driver-s" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="overthrust">
+<h2>Overthrust<a class="headerlink" href="#overthrust" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/velocity-overthrust.png" src="_images/velocity-overthrust.png" />
 <p><strong>TODO: Describe ``examples/Overthrust.cpp``</strong></p>
 <p>Usage</p>
@@ -72,6 +74,28 @@
 <li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
 <li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
 </ul>
+<div class="section" id="eight-hz-example">
+<h3>Eight Hz example<a class="headerlink" href="#eight-hz-example" title="Permalink to this headline">¶</a></h3>
+<p>This example shows the Overthrust model solved at its native resolution
+(<span class="math">\(801 \times 801 \times 187\)</span>) at a frequency of 8 Hz in order to ensure
+that there are slightly more than 10 points per wavelength at the shortest
+wavelength. The command used was:</p>
+<div class="highlight-python"><pre>Overthrust 801 801 187 50.26 16 16 8 1 5 3.75 7.07 4 1</pre>
+</div>
+<p>and all four residuals converged to five digits of relative accuracy in
+86 iterations of GMRES(20) on 256 nodes of Lonestar
+(using eight cores per node, in roughly ten minutes, including the
+preconditioner setup time).</p>
+<img alt="_images/solution-overthrust-singleShot-YZ-8.png" src="_images/solution-overthrust-singleShot-YZ-8.png" />
+<p>The middle YZ plane of the single-shot solution.</p>
+<img alt="_images/solution-overthrust-threeShots-YZ-8.png" src="_images/solution-overthrust-threeShots-YZ-8.png" />
+<p>The middle YZ plane of the three-shot solution.</p>
+<img alt="_images/solution-overthrust-threeShots-YZ-8-0.55.png" src="_images/solution-overthrust-threeShots-YZ-8-0.55.png" />
+<p>An off-center YZ plane (x=0.55*20) of the three-shot solution.</p>
+<img alt="_images/solution-overthrust-planeWave-YZ-8.png" src="_images/solution-overthrust-planeWave-YZ-8.png" />
+<p>The middle YZ plane of the plane wave solution.</p>
+</div>
+</div>
 </div>
 
 

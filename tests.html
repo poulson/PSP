@@ -180,7 +180,64 @@ preconditioner on a variety of different velocity models.</p>
 <li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
 <li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
 </ul>
-<p><strong>TODO:</strong> Describe sources and show some results.</p>
+<p>For each run of the <tt class="docutils literal"><span class="pre">UnitCube</span></tt> driver, four different sets of sources are used:</p>
+<ol class="arabic simple">
+<li>A single localized Gaussian centered at <span class="math">\((0.5,0.5,0.1)\)</span>.</li>
+<li>Three localized Gaussians, centered at <span class="math">\((0.5,0.5,0.1)\)</span>, <span class="math">\((0.25,0.25,0.1)\)</span>, and <span class="math">\((0.75,0.75,0.5)\)</span>.</li>
+<li>A Gaussian beam centered at <span class="math">\((0.75,0.75,0.5)\)</span> and pointed in the direction <span class="math">\((0.57735,0.57735,-0.57735)\)</span>.</li>
+<li>A plane wave pointed in the same direction as the Gaussian beam, but with support in the complement of PML.</li>
+</ol>
+</div>
+<div class="section" id="uniform-example">
+<h3>Uniform example<a class="headerlink" href="#uniform-example" title="Permalink to this headline">¶</a></h3>
+<p>The following results are gathered from running at 314.16 rad/sec over the
+uniform velocity model with a <span class="math">\(500 \times 500 \times 500\)</span> grid, via the
+command:</p>
+<div class="highlight-python"><pre>UnitCube 0 500 314.16</pre>
+</div>
+<p>which converged to five digits of relative accuracy in 21 iterations of
+GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
+<img alt="_images/solution-uniform-singleShot-YZ-50.png" src="_images/solution-uniform-singleShot-YZ-50.png" />
+<p>The middle YZ plane of the single-shot solution.</p>
+<img alt="_images/solution-uniform-threeShots-YZ-50-0.6.png" src="_images/solution-uniform-threeShots-YZ-50-0.6.png" />
+<p>A slightly off-center YZ plane (x=0.6) of the three-shot solution.</p>
+<img alt="_images/solution-uniform-planeWave-YZ-50.png" src="_images/solution-uniform-planeWave-YZ-50.png" />
+<p>The middle YZ plane of the plane wave solution.</p>
+</div>
+<div class="section" id="converging-lense-example">
+<h3>Converging lense example<a class="headerlink" href="#converging-lense-example" title="Permalink to this headline">¶</a></h3>
+<p>This example used the converging lense velocity model at 235.62 rad/sec over
+another <span class="math">\(500 \times 500 \times 500\)</span> grid, via the command:</p>
+<div class="highlight-python"><pre>UnitCube 1 500 235.62</pre>
+</div>
+<p>and converged to five digits of relative accuracy in 53 iterations of GMRES(20)
+on 256 nodes of TACC&#8217;s Lonestar.</p>
+<img alt="_images/solution-gaussian-singleShot-YZ-37.5.png" src="_images/solution-gaussian-singleShot-YZ-37.5.png" />
+<p>The middle YZ plane of the single-shot solution.</p>
+<img alt="_images/solution-gaussian-threeShots-YZ-37.5.png" src="_images/solution-gaussian-threeShots-YZ-37.5.png" />
+<p>The middle YZ plane of the three-shot solution.</p>
+<img alt="_images/solution-gaussian-planeWave-YZ-37.5.png" src="_images/solution-gaussian-planeWave-YZ-37.5.png" />
+<p>The middle YZ plane of the plane wave solution.</p>
+</div>
+<div class="section" id="wave-guide-example">
+<h3>Wave guide example<a class="headerlink" href="#wave-guide-example" title="Permalink to this headline">¶</a></h3>
+<p>This third example uses the wave guide velocity model over a
+<span class="math">\(500 \times 500 \times 500\)</span> grid, again at 235.62 rad/sec. The command
+was:</p>
+<div class="highlight-python"><pre>UnitCube 2 500 235.62</pre>
+</div>
+<p>and all four residuals converged to five digits of relative accuracy in
+55 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
+<img alt="_images/solution-guide-singleShot-YZ-37.5.png" src="_images/solution-guide-singleShot-YZ-37.5.png" />
+<p>The middle YZ plane of the single-shot solution.</p>
+<img alt="_images/solution-guide-singleShot-YZ-37.5-0.55.png" src="_images/solution-guide-singleShot-YZ-37.5-0.55.png" />
+<p>An off-center YZ plane (x=0.55) of the single-shot solution.</p>
+<img alt="_images/solution-guide-threeShots-YZ-37.5.png" src="_images/solution-guide-threeShots-YZ-37.5.png" />
+<p>The middle YZ plane of the three-shot solution.</p>
+<img alt="_images/solution-guide-threeShots-YZ-37.5-0.55.png" src="_images/solution-guide-threeShots-YZ-37.5-0.55.png" />
+<p>An off-center YZ plane (x=0.55) of the three-shot solution.</p>
+<img alt="_images/solution-guide-planeWave-YZ-37.5.png" src="_images/solution-guide-planeWave-YZ-37.5.png" />
+<p>The middle YZ plane of the plane wave solution.</p>
 </div>
 </div>
 <div class="section" id="interpolate">
