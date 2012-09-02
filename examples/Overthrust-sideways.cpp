@@ -141,7 +141,7 @@ main( int argc, char* argv[] )
             std::cout << "Finished initialization: " << initialTime 
                       << " seconds." << std::endl;
 
-        DistUniformGrid<C> B( nx, ny, nz, px, py, pz, comm, 4 );
+        DistUniformGrid<C> B( nx, ny, nz, px, py, pz, comm, 4, ZYX );
         const int xShift = B.XShift();
         const int yShift = B.YShift();
         const int zShift = B.ZShift();
