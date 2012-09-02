@@ -204,10 +204,10 @@ This third example uses the wave guide velocity model over a
 :math:`500 \times 500 \times 500` grid, again at 235.62 rad/sec. The command
 was::
 
-    UnitCube 2 500 235.62
+    UnitCube 2 500 235.62 1 5 2.0
 
 and all four residuals converged to five digits of relative accuracy in 
-55 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
+51 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
 
 .. image:: solution-guide-singleShot-YZ-37.5.png
 
@@ -228,6 +228,58 @@ An off-center YZ plane (x=0.55) of the three-shot solution.
 .. image:: solution-guide-planeWave-YZ-37.5.png
 
 The middle YZ plane of the plane wave solution.
+
+Two sideways layers example
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+This example tests a velocity model which is split between a two materials 
+with wave speeds which vary by a factor of four. The grid size was 
+:math:`500 \times 500 \times 500`, and the frequency was set to 314.16 
+radians/second. Using a PML magnitude of 4.0, via the command::
+    
+    UnitCube 5 500 314.16 1 5 4.0
+
+all four residuals converged to five digits of relative accuracy in 
+47 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
+
+.. image:: solution-twoSidewaysLayers-singleShot-YZ-50.png
+
+The middle YZ plane of the single-shot solution.
+
+.. image:: solution-twoSidewaysLayers-singleShot-YZ-50-0.7.png
+
+An off-center YZ plane (x=0.7) of the single-shot solution.
+
+.. image:: solution-twoSidewaysLayers-threeShots-YZ-50.png
+
+The middle YZ plane of the three-shot solution.
+
+.. image:: solution-twoSidewaysLayers-threeShots-YZ-50-0.7.png
+
+An off-center YZ plane (x=0.7) of the three-shot solution.
+
+Wedge example
+^^^^^^^^^^^^^
+This example tests a velocity model which is split between a three different 
+materials, with the lowest velocity material wedged into the middle. The grid 
+size was :math:`500 \times 500 \times 500`, and the frequency was set to 471.25 
+radians/second. Using a PML magnitude of 4.0, via the command::
+    
+    UnitCube 9 500 471.25 1 5 4.0
+
+all four residuals converged to five digits of relative accuracy in 48 
+iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
+
+.. image:: solution-wedge-singleShot-YZ-75.png
+
+The center YZ plane of the single-shot solution.
+
+.. image:: solution-wedge-singleShot-YZ-75-0.7.png
+
+An off-center YZ plane (x=0.7) of the single-shot solution.
+
+.. image:: solution-wedge-threeShots-YZ-75-0.7.png
+
+An off-center YZ plane (x=0.7) of the three-shot solution.
 
 Interpolate
 -----------
