@@ -222,12 +222,16 @@ on 256 nodes of TACC&#8217;s Lonestar.</p>
 <div class="section" id="wave-guide-example">
 <h3>Wave guide example<a class="headerlink" href="#wave-guide-example" title="Permalink to this headline">¶</a></h3>
 <p>This third example uses the wave guide velocity model over a
-<span class="math">\(500 \times 500 \times 500\)</span> grid, again at 235.62 rad/sec. The command
-was:</p>
+<span class="math">\(500 \times 500 \times 500\)</span> grid, again at 235.62 rad/sec. Using five
+grid points of PML, with a coordinate-stretching magnitude of 2.0, via:</p>
 <div class="highlight-python"><pre>UnitCube 2 500 235.62 1 5 2.0</pre>
 </div>
 <p>and all four residuals converged to five digits of relative accuracy in
-51 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
+51 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar. With six grid points
+of PML, via:</p>
+<div class="highlight-python"><pre>UnitCube 2 500 235.62 1 6 2.0</pre>
+</div>
+<p>the same model converged in 26 iterations.</p>
 <img alt="_images/solution-guide-singleShot-YZ-37.5.png" src="_images/solution-guide-singleShot-YZ-37.5.png" />
 <p>The middle YZ plane of the single-shot solution.</p>
 <img alt="_images/solution-guide-singleShot-YZ-37.5-0.55.png" src="_images/solution-guide-singleShot-YZ-37.5-0.55.png" />
