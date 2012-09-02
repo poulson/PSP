@@ -201,13 +201,18 @@ The middle YZ plane of the plane wave solution.
 Wave guide example
 ^^^^^^^^^^^^^^^^^^
 This third example uses the wave guide velocity model over a 
-:math:`500 \times 500 \times 500` grid, again at 235.62 rad/sec. The command
-was::
+:math:`500 \times 500 \times 500` grid, again at 235.62 rad/sec. Using five 
+grid points of PML, with a coordinate-stretching magnitude of 2.0, via::
 
     UnitCube 2 500 235.62 1 5 2.0
 
 and all four residuals converged to five digits of relative accuracy in 
-51 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
+51 iterations of GMRES(20) on 256 nodes of TACC's Lonestar. With six grid points
+of PML, via::
+
+    UnitCube 2 500 235.62 1 6 2.0
+
+the same model converged in 26 iterations.
 
 .. image:: solution-guide-singleShot-YZ-37.5.png
 

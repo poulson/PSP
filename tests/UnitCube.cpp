@@ -374,8 +374,9 @@ main( int argc, char* argv[] )
                 for( int yLocal=0; yLocal<yLocalSize; ++yLocal )
                 {
                     const int y = yShift + yLocal*py;
+                    const double Y = y / (n+1.0);
                     double speed;
-                    if( y >= n/2-6 && y < n/2-4 && z <= 3*n/4 )
+                    if( Y >= 0.4 && Y < 0.45 && Z <= 0.75 )
                         speed = 1e10;
                     else
                         speed = 1.;
