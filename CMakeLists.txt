@@ -124,7 +124,7 @@ endif()
 # Build the example drivers if necessary
 if(PSP_EXAMPLES)
   set(EXAMPLE_DIR ${PROJECT_SOURCE_DIR}/examples)
-  set(EXAMPLES Overthrust)
+  set(EXAMPLES Overthrust Overthrust-sideways)
 
   # Build the examples
   set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/examples")

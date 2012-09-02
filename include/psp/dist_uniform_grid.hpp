@@ -430,7 +430,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                 for( int xLocal=0; xLocal<xLocalSize_; ++xLocal )
                 {
                     const int x = xShift_ + xLocal*px_;
-                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const int i = x + z*nx_ + y*nx_*nz_;
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
@@ -450,7 +450,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                 for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
                 {
                     const int y = yShift_ + yLocal*py_;
-                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const int i = y + x*ny_ + z*nx_*ny_;
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
@@ -470,7 +470,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                 for( int yLocal=0; yLocal<yLocalSize_; ++yLocal )
                 {
                     const int y = yShift_ + yLocal*py_;
-                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const int i = y + z*ny_ + x*ny_*nz_;
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
@@ -490,7 +490,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                 for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
                 {
                     const int z = zShift_ + zLocal*pz_;
-                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const int i = z + x*nz_ + y*nz_*nx_;
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
@@ -510,7 +510,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                 for( int zLocal=0; zLocal<zLocalSize_; ++zLocal )
                 {
                     const int z = zShift_ + zLocal*pz_;
-                    const int i = x + y*nx_ + z*nx_*ny_;
+                    const int i = z + y*nz_ + x*nz_*ny_;
                     const std::streamoff pos = i*numScalars_*sizeof(F);
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
