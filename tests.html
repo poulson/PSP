@@ -61,8 +61,8 @@
 preconditioner.</p>
 <img alt="_images/velocity-uniform.png" src="_images/velocity-uniform.png" />
 </div>
-<div class="section" id="converging-lense">
-<h3>1. Converging lense<a class="headerlink" href="#converging-lense" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="converging-lens">
+<h3>1. Converging lens<a class="headerlink" href="#converging-lens" title="Permalink to this headline">¶</a></h3>
 <p>One of the models tested in Engquist and Ying&#8217;s <em>Sweeping preconditioner for
 the Helmholtz equation: moving Perfectly Matched Layers</em>.</p>
 <img alt="_images/velocity-gaussian.png" src="_images/velocity-gaussian.png" />
@@ -204,13 +204,13 @@ GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-uniform-planeWave-YZ-50.png" src="_images/solution-uniform-planeWave-YZ-50.png" />
 <p>The middle YZ plane of the plane wave solution.</p>
 </div>
-<div class="section" id="converging-lense-example">
-<h3>Converging lense example<a class="headerlink" href="#converging-lense-example" title="Permalink to this headline">¶</a></h3>
-<p>This example used the converging lense velocity model at 235.62 rad/sec over
+<div class="section" id="converging-lens-example">
+<h3>Converging lens example<a class="headerlink" href="#converging-lens-example" title="Permalink to this headline">¶</a></h3>
+<p>This example used the converging lens velocity model at 235.62 rad/sec over
 another <span class="math">\(500 \times 500 \times 500\)</span> grid, via the command:</p>
-<div class="highlight-python"><pre>UnitCube 1 500 235.62</pre>
+<div class="highlight-python"><pre>UnitCube 1 500 235.62 1 5 2.0</pre>
 </div>
-<p>and converged to five digits of relative accuracy in 53 iterations of GMRES(20)
+<p>and converged to five digits of relative accuracy in 43 iterations of GMRES(20)
 on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-gaussian-singleShot-YZ-37.5.png" src="_images/solution-gaussian-singleShot-YZ-37.5.png" />
 <p>The middle YZ plane of the single-shot solution.</p>
@@ -279,6 +279,20 @@ iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-wedge-threeShots-YZ-75-0.7.png" src="_images/solution-wedge-threeShots-YZ-75-0.7.png" />
 <p>An off-center YZ plane (x=0.7) of the three-shot solution.</p>
 </div>
+<div class="section" id="id1">
+<h3>Separator<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<p>This example shows that extremely large variations in the velocity field can
+be harmless: even though there is a &#8220;separator&#8221; with a velocity which is ten
+orders of magnitude larger than the background velocity, the sweeping
+preconditioner converged in only 27 iterations for the 50 wavelength
+calculation:</p>
+<div class="highlight-python"><pre>UnitCube 11 500 314.16 1 5 3.0</pre>
+</div>
+<img alt="_images/solution-separator-singleShot-YZ-50-0.7.png" src="_images/solution-separator-singleShot-YZ-50-0.7.png" />
+<p>An off-center YZ plane (x=0.7) of the single-shot solution.</p>
+<img alt="_images/solution-separator-threeShots-YZ-50-0.7.png" src="_images/solution-separator-threeShots-YZ-50-0.7.png" />
+<p>An off-center YZ plane (x=0.7) of the three-shot solution.</p>
+</div>
 </div>
 <div class="section" id="interpolate">
 <h2>Interpolate<a class="headerlink" href="#interpolate" title="Permalink to this headline">¶</a></h2>
@@ -286,8 +300,8 @@ iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 is meant to exercise the routine
 <a class="reference internal" href="dist_uniform_grid.html#DistUniformGrid:F:::InterpolateTo__i.i.i" title="DistUniformGrid&lt;F&gt;::InterpolateTo"><tt class="xref cpp cpp-func docutils literal"><span class="pre">DistUniformGrid&lt;F&gt;::InterpolateTo()</span></tt></a>, which provides a means of
 linearly interpolating a velocity model into a different grid size in parallel.</p>
-<div class="section" id="id1">
-<h3>Parameters<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="id2">
+<h3>Parameters<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
 <p>Usage</p>
 <div class="highlight-python"><pre>Interpolate &lt;velocity&gt; &lt;m1&gt; &lt;m2&gt; &lt;m3&gt; &lt;n1&gt; &lt;n2&gt; &lt;n3&gt;</pre>
 </div>

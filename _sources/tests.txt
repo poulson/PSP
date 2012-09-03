@@ -11,8 +11,8 @@ preconditioner.
 
 .. image:: velocity-uniform.png
 
-1. Converging lense
-^^^^^^^^^^^^^^^^^^^
+1. Converging lens
+^^^^^^^^^^^^^^^^^^
 One of the models tested in Engquist and Ying's *Sweeping preconditioner for 
 the Helmholtz equation: moving Perfectly Matched Layers*.
 
@@ -176,14 +176,14 @@ A slightly off-center YZ plane (x=0.6) of the three-shot solution.
 
 The middle YZ plane of the plane wave solution.
 
-Converging lense example
-^^^^^^^^^^^^^^^^^^^^^^^^
-This example used the converging lense velocity model at 235.62 rad/sec over 
+Converging lens example
+^^^^^^^^^^^^^^^^^^^^^^^
+This example used the converging lens velocity model at 235.62 rad/sec over 
 another :math:`500 \times 500 \times 500` grid, via the command::
     
-    UnitCube 1 500 235.62
+    UnitCube 1 500 235.62 1 5 2.0
 
-and converged to five digits of relative accuracy in 53 iterations of GMRES(20)
+and converged to five digits of relative accuracy in 43 iterations of GMRES(20)
 on 256 nodes of TACC's Lonestar.
 
 .. image:: solution-gaussian-singleShot-YZ-37.5.png
@@ -283,6 +283,24 @@ The center YZ plane of the single-shot solution.
 An off-center YZ plane (x=0.7) of the single-shot solution.
 
 .. image:: solution-wedge-threeShots-YZ-75-0.7.png
+
+An off-center YZ plane (x=0.7) of the three-shot solution.
+
+Separator
+^^^^^^^^^
+This example shows that extremely large variations in the velocity field can 
+be harmless: even though there is a "separator" with a velocity which is ten
+orders of magnitude larger than the background velocity, the sweeping 
+preconditioner converged in only 27 iterations for the 50 wavelength 
+calculation::
+    
+    UnitCube 11 500 314.16 1 5 3.0
+
+.. image:: solution-separator-singleShot-YZ-50-0.7.png
+
+An off-center YZ plane (x=0.7) of the single-shot solution.
+
+.. image:: solution-separator-threeShots-YZ-50-0.7.png
 
 An off-center YZ plane (x=0.7) of the three-shot solution.
 

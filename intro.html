@@ -71,9 +71,10 @@ should be qualitatively similar to more sophisticated discretizations
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
 <p class="last">To emphasize the above point about the preconditioner being meant for
-<em>large</em> problems, roughly speaking, if your domain is smaller than about
+<em>large</em> problems, roughly speaking, if the domain is smaller than about
 50 or 60 grid points in each direction, then it will be more practical to
-simply use a sparse-direct solver.</p>
+simply use a sparse-direct solver, ILU preconditioner, or shifted-Laplacian
+preconditioner.</p>
 </div>
 </div>
 <div class="section" id="dependencies">

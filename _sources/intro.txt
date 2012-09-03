@@ -21,9 +21,10 @@ should be qualitatively similar to more sophisticated discretizations
 .. note::
 
    To emphasize the above point about the preconditioner being meant for 
-   *large* problems, roughly speaking, if your domain is smaller than about 
+   *large* problems, roughly speaking, if the domain is smaller than about 
    50 or 60 grid points in each direction, then it will be more practical to 
-   simply use a sparse-direct solver.
+   simply use a sparse-direct solver, ILU preconditioner, or shifted-Laplacian
+   preconditioner.
 
 Dependencies
 ============

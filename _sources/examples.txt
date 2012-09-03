@@ -32,10 +32,10 @@ This example shows the Overthrust model solved at its native resolution
 that there are slightly more than 10 points per wavelength at the shortest 
 wavelength. The command used was::
     
-    Overthrust 801 801 187 50.26 16 16 8 1 5 3.75 7.07 4 1
+    Overthrust 801 801 187 50.26 16 16 8 1 5 15 7.07 4 1
 
 and all four residuals converged to five digits of relative accuracy in 
-86 iterations of GMRES(20) on 256 nodes of Lonestar 
+77 iterations of GMRES(20) on 256 nodes of Lonestar 
 (using eight cores per node, in roughly ten minutes, including the 
 preconditioner setup time).
 
