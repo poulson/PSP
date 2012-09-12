@@ -21,16 +21,15 @@
 namespace psp {
 
 template<typename R>
-DistHelmholtz<R>::DistHelmholtz
-( const Discretization<R>& disc, mpi::Comm comm,
-  R damping, int numPlanesPerPanel, int cutoff )
+DistSpectralHelmholtz<R>::DistSpectralHelmholtz
+( const SpectralDiscretization<R>& disc, mpi::Comm comm,
+  R damping, int numPlanesPerPanel )
 : comm_(comm), disc_(disc),
   hx_(disc.wx/(disc.nx+1)),
   hy_(disc.wy/(disc.ny+1)),
   hz_(disc.wz/(disc.nz+1)),
   damping_(damping),
   numPlanesPerPanel_(numPlanesPerPanel), 
-  nestedCutoff_(cutoff),
   initialized_(false)
 {
     // Pull out some information about our communicator
@@ -50,6 +49,17 @@ DistHelmholtz<R>::DistHelmholtz
         throw std::logic_error
         ("The domain is very shallow. Please run a sparse-direct factorization "
          "instead.");
+
+    // Ensure that the discretization makes sense
+    const int polyOrder = disc.polyOrder;
+    if( (nx-1) % polyOrder != 0 || 
+        (ny-1) % polyOrder != 0 ||
+        (nz-1) % polyOrder != 0 )
+        throw std::logic_error("Number of grid points is invalid");
+    if( disc.bx % polyOrder != 0 ||
+        disc.by % polyOrder != 0 ||
+        disc.bz % polyOrder != 0 )
+        throw std::logic_error("One or more invalid PML size");
 
     // Compute the depths of each interior panel class and the number of 
     // full inner panels.
@@ -206,24 +216,38 @@ DistHelmholtz<R>::DistHelmholtz
         const int z = naturalIndex/(nx*ny);
         const int v = (nz-1) - z;
 
-        // If there is a v connection which spans panels, count it here.
+        // If there are v connections which spans panels, count them here.
+        const int vElemOffset = v % polyOrder;
+        const int vBackwardReach = 
+            ( vElemOffset == 0 ? polyOrder : vElemOffset );
+        const int vForwardReach = polyOrder - vElemOffset;
         const int localV = LocalV( v );
         const int whichPanel = WhichPanel( v );
         const int panelDepth = PanelDepth( whichPanel );
         const int panelPadding = PanelPadding( whichPanel );
-        if( localV == panelPadding && whichPanel != 0 )
+        if( localV < panelPadding+vBackwardReach && whichPanel != 0 )
         {
-            // Handle connection to previous panel, which is relevant to the
+            // Handle connections to previous panel, which are relevant to the
             // computation of A_{i+1,i} B_i
-            const int proc = OwningProcess( x, y, v-1, commSize );
-            ++subdiagRecvCountsPerm[proc*(numPanels_-1)+(whichPanel-1)];
+            const int numBackConnections = panelPadding+vBackwardReach-localV;
+            for( int s=0; s<numBackConnections; ++s )
+            {
+                const int proc = OwningProcess( x, y, v-(s+1), commSize );
+                ++subdiagRecvCountsPerm[proc*(numPanels_-1)+(whichPanel-1)];
+            }
         }
-        if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
+        if( localV+vForwardReach >= panelPadding+panelDepth && 
+            whichPanel != numPanels_-1 )
         {
             // Handle connection to next panel, which is relevant to the 
             // computation of A_{i,i+1} B_{i+1}
-            const int proc = OwningProcess( x, y, v+1, commSize );
-            ++supdiagRecvCountsPerm[proc*(numPanels_-1)+whichPanel];
+            const int numForwardConnections = 
+                localV+vForwardReach+1-(panelPadding+panelDepth);
+            for( int s=0; s<numForwardConnections; ++s )
+            {
+                const int proc = OwningProcess( x, y, v+(s+1), commSize );
+                ++supdiagRecvCountsPerm[proc*(numPanels_-1)+whichPanel];
+            }
         }
     }
     std::vector<int> subdiagSendCountsPerm( (numPanels_-1)*commSize );
@@ -329,70 +353,81 @@ DistHelmholtz<R>::DistHelmholtz
         const int z = naturalRow/(nx*ny);
         const int v = (nz-1) - z;
 
-        // If there is a v connection which spans panels, count it here.
+        const int vElemOffset = v % polyOrder;
+        const int vBackwardReach = 
+            ( vElemOffset == 0 ? polyOrder : vElemOffset );
+        const int vForwardReach = polyOrder - vElemOffset;
         const int localV = LocalV( v );
         const int whichPanel = WhichPanel( v );
         const int panelDepth = PanelDepth( whichPanel );
         const int panelPadding = PanelPadding( whichPanel );
-        if( localV == panelPadding && whichPanel != 0 )
+        if( localV < panelPadding+vBackwardReach && whichPanel != 0 )
         {
-            // Handle connection to previous panel, which is relevant to the
+            // Handle connections to previous panel, which are relevant to the
             // computation of A_{i+1,i} B_i
-
-            // Search for the appropriate index in this row
-            int localIndex = -1;
-            const int naturalCol = x + y*nx + (z+1)*nx*ny;
-            for( int jLocal=1; jLocal<rowSize; ++jLocal )
+            const int numBackConnections = panelPadding+vBackwardReach-localV;
+            for( int s=0; s<numBackConnections; ++s )
             {
-                if( localConnections[rowOffset+jLocal] == naturalCol )
+                // Search for the appropriate index in this row
+                int localIndex = -1;
+                const int naturalCol = x + y*nx + (z+(s+1))*nx*ny;
+                for( int jLocal=1; jLocal<rowSize; ++jLocal )
                 {
-                    localIndex = rowOffset+jLocal;
-                    break;
+                    if( localConnections[rowOffset+jLocal] == naturalCol )
+                    {
+                        localIndex = rowOffset+jLocal;
+                        break;
+                    }
                 }
-            }
 #ifndef RELEASE
-            if( localIndex == -1 )
-                throw std::logic_error("Did not find subdiag connection");
+                if( localIndex == -1 )
+                    throw std::logic_error("Did not find subdiag connection");
 #endif
 
-            const int proc = OwningProcess( x, y, v-1, commSize );
-            const int index = (whichPanel-1)*commSize + proc;
-            const int offset = subdiagOffsets[index];
-            subdiagRecvIndices[offset] = naturalCol;
-            subdiagRecvLocalIndices_[offset] = localIndex;
-            subdiagRecvLocalRows_[offset] = iLocal;
+                const int proc = OwningProcess( x, y, v-(s+1), commSize );
+                const int index = (whichPanel-1)*commSize + proc;
+                const int offset = subdiagOffsets[index];
+                subdiagRecvIndices[offset] = naturalCol;
+                subdiagRecvLocalIndices_[offset] = localIndex;
+                subdiagRecvLocalRows_[offset] = iLocal;
 
-            ++subdiagOffsets[index];
+                ++subdiagOffsets[index];
+            }
         }
-        if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
+        if( localV+vForwardReach >= panelPadding+panelDepth && 
+            whichPanel != numPanels_-1 )
         {
             // Handle connection to next panel, which is relevant to the 
             // computation of A_{i,i+1} B_{i+1}
-
-            // Search for the appropriate index in this row
-            int localIndex = -1;
-            const int naturalCol = x + y*nx + (z-1)*nx*ny;
-            for( int jLocal=1; jLocal<rowSize; ++jLocal )
+            const int numForwardConnections = 
+                localV+vForwardReach+1-(panelPadding+panelDepth);
+            for( int s=0; s<numForwardConnections; ++s )
             {
-                if( localConnections[rowOffset+jLocal] == naturalCol )
+                // Search for the appropriate index in this row
+                int localIndex = -1;
+                const int naturalCol = x + y*nx + (z-1)*nx*ny;
+                for( int jLocal=1; jLocal<rowSize; ++jLocal )
                 {
-                    localIndex = rowOffset+jLocal;
-                    break;
+                    if( localConnections[rowOffset+jLocal] == naturalCol )
+                    {
+                        localIndex = rowOffset+jLocal;
+                        break;
+                    }
                 }
-            }
 #ifndef RELEASE
-            if( localIndex == -1 )
-                throw std::logic_error("Did not find supdiag connection");
+                if( localIndex == -1 )
+                    throw std::logic_error("Did not find supdiag connection");
 #endif
 
-            const int proc = OwningProcess( x, y, v+1, commSize );
-            const int index = whichPanel*commSize + proc;
-            const int offset = supdiagOffsets[index];
-            supdiagRecvIndices[offset] = naturalCol;
-            supdiagRecvLocalIndices_[offset] = localIndex;
-            supdiagRecvLocalRows_[offset] = iLocal;
+                const int proc = OwningProcess( x, y, v+(s+1), commSize );
+                const int index = whichPanel*commSize + proc;
+                const int offset = supdiagOffsets[index];
+                supdiagRecvIndices[offset] = naturalCol;
+                supdiagRecvLocalIndices_[offset] = localIndex;
+                supdiagRecvLocalRows_[offset] = iLocal;
 
-            ++supdiagOffsets[index];
+                ++supdiagOffsets[index];
+            }
         }
     }
     subdiagOffsets.clear();
@@ -448,28 +483,29 @@ DistHelmholtz<R>::DistHelmholtz
 
 template<typename R>
 inline
-DistHelmholtz<R>::~DistHelmholtz()
+DistSpectralHelmholtz<R>::~DistSpectralHelmholtz()
 { }
 
 template<typename R>
 int
-DistHelmholtz<R>::LocalPanelHeight
+DistSpectralHelmholtz<R>::LocalPanelHeight
 ( int vSize, int vPadding, int commRank, int commSize ) const
 {
     int localHeight = 0;
     LocalPanelHeightRecursion
-    ( disc_.nx, disc_.ny, vSize, vPadding, nestedCutoff_, 
+    ( 0, 0, disc_.nx, disc_.ny, vSize, vPadding, disc_.polyOrder, 
       commRank, commSize, localHeight );
     return localHeight;
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::LocalPanelHeightRecursion
-( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
+DistSpectralHelmholtz<R>::LocalPanelHeightRecursion
+( int xOffset, int yOffset,
+  int xSize, int ySize, int vSize, int vPadding, int polyOrder, 
   int teamRank, int teamSize, int& localHeight ) 
 {
-    if( teamSize == 1 && xSize*ySize <= cutoff )
+    if( teamSize == 1 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
     {
         // Add the leaf
         localHeight += xSize*ySize*vSize;
@@ -486,15 +522,19 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
         localHeight += LocalLength<int>( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
-        const int xLeftSize = (xSize-1) / 2;
+        const int xLeftSizeProp = (xSize-1) / 2;
+        const int xLeftSize =
+            xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
         if( teamSize == 1 )
         {
             // Add the left side
             LocalPanelHeightRecursion
-            ( xLeftSize, ySize, vSize, vPadding, cutoff, 0, 1, localHeight );
+            ( xOffset, yOffset, 
+              xLeftSize, ySize, vSize, vPadding, polyOrder, 0, 1, localHeight );
             // Add the right side
             LocalPanelHeightRecursion
-            ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff, 0, 1, 
+            ( xOffset+xLeftSize+1, yOffset, 
+              xSize-(xLeftSize+1), ySize, vSize, vPadding, polyOrder, 0, 1, 
               localHeight );
         }
         else
@@ -510,14 +550,16 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
             {
                 // Add the left side
                 LocalPanelHeightRecursion
-                ( xLeftSize, ySize, vSize, vPadding, cutoff,
+                ( xOffset, yOffset,  
+                  xLeftSize, ySize, vSize, vPadding, polyOrder,
                   newTeamRank, leftTeamSize, localHeight );
             }
             else
             {
                 // Add the right side
                 LocalPanelHeightRecursion
-                ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff,
+                ( xOffset+xLeftSize+1, yOffset, 
+                  xSize-(xLeftSize+1), ySize, vSize, vPadding, polyOrder,
                   newTeamRank, rightTeamSize, localHeight );
             }
         }
@@ -534,15 +576,19 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
         localHeight += LocalLength<int>( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
-        const int yLeftSize = (ySize-1) / 2;
+        const int yLeftSizeProp = (ySize-1) / 2;
+        const int yLeftSize =
+            yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
         if( teamSize == 1 )
         {
             // Add the left side
             LocalPanelHeightRecursion
-            ( xSize, yLeftSize, vSize, vPadding, cutoff, 0, 1, localHeight );
+            ( xOffset, yOffset, 
+              xSize, yLeftSize, vSize, vPadding, polyOrder, 0, 1, localHeight );
             // Add the right side
             LocalPanelHeightRecursion
-            ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 0, 1, 
+            ( xOffset, yOffset+yLeftSize+1, 
+              xSize, ySize-(yLeftSize+1), vSize, vPadding, polyOrder, 0, 1, 
               localHeight );
         }
         else
@@ -558,14 +604,16 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
             {
                 // Add the left side
                 LocalPanelHeightRecursion
-                ( xSize, yLeftSize, vSize, vPadding, cutoff,
+                ( xOffset, yOffset, 
+                  xSize, yLeftSize, vSize, vPadding, polyOrder,
                   newTeamRank, leftTeamSize, localHeight );
             }
             else
             {
                 // Add the right side
                 LocalPanelHeightRecursion
-                ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 
+                ( xOffset, yOffset+yLeftSize+1, 
+                  xSize, ySize-(yLeftSize+1), vSize, vPadding, polyOrder, 
                   newTeamRank, rightTeamSize, localHeight );
             }
         }
@@ -574,7 +622,7 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
 
 template<typename R>
 int
-DistHelmholtz<R>::NumLocalNodes( int commRank, int commSize ) const
+DistSpectralHelmholtz<R>::NumLocalNodes( int commRank, int commSize ) const
 {
     int numLocalNodes = 0;
     NumLocalNodesRecursion
@@ -586,9 +634,10 @@ DistHelmholtz<R>::NumLocalNodes( int commRank, int commSize ) const
 template<typename R>
 void
 DistHelmholtz<R>::NumLocalNodesRecursion
-( int xSize, int ySize, int cutoff, int teamRank, int teamSize, int& numLocal )
+( int xOffset, int yOffset, int xSize, int ySize, 
+  int polyOrder, int teamRank, int teamSize, int& numLocal )
 {
-    if( teamSize == 1 && xSize*ySize <= cutoff )
+    if( teamSize == 1 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
     {
         ++numLocal;
     }
@@ -597,7 +646,9 @@ DistHelmholtz<R>::NumLocalNodesRecursion
         //
         // Cut the x dimension
         //
-        const int xLeftSize = (xSize-1) / 2;
+        const int xLeftSizeProp = (xSize-1) / 2;
+        const int xLeftSize =
+            xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
 
         // Add our local portion of the partition
         if( teamSize == 1 )
@@ -607,11 +658,12 @@ DistHelmholtz<R>::NumLocalNodesRecursion
 
             // Add the left side
             NumLocalNodesRecursion
-            ( xLeftSize, ySize, cutoff, 0, 1, numLocal );
+            ( xOffset, yOffset, xLeftSize, ySize, polyOrder, 0, 1, numLocal );
 
             // Add the right side
             NumLocalNodesRecursion
-            ( xSize-(xLeftSize+1), ySize, cutoff, 0, 1, numLocal );
+            ( xOffset+xLeftSize+1, yOffset, 
+              xSize-(xLeftSize+1), ySize, polyOrder, 0, 1, numLocal );
         }
         else
         {
@@ -626,14 +678,16 @@ DistHelmholtz<R>::NumLocalNodesRecursion
             {
                 // Add the left side
                 NumLocalNodesRecursion
-                ( xLeftSize, ySize, cutoff, newTeamRank, leftTeamSize, 
+                ( xOffset, yOffset, 
+                  xLeftSize, ySize, polyOrder, newTeamRank, leftTeamSize, 
                   numLocal );
             }
             else
             {
                 // Add the right side
                 NumLocalNodesRecursion
-                ( xSize-(xLeftSize+1), ySize, cutoff, newTeamRank, 
+                ( xOffset+xLeftSize+1, yOffset, 
+                  xSize-(xLeftSize+1), ySize, polyOrder, newTeamRank, 
                   rightTeamSize, numLocal );
             }
         }
@@ -643,7 +697,9 @@ DistHelmholtz<R>::NumLocalNodesRecursion
         //
         // Cut the y dimension 
         //
-        const int yLeftSize = (ySize-1) / 2;
+        const int yLeftSizeProp = (ySize-1) / 2;
+        const int yLeftSize =
+            yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
 
         // Add our local portion of the partition
         if( teamSize == 1 )
@@ -653,10 +709,11 @@ DistHelmholtz<R>::NumLocalNodesRecursion
 
             // Add the left side
             NumLocalNodesRecursion
-            ( xSize, yLeftSize, cutoff, 0, 1, numLocal );
+            ( xOffset, yOffset, xSize, yLeftSize, polyOrder, 0, 1, numLocal );
             // Add the right side
             NumLocalNodesRecursion
-            ( xSize, ySize-(yLeftSize+1), cutoff, 0, 1, numLocal );
+            ( xOffset, yOffset+yLeftSize+1, 
+              xSize, ySize-(yLeftSize+1), polyOrder, 0, 1, numLocal );
         }
         else
         {
@@ -671,14 +728,16 @@ DistHelmholtz<R>::NumLocalNodesRecursion
             {
                 // Add the left side
                 NumLocalNodesRecursion
-                ( xSize, yLeftSize, cutoff, newTeamRank, leftTeamSize, 
+                ( xOffset, yOffset, 
+                  xSize, yLeftSize, polyOrder, newTeamRank, leftTeamSize, 
                   numLocal );
             }
             else
             {
                 // Add the right side
                 NumLocalNodesRecursion
-                ( xSize, ySize-(yLeftSize+1), cutoff, newTeamRank, 
+                ( xOffset, yOffset+yLeftSize+1, 
+                  xSize, ySize-(yLeftSize+1), polyOrder, newTeamRank, 
                   rightTeamSize, numLocal );
             }
         }
@@ -687,7 +746,7 @@ DistHelmholtz<R>::NumLocalNodesRecursion
 
 template<typename R>
 cliq::DistSymmFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelFactorization( int whichPanel )
+DistSpectralHelmholtz<R>::PanelFactorization( int whichPanel )
 {
     if( whichPanel == 0 )
         return bottomFact_;
@@ -701,7 +760,7 @@ DistHelmholtz<R>::PanelFactorization( int whichPanel )
 
 template<typename R>
 DistCompressedFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
+DistSpectralHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
 {
     if( whichPanel == 0 )
         return bottomCompressedFact_;
@@ -715,7 +774,7 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
 
 template<typename R>
 const cliq::DistSymmFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
+DistSpectralHelmholtz<R>::PanelFactorization( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return bottomFact_;
@@ -729,7 +788,7 @@ DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
 
 template<typename R>
 const DistCompressedFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
+DistSpectralHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return bottomCompressedFact_;
@@ -742,7 +801,7 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
 }
 
 template<typename R>
-cliq::DistSymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
+cliq::DistSymmInfo& DistSpectralHelmholtz<R>::PanelAnalysis( int whichPanel )
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomInfo_;
@@ -754,7 +813,7 @@ cliq::DistSymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
 
 template<typename R>
 const cliq::DistSymmInfo&
-DistHelmholtz<R>::PanelAnalysis( int whichPanel ) const
+DistSpectralHelmholtz<R>::PanelAnalysis( int whichPanel ) const
 {
     if( whichPanel < 1 + numFullInnerPanels_ )
         return bottomInfo_;
@@ -766,7 +825,7 @@ DistHelmholtz<R>::PanelAnalysis( int whichPanel ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::PanelPadding( int whichPanel ) const
+DistSpectralHelmholtz<R>::PanelPadding( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return 0;
@@ -776,7 +835,7 @@ DistHelmholtz<R>::PanelPadding( int whichPanel ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::PanelDepth( int whichPanel ) const
+DistSpectralHelmholtz<R>::PanelDepth( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return bottomDepth_;
@@ -790,7 +849,7 @@ DistHelmholtz<R>::PanelDepth( int whichPanel ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::WhichPanel( int v ) const
+DistSpectralHelmholtz<R>::WhichPanel( int v ) const
 {
     if( v < bottomDepth_ )
         return 0;
@@ -802,7 +861,7 @@ DistHelmholtz<R>::WhichPanel( int v ) const
 
 template<typename R>
 int 
-DistHelmholtz<R>::LocalV( int v ) const
+DistSpectralHelmholtz<R>::LocalV( int v ) const
 {
     if( v < bottomDepth_ )
         return v;
@@ -815,7 +874,7 @@ DistHelmholtz<R>::LocalV( int v ) const
 // Return the lowest v index of the specified panel
 template<typename R>
 int
-DistHelmholtz<R>::PanelV( int whichPanel ) const
+DistSpectralHelmholtz<R>::PanelV( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return 0;
@@ -832,7 +891,7 @@ DistHelmholtz<R>::PanelV( int whichPanel ) const
 // panel, numbered from the bottom up
 template<typename R>
 int 
-DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
+DistSpectralHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return 0;
@@ -847,7 +906,7 @@ DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
+DistSpectralHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 {
     if( whichPanel == 0 )
         return localBottomHeight_;
@@ -861,7 +920,7 @@ DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
 
 template<typename R>
 void
-DistHelmholtz<R>::MapLocalPanelIndices
+DistSpectralHelmholtz<R>::MapLocalPanelIndices
 ( int commRank, int commSize, int whichPanel ) 
 {
     const int vSize = PanelDepth( whichPanel );
@@ -870,32 +929,35 @@ DistHelmholtz<R>::MapLocalPanelIndices
     int localOffset = LocalPanelOffset( whichPanel );
     MapLocalPanelIndicesRecursion
     ( disc_.nx, disc_.ny, disc_.nz, disc_.nx, disc_.ny, vSize, 
-      vPadding, 0, 0, vOffset, nestedCutoff_, commRank, commSize, 
+      vPadding, 0, 0, vOffset, disc_.polyOrder, commRank, commSize, 
       localToNaturalMap_, localRowOffsets_, localOffset );
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::MapLocalPanelIndicesRecursion
+DistSpectralHelmholtz<R>::MapLocalPanelIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
-  int xOffset, int yOffset, int vOffset, int cutoff, 
+  int xOffset, int yOffset, int vOffset, int polyOrder, 
   int teamRank, int teamSize,
   std::vector<int>& localToNaturalMap, std::vector<int>& localRowOffsets,
   int& localOffset )
 {
-    if( teamSize == 1 && xSize*ySize <= cutoff )
+    if( teamSize == 1 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
     {
         // Add the leaf
         for( int vDelta=0; vDelta<vSize; ++vDelta )
         {
             const int v = vOffset + vDelta;
+            const int vElem = v % polyOrder;
             const int z = (nz-1) - v;
             for( int yDelta=0; yDelta<ySize; ++yDelta )
             {
                 const int y = yOffset + yDelta;
+                const int yElem = y % polyOrder;
                 for( int xDelta=0; xDelta<xSize; ++xDelta )
                 {
                     const int x = xOffset + xDelta;
+                    const int xElem = x % polyOrder;
 
                     // Map this local entry to the global natural index
                     localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
@@ -903,17 +965,17 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
                     // Compute the number of connections from this row
                     int numConnections = 1; // always count diagonal
                     if( x > 0 )
-                        ++numConnections;
+                        numConnections += ( xElem == 0 ? polyOrder : xElem );
                     if( x+1 < nx ) 
-                        ++numConnections;
+                        numConnections += polyOrder - xElem;
                     if( y > 0 )
-                        ++numConnections;
+                        numConnections += ( yElem == 0 ? polyOrder : yElem );
                     if( y+1 < ny )
-                        ++numConnections;
+                        numConnections += polyOrder - yElem;
                     if( v > 0 )
-                        ++numConnections;
+                        numConnections += ( vElem == 0 ? polyOrder : vElem );
                     if( v+1 < nz )
-                        ++numConnections;
+                        numConnections += polyOrder - vElem;
                     localRowOffsets[localOffset+1] = 
                         localRowOffsets[localOffset] + numConnections;
 
@@ -929,18 +991,20 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int xLeftSize = (xSize-1) / 2;
+        const int xLeftSizeProp = (xSize-1) / 2;
+        const int xLeftSize =
+            xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
         if( teamSize == 1 )
         {
             // Add the left side
             MapLocalPanelIndicesRecursion
             ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, 0, 1, localToNaturalMap, 
+              xOffset, yOffset, vOffset, polyOrder, 0, 1, localToNaturalMap, 
               localRowOffsets, localOffset );
             // Add the right side
             MapLocalPanelIndicesRecursion
             ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
-              xOffset+(xLeftSize+1), yOffset, vOffset, cutoff, 
+              xOffset+(xLeftSize+1), yOffset, vOffset, polyOrder, 
               0, 1, localToNaturalMap, localRowOffsets, localOffset );
         }
         else
@@ -957,7 +1021,7 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
                 // Add the left side
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newTeamRank,
+                  xOffset, yOffset, vOffset, polyOrder, newTeamRank,
                   leftTeamSize, localToNaturalMap, localRowOffsets, 
                   localOffset );
             }
@@ -966,7 +1030,7 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
                 // Add the right side
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
-                  xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
+                  xOffset+(xLeftSize+1), yOffset, vOffset, polyOrder,
                   newTeamRank, rightTeamSize, localToNaturalMap, 
                   localRowOffsets, localOffset );
             }
@@ -986,6 +1050,9 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
             const int y = yOffset + yDelta;
             const int v = vOffset + vDelta;
             const int z = (nz-1) - v;
+            const int xElem = x % polyOrder;
+            const int yElem = y % polyOrder;
+            const int vElem = v % polyOrder;
 
             // Map this local entry to the global natrual index
             localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
@@ -993,17 +1060,17 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
             // Compute the number of connections from this row
             int numConnections = 1; // always count diagonal
             if( x > 0 )
-                ++numConnections;
-            if( x+1 < nx )
-                ++numConnections;
+                numConnections += ( xElem == 0 ? polyOrder : xElem );
+            if( x+1 < nx ) 
+                numConnections += polyOrder - xElem;
             if( y > 0 )
-                ++numConnections;
+                numConnections += ( yElem == 0 ? polyOrder : yElem );
             if( y+1 < ny )
-                ++numConnections;
+                numConnections += polyOrder - yElem;
             if( v > 0 )
-                ++numConnections;
+                numConnections += ( vElem == 0 ? polyOrder : vElem );
             if( v+1 < nz )
-                ++numConnections;
+                numConnections += polyOrder - vElem;
             localRowOffsets[localOffset+1] = 
                 localRowOffsets[localOffset] + numConnections;
 
@@ -1017,18 +1084,20 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int yLeftSize = (ySize-1) / 2;
+        const int yLeftSizeProp = (ySize-1) / 2;
+        const int yLeftSize =
+            yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
         if( teamSize == 1 )
         {
             // Add the left side
             MapLocalPanelIndicesRecursion
             ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, 0, 1, localToNaturalMap, 
+              xOffset, yOffset, vOffset, polyOrder, 0, 1, localToNaturalMap, 
               localRowOffsets, localOffset );
             // Add the right side
             MapLocalPanelIndicesRecursion
             ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
-              xOffset, yOffset+(yLeftSize+1), vOffset, cutoff, 
+              xOffset, yOffset+(yLeftSize+1), vOffset, polyOrder, 
               0, 1, localToNaturalMap, localRowOffsets, localOffset );
         }
         else
@@ -1045,7 +1114,7 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
                 // Add the left side
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newTeamRank, 
+                  xOffset, yOffset, vOffset, polyOrder, newTeamRank, 
                   leftTeamSize, localToNaturalMap, localRowOffsets, 
                   localOffset );
             }
@@ -1054,7 +1123,7 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
                 // Add the right side
                 MapLocalPanelIndicesRecursion
                 ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
-                  xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
+                  xOffset, yOffset+(yLeftSize+1), vOffset, polyOrder,
                   newTeamRank, rightTeamSize, localToNaturalMap, 
                   localRowOffsets, localOffset );
             }
@@ -1074,6 +1143,9 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
             const int y = yOffset + yLeftSize;
             const int v = vOffset + vDelta;
             const int z = (nz-1) - v;
+            const int xElem = x % polyOrder;
+            const int yElem = y % polyOrder;
+            const int vElem = v % polyOrder;
 
             // Map this local entry to the global natrual index
             localToNaturalMap[localOffset] = x + y*nx + z*nx*ny;
@@ -1081,17 +1153,17 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
             // Compute the number of connections from this row
             int numConnections = 1; // always count diagonal
             if( x > 0 )
-                ++numConnections;
-            if( x+1 < nx )
-                ++numConnections;
+                numConnections += ( xElem == 0 ? polyOrder : xElem );
+            if( x+1 < nx ) 
+                numConnections += polyOrder - xElem;
             if( y > 0 )
-                ++numConnections;
+                numConnections += ( yElem == 0 ? polyOrder : yElem );
             if( y+1 < ny )
-                ++numConnections;
+                numConnections += polyOrder - yElem;
             if( v > 0 )
-                ++numConnections;
+                numConnections += ( vElem == 0 ? polyOrder : vElem );
             if( v+1 < nz )
-                ++numConnections;
+                numConnections += polyOrder - vElem;
             localRowOffsets[localOffset+1] = 
                 localRowOffsets[localOffset] + numConnections;
 
@@ -1102,7 +1174,7 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
 
 template<typename R>
 void
-DistHelmholtz<R>::MapLocalConnectionIndices
+DistSpectralHelmholtz<R>::MapLocalConnectionIndices
 ( int commRank, int commSize, 
   std::vector<int>& localConnections, int whichPanel ) const
 {
@@ -1113,45 +1185,78 @@ DistHelmholtz<R>::MapLocalConnectionIndices
     int localOffset = localRowOffsets_[panelOffset];
     MapLocalConnectionIndicesRecursion
     ( disc_.nx, disc_.ny, disc_.nz, disc_.nx, disc_.ny, vSize, 
-      vPadding, 0, 0, vOffset, nestedCutoff_, commRank, commSize, 
+      vPadding, 0, 0, vOffset, disc_.polyOrder, commRank, commSize, 
       localConnections, localOffset );
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
+DistSpectralHelmholtz<R>::MapLocalConnectionIndicesRecursion
 ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
-  int xOffset, int yOffset, int vOffset, int cutoff, 
+  int xOffset, int yOffset, int vOffset, int polyOrder, 
   int teamRank, int teamSize,
   std::vector<int>& localConnections, int& localOffset )
 {
-    if( teamSize == 1 && xSize*ySize <= cutoff )
+    if( teamSize == 1 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
     {
         // Add the leaf
         for( int vDelta=0; vDelta<vSize; ++vDelta )
         {
             const int v = vOffset + vDelta;
             const int z = (nz-1) - v;
+            const int vElem = v % polyOrder;
             for( int yDelta=0; yDelta<ySize; ++yDelta )
             {
                 const int y = yOffset + yDelta;
+                const int yElem = y % polyOrder;
                 for( int xDelta=0; xDelta<xSize; ++xDelta )
                 {
                     const int x = xOffset + xDelta;
+                    const int xElem = x % polyOrder;
 
                     localConnections[localOffset++] = x + y*nx + z*nx*ny;
                     if( x > 0 )
-                        localConnections[localOffset++] = (x-1)+y*nx+z*nx*ny;
-                    if( x+1 < nx ) 
-                        localConnections[localOffset++] = (x+1)+y*nx+z*nx*ny;
+                    {
+                        const int numCon = ( xElem==0 ? polyOrder : xElem );
+                        for( int s=0; s<numCon; ++s )
+                            localConnections[localOffset++] = 
+                                x-(s+1) + y*nx + z*nx*ny;
+                    }
+                    if( x+1 < nx )
+                    {
+                        const int numCon = polyOrder - xElem;
+                        for( int s=0; s<numCon; ++s )
+                            localConnections[localOffset++] = 
+                                x+(s+1) + y*nx + z*nx*ny;
+                    }
                     if( y > 0 )
-                        localConnections[localOffset++] = x+(y-1)*nx+z*nx*ny;
+                    {
+                        const int numCon = ( yElem==0 ? polyOrder : yElem );
+                        for( int s=0; s<numCon; ++s )
+                            localConnections[localOffset++] = 
+                                x + (y-(s+1))*nx + z*nx*ny;
+                    }
                     if( y+1 < ny )
-                        localConnections[localOffset++] = x+(y+1)*nx+z*nx*ny;
+                    {
+                        const int numCon = polyOrder - yElem;
+                        for( int s=0; s<numCon; ++s )
+                            localConnections[localOffset++] = 
+                                x + (y+(s+1))*nx + z*nx*ny;
+                    }
                     if( v > 0 )
-                        localConnections[localOffset++] = x+y*nx+(z+1)*nx*ny;
+                    {
+                        const int numCon = ( vElem==0 ? polyOrder : vElem );
+                        for( int s=0; s<numCon; ++s )
+                            localConnections[localOffset++] = 
+                                x + y*nx + (z+(s+1))*nx*ny;
+                    }
                     if( v+1 < nz )
-                        localConnections[localOffset++] = x+y*nx+(z-1)*nx*ny;
+                    {
+                        const int numCon = polyOrder - vElem;
+                        for( int s=0; s<numCon; ++s )
+                            localConnections[localOffset++] = 
+                                x + y*nx + (z-(s+1))*nx*ny;
+                    }
                 }
             }
         }
@@ -1163,18 +1268,20 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int xLeftSize = (xSize-1) / 2;
+        const int xLeftSizeProp = (xSize-1) / 2;
+        const int xLeftSize =
+            xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
         if( teamSize == 1 )
         {
             // Add the left side
             MapLocalConnectionIndicesRecursion
             ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, 0, 1, localConnections, 
+              xOffset, yOffset, vOffset, polyOrder, 0, 1, localConnections, 
               localOffset );
             // Add the right side
             MapLocalConnectionIndicesRecursion
             ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
-              xOffset+(xLeftSize+1), yOffset, vOffset, cutoff, 
+              xOffset+(xLeftSize+1), yOffset, vOffset, polyOrder, 
               0, 1, localConnections, localOffset );
         }
         else
@@ -1191,7 +1298,7 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
                 // Add the left side
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xLeftSize, ySize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newTeamRank, 
+                  xOffset, yOffset, vOffset, polyOrder, newTeamRank, 
                   leftTeamSize, localConnections, localOffset );
             }
             else
@@ -1199,7 +1306,7 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
                 // Add the right side
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xSize-(xLeftSize+1), ySize, vSize, vPadding,
-                  xOffset+(xLeftSize+1), yOffset, vOffset, cutoff,
+                  xOffset+(xLeftSize+1), yOffset, vOffset, polyOrder,
                   newTeamRank, rightTeamSize, localConnections, 
                   localOffset );
             }
@@ -1219,20 +1326,53 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
             const int y = yOffset + yDelta;
             const int v = vOffset + vDelta;
             const int z = (nz-1) - v;
+            const int xElem = x % polyOrder;
+            const int yElem = y % polyOrder;
+            const int vElem = v % polyOrder;
 
-            localConnections[localOffset++] = x+y*nx+z*nx*ny;
+            localConnections[localOffset++] = x + y*nx + z*nx*ny;
             if( x > 0 )
-                localConnections[localOffset++] = (x-1) + y*nx + z*nx*ny;
+            {
+                const int numCon = ( xElem==0 ? polyOrder : xElem );
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x-(s+1) + y*nx + z*nx*ny;
+            }
             if( x+1 < nx )
-                localConnections[localOffset++] = (x+1) + y*nx + z*nx*ny;
+            {
+                const int numCon = polyOrder - xElem;
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x+(s+1) + y*nx + z*nx*ny;
+            }
             if( y > 0 )
-                localConnections[localOffset++] = x + (y-1)*nx + z*nx*ny;
+            {
+                const int numCon = ( yElem==0 ? polyOrder : yElem );
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + (y-(s+1))*nx + z*nx*ny;
+            }
             if( y+1 < ny )
-                localConnections[localOffset++] = x + (y+1)*nx + z*nx*ny;
+            {
+                const int numCon = polyOrder - yElem;
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + (y+(s+1))*nx + z*nx*ny;
+            }
             if( v > 0 )
-                localConnections[localOffset++] = x + y*nx + (z+1)*nx*ny;
+            {
+                const int numCon = ( vElem==0 ? polyOrder : vElem );
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + y*nx + (z+(s+1))*nx*ny;
+            }
             if( v+1 < nz )
-                localConnections[localOffset++] = x + y*nx + (z-1)*nx*ny;
+            {
+                const int numCon = polyOrder - vElem;
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + y*nx + (z-(s+1))*nx*ny;
+            }
         }
     }
     else
@@ -1242,18 +1382,20 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         //
 
         // Add the left and/or right sides
-        const int yLeftSize = (ySize-1) / 2;
+        const int yLeftSizeProp = (ySize-1) / 2;
+        const int yLeftSize =
+            yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
         if( teamSize == 1 )
         {
             // Add the left side
             MapLocalConnectionIndicesRecursion
             ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-              xOffset, yOffset, vOffset, cutoff, 0, 1, localConnections, 
+              xOffset, yOffset, vOffset, polyOrder, 0, 1, localConnections, 
               localOffset );
             // Add the right side
             MapLocalConnectionIndicesRecursion
             ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
-              xOffset, yOffset+(yLeftSize+1), vOffset, cutoff, 
+              xOffset, yOffset+(yLeftSize+1), vOffset, polyOrder, 
               0, 1, localConnections, localOffset );
         }
         else
@@ -1270,7 +1412,7 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
                 // Add the left side
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xSize, yLeftSize, vSize, vPadding, 
-                  xOffset, yOffset, vOffset, cutoff, newTeamRank, 
+                  xOffset, yOffset, vOffset, polyOrder, newTeamRank, 
                   leftTeamSize, localConnections, localOffset );
             }
             else
@@ -1278,7 +1420,7 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
                 // Add the right side
                 MapLocalConnectionIndicesRecursion
                 ( nx, ny, nz, xSize, ySize-(yLeftSize+1), vSize, vPadding,
-                  xOffset, yOffset+(yLeftSize+1), vOffset, cutoff,
+                  xOffset, yOffset+(yLeftSize+1), vOffset, polyOrder,
                   newTeamRank, rightTeamSize, localConnections, 
                   localOffset );
             }
@@ -1298,31 +1440,65 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
             const int y = yOffset + yLeftSize;
             const int v = vOffset + vDelta;
             const int z = (nz-1) - v;
+            const int xElem = x % polyOrder;
+            const int yElem = y % polyOrder;
+            const int vElem = v % polyOrder;
 
             localConnections[localOffset++] = x + y*nx + z*nx*ny;
             if( x > 0 )
-                localConnections[localOffset++] = (x-1) + y*nx + z*nx*ny;
+            {
+                const int numCon = ( xElem==0 ? polyOrder : xElem );
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x-(s+1) + y*nx + z*nx*ny;
+            }
             if( x+1 < nx )
-                localConnections[localOffset++] = (x+1) + y*nx + z*nx*ny;
+            {
+                const int numCon = polyOrder - xElem;
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x+(s+1) + y*nx + z*nx*ny;
+            }
             if( y > 0 )
-                localConnections[localOffset++] = x + (y-1)*nx + z*nx*ny;
+            {
+                const int numCon = ( yElem==0 ? polyOrder : yElem );
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + (y-(s+1))*nx + z*nx*ny;
+            }
             if( y+1 < ny )
-                localConnections[localOffset++] = x + (y+1)*nx + z*nx*ny;
+            {
+                const int numCon = polyOrder - yElem;
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + (y+(s+1))*nx + z*nx*ny;
+            }
             if( v > 0 )
-                localConnections[localOffset++] = x + y*nx + (z+1)*nx*ny;
+            {
+                const int numCon = ( vElem==0 ? polyOrder : vElem );
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + y*nx + (z+(s+1))*nx*ny;
+            }
             if( v+1 < nz )
-                localConnections[localOffset++] = x + y*nx + (z-1)*nx*ny;
+            {
+                const int numCon = polyOrder - vElem;
+                for( int s=0; s<numCon; ++s )
+                    localConnections[localOffset++] = 
+                        x + y*nx + (z-(s+1))*nx*ny;
+            }
         }
     }
 }
 
 template<typename R>
 int
-DistHelmholtz<R>::OwningProcess( int naturalIndex, int commSize ) const
+DistSpectralHelmholtz<R>::OwningProcess( int naturalIndex, int commSize ) const
 {
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int nz = disc_.nz;
+    const int polyOrder = disc_.polyOrder;
 
     const int x = naturalIndex % nx;
     const int y = (naturalIndex/nx) % ny;
@@ -1331,27 +1507,31 @@ DistHelmholtz<R>::OwningProcess( int naturalIndex, int commSize ) const
     const int vLocal = LocalV( v );
 
     int proc = 0;
-    OwningProcessRecursion( x, y, vLocal, nx, ny, commSize, proc );
+    OwningProcessRecursion
+    ( x, y, vLocal, nx, ny, 0, 0, polyOrder, commSize, proc );
     return proc;
 }
 
 template<typename R>
 int
-DistHelmholtz<R>::OwningProcess( int x, int y, int v, int commSize ) const
+DistSpectralHelmholtz<R>::OwningProcess( int x, int y, int v, int commSize ) const
 {
     const int nx = disc_.nx;
     const int ny = disc_.ny;
+    const int polyOrder = disc_.polyOrder;
     const int vLocal = LocalV( v );
 
     int proc = 0;
-    OwningProcessRecursion( x, y, vLocal, nx, ny, commSize, proc );
+    OwningProcessRecursion
+    ( x, y, vLocal, nx, ny, 0, 0, polyOrder, commSize, proc );
     return proc;
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::OwningProcessRecursion
-( int x, int y, int vLocal, int xSize, int ySize, int teamSize, int& proc )
+DistSpectralHelmholtz<R>::OwningProcessRecursion
+( int x, int y, int vLocal, int xSize, 
+  int ySize, int xOffset, int yOffset, int polyOrder, int teamSize, int& proc )
 {
     if( teamSize == 1 )
         return;
@@ -1364,7 +1544,9 @@ DistHelmholtz<R>::OwningProcessRecursion
         //
         // Cut the x dimension
         //
-        const int xLeftSize = (xSize-1) / 2;
+        const int xLeftSizeProp = (xSize-1) / 2;
+        const int xLeftSize =
+            xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
         if( x == xLeftSize )
         {
             proc += (y+vLocal*ySize) % teamSize;
@@ -1375,13 +1557,14 @@ DistHelmholtz<R>::OwningProcessRecursion
             proc += leftTeamSize;
             OwningProcessRecursion
             ( x-(xLeftSize+1), y, vLocal, xSize-(xLeftSize+1), ySize, 
-              rightTeamSize, proc );
+              xOffset+(xLeftSize+1), yOffset, polyOrder, rightTeamSize, proc );
         }
         else // x < leftSize
         {
             // Continue down the left side
             OwningProcessRecursion
-            ( x, y, vLocal, xLeftSize, ySize, leftTeamSize, proc );
+            ( x, y, vLocal, xLeftSize, ySize, xOffset, yOffset, polyOrder, 
+              leftTeamSize, proc );
         }
     }
     else
@@ -1389,7 +1572,9 @@ DistHelmholtz<R>::OwningProcessRecursion
         //
         // Cut the y dimension 
         //
-        const int yLeftSize = (ySize-1) / 2;
+        const int yLeftSizeProp = (ySize-1) / 2;
+        const int yLeftSize = 
+            yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
         if( y == yLeftSize )
         {
             proc += (x+vLocal*xSize) % teamSize;
@@ -1400,20 +1585,21 @@ DistHelmholtz<R>::OwningProcessRecursion
             proc += leftTeamSize;
             OwningProcessRecursion
             ( x, y-(yLeftSize+1), vLocal, xSize, ySize-(yLeftSize+1), 
-              rightTeamSize, proc );
+              xOffset, yOffset+(yLeftSize+1), polyOrder, rightTeamSize, proc );
         }
         else // x < leftSize
         {
             // Continue down the left side
             OwningProcessRecursion
-            ( x, y, vLocal, xSize, yLeftSize, leftTeamSize, proc );
+            ( x, y, vLocal, xSize, yLeftSize, xOffset, yOffset, polyOrder, 
+              leftTeamSize, proc );
         }
     }
 }
 
 template<typename R>
 int
-DistHelmholtz<R>::DistributedDepth( int commRank, int commSize ) 
+DistSpectralHelmholtz<R>::DistributedDepth( int commRank, int commSize ) 
 {
     int distDepth = 0;
     DistributedDepthRecursion( commRank, commSize, distDepth );
@@ -1422,7 +1608,7 @@ DistHelmholtz<R>::DistributedDepth( int commRank, int commSize )
 
 template<typename R>
 void
-DistHelmholtz<R>::DistributedDepthRecursion
+DistSpectralHelmholtz<R>::DistributedDepthRecursion
 ( int commRank, int commSize, int& distDepth )
 {
     if( commSize == 1 )
@@ -1441,24 +1627,24 @@ DistHelmholtz<R>::DistributedDepthRecursion
 
 template<typename R>
 int
-DistHelmholtz<R>::ReorderedIndex
+DistSpectralHelmholtz<R>::ReorderedIndex
 ( int x, int y, int vLocal, int vSize ) const
 {
     int index = 
         ReorderedIndexRecursion
-        ( x, y, vLocal, disc_.nx, disc_.ny, vSize, distDepth_, 
-          nestedCutoff_, 0 );
+        ( x, y, vLocal, disc_.nx, disc_.ny, vSize, 0, 0, disc_.polyOrder, 
+          distDepth_, 0 );
     return index;
 }
 
 template<typename R>
 int
-DistHelmholtz<R>::ReorderedIndexRecursion
+DistSpectralHelmholtz<R>::ReorderedIndexRecursion
 ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
-  int depthTilSerial, int cutoff, int offset )
+  int xOffset, int yOffset, int polyOrder, int depthTilSerial, int offset )
 {
     const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
-    if( depthTilSerial == 0 && xSize*ySize <= cutoff )
+    if( depthTilSerial == 0 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
     {
         // We have satisfied the nested dissection constraints
         return offset + (x+y*xSize+vLocal*xSize*ySize);
@@ -1466,12 +1652,13 @@ DistHelmholtz<R>::ReorderedIndexRecursion
     else if( xSize >= ySize )
     {
         // Partition the X dimension
-        const int middle = (xSize-1)/2;
+        const int middleProp = (xSize-1)/2;
+        const int middle = middleProp - (xOffset+middleProp) % polyOrder;
         if( x < middle )
         {
             return ReorderedIndexRecursion
-            ( x, y, vLocal, middle, ySize, vSize, nextDepthTilSerial, cutoff,
-              offset );
+            ( x, y, vLocal, middle, ySize, vSize, xOffset, yOffset, polyOrder,
+              nextDepthTilSerial, offset );
         }
         else if( x == middle )
         {
@@ -1481,18 +1668,20 @@ DistHelmholtz<R>::ReorderedIndexRecursion
         {
             return ReorderedIndexRecursion
             ( x-middle-1, y, vLocal, std::max(xSize-middle-1,0), ySize, vSize,
-              nextDepthTilSerial, cutoff, offset+middle*ySize*vSize );
+              xOffset+(middle+1), yOffset, polyOrder, 
+              nextDepthTilSerial, offset+middle*ySize*vSize );
         }
     }
     else
     {
         // Partition the Y dimension
-        const int middle = (ySize-1)/2;
+        const int middleProp = (ySize-1)/2;
+        const int middle = middleProp - (yOffset+middleProp) % polyOrder;
         if( y < middle )
         {
             return ReorderedIndexRecursion
-            ( x, y, vLocal, xSize, middle, vSize, nextDepthTilSerial, cutoff, 
-              offset );
+            ( x, y, vLocal, xSize, middle, vSize, xOffset, yOffset, polyOrder, 
+              nextDepthTilSerial, offset );
         }
         else if( y == middle )
         {
@@ -1502,24 +1691,25 @@ DistHelmholtz<R>::ReorderedIndexRecursion
         {
             return ReorderedIndexRecursion
             ( x, y-middle-1, vLocal, xSize, std::max(ySize-middle-1,0), vSize,
-              nextDepthTilSerial, cutoff, offset+xSize*middle*vSize );
+              xOffset, yOffset+(middle+1), polyOrder, 
+              nextDepthTilSerial, offset+xSize*middle*vSize );
         }
     }
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::FillPanelElimTree
+DistSpectralHelmholtz<R>::FillPanelElimTree
 ( int vSize, cliq::DistSymmElimTree& eTree ) const
 {
-    int nxSub=disc_.nx, nySub=disc_.ny, xOffset=0, yOffset=0;    
+    int nxSub=disc_.nx, nySub=disc_.ny, xOffset=0, yOffset=0;
     FillPanelDistElimTree( vSize, nxSub, nySub, xOffset, yOffset, eTree );
     FillPanelLocalElimTree( vSize, nxSub, nySub, xOffset, yOffset, eTree );
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::FillPanelDistElimTree
+DistSpectralHelmholtz<R>::FillPanelDistElimTree
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset,
   cliq::DistSymmElimTree& eTree ) const
 {
@@ -1530,7 +1720,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
 
     const int nx = disc_.nx;
     const int ny = disc_.ny;
-    const int cutoff = nestedCutoff_;
+    const int polyOrder = disc_.polyOrder;
     mpi::CommDup( comm_, eTree.distNodes.back().comm );
 
     // Fill the distributed nodes
@@ -1552,28 +1742,37 @@ DistHelmholtz<R>::FillPanelDistElimTree
         if( nxSub >= nySub )
         {
             // Form the structure of a partition of the X dimension
-            const int middle = (nxSub-1)/2;
+            const int middleProp = (nxSub-1)/2;
+            const int middle = middleProp - (xOffset+middleProp) % polyOrder;
             node.size = nySub*vSize;
             node.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
+
+            const int yLeftElem = yOffset % polyOrder;
+            const int yRightElem = (yOffset+nySub-1) % polyOrder;
+            const int numBackConnections = 
+                ( yLeftElem==0 ? polyOrder : yLeftElem );
+            const int numForwardConnections = polyOrder - yRightElem;
 
             // Allocate space for the lower structure
             int numJoins = 0;
             if( yOffset > 0 )
-                ++numJoins;
+                numJoins += numBackConnections;
             if( yOffset+nySub < ny )
-                ++numJoins;
+                numJoins += numForwardConnections;
             node.lowerStruct.resize( numJoins*vSize );
 
             // Fill the (unsorted) lower structure
             int joinOffset = 0;
             if( yOffset > 0 )
                 for( int i=0; i<vSize; ++i )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset+middle, yOffset-1, i, vSize );
+                    for( int s=0; s<numBackConnections; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset+middle, yOffset-(s+1), i, vSize );
             if( yOffset+nySub < ny )
                 for( int i=0; i<vSize; ++i )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset+middle, yOffset+nySub, i, vSize );
+                    for( int s=0; s<numForwardConnections; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset+middle, yOffset+nySub+s, i, vSize );
 
             // Sort the lower structure
             std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1593,28 +1792,37 @@ DistHelmholtz<R>::FillPanelDistElimTree
         else
         {
             // Form the structure of a partition of the Y dimension
-            const int middle = (nySub-1)/2;
+            const int middleProp = (nySub-1)/2;
+            const int middle = middleProp - (yOffset+middleProp) % polyOrder;
             node.size = nxSub*vSize;
             node.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
+
+            const int xLeftElem = xOffset % polyOrder;
+            const int xRightElem = (xOffset+nxSub-1) % polyOrder;
+            const int numBackConnections = 
+                ( xLeftElem==0 ? polyOrder : xLeftElem );
+            const int numForwardConnections = polyOrder - xRightElem;
 
             // Allocate space for the lower structure
             int numJoins = 0;
             if( xOffset > 0 )
-                ++numJoins;
+                numJoins += numBackConnections;
             if( xOffset+nxSub < nx )
-                ++numJoins;
+                numJoins += numForwardConnections;
             node.lowerStruct.resize( numJoins*vSize );
 
             // Fill the (unsorted) lower structure
             int joinOffset = 0;
             if( xOffset > 0 )
                 for( int i=0; i<vSize; ++i )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset-1, yOffset+middle, i, vSize );
+                    for( int s=0; s<numBackConnections; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset-(s+1), yOffset+middle, i, vSize );
             if( xOffset+nxSub < nx )
                 for( int i=0; i<vSize; ++i )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset+nxSub, yOffset+middle, i, vSize );
+                    for( int s=0; s<numForwardConnections; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset+nxSub+s, yOffset+middle, i, vSize );
 
             // Sort the lower structure
             std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1635,44 +1843,58 @@ DistHelmholtz<R>::FillPanelDistElimTree
 
     // Fill the bottom node, which is only owned by a single process
     cliq::DistSymmNode& node = eTree.distNodes[0];
-    if( nxSub*nySub <= cutoff )
+    if( nxSub*nySub <= (polyOrder+1)*(polyOrder+1) )
     {
         node.size = nxSub*nySub*vSize;
         node.offset = ReorderedIndex( xOffset, yOffset, 0, vSize );
 
+        const int xLeftElem = xOffset % polyOrder;
+        const int yLeftElem = yOffset % polyOrder;
+        const int xRightElem = (xOffset+nxSub-1) % polyOrder;
+        const int yRightElem = (yOffset+nySub-1) % polyOrder;
+
+        const int xNumBackCon = ( xLeftElem==0 ? polyOrder : xLeftElem );
+        const int yNumBackCon = ( yLeftElem==0 ? polyOrder : yLeftElem );
+        const int xNumForwardCon = polyOrder - xRightElem;
+        const int yNumForwardCon = polyOrder - yRightElem;
+
         // Count, allocate, and fill the lower struct
         int joinSize = 0;
         if( xOffset > 0 )
-            joinSize += nySub;
+            joinSize += xNumBackCon*nySub;
         if( xOffset+nxSub < nx )
-            joinSize += nySub;
+            joinSize += xNumForwardCon*nySub;
         if( yOffset > 0 )
-            joinSize += nxSub;
+            joinSize += yNumBackCon*nxSub;
         if( yOffset+nySub < ny )
-            joinSize += nxSub;
+            joinSize += yNumForwardCon*nxSub;
         node.lowerStruct.resize( joinSize*vSize );
 
         int joinOffset = 0;
         if( xOffset > 0 )
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nySub; ++j )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset-1, yOffset+j, i, vSize );
+                    for( int s=0; s<xNumBackCon; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset-(s+1), yOffset+j, i, vSize );
         if( xOffset+nxSub < nx )
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nySub; ++j )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset+nxSub, yOffset+j, i, vSize );
+                    for( int s=0; s<xNumForwardCon; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset+nxSub+s, yOffset+j, i, vSize );
         if( yOffset > 0 )
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nxSub; ++j )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset+j, yOffset-1, i, vSize );
+                    for( int s=0; s<yNumBackCon; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset+j, yOffset-(s+1), i, vSize );
         if( yOffset+nySub < ny )
             for( int i=0; i<vSize; ++i )
                 for( int j=0; j<nxSub; ++j )
-                    node.lowerStruct[joinOffset++] = ReorderedIndex
-                    ( xOffset+j, yOffset+nySub, i, vSize );
+                    for( int s=0; s<yNumForwardCon; ++s )
+                        node.lowerStruct[joinOffset++] = ReorderedIndex
+                        ( xOffset+j, yOffset+nySub+s, i, vSize );
 
         // Sort the lower structure
         std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1680,28 +1902,36 @@ DistHelmholtz<R>::FillPanelDistElimTree
     else if( nxSub >= nySub )
     {
         // Form the structure of a partition of the X dimension
-        const int middle = (nxSub-1)/2;
+        const int middleProp = (nxSub-1)/2;
+        const int middle = middleProp - (xOffset+middleProp) % polyOrder;
         node.size = nySub*vSize;
         node.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
+
+        const int yLeftElem = yOffset % polyOrder;
+        const int yRightElem = (yOffset+nySub-1) % polyOrder;
+        const int yNumBackCon = ( yLeftElem==0 ? polyOrder : yLeftElem );
+        const int yNumForwardCon = polyOrder - yRightElem;
 
         // Allocate space for the lower structure
         int numJoins = 0;
         if( yOffset > 0 )
-            ++numJoins;
+            numJoins += yNumBackCon;
         if( yOffset+nySub < ny )
-            ++numJoins;
+            numJoins += yNumForwardCon;
         node.lowerStruct.resize( numJoins*vSize );
 
         // Fill the (unsorted) lower structure
         int joinOffset = 0;
         if( yOffset > 0 )
             for( int i=0; i<vSize; ++i )
-                node.lowerStruct[joinOffset++] = ReorderedIndex
-                ( xOffset+middle, yOffset-1, i, vSize );
+                for( int s=0; s<yNumBackCon; ++s )
+                    node.lowerStruct[joinOffset++] = ReorderedIndex
+                    ( xOffset+middle, yOffset-(s+1), i, vSize );
         if( yOffset+nySub < ny )
             for( int i=0; i<vSize; ++i )
-                node.lowerStruct[joinOffset++] = ReorderedIndex
-                ( xOffset+middle, yOffset+nySub, i, vSize );
+                for( int s=0; s<yNumForwardCon; ++s )
+                    node.lowerStruct[joinOffset++] = ReorderedIndex
+                    ( xOffset+middle, yOffset+nySub+s, i, vSize );
 
         // Sort the lower structure
         std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1709,28 +1939,35 @@ DistHelmholtz<R>::FillPanelDistElimTree
     else
     {
         // Form the structure of a partition of the Y dimension
-        const int middle = (nySub-1)/2;
+        const int middleProp = (nySub-1)/2;
         node.size = nxSub*vSize;
         node.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
+
+        const int xLeftElem = xOffset % polyOrder;
+        const int xRightElem = (xOffset+nxSub-1) % polyOrder;
+        const int xNumBackCon = ( xLeftElem==0 ? polyOrder : xLeftElem );
+        const int xNumForwardCon = polyOrder - xRightElem;
 
         // Allocate space for the lower structure
         int numJoins = 0;
         if( xOffset > 0 )
-            ++numJoins;
+            numJoins += xNumBackCon;
         if( xOffset+nxSub < nx )
-            ++numJoins;
+            numJoins += xNumForwardCon;
         node.lowerStruct.resize( numJoins*vSize );
 
         // Fill the (unsorted) lower structure
         int joinOffset = 0;
         if( xOffset > 0 )
             for( int i=0; i<vSize; ++i )
-                node.lowerStruct[joinOffset++] = ReorderedIndex
-                ( xOffset-1, yOffset+middle, i, vSize );
+                for( int s=0; s<xNumBackCon; ++s )
+                    node.lowerStruct[joinOffset++] = ReorderedIndex
+                    ( xOffset-(s+1), yOffset+middle, i, vSize );
         if( xOffset+nxSub < nx )
             for( int i=0; i<vSize; ++i )
-                node.lowerStruct[joinOffset++] = ReorderedIndex
-                ( xOffset+nxSub, yOffset+middle, i, vSize );
+                for( int s=0; s<xNumForwardCon; ++s )
+                    node.lowerStruct[joinOffset++] = ReorderedIndex
+                    ( xOffset+nxSub+s, yOffset+middle, i, vSize );
 
         // Sort the lower structure
         std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1739,7 +1976,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
 
 template<typename R>
 void
-DistHelmholtz<R>::FillPanelLocalElimTree
+DistSpectralHelmholtz<R>::FillPanelLocalElimTree
 ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
   cliq::DistSymmElimTree& eTree ) const
 {
@@ -1748,7 +1985,7 @@ DistHelmholtz<R>::FillPanelLocalElimTree
     const int numLocalNodes = NumLocalNodes( commRank, commSize );
     eTree.localNodes.resize( numLocalNodes );
 
-    const int cutoff = nestedCutoff_;
+    const int polyOrder = disc_.polyOrder;
     const int nx = disc_.nx;
     const int ny = disc_.ny;
 
@@ -1782,11 +2019,20 @@ DistHelmholtz<R>::FillPanelLocalElimTree
                 eTree.localNodes[node.parent]->children[1] = s;
         }
 
-        if( box.nx*box.ny <= cutoff )
+        if( box.nx*box.ny <= (polyOrder+1)*(polyOrder+1) )
         {
             node.size = box.nx*box.ny*vSize;
             node.offset = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
             node.children.clear();
+
+            const int xLeftElem = box.xOffset % polyOrder;
+            const int yLeftElem = box.yOffset % polyOrder;
+            const int xRightElem = (box.xOffset+box.nx-1) % polyOrder;
+            const int yRightElem = (box.yOffset+box.ny-1) % polyOrder;
+            const int xNumBackCon = ( xLeftElem==0 ? polyOrder : xLeftElem );
+            const int yNumBackCon = ( yLeftElem==0 ? polyOrder : yLeftElem );
+            const int xNumForwardCon = polyOrder - xRightElem;
+            const int yNumForwardCon = polyOrder - yRightElem;
 
             // Count, allocate, and fill the lower struct
             int joinSize = 0;
@@ -1804,23 +2050,27 @@ DistHelmholtz<R>::FillPanelLocalElimTree
             if( box.xOffset > 0 )
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.ny; ++j )
+                        for( int s=0; s<xNumBackCon; ++s )
                         node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset-1, box.yOffset+j, i, vSize );
+                        ( box.xOffset-(s+1), box.yOffset+j, i, vSize );
             if( box.xOffset+box.nx < nx )
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.ny; ++j )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset+box.nx, box.yOffset+j, i, vSize );
+                        for( int s=0; s<xNumForwardCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset+box.nx+s, box.yOffset+j, i, vSize );
             if( box.yOffset > 0 )
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.nx; ++j )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset+j, box.yOffset-1, i, vSize );
+                        for( int s=0; s<yNumBackCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset+j, box.yOffset-(s+1), i, vSize );
             if( box.yOffset+box.ny < ny )
                 for( int i=0; i<vSize; ++i )
                     for( int j=0; j<box.nx; ++j )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset+j, box.yOffset+box.ny, i, vSize );
+                        for( int s=0; s<yNumForwardCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset+j, box.yOffset+box.ny+s, i, vSize );
 
             // Sort the lower structure
             std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1836,23 +2086,32 @@ DistHelmholtz<R>::FillPanelLocalElimTree
                 node.offset = ReorderedIndex
                     ( box.xOffset+middle, box.yOffset, 0, vSize );
 
+                const int yLeftElem = box.yOffset % polyOrder;
+                const int yRightElem = (box.yOffset+box.ny-1) % polyOrder;
+                const int yNumBackCon = 
+                    ( yLeftElem==0 ? polyOrder : yLeftElem );
+                const int yNumForwardCon = polyOrder - yRightElem;
+
                 // Count, allocate, and fill the lower struct
                 int numJoins = 0;
                 if( box.yOffset > 0 )
-                    ++numJoins;
+                    numJoins += yNumBackCon;
                 if( box.yOffset+box.ny < ny )
-                    ++numJoins;
+                    numJoins += yNumForwardCon;
                 node.lowerStruct.resize( numJoins*vSize );
 
                 int joinOffset = 0;
                 if( box.yOffset > 0 )
                     for( int i=0; i<vSize; ++i )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset+middle, box.yOffset-1, i, vSize );
+                        for( int s=0; s<yNumBackCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset+middle, box.yOffset-(s+1), i, vSize );
                 if( box.yOffset+box.ny < ny )
                     for( int i=0; i<vSize; ++i )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset+middle, box.yOffset+box.ny, i, vSize );
+                        for( int s=0; s<yNumForwardCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset+middle, box.yOffset+box.ny+s, 
+                              i, vSize );
 
                 // Sort the lower structure
                 std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
@@ -1885,23 +2144,32 @@ DistHelmholtz<R>::FillPanelLocalElimTree
                 node.offset = ReorderedIndex
                     ( box.xOffset, box.yOffset+middle, 0, vSize );
 
+                const int xLeftElem = box.xOffset % polyOrder;
+                const int xRightElem = (box.xOffset+box.nx-1) % polyOrder;
+                const int xNumBackCon = 
+                    ( xLeftElem==0 ? polyOrder : xLeftElem );
+                const int xNumForwardCon = polyOrder - xRightElem;
+
                 // Count, allocate, and fill the lower struct
                 int numJoins = 0;
                 if( box.xOffset > 0 )
-                    ++numJoins;
+                    numJoins += xNumBackCon;
                 if( box.xOffset+box.nx < nx )
-                    ++numJoins;
+                    numJoins += xNumForwardCon;
                 node.lowerStruct.resize( numJoins*vSize );
 
                 int joinOffset = 0;
                 if( box.xOffset > 0 )
                     for( int i=0; i<vSize; ++i )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset-1, box.yOffset+middle, i, vSize );
+                        for( int s=0; s<xNumBackCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset-(s+1), box.yOffset+middle, i, vSize );
                 if( box.xOffset+box.nx < nx )
                     for( int i=0; i<vSize; ++i )
-                        node.lowerStruct[joinOffset++] = ReorderedIndex
-                        ( box.xOffset+box.nx, box.yOffset+middle, i, vSize );
+                        for( int s=0; s<xNumForwardCon; ++s )
+                            node.lowerStruct[joinOffset++] = ReorderedIndex
+                            ( box.xOffset+box.nx+s, box.yOffset+middle, 
+                              i, vSize );
 
                 // Sort the lower structure
                 std::sort( node.lowerStruct.begin(), node.lowerStruct.end() );
