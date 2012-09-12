@@ -27,6 +27,7 @@ set(PSP_VERSION_MINOR 1)
 
 option(PSP_TESTS "Build a collection of test executables" OFF)
 option(PSP_EXAMPLES "Build one or more example executables" OFF)
+option(PRINT_RAYLEIGH_QUOTIENTS "Print largest Rayleigh quotients before restart" ON)
 
 # TODO: Think of how to avoid this mess...
 add_subdirectory(external/clique)

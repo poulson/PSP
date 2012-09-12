@@ -294,6 +294,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
 
     int it=0;
     bool converged=false;
+    bool firstBatch=true;
     while( !converged )
     {
         if( commRank == 0 )
@@ -582,6 +583,20 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "  converged with relative tolerance: " 
                               << maxRelResidNorm << std::endl;
                 converged = true;
+#ifdef PRINT_RAYLEIGH_QUOTIENTS
+                if( firstBatch && commRank == 0 )
+                {
+                    for( int k=0; k<numRhs; ++k )
+                    {
+                        std::ostringstream msg;
+                        msg << "Rayleigh quotient for " << k 
+                            << "'th vector before restart:";
+                        Matrix<C> H;
+                        H.View( HList, 0, k*m, m, m );
+                        H.Print( msg.str() );
+                    }
+                }
+#endif // PRINT_RAYLEIGH_QUOTIENTS
                 break;
             }
             else
@@ -605,6 +620,22 @@ DistHelmholtz<R>::InternalSolveWithGMRES
             }
             ++it;
         }
+
+#ifdef PRINT_RAYLEIGH_QUOTIENTS
+        if( firstBatch && commRank == 0 )
+        {
+            for( int k=0; k<numRhs; ++k )
+            {
+                std::ostringstream msg;
+                msg << "Rayleigh quotient for " << k 
+                    << "'th vector before restart:";
+                Matrix<C> H;
+                H.View( HList, 0, k*m, m, m );
+                H.Print( msg.str() );
+            }
+        }
+#endif // PRINT_RAYLEIGH_QUOTIENTS
+        firstBatch = false;
     }
     bList = xList;
 }
