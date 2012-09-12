@@ -161,7 +161,7 @@ command::
     
     UnitCube 0 500 314.16 
 
-which converged to five digits of relative accuracy in 21 iterations of 
+which converged to five digits of relative accuracy in 22 iterations of 
 GMRES(20) on 256 nodes of TACC's Lonestar.
 
 .. image:: solution-uniform-singleShot-YZ-50.png
@@ -183,7 +183,7 @@ another :math:`500 \times 500 \times 500` grid, via the command::
     
     UnitCube 1 500 235.62 1 5 2.0
 
-and converged to five digits of relative accuracy in 43 iterations of GMRES(20)
+and converged to five digits of relative accuracy in 44 iterations of GMRES(20)
 on 256 nodes of TACC's Lonestar.
 
 .. image:: solution-gaussian-singleShot-YZ-37.5.png
@@ -207,12 +207,12 @@ grid points of PML, with a coordinate-stretching magnitude of 2.0, via::
     UnitCube 2 500 235.62 1 5 2.0
 
 and all four residuals converged to five digits of relative accuracy in 
-51 iterations of GMRES(20) on 256 nodes of TACC's Lonestar. With six grid points
+52 iterations of GMRES(20) on 256 nodes of TACC's Lonestar. With six grid points
 of PML, via::
 
     UnitCube 2 500 235.62 1 6 2.0
 
-the same model converged in 26 iterations.
+the same model converged in 27 iterations.
 
 .. image:: solution-guide-singleShot-YZ-37.5.png
 
@@ -244,7 +244,7 @@ radians/second. Using a PML magnitude of 4.0, via the command::
     UnitCube 5 500 314.16 1 5 4.0
 
 all four residuals converged to five digits of relative accuracy in 
-47 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
+48 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
 
 .. image:: solution-twoSidewaysLayers-singleShot-YZ-50.png
 
@@ -271,7 +271,7 @@ radians/second. Using a PML magnitude of 4.0, via the command::
     
     UnitCube 9 500 471.25 1 5 4.0
 
-all four residuals converged to five digits of relative accuracy in 48 
+all four residuals converged to five digits of relative accuracy in 49
 iterations of GMRES(20) on 256 nodes of TACC's Lonestar.
 
 .. image:: solution-wedge-singleShot-YZ-75.png
@@ -291,7 +291,7 @@ Separator
 This example shows that extremely large variations in the velocity field can 
 be harmless: even though there is a "separator" with a velocity which is ten
 orders of magnitude larger than the background velocity, the sweeping 
-preconditioner converged in only 27 iterations for the 50 wavelength 
+preconditioner converged in only 28 iterations for the 50 wavelength 
 calculation::
     
     UnitCube 11 500 314.16 1 5 3.0

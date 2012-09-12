@@ -40,7 +40,7 @@
       <div class="topnav">
       
         <p>
-        «&#160;&#160;<a href="dist_helmholtz.html">The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>
+        «&#160;&#160;<a href="dist_helmholtz.html">The <tt class="docutils literal docutils literal docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
@@ -195,7 +195,7 @@ uniform velocity model with a <span class="math">\(500 \times 500 \times 500\)</
 command:</p>
 <div class="highlight-python"><pre>UnitCube 0 500 314.16</pre>
 </div>
-<p>which converged to five digits of relative accuracy in 21 iterations of
+<p>which converged to five digits of relative accuracy in 22 iterations of
 GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-uniform-singleShot-YZ-50.png" src="_images/solution-uniform-singleShot-YZ-50.png" />
 <p>The middle YZ plane of the single-shot solution.</p>
@@ -210,7 +210,7 @@ GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 another <span class="math">\(500 \times 500 \times 500\)</span> grid, via the command:</p>
 <div class="highlight-python"><pre>UnitCube 1 500 235.62 1 5 2.0</pre>
 </div>
-<p>and converged to five digits of relative accuracy in 43 iterations of GMRES(20)
+<p>and converged to five digits of relative accuracy in 44 iterations of GMRES(20)
 on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-gaussian-singleShot-YZ-37.5.png" src="_images/solution-gaussian-singleShot-YZ-37.5.png" />
 <p>The middle YZ plane of the single-shot solution.</p>
@@ -227,11 +227,11 @@ grid points of PML, with a coordinate-stretching magnitude of 2.0, via:</p>
 <div class="highlight-python"><pre>UnitCube 2 500 235.62 1 5 2.0</pre>
 </div>
 <p>and all four residuals converged to five digits of relative accuracy in
-51 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar. With six grid points
+52 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar. With six grid points
 of PML, via:</p>
 <div class="highlight-python"><pre>UnitCube 2 500 235.62 1 6 2.0</pre>
 </div>
-<p>the same model converged in 26 iterations.</p>
+<p>the same model converged in 27 iterations.</p>
 <img alt="_images/solution-guide-singleShot-YZ-37.5.png" src="_images/solution-guide-singleShot-YZ-37.5.png" />
 <p>The middle YZ plane of the single-shot solution.</p>
 <img alt="_images/solution-guide-singleShot-YZ-37.5-0.55.png" src="_images/solution-guide-singleShot-YZ-37.5-0.55.png" />
@@ -252,7 +252,7 @@ radians/second. Using a PML magnitude of 4.0, via the command:</p>
 <div class="highlight-python"><pre>UnitCube 5 500 314.16 1 5 4.0</pre>
 </div>
 <p>all four residuals converged to five digits of relative accuracy in
-47 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
+48 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-twoSidewaysLayers-singleShot-YZ-50.png" src="_images/solution-twoSidewaysLayers-singleShot-YZ-50.png" />
 <p>The middle YZ plane of the single-shot solution.</p>
 <img alt="_images/solution-twoSidewaysLayers-singleShot-YZ-50-0.7.png" src="_images/solution-twoSidewaysLayers-singleShot-YZ-50-0.7.png" />
@@ -270,7 +270,7 @@ size was <span class="math">\(500 \times 500 \times 500\)</span>, and the freque
 radians/second. Using a PML magnitude of 4.0, via the command:</p>
 <div class="highlight-python"><pre>UnitCube 9 500 471.25 1 5 4.0</pre>
 </div>
-<p>all four residuals converged to five digits of relative accuracy in 48
+<p>all four residuals converged to five digits of relative accuracy in 49
 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <img alt="_images/solution-wedge-singleShot-YZ-75.png" src="_images/solution-wedge-singleShot-YZ-75.png" />
 <p>The center YZ plane of the single-shot solution.</p>
@@ -284,7 +284,7 @@ iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <p>This example shows that extremely large variations in the velocity field can
 be harmless: even though there is a &#8220;separator&#8221; with a velocity which is ten
 orders of magnitude larger than the background velocity, the sweeping
-preconditioner converged in only 27 iterations for the 50 wavelength
+preconditioner converged in only 28 iterations for the 50 wavelength
 calculation:</p>
 <div class="highlight-python"><pre>UnitCube 11 500 314.16 1 5 3.0</pre>
 </div>
@@ -320,7 +320,7 @@ linearly interpolating a velocity model into a different grid size in parallel.<
       <div class="bottomnav">
       
         <p>
-        «&#160;&#160;<a href="dist_helmholtz.html">The <tt class="docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>
+        «&#160;&#160;<a href="dist_helmholtz.html">The <tt class="docutils literal docutils literal docutils literal"><span class="pre">DistHelmholtz</span></tt> class</a>
         &#160;&#160;::&#160;&#160;
         <a class="uplink" href="index.html">Contents</a>
         &#160;&#160;::&#160;&#160;
