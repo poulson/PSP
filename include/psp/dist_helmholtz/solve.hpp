@@ -270,6 +270,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
               wList(  localHeight, numRhs   ), // contiguous
               zList(  m+1,         numRhs   ), // contiguous
               HList(  m,           m*numRhs ); // contiguous
+    elem::MakeZeros( HList );
 
     // For storing Givens rotations
     Matrix<R> csList( m, numRhs );
@@ -583,20 +584,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << "  converged with relative tolerance: " 
                               << maxRelResidNorm << std::endl;
                 converged = true;
-#ifdef PRINT_RAYLEIGH_QUOTIENTS
-                if( firstBatch && commRank == 0 )
-                {
-                    for( int k=0; k<numRhs; ++k )
-                    {
-                        std::ostringstream msg;
-                        msg << "Rayleigh quotient for " << k 
-                            << "'th vector before restart:";
-                        Matrix<C> H;
-                        H.View( HList, 0, k*m, m, m );
-                        H.Print( msg.str() );
-                    }
-                }
-#endif // PRINT_RAYLEIGH_QUOTIENTS
+                ++it;
                 break;
             }
             else
@@ -630,7 +618,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                 msg << "Rayleigh quotient for " << k 
                     << "'th vector before restart:";
                 Matrix<C> H;
-                H.View( HList, 0, k*m, m, m );
+                H.View( HList, 0, k*m, it, it );
                 H.Print( msg.str() );
             }
         }
