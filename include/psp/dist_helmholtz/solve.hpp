@@ -270,7 +270,10 @@ DistHelmholtz<R>::InternalSolveWithGMRES
               wList(  localHeight, numRhs   ), // contiguous
               zList(  m+1,         numRhs   ), // contiguous
               HList(  m,           m*numRhs ); // contiguous
-    elem::MakeZeros( HList );
+#ifdef PRINT_RAYLEIGH_QUOTIENTS
+    Matrix<C> HListCopy( m, m*numRhs );
+    elem::MakeZeros( HListCopy );
+#endif
 
     // For storing Givens rotations
     Matrix<R> csList( m, numRhs );
@@ -411,6 +414,11 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     InnerProducts( viList, wList, alphaList );
                     for( int k=0; k<numRhs; ++k )
                         HList.Set(i,j+k*m,alphaList[k]);
+#ifdef PRINT_RAYLEIGH_QUOTIENTS
+                    if( firstBatch )
+                        for( int k=0; k<numRhs; ++k )
+                            HListCopy.Set(i,j+k*m,alphaList[k]);
+#endif
 
                     // w := w - H(i,j) v_i
                     SubtractScaledColumns( alphaList, viList, wList );
@@ -437,6 +445,11 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     ( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
+#ifdef PRINT_RAYLEIGH_QUOTIENTS
+                    if( firstBatch )
+                        for( int k=0; k<numRhs; ++k )
+                            HListCopy.Set(j+1,j+k*m,deltaList[k]);
+#endif
                 }
 #ifndef RELEASE
                 mpi::Barrier( comm_ );
@@ -618,7 +631,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                 msg << "Rayleigh quotient for " << k 
                     << "'th vector before restart:";
                 Matrix<C> H;
-                H.View( HList, 0, k*m, it, it );
+                H.View( HListCopy, 0, k*m, it, it );
                 H.Print( msg.str() );
             }
         }
