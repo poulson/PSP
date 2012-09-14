@@ -28,7 +28,7 @@ the Helmholtz equation: moving Perfectly Matched Layers*.
 3. Two decreasing layers
 ^^^^^^^^^^^^^^^^^^^^^^^^
 Two layers stacked on top of each other, where the bottom layer has a velocity 
-which is eight times higher than in the top layer.
+which is four times higher than in the top layer.
 
 .. image:: velocity-twoDecLayers.png
 
