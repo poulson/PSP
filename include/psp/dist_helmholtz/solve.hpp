@@ -270,9 +270,10 @@ DistHelmholtz<R>::InternalSolveWithGMRES
               wList(  localHeight, numRhs   ), // contiguous
               zList(  m+1,         numRhs   ), // contiguous
               HList(  m,           m*numRhs ); // contiguous
-#ifdef PRINT_RAYLEIGH_QUOTIENTS
+#ifdef PRINT_RITZ_VALUES
     Matrix<C> HListCopy( m, m*numRhs );
     elem::MakeZeros( HListCopy );
+    bool firstBatch=true;
 #endif
 
     // For storing Givens rotations
@@ -298,7 +299,6 @@ DistHelmholtz<R>::InternalSolveWithGMRES
 
     int it=0;
     bool converged=false;
-    bool firstBatch=true;
     while( !converged )
     {
         if( commRank == 0 )
@@ -414,7 +414,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     InnerProducts( viList, wList, alphaList );
                     for( int k=0; k<numRhs; ++k )
                         HList.Set(i,j+k*m,alphaList[k]);
-#ifdef PRINT_RAYLEIGH_QUOTIENTS
+#ifdef PRINT_RITZ_VALUES
                     if( firstBatch )
                         for( int k=0; k<numRhs; ++k )
                             HListCopy.Set(i,j+k*m,alphaList[k]);
@@ -445,7 +445,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     ( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
-#ifdef PRINT_RAYLEIGH_QUOTIENTS
+#ifdef PRINT_RITZ_VALUES
                     if( firstBatch )
                         for( int k=0; k<numRhs; ++k )
                             HListCopy.Set(j+1,j+k*m,deltaList[k]);
@@ -622,21 +622,26 @@ DistHelmholtz<R>::InternalSolveWithGMRES
             ++it;
         }
 
-#ifdef PRINT_RAYLEIGH_QUOTIENTS
+#ifdef PRINT_RITZ_VALUES
         if( firstBatch && commRank == 0 )
         {
+            std::vector<C> ritzVals( it );
             for( int k=0; k<numRhs; ++k )
             {
-                std::ostringstream msg;
-                msg << "Rayleigh quotient for " << k 
-                    << "'th vector before restart:";
                 Matrix<C> H;
                 H.View( HListCopy, 0, k*m, it, it );
-                H.Print( msg.str() );
+                elem::lapack::HessenbergEig
+                ( it, H.Buffer(), H.LDim(), &ritzVals[0] );
+
+                std::cout << "Ritz values for " << k 
+                          << "'th right-hand side before first restart:\n";
+                for( int s=0; s<it; ++s ) 
+                    std::cout << ritzVals[s] << " ";
+                std::cout << std::endl;
             }
         }
-#endif // PRINT_RAYLEIGH_QUOTIENTS
         firstBatch = false;
+#endif
     }
     bList = xList;
 }
