@@ -631,7 +631,7 @@ DistHelmholtz<R>::FormGlobalRow
     const C vTermR = (vTempR+vTempM) / (2*hz_*hz_);
 
     // Compute the center term
-    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
+    const C centerTerm = (xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) -
         (disc_.omega/alpha)*(disc_.omega/alpha)*s1InvM*s2InvM*s3InvM;
 
     // Fill in the center term
@@ -640,17 +640,17 @@ DistHelmholtz<R>::FormGlobalRow
 
     // Fill the rest of the terms
     if( x > 0 )
-        localEntries_[offset++] = xTermL;
+        localEntries_[offset++] = -xTermL;
     if( x+1 < disc_.nx )
-        localEntries_[offset++] = xTermR;
+        localEntries_[offset++] = -xTermR;
     if( y > 0 )
-        localEntries_[offset++] = yTermL;
+        localEntries_[offset++] = -yTermL;
     if( y+1 < disc_.ny )
-        localEntries_[offset++] = yTermR;
+        localEntries_[offset++] = -yTermR;
     if( v > 0 )
-        localEntries_[offset++] = vTermL;
+        localEntries_[offset++] = -vTermL;
     if( v+1 < disc_.nz )
-        localEntries_[offset++] = vTermR;
+        localEntries_[offset++] = -vTermR;
 }
 
 // NOTE: This assumed a 7-point finite-difference stencil and must be 
@@ -700,7 +700,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
 
     // Compute the center term
     const C shiftedOmega = C(disc_.omega,damping_);
-    const C centerTerm = -(xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) + 
+    const C centerTerm = (xTermL+xTermR+yTermL+yTermR+vTermL+vTermR) -
         (shiftedOmega/alpha)*(shiftedOmega/alpha)*s1InvM*s2InvM*s3InvM;
     const int vLocal = v - vOffset;
     const int nx = disc_.nx;
@@ -739,7 +739,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
-            values.push_back( xTermL );
+            values.push_back( -xTermL );
         }
     }
 
@@ -765,7 +765,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
-            values.push_back( xTermR );
+            values.push_back( -xTermR );
         }
     }
 
@@ -791,7 +791,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
-            values.push_back( yTermL );
+            values.push_back( -yTermL );
         }
     }
 
@@ -817,7 +817,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
-            values.push_back( yTermR );
+            values.push_back( -yTermR );
         }
     }
 
@@ -843,7 +843,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
-            values.push_back( vTermL );
+            values.push_back( -vTermL );
         }
     }
 
@@ -869,7 +869,7 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
-            values.push_back( vTermR );
+            values.push_back( -vTermR );
         }
     }
 }
