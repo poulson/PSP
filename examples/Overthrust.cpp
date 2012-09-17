@@ -192,13 +192,13 @@ main( int argc, char* argv[] )
                         4*(xLocal + yLocal*xLocalSize + 
                            zLocal*xLocalSize*yLocalSize);
 
-                    localB[localIndex+0] = f0;
-                    localB[localIndex+1] = f0+f1+f2;
-                    localB[localIndex+2] = fBeam;
+                    localB[localIndex+0] = -f0;
+                    localB[localIndex+1] = -(f0+f1+f2);
+                    localB[localIndex+2] = -fBeam;
                     if( x >= pmlSize && x < nx-pmlSize &&
                         y >= pmlSize && y < ny-pmlSize && 
                         (!pmlOnTop || z >= pmlSize) && z < nz-pmlSize )
-                        localB[localIndex+3] = planeWave;
+                        localB[localIndex+3] = -planeWave;
                     else
                         localB[localIndex+3] = 0;
                 }
