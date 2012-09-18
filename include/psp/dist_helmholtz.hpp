@@ -81,26 +81,6 @@ private:
     ( DistUniformGrid<C>& gridB, Matrix<C>& B, int m, R relTol, 
       bool viewIteratees ) const;
 
-    bool CheckForNaN( R alpha ) const;
-    bool CheckForNaN( C alpha ) const;
-    bool CheckForNaN( const std::vector<R>& alpha ) const;
-    bool CheckForNaN( const std::vector<C>& alpha ) const;
-    bool CheckForZero( const std::vector<R>& alpha ) const;
-    bool CheckForZero( const std::vector<C>& alpha ) const;
-
-    void Norms( const Matrix<C>& xList, std::vector<R>& normList ) const;
-    void InnerProducts
-    ( const Matrix<C>& xList, const Matrix<C>& yList,
-      std::vector<C>& alphaList ) const;
-
-    void MultiplyColumns
-    ( Matrix<C>& xList, const std::vector<C>& deltaList ) const;
-    void DivideColumns
-    ( Matrix<C>& xList, const std::vector<R>& deltaList ) const;
-    void SubtractScaledColumns
-    ( const std::vector<C>& deltaList,
-      const Matrix<C>& xList, Matrix<C>& yList ) const;
-
     void Multiply( Matrix<C>& B ) const;
     void Precondition( Matrix<C>& B ) const;
 

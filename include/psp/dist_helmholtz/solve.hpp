@@ -292,7 +292,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
     // w := b (= b - A x_0)
     // origResidNorm := ||w||_2
     wList = bList;
-    Norms( wList, origResidNormList );
+    Norms( wList, origResidNormList, comm_ );
     const bool origResidHasNaN = CheckForNaN( origResidNormList );
     if( origResidHasNaN )
         throw std::runtime_error("Original residual norms had a NaN");
@@ -327,7 +327,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
         }
-        Norms( wList, betaList );
+        Norms( wList, betaList, comm_ );
         const bool betaListHasNaN = CheckForNaN( betaList );
         if( betaListHasNaN )
             throw std::runtime_error("beta list had a NaN");
@@ -368,7 +368,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
 #ifndef RELEASE
-            Norms( wList, deltaList );
+            Norms( wList, deltaList, comm_ );
             const bool multiplyHasNaN = CheckForNaN( deltaList );
             if( multiplyHasNaN )
                 throw std::runtime_error("multiply had a NaN");
@@ -391,7 +391,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
 #ifndef RELEASE
-            Norms( wList, deltaList );
+            Norms( wList, deltaList, comm_ );
             const bool preconditionHasNaN = CheckForNaN( deltaList );
             if( preconditionHasNaN )
                 throw std::runtime_error("precondition had a NaN");
@@ -411,7 +411,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     Matrix<C> viList;
                     viList.LockedView
                     ( VInter, 0, i*numRhs, localHeight, numRhs );
-                    InnerProducts( viList, wList, alphaList );
+                    InnerProducts( viList, wList, alphaList, comm_ );
                     for( int k=0; k<numRhs; ++k )
                         HList.Set(i,j+k*m,alphaList[k]);
 #ifdef PRINT_RITZ_VALUES
@@ -423,7 +423,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                     // w := w - H(i,j) v_i
                     SubtractScaledColumns( alphaList, viList, wList );
                 }
-                Norms( wList, deltaList );
+                Norms( wList, deltaList, comm_ );
                 const bool deltaListHasNaN = CheckForNaN( deltaList );
                 if( deltaListHasNaN )
                     throw std::runtime_error("delta list had a NaN");
@@ -582,7 +582,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
             elem::Axpy( (C)1, bList, wList );
 
             // Residual checks
-            Norms( wList, residNormList );
+            Norms( wList, residNormList, comm_ );
             const bool residNormListHasNaN = CheckForNaN( residNormList );
             if( residNormListHasNaN )
                 throw std::runtime_error("resid norm list has NaN");
@@ -644,153 +644,6 @@ DistHelmholtz<R>::InternalSolveWithGMRES
 #endif
     }
     bList = xList;
-}
-
-template<typename R>
-bool
-DistHelmholtz<R>::CheckForNaN( R alpha ) const
-{
-    return alpha != alpha; // hopefully this is not optimized away
-}
-
-template<typename R>
-bool
-DistHelmholtz<R>::CheckForNaN( C alpha ) const
-{
-    return alpha != alpha; // hopefully this is not optimized away
-}
-
-template<typename R>
-bool
-DistHelmholtz<R>::CheckForNaN( const std::vector<R>& alphaList ) const
-{
-    bool foundNaN = false;
-    for( unsigned k=0; k<alphaList.size(); ++k )
-        if( CheckForNaN(alphaList[k]) )
-            foundNaN = true;
-    return foundNaN;
-}
-
-template<typename R>
-bool
-DistHelmholtz<R>::CheckForNaN( const std::vector<C>& alphaList ) const
-{
-    bool foundNaN = false;
-    for( unsigned k=0; k<alphaList.size(); ++k )
-        if( CheckForNaN(alphaList[k]) )
-            foundNaN = true;
-    return foundNaN;
-}
-
-template<typename R>
-bool
-DistHelmholtz<R>::CheckForZero( const std::vector<R>& alphaList ) const
-{
-    bool foundZero = false;
-    for( unsigned k=0; k<alphaList.size(); ++k )
-        if( alphaList[k] == (R)0 ) // think about using a tolerance instead
-            foundZero = true;
-    return foundZero;
-}
-
-template<typename R>
-bool
-DistHelmholtz<R>::CheckForZero( const std::vector<C>& alphaList ) const
-{
-    bool foundZero = false;
-    for( unsigned k=0; k<alphaList.size(); ++k )
-        if( alphaList[k] == (C)0 ) // think about using a tolerance instead
-            foundZero = true;
-    return foundZero;
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::Norms
-( const Matrix<C>& xList, std::vector<R>& normList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    const int commSize = mpi::CommSize( comm_ );
-    std::vector<R> localNorms( numCols );
-    for( int j=0; j<numCols; ++j )
-        localNorms[j] = blas::Nrm2( localHeight, xList.LockedBuffer(0,j), 1 );
-    std::vector<R> allLocalNorms( numCols*commSize );
-    mpi::AllGather
-    ( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm_ );
-    normList.resize( numCols );
-    for( int j=0; j<numCols; ++j )
-        normList[j] = blas::Nrm2( commSize, &allLocalNorms[j], numCols );
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::InnerProducts
-( const Matrix<C>& xList, const Matrix<C>& yList,
-  std::vector<C>& alphaList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    std::vector<C> localAlphaList( numCols );
-    for( int j=0; j<numCols; ++j )
-        localAlphaList[j] = 
-            blas::Dot
-            ( localHeight, xList.LockedBuffer(0,j), 1,
-                           yList.LockedBuffer(0,j), 1 );
-    alphaList.resize( numCols );
-    mpi::AllReduce
-    ( &localAlphaList[0], &alphaList[0], numCols, MPI_SUM, comm_ );
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::DivideColumns
-( Matrix<C>& xList, const std::vector<R>& deltaList ) const
-{
-    const R one = 1;
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    for( int j=0; j<numCols; ++j )
-    {
-        const R invDelta = one/deltaList[j];
-        C* x = xList.Buffer(0,j);
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            x[iLocal] *= invDelta;
-    }
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::MultiplyColumns
-( Matrix<C>& xList, const std::vector<C>& deltaList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    for( int j=0;j<numCols; ++j )
-    {
-        const C delta = deltaList[j];
-        C* x = xList.Buffer(0,j);
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            x[iLocal] *= delta;
-    }
-}
-
-template<typename R>
-void
-DistHelmholtz<R>::SubtractScaledColumns
-( const std::vector<C>& deltaList, 
-  const Matrix<C>& xList, Matrix<C>& yList ) const
-{
-    const int numCols = xList.Width();
-    const int localHeight = xList.Height();
-    for( int j=0; j<numCols; ++j )
-    {
-        const C delta = deltaList[j];
-        const C* x = xList.LockedBuffer(0,j);
-        C* y = yList.Buffer(0,j);
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
-            y[iLocal] -= delta*x[iLocal];
-    }
 }
 
 // B := A B
@@ -950,10 +803,10 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int remainingSize = xySize*panelDepth;
 
         for( int k=0; k<numRhs; ++k )
-            std::memcpy
+            elem::MemCopy
             ( localPanelB.Buffer(myOffset+paddingSize,k), 
               B.LockedBuffer(BOffset,k),
-              remainingSize*sizeof(C) );
+              remainingSize );
         BOffset += remainingSize;
     }
     const int numDistNodes = info.distNodes.size();
@@ -979,10 +832,10 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )
-            std::memcpy
+            elem::MemCopy
             ( localPanelB.Buffer(localOffset1d+localPaddingSize,k),
               B.LockedBuffer(BOffset,k),
-              localRemainingSize*sizeof(C) );
+              localRemainingSize );
         BOffset += localRemainingSize;
     }
 #ifndef RELEASE
@@ -1014,10 +867,10 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int remainingSize = size - paddingSize;
 
         for( int k=0; k<numRhs; ++k )
-            std::memcpy
+            elem::MemCopy
             ( B.Buffer(BOffset,k),
               localPanelB.LockedBuffer(myOffset+paddingSize,k), 
-              remainingSize*sizeof(C) );
+              remainingSize );
         BOffset += remainingSize;
     }
     for( int t=1; t<numDistNodes; ++t )
@@ -1042,10 +895,10 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )
-            std::memcpy
+            elem::MemCopy
             ( B.Buffer(BOffset,k),
               localPanelB.LockedBuffer(localOffset1d+localPaddingSize,k),
-              localRemainingSize*sizeof(C) );
+              localRemainingSize );
         BOffset += localRemainingSize;
     }
 #ifndef RELEASE
