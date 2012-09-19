@@ -68,7 +68,7 @@ using elem::Exp;
 using elem::Base;
 
 #ifdef HAVE_MKDIR
-void EnsureDireExists( const char* path, mode_t mode=0777 );
+void EnsureDirExists( const char* path, mode_t mode=0777 );
 #endif
 
 // Some simple utility functions useful for running several GMRES(k) 

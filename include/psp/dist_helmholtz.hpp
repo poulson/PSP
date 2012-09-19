@@ -212,16 +212,24 @@ private:
     ( int x, int y, int vLocal, int xSize, int ySize, 
       int teamSize, int& process );
 
-    void LocalReordering( std::map<int,int>& reordering, int vSize ) const;
-    static void LocalReorderingRecursion
-    ( std::map<int,int>& reordering, int offset, 
-      int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-      int depthTilSerial, int cutoff, int commRank, int commSize );
-
+    int ReorderedIndex( int x, int y, int v ) const;
     int ReorderedIndex( int x, int y, int vLocal, int vSize ) const;
     static int ReorderedIndexRecursion
     ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
       int depthTilSerial, int cutoff, int offset );
+
+    int LocalReorderedIndex( int x, int y, int v ) const;
+    int LocalReorderedIndex( int x, int y, int vLocal, int vSize ) const;
+    int LocalReorderedIndexRecursion
+    ( int x, int y, int vLocal, int xSize, int ySize, int vSize, int cutoff, 
+      int offset, int commRank, int commSize );
+
+    void LocalReordering( std::map<int,int>& reordering, int vSize ) const;
+    static void LocalReorderingRecursion
+    ( std::map<int,int>& reordering, 
+      int offset, int xOffset, int yOffset,
+      int xSize, int ySize, int vSize, int nx, int ny,
+      int cutoff, int commRank, int commSize );
 
     //
     // Global sparse helper routines

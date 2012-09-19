@@ -1440,8 +1440,21 @@ DistHelmholtz<R>::DistributedDepthRecursion
 
 template<typename R>
 int
-DistHelmholtz<R>::ReorderedIndex
-( int x, int y, int vLocal, int vSize ) const
+DistHelmholtz<R>::ReorderedIndex( int x, int y, int v ) const
+{
+    const int panel = WhichPanel( v );
+    const int padding = PanelPadding( panel );
+    const int panelDepth = PanelDepth( panel );
+    const int vLocal = LocalV( v ) - padding;
+
+    const int vPanel = PanelV( panel );
+    const int panelIndex = ReorderedIndex( x, y, vLocal, panelDepth );
+    return panelIndex + disc_.nx*disc_.ny*vPanel;
+}
+
+template<typename R>
+int
+DistHelmholtz<R>::ReorderedIndex( int x, int y, int vLocal, int vSize ) const
 {
     int index = 
         ReorderedIndexRecursion

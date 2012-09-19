@@ -874,8 +874,6 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
     }
 }
         
-// NOTE: This assumed the velocity only enters through the diagonal of the 
-//       operator and must be generalized.
 template<typename R>
 void
 DistSpectralHelmholtz<R>::GetGlobalVelocity
@@ -950,10 +948,6 @@ DistSpectralHelmholtz<R>::GetGlobalVelocity
     offsets = recvDispls;
 }
 
-// NOTE: This assumes a discretization where the velocity field only
-//       enters through the diagonal of the operator. If we have elements
-//       then we will need to know the velocity field over the entire 
-//       element.
 template<typename R>
 void
 DistSpectralHelmholtz<R>::GetPanelVelocity
@@ -1119,26 +1113,146 @@ DistSpectralHelmholtz<R>::GetPanelVelocity
 }
 
 template<typename R>
+int DistSpectralHelmholtz<R>::LocalReorderedIndex( int x, int y, int v ) const
+{
+    const int panel = WhichPanel( v );
+
+    const int panelDepth = PanelDepth( panel );
+    const int panelPadding = PanelPadding( panel );
+    const int vLocal = LocalV( v ) - panelPadding;
+
+    const int localPanelOffset = LocalPanelOffset( panel );
+    const int localPanelIndex = LocalReorderedIndex( x, y, vLocal, panelDepth );
+
+    return localPanelOffset + localPanelIndex;
+}
+
+template<typename R>
+int DistSpectralHelmholtz<R>::LocalReorderedIndex
+( int x, int y, int vLocal, int vSize ) const
+{
+    const int commRank = mpi::CommRank( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
+    int offset = 0;
+    return LocalReorderedIndexRecursion
+    ( x, y, vLocal, disc_.nx, disc_.ny, vSize, 0, 0, disc_.polyOrder, 
+      offset, commRank, commSize );
+}
+
+template<typename R>
+int DistSpectralHelmholtz<R>::LocalReorderedIndexRecursion
+( int x, int y, int vLocal, int xSize, int ySize, int vSize,
+  int xOffset, int yOffset, int polyOrder, int offset, 
+  int commRank, int commSize )
+{
+    if( commSize == 0 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
+    {
+        return offset + x + y*xSize + vLocal*xSize*ySize;
+    }
+    else if( xSize >= ySize )
+    {
+        //
+        // Partition the X dimension
+        //
+        const int xLeftSizeProp = (xSize-1)/2;
+        const int xLeftSize = 
+            xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
+        const int xRightSize = std::max(xSize-xLeftSize-1,0);
+
+        const int leftTeamSize = ( commSize==1 ? 1 : commSize/2 );
+        const int rightTeamSize = ( commSize==1 ? 1 : commSize - leftTeamSize );
+        const bool onLeft = ( commRank < leftTeamSize );
+        const bool onRight = ( commSize==1 || !onLeft );
+        const int childCommRank = ( onLeft ? commRank : commRank-leftTeamSize );
+
+        // Recurse on the left side
+        if( x < xLeftSize )
+            return LocalReorderedIndexRecursion
+            ( x, y, vLocal, xLeftSize, ySize, vSize, xOffset, yOffset, 
+              polyOrder, offset, childCommRank, leftTeamSize );
+        else if( onLeft )
+            LocalPanelSizeRecursion
+            ( xLeftSize, ySize, vSize, 0, polyOrder, 
+              childCommRank, leftTeamSize, offset );
+
+        // Recurse on the right side
+        if( x > xLeftSize )
+            return LocalReorderedIndexRecursion
+            ( x-(xLeftSize+1), y, vLocal, xRightSize, ySize, vSize, 
+              xOffset+(xLeftSize+1), yOffset, polyOrder, offset, 
+              childCommRank, rightTeamSize );
+        else if( onRight )
+            LocalPanelSizeRecursion
+            ( xRightSize, ySize, vSize, 0, polyOrder, 
+              childCommRank, rightTeamSize, offset );
+
+        // Store the separator
+        if( x == xLeftSize )
+            return offset + y + vLocal*ySize;
+    }
+    else
+    {
+        //
+        // Partition the Y dimension
+        //
+        const int yLeftSizeProp = (ySize-1)/2;
+        const int yLeftSize = 
+            yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
+        const int yRightSize = std::max(ySize-yLeftSize-1,0);
+
+        const int leftTeamSize = ( commSize==1 ? 1 : commSize/2 );
+        const int rightTeamSize = ( commSize==1 ? 1 : commSize - leftTeamSize );
+        const bool onLeft = ( commRank < leftTeamSize );
+        const bool onRight = ( commSize==1 || !onLeft );
+        const int childCommRank = ( onLeft ? commRank : commRank-leftTeamSize );
+
+        // Recurse on the left side
+        if( y < yLeftSize )
+            return LocalReorderedIndexRecursion
+            ( x, y, vLocal, xSize, yLeftSize, vSize, xOffset, yOffset, 
+              polyOrder, offset, childCommRank, leftTeamSize );
+        else if( onLeft )
+            LocalPanelSizeRecursion
+            ( xSize, yLeftSize, vSize, 0, polyOrder, 
+              childCommRank, leftTeamSize, offset );
+
+        // Recurse on the right side
+        if( y > yLeftSize )
+            return LocalReorderedIndexRecursion
+            ( x, y-(yLeftSize+1), vLocal, xSize, yRightSize, vSize, 
+              xOffset, yOffset+(yLeftSize+1), polyOrder, offset, 
+              childCommRank, rightTeamSize );
+        else if( onRight )
+            LocalPanelSizeRecursion
+            ( xSize, yRightSize, vSize, 0, polyOrder, 
+              childCommRank, rightTeamSize, offset );
+
+        // Store the separator
+        if( y == yLeftSize )
+            return offset + x + vLocal*xSize;
+    }
+}
+
+template<typename R>
 void DistSpectralHelmholtz<R>::LocalReordering
 ( std::map<int,int>& reordering, int vSize ) const
 {
+    const int commRank = mpi::CommRank( comm_ );
+    const int commSize = mpi::CommSize( comm_ );
     int offset = 0;
     LocalReorderingRecursion
     ( reordering, offset,
       0, 0, disc_.nx, disc_.ny, vSize, disc_.nx, disc_.ny,
-      disc_.polyOrder, distDepth_, mpi::CommRank(comm_), mpi::CommSize(comm_) );
+      disc_.polyOrder, commRank, commSize );
 }
 
-// NOTE: This routine will need to be modified for spectral elements so that 
-//       the separators are chosen on element boundaries.
 template<typename R>
 void DistSpectralHelmholtz<R>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-  int polyOrder, int depthTilSerial, int commRank, int commSize )
+  int polyOrder, int commRank, int commSize )
 {
-    const int nextDepthTilSerial = std::max(depthTilSerial-1,0);
-    if( depthTilSerial == 0 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
+    if( commSize == 1 && xSize*ySize <= (polyOrder+1)*(polyOrder+1) )
     {
         for( int vDelta=0; vDelta<vSize; ++vDelta )
         {
@@ -1160,8 +1274,6 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the X dimension
         //
-        // NOTE: computation of xLeftSize needs to be modified to ensure that
-        //       the separator is placed on an element boundary
         const int xLeftSizeProp = (xSize-1)/2;
         const int xLeftSize = 
             xLeftSizeProp - (xLeftSizeProp+xOffset) % polyOrder;
@@ -1170,7 +1282,7 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
         const int leftTeamSize = ( commSize==1 ? 1 : commSize/2 );
         const int rightTeamSize = ( commSize==1 ? 1 : commSize - leftTeamSize );
         const bool onLeft = ( commRank < leftTeamSize );
-        const bool onRight = ( depthTilSerial==0 || !onLeft );
+        const bool onRight = ( commSize==1 || !onLeft );
         const int childCommRank = ( onLeft ? commRank : commRank-leftTeamSize );
 
         // Recurse on the left side
@@ -1178,7 +1290,7 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, xLeftSize, ySize, vSize, nx, ny,
-              polyOrder, nextDepthTilSerial, childCommRank, leftTeamSize );
+              polyOrder, childCommRank, leftTeamSize );
         offset += xLeftSize*ySize*vSize;
 
         // Recurse on the right side
@@ -1186,7 +1298,7 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset+xLeftSize+1, yOffset, xRightSize, ySize, vSize, nx, ny,
-              polyOrder, nextDepthTilSerial, childCommRank, rightTeamSize );
+              polyOrder, childCommRank, rightTeamSize );
         offset += xRightSize*ySize*vSize;
 
         // Store the separator
@@ -1207,8 +1319,6 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
         //
         // Partition the Y dimension
         //
-        // NOTE: computation of yLeftSize needs to be modified to ensure that
-        //       the separator is placed on an element boundary
         const int yLeftSizeProp = (ySize-1)/2;
         const int yLeftSize = 
             yLeftSizeProp - (yLeftSizeProp+yOffset) % polyOrder;
@@ -1217,7 +1327,7 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
         const int leftTeamSize = ( commSize==1 ? 1 : commSize/2 );
         const int rightTeamSize = ( commSize==1 ? 1 : commSize - leftTeamSize );
         const bool onLeft = ( commRank < leftTeamSize );
-        const bool onRight = ( depthTilSerial==0 || !onLeft );
+        const bool onRight = ( commSize==1 || !onLeft );
         const int childCommRank = ( onLeft ? commRank : commRank-leftTeamSize );
 
         // Recurse on the left side
@@ -1225,7 +1335,7 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset, xSize, yLeftSize, vSize, nx, ny,
-              polyOrder, nextDepthTilSerial, childCommRank, leftTeamSize );
+              polyOrder, childCommRank, leftTeamSize );
         offset += xSize*yLeftSize*vSize;
 
         // Recurse on the right side
@@ -1233,7 +1343,7 @@ void DistSpectralHelmholtz<R>::LocalReorderingRecursion
             LocalReorderingRecursion
             ( reordering, offset,
               xOffset, yOffset+yLeftSize+1, xSize, yRightSize, vSize, nx, ny,
-              polyOrder, nextDepthTilSerial, childCommRank, rightTeamSize );
+              polyOrder, childCommRank, rightTeamSize );
         offset += xSize*yRightSize*vSize;
 
         // Store the separator
