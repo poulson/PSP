@@ -220,7 +220,7 @@ private:
 
     int LocalReorderedIndex( int x, int y, int v ) const;
     int LocalReorderedIndex( int x, int y, int vLocal, int vSize ) const;
-    int LocalReorderedIndexRecursion
+    static int LocalReorderedIndexRecursion
     ( int x, int y, int vLocal, int xSize, int ySize, int vSize, int cutoff, 
       int offset, int commRank, int commSize );
 
