@@ -101,6 +101,13 @@ template<typename T>
 void SubtractScaledColumns
 ( const std::vector<T>& deltaList, const Matrix<T>& xList, Matrix<T>& yList );
 
+// For use in Dist(Spectral)Helmholtz::FillPanelLocalElimTree
+struct Box
+{
+    int parentIndex, nx, ny, xOffset, yOffset;
+    bool leftChild;
+};
+
 } // namespace psp
 
 #include "psp/config.h"

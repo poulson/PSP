@@ -76,7 +76,7 @@ DistSpectralHelmholtz<R>::PullRightHandSides
 
     // Pack and send the amount of data that we will need to recv
     std::vector<int> recvCounts( commSize, 0 );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = gridB.OwningProcess( naturalIndex );
@@ -101,7 +101,7 @@ DistSpectralHelmholtz<R>::PullRightHandSides
     // Pack and send the indices that we will need to recv from each process.
     std::vector<int> offsets = recvDispls;
     std::vector<int> recvIndices( totalRecvCount );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = gridB.OwningProcess( naturalIndex );
@@ -150,8 +150,8 @@ DistSpectralHelmholtz<R>::PullRightHandSides
 
     // Unpack the received right-hand side data
     offsets = recvDispls;
-    B.ResizeTo( localHeight_, numRhs, localHeight_ );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    B.ResizeTo( localSize_, numRhs, localSize_ );
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = gridB.OwningProcess( naturalIndex );
@@ -171,7 +171,7 @@ DistSpectralHelmholtz<R>::PushRightHandSides
 
     // Pack and send the amount of data that we will need to send.
     std::vector<int> sendCounts( commSize, 0 );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = gridB.OwningProcess( naturalIndex );
@@ -197,7 +197,7 @@ DistSpectralHelmholtz<R>::PushRightHandSides
     // each process.
     std::vector<int> offsets = sendDispls;
     std::vector<int> sendIndices( totalSendCount );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = gridB.OwningProcess( naturalIndex );
@@ -223,7 +223,7 @@ DistSpectralHelmholtz<R>::PushRightHandSides
     // Pack and send the right-hand side data
     offsets = sendDispls;
     std::vector<C> sendB( totalSendCount );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal]; 
         const int proc = gridB.OwningProcess( naturalIndex );
@@ -261,15 +261,15 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
   bool viewIterates ) const
 {
     const int numRhs = bList.Width();
-    const int localHeight = bList.Height();
+    const int localSize = bList.Height();
     const int commRank = mpi::CommRank( comm_ );
 
-    Matrix<C> VInter( localHeight, numRhs*m ), // interwoven
-              x0List( localHeight, numRhs   ), // contiguous
-              xList(  localHeight, numRhs   ), // contiguous
-              wList(  localHeight, numRhs   ), // contiguous
-              zList(  m+1,         numRhs   ), // contiguous
-              HList(  m,           m*numRhs ); // contiguous
+    Matrix<C> VInter( localSize, numRhs*m ), // interwoven
+              x0List( localSize, numRhs   ), // contiguous
+              xList(  localSize, numRhs   ), // contiguous
+              wList(  localSize, numRhs   ), // contiguous
+              zList(  m+1,       numRhs   ), // contiguous
+              HList(  m,         m*numRhs ); // contiguous
 
     // For storing Givens rotations
     Matrix<R> csList( m, numRhs );
@@ -329,7 +329,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
 
         // v0 := w / beta
         Matrix<C> v0List;
-        v0List.View( VInter, 0, 0, localHeight, numRhs );
+        v0List.View( VInter, 0, 0, localSize, numRhs );
         v0List = wList;
         DivideColumns( v0List, betaList );
 
@@ -342,7 +342,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
         {
             // w := A v_j
             Matrix<C> vjList;
-            vjList.LockedView( VInter, 0, j*numRhs, localHeight, numRhs );
+            vjList.LockedView( VInter, 0, j*numRhs, localSize, numRhs );
             wList = vjList;
             {
 #ifndef RELEASE
@@ -404,8 +404,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 {
                     // H(i,j) := v_i' w
                     Matrix<C> viList;
-                    viList.LockedView
-                    ( VInter, 0, i*numRhs, localHeight, numRhs );
+                    viList.LockedView( VInter, 0, i*numRhs, localSize, numRhs );
                     InnerProducts( viList, wList, alphaList, comm_ );
                     for( int k=0; k<numRhs; ++k )
                         HList.Set(i,j+k*m,alphaList[k]);
@@ -431,8 +430,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 if( j+1 != m )
                 {
                     Matrix<C> vjp1List;
-                    vjp1List.View
-                    ( VInter, 0, (j+1)*numRhs, localHeight, numRhs );
+                    vjp1List.View( VInter, 0, (j+1)*numRhs, localSize, numRhs );
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
                 }
@@ -525,13 +523,13 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
 
                     // x := x0 + Vj y
                     Matrix<C> x, x0, vi;
-                    x.View(         xList, 0, k, localHeight, 1 );
-                    x0.LockedView( x0List, 0, k, localHeight, 1 );
+                    x.View(         xList, 0, k, localSize, 1 );
+                    x0.LockedView( x0List, 0, k, localSize, 1 );
                     x = x0;
                     for( int i=0; i<=j; ++i )
                     {
                         const C eta_i = y.Get(i,0);
-                        vi.LockedView( VInter, 0, i*numRhs+k, localHeight, 1 );
+                        vi.LockedView( VInter, 0, i*numRhs+k, localSize, 1 );
                         elem::Axpy( eta_i, vi, x );
                     }
                 }
@@ -655,13 +653,13 @@ DistSpectralHelmholtz<R>::Multiply( Matrix<C>& B ) const
     // Run the local multiplies to form the result
     std::vector<int> offsets = recvDispls;
     C* BBuffer = B.Buffer();
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         // Multiply by the diagonal value
         const int rowOffset = localRowOffsets_[iLocal];
         const C diagVal = localEntries_[rowOffset];
         for( int k=0; k<numRhs; ++k )
-            BBuffer[iLocal+k*localHeight_] *= diagVal;
+            BBuffer[iLocal+k*localSize_] *= diagVal;
 
         // Multiply by the off-diagonal values
         const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
@@ -670,7 +668,7 @@ DistSpectralHelmholtz<R>::Multiply( Matrix<C>& B ) const
             const int proc = owningProcesses_[rowOffset+jLocal];
             const C offDiagVal = localEntries_[rowOffset+jLocal];
             for( int k=0; k<numRhs; ++k )
-                BBuffer[iLocal+k*localHeight_] +=
+                BBuffer[iLocal+k*localSize_] +=
                     offDiagVal*recvRhs[offsets[proc]+k];
             offsets[proc] += numRhs;
         }
@@ -741,12 +739,12 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     const int numRhs = B.Width();
     const int panelPadding = PanelPadding( i );
     const int panelDepth = PanelDepth( i );
-    const int localHeight1d = 
+    const int localSize1d = 
         info.distNodes.back().localOffset1d + 
         info.distNodes.back().localSize1d;
 
     Matrix<C> localPanelB;
-    elem::Zeros( localHeight1d, numRhs, localPanelB );
+    elem::Zeros( localSize1d, numRhs, localPanelB );
 
     // For each node, pull in each right-hand side with a memcpy
     int BOffset = LocalPanelOffset( i );
@@ -802,7 +800,7 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         BOffset += localRemainingSize;
     }
 #ifndef RELEASE
-    if( BOffset != LocalPanelOffset(i)+LocalPanelHeight(i) )
+    if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
         throw std::logic_error("Invalid BOffset usage in pull");
 #endif
 
@@ -865,7 +863,7 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         BOffset += localRemainingSize;
     }
 #ifndef RELEASE
-    if( BOffset != LocalPanelOffset(i)+LocalPanelHeight(i) )
+    if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
         throw std::logic_error("Invalid BOffset usage in push");
 #endif
 }
@@ -944,15 +942,15 @@ DistSpectralHelmholtz<R>::ExtractPanel
 ( Matrix<C>& B, int i, Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
-    const int localPanelHeight = LocalPanelHeight( i );
+    const int localPanelSize = LocalPanelSize( i );
     const int numRhs = B.Width();
-    Z.ResizeTo( localPanelHeight, numRhs );
+    Z.ResizeTo( localPanelSize, numRhs );
 
     for( int k=0; k<numRhs; ++k )
     {
         elem::MemCopy
-        ( Z.Buffer(0,k), B.LockedBuffer(localPanelOffset,k), localPanelHeight );
-        elem::MemZero( B.Buffer(localPanelOffset,k), localPanelHeight );
+        ( Z.Buffer(0,k), B.LockedBuffer(localPanelOffset,k), localPanelSize );
+        elem::MemZero( B.Buffer(localPanelOffset,k), localPanelSize );
     }
 }
 
@@ -981,11 +979,11 @@ DistSpectralHelmholtz<R>::MultiplySuperdiagonal( Matrix<C>& B, int i ) const
                       << "iLocal=" << iLocal << std::endl;
             throw std::logic_error("Send index was too small");
         }
-        if( iLocal >= LocalPanelOffset(i+1)+LocalPanelHeight(i+1) )
+        if( iLocal >= LocalPanelOffset(i+1)+LocalPanelSize(i+1) )
         {
             std::cout << "s=" << s << "\n"
                       << "offset i+1=" << LocalPanelOffset(i+1) << ", \n"
-                      << "height i+1=" << LocalPanelHeight(i+1) << ", \n"
+                      << "height i+1=" << LocalPanelSize(i+1) << ", \n"
                       << "iLocal    =" << iLocal << std::endl;
             throw std::logic_error("Send index was too big");
         }
@@ -1043,10 +1041,10 @@ DistSpectralHelmholtz<R>::UpdatePanel
 ( Matrix<C>& B, int i, const Matrix<C>& Z ) const
 {
     const int localPanelOffset = LocalPanelOffset( i );
-    const int localPanelHeight = LocalPanelHeight( i );
+    const int localPanelSize = LocalPanelSize( i );
     const int numRhs = Z.Width();
     for( int k=0; k<numRhs; ++k )
-        for( int s=0; s<localPanelHeight; ++s )
+        for( int s=0; s<localPanelSize; ++s )
             B.Update( localPanelOffset+s, k, Z.Get(s,k) );
 }
 

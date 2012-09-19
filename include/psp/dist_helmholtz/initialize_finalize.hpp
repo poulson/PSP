@@ -407,7 +407,7 @@ DistHelmholtz<R>::Initialize
         // Now make use of the redistributed velocity data to form the global 
         // sparse matrix
         localEntries_.resize( localRowOffsets_.back() );
-        for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+        for( int iLocal=0; iLocal<localSize_; ++iLocal )
         {
             const int naturalIndex = localToNaturalMap_[iLocal];
             const int x = naturalIndex % nx;
@@ -887,7 +887,7 @@ DistHelmholtz<R>::GetGlobalVelocity
 
     // Pack and send the amount of data that we need to recv from each process.
     std::vector<int> recvCounts( commSize, 0 );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = velocity.OwningProcess( naturalIndex );
@@ -913,7 +913,7 @@ DistHelmholtz<R>::GetGlobalVelocity
     // Pack and send the indices that we need to recv from each process.
     std::vector<int> recvIndices( totalRecvCount );
     offsets = recvDispls;
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int naturalIndex = localToNaturalMap_[iLocal];
         const int proc = velocity.OwningProcess( naturalIndex );

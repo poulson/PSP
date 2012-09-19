@@ -92,40 +92,40 @@ DistHelmholtz<R>::DistHelmholtz
     //
 
     // Compute the number of rows we own of the sparse distributed matrix
-    localBottomHeight_ = 
-        LocalPanelHeight( bottomDepth_, 0, commRank, commSize );
-    localFullInnerHeight_ = 
-        LocalPanelHeight( numPlanesPerPanel_, bz, commRank, commSize );
-    localLeftoverInnerHeight_ = 
-        LocalPanelHeight( leftoverInnerDepth_, bz, commRank, commSize );
-    localTopHeight_ = LocalPanelHeight( topOrigDepth_, bz, commRank, commSize );
-    localHeight_ = localBottomHeight_ +
-                   numFullInnerPanels_*localFullInnerHeight_ +
-                   localLeftoverInnerHeight_ + 
-                   localTopHeight_;
+    localBottomSize_ = 
+        LocalPanelSize( bottomDepth_, 0, commRank, commSize );
+    localFullInnerSize_ = 
+        LocalPanelSize( numPlanesPerPanel_, bz, commRank, commSize );
+    localLeftoverInnerSize_ = 
+        LocalPanelSize( leftoverInnerDepth_, bz, commRank, commSize );
+    localTopSize_ = LocalPanelSize( topOrigDepth_, bz, commRank, commSize );
+    localSize_ = localBottomSize_ +
+                   numFullInnerPanels_*localFullInnerSize_ +
+                   localLeftoverInnerSize_ + 
+                   localTopSize_;
 
     // Compute the natural indices of the rows of the global sparse matrix 
     // that are owned by our process. Also, set up the offsets for the 
     // (soon-to-be-computed) packed storage of the connectivity of our local 
     // rows.
-    localToNaturalMap_.resize( localHeight_ );
-    localRowOffsets_.resize( localHeight_+1 );
+    localToNaturalMap_.resize( localSize_ );
+    localRowOffsets_.resize( localSize_+1 );
     localRowOffsets_[0] = 0;
-    for( int whichPanel=0; whichPanel<numPanels_; ++whichPanel )
-        MapLocalPanelIndices( commRank, commSize, whichPanel );
+    for( int panel=0; panel<numPanels_; ++panel )
+        MapLocalPanelIndices( commRank, commSize, panel );
 
     // Fill in the natural indices of the connections to our local rows of the
     // global sparse matrix.
     std::vector<int> localConnections( localRowOffsets_.back() );
-    for( int whichPanel=0; whichPanel<numPanels_; ++whichPanel )
+    for( int panel=0; panel<numPanels_; ++panel )
         MapLocalConnectionIndices
-        ( commRank, commSize, localConnections, whichPanel );
+        ( commRank, commSize, localConnections, panel );
 
     // Count the number of indices that we need to recv from each process 
     // during the global sparse matrix multiplication.
     globalRecvCounts_.resize( commSize, 0 );
     owningProcesses_.resize( localRowOffsets_.back() );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         // Handle the diagonal value
         const int rowOffset = localRowOffsets_[iLocal];
@@ -161,7 +161,7 @@ DistHelmholtz<R>::DistHelmholtz
     // Pack and send the list of indices that we will need from each process
     std::vector<int> offsets = globalRecvDispls_;
     std::vector<int> recvIndices( totalRecvCount );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         const int rowOffset = localRowOffsets_[iLocal];
         const int rowSize = localRowOffsets_[iLocal+1]-rowOffset;
@@ -183,7 +183,7 @@ DistHelmholtz<R>::DistHelmholtz
 
     // Invert the local to natural map
     std::map<int,int> naturalToLocalMap;
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
         naturalToLocalMap[localToNaturalMap_[iLocal]] = iLocal;
 
     // Convert the natural indices to their local indices in place
@@ -197,7 +197,7 @@ DistHelmholtz<R>::DistHelmholtz
     // TODO: Simplify by splitting into three different classes of panels.
     std::vector<int> subdiagRecvCountsPerm( (numPanels_-1)*commSize, 0 );
     std::vector<int> supdiagRecvCountsPerm( (numPanels_-1)*commSize, 0 );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         // Get our natural coordinates
         const int naturalIndex = localToNaturalMap_[iLocal];
@@ -208,22 +208,22 @@ DistHelmholtz<R>::DistHelmholtz
 
         // If there is a v connection which spans panels, count it here.
         const int localV = LocalV( v );
-        const int whichPanel = WhichPanel( v );
-        const int panelDepth = PanelDepth( whichPanel );
-        const int panelPadding = PanelPadding( whichPanel );
-        if( localV == panelPadding && whichPanel != 0 )
+        const int panel = WhichPanel( v );
+        const int panelDepth = PanelDepth( panel );
+        const int panelPadding = PanelPadding( panel );
+        if( localV == panelPadding && panel != 0 )
         {
             // Handle connection to previous panel, which is relevant to the
             // computation of A_{i+1,i} B_i
             const int proc = OwningProcess( x, y, v-1, commSize );
-            ++subdiagRecvCountsPerm[proc*(numPanels_-1)+(whichPanel-1)];
+            ++subdiagRecvCountsPerm[proc*(numPanels_-1)+(panel-1)];
         }
-        if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
+        if( localV == panelPadding+panelDepth-1 && panel != numPanels_-1 )
         {
             // Handle connection to next panel, which is relevant to the 
             // computation of A_{i,i+1} B_{i+1}
             const int proc = OwningProcess( x, y, v+1, commSize );
-            ++supdiagRecvCountsPerm[proc*(numPanels_-1)+whichPanel];
+            ++supdiagRecvCountsPerm[proc*(numPanels_-1)+panel];
         }
     }
     std::vector<int> subdiagSendCountsPerm( (numPanels_-1)*commSize );
@@ -318,7 +318,7 @@ DistHelmholtz<R>::DistHelmholtz
     supdiagRecvLocalIndices_.resize( supdiagTotalRecvCount );
     subdiagRecvLocalRows_.resize( subdiagTotalRecvCount );
     supdiagRecvLocalRows_.resize( supdiagTotalRecvCount );
-    for( int iLocal=0; iLocal<localHeight_; ++iLocal )
+    for( int iLocal=0; iLocal<localSize_; ++iLocal )
     {
         // Get our natural coordinates
         const int rowOffset = localRowOffsets_[iLocal];
@@ -331,10 +331,10 @@ DistHelmholtz<R>::DistHelmholtz
 
         // If there is a v connection which spans panels, count it here.
         const int localV = LocalV( v );
-        const int whichPanel = WhichPanel( v );
-        const int panelDepth = PanelDepth( whichPanel );
-        const int panelPadding = PanelPadding( whichPanel );
-        if( localV == panelPadding && whichPanel != 0 )
+        const int panel = WhichPanel( v );
+        const int panelDepth = PanelDepth( panel );
+        const int panelPadding = PanelPadding( panel );
+        if( localV == panelPadding && panel != 0 )
         {
             // Handle connection to previous panel, which is relevant to the
             // computation of A_{i+1,i} B_i
@@ -356,7 +356,7 @@ DistHelmholtz<R>::DistHelmholtz
 #endif
 
             const int proc = OwningProcess( x, y, v-1, commSize );
-            const int index = (whichPanel-1)*commSize + proc;
+            const int index = (panel-1)*commSize + proc;
             const int offset = subdiagOffsets[index];
             subdiagRecvIndices[offset] = naturalCol;
             subdiagRecvLocalIndices_[offset] = localIndex;
@@ -364,7 +364,7 @@ DistHelmholtz<R>::DistHelmholtz
 
             ++subdiagOffsets[index];
         }
-        if( localV == panelPadding+panelDepth-1 && whichPanel != numPanels_-1 )
+        if( localV == panelPadding+panelDepth-1 && panel != numPanels_-1 )
         {
             // Handle connection to next panel, which is relevant to the 
             // computation of A_{i,i+1} B_{i+1}
@@ -386,7 +386,7 @@ DistHelmholtz<R>::DistHelmholtz
 #endif
 
             const int proc = OwningProcess( x, y, v+1, commSize );
-            const int index = whichPanel*commSize + proc;
+            const int index = panel*commSize + proc;
             const int offset = supdiagOffsets[index];
             supdiagRecvIndices[offset] = naturalCol;
             supdiagRecvLocalIndices_[offset] = localIndex;
@@ -453,26 +453,26 @@ DistHelmholtz<R>::~DistHelmholtz()
 
 template<typename R>
 int
-DistHelmholtz<R>::LocalPanelHeight
+DistHelmholtz<R>::LocalPanelSize
 ( int vSize, int vPadding, int commRank, int commSize ) const
 {
-    int localHeight = 0;
-    LocalPanelHeightRecursion
+    int localSize = 0;
+    LocalPanelSizeRecursion
     ( disc_.nx, disc_.ny, vSize, vPadding, nestedCutoff_, 
-      commRank, commSize, localHeight );
-    return localHeight;
+      commRank, commSize, localSize );
+    return localSize;
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::LocalPanelHeightRecursion
+DistHelmholtz<R>::LocalPanelSizeRecursion
 ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
-  int teamRank, int teamSize, int& localHeight ) 
+  int teamRank, int teamSize, int& localSize ) 
 {
     if( teamSize == 1 && xSize*ySize <= cutoff )
     {
         // Add the leaf
-        localHeight += xSize*ySize*vSize;
+        localSize += xSize*ySize*vSize;
     }
     else if( xSize >= ySize )
     {
@@ -483,19 +483,19 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localHeight += LocalLength<int>( ySize*vSize, colShift, teamSize );
+        localSize += LocalLength<int>( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSize = (xSize-1) / 2;
         if( teamSize == 1 )
         {
             // Add the left side
-            LocalPanelHeightRecursion
-            ( xLeftSize, ySize, vSize, vPadding, cutoff, 0, 1, localHeight );
+            LocalPanelSizeRecursion
+            ( xLeftSize, ySize, vSize, vPadding, cutoff, 0, 1, localSize );
             // Add the right side
-            LocalPanelHeightRecursion
+            LocalPanelSizeRecursion
             ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff, 0, 1, 
-              localHeight );
+              localSize );
         }
         else
         {
@@ -509,16 +509,16 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
             if( onLeft )
             {
                 // Add the left side
-                LocalPanelHeightRecursion
+                LocalPanelSizeRecursion
                 ( xLeftSize, ySize, vSize, vPadding, cutoff,
-                  newTeamRank, leftTeamSize, localHeight );
+                  newTeamRank, leftTeamSize, localSize );
             }
             else
             {
                 // Add the right side
-                LocalPanelHeightRecursion
+                LocalPanelSizeRecursion
                 ( xSize-(xLeftSize+1), ySize, vSize, vPadding, cutoff,
-                  newTeamRank, rightTeamSize, localHeight );
+                  newTeamRank, rightTeamSize, localSize );
             }
         }
     }
@@ -531,19 +531,19 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localHeight += LocalLength<int>( xSize*vSize, colShift, teamSize );
+        localSize += LocalLength<int>( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSize = (ySize-1) / 2;
         if( teamSize == 1 )
         {
             // Add the left side
-            LocalPanelHeightRecursion
-            ( xSize, yLeftSize, vSize, vPadding, cutoff, 0, 1, localHeight );
+            LocalPanelSizeRecursion
+            ( xSize, yLeftSize, vSize, vPadding, cutoff, 0, 1, localSize );
             // Add the right side
-            LocalPanelHeightRecursion
+            LocalPanelSizeRecursion
             ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 0, 1, 
-              localHeight );
+              localSize );
         }
         else
         {
@@ -557,16 +557,16 @@ DistHelmholtz<R>::LocalPanelHeightRecursion
             if( onLeft )
             {
                 // Add the left side
-                LocalPanelHeightRecursion
+                LocalPanelSizeRecursion
                 ( xSize, yLeftSize, vSize, vPadding, cutoff,
-                  newTeamRank, leftTeamSize, localHeight );
+                  newTeamRank, leftTeamSize, localSize );
             }
             else
             {
                 // Add the right side
-                LocalPanelHeightRecursion
+                LocalPanelSizeRecursion
                 ( xSize, ySize-(yLeftSize+1), vSize, vPadding, cutoff, 
-                  newTeamRank, rightTeamSize, localHeight );
+                  newTeamRank, rightTeamSize, localSize );
             }
         }
     }
@@ -687,13 +687,13 @@ DistHelmholtz<R>::NumLocalNodesRecursion
 
 template<typename R>
 cliq::DistSymmFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelFactorization( int whichPanel )
+DistHelmholtz<R>::PanelFactorization( int panel )
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return bottomFact_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
-        return *fullInnerFacts_[whichPanel-1];
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( panel < 1 + numFullInnerPanels_ )
+        return *fullInnerFacts_[panel-1];
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerFact_;
     else
         return topFact_;
@@ -701,13 +701,13 @@ DistHelmholtz<R>::PanelFactorization( int whichPanel )
 
 template<typename R>
 DistCompressedFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
+DistHelmholtz<R>::PanelCompressedFactorization( int panel )
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return bottomCompressedFact_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
-        return *fullInnerCompressedFacts_[whichPanel-1];
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( panel < 1 + numFullInnerPanels_ )
+        return *fullInnerCompressedFacts_[panel-1];
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerCompressedFact_;
     else
         return topCompressedFact_;
@@ -715,13 +715,13 @@ DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel )
 
 template<typename R>
 const cliq::DistSymmFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
+DistHelmholtz<R>::PanelFactorization( int panel ) const
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return bottomFact_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
-        return *fullInnerFacts_[whichPanel-1];
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( panel < 1 + numFullInnerPanels_ )
+        return *fullInnerFacts_[panel-1];
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerFact_;
     else
         return topFact_;
@@ -729,24 +729,24 @@ DistHelmholtz<R>::PanelFactorization( int whichPanel ) const
 
 template<typename R>
 const DistCompressedFrontTree<Complex<R> >&
-DistHelmholtz<R>::PanelCompressedFactorization( int whichPanel ) const
+DistHelmholtz<R>::PanelCompressedFactorization( int panel ) const
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return bottomCompressedFact_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
-        return *fullInnerCompressedFacts_[whichPanel-1];
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( panel < 1 + numFullInnerPanels_ )
+        return *fullInnerCompressedFacts_[panel-1];
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerCompressedFact_;
     else
         return topCompressedFact_;
 }
 
 template<typename R>
-cliq::DistSymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
+cliq::DistSymmInfo& DistHelmholtz<R>::PanelAnalysis( int panel )
 {
-    if( whichPanel < 1 + numFullInnerPanels_ )
+    if( panel < 1 + numFullInnerPanels_ )
         return bottomInfo_;
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerInfo_;
     else
         return topInfo_;
@@ -754,11 +754,11 @@ cliq::DistSymmInfo& DistHelmholtz<R>::PanelAnalysis( int whichPanel )
 
 template<typename R>
 const cliq::DistSymmInfo&
-DistHelmholtz<R>::PanelAnalysis( int whichPanel ) const
+DistHelmholtz<R>::PanelAnalysis( int panel ) const
 {
-    if( whichPanel < 1 + numFullInnerPanels_ )
+    if( panel < 1 + numFullInnerPanels_ )
         return bottomInfo_;
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerInfo_;
     else
         return topInfo_;
@@ -766,9 +766,9 @@ DistHelmholtz<R>::PanelAnalysis( int whichPanel ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::PanelPadding( int whichPanel ) const
+DistHelmholtz<R>::PanelPadding( int panel ) const
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return 0;
     else
         return disc_.bz;
@@ -776,13 +776,13 @@ DistHelmholtz<R>::PanelPadding( int whichPanel ) const
 
 template<typename R>
 int
-DistHelmholtz<R>::PanelDepth( int whichPanel ) const
+DistHelmholtz<R>::PanelDepth( int panel ) const
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return bottomDepth_;
-    else if( whichPanel < 1 + numFullInnerPanels_ )
+    else if( panel < 1 + numFullInnerPanels_ )
         return numPlanesPerPanel_;
-    else if( haveLeftover_ && whichPanel == 1 + numFullInnerPanels_ )
+    else if( haveLeftover_ && panel == 1 + numFullInnerPanels_ )
         return leftoverInnerDepth_;
     else
         return topOrigDepth_;
@@ -815,13 +815,13 @@ DistHelmholtz<R>::LocalV( int v ) const
 // Return the lowest v index of the specified panel
 template<typename R>
 int
-DistHelmholtz<R>::PanelV( int whichPanel ) const
+DistHelmholtz<R>::PanelV( int panel ) const
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return 0;
-    else if( whichPanel < numFullInnerPanels_+1 )
-        return bottomDepth_ + numPlanesPerPanel_*(whichPanel-1);
-    else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
+    else if( panel < numFullInnerPanels_+1 )
+        return bottomDepth_ + numPlanesPerPanel_*(panel-1);
+    else if( haveLeftover_ && panel == numFullInnerPanels_+1 )
         return bottomDepth_ + numPlanesPerPanel_*numFullInnerPanels_;
     else
         return bottomDepth_ + numPlanesPerPanel_*numFullInnerPanels_ + 
@@ -832,42 +832,41 @@ DistHelmholtz<R>::PanelV( int whichPanel ) const
 // panel, numbered from the bottom up
 template<typename R>
 int 
-DistHelmholtz<R>::LocalPanelOffset( int whichPanel ) const
+DistHelmholtz<R>::LocalPanelOffset( int panel ) const
 {
-    if( whichPanel == 0 )
+    if( panel == 0 )
         return 0;
-    else if( whichPanel < numFullInnerPanels_+1 )
-        return localBottomHeight_ + localFullInnerHeight_*(whichPanel-1);
-    else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
-        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_;
+    else if( panel < numFullInnerPanels_+1 )
+        return localBottomSize_ + localFullInnerSize_*(panel-1);
+    else if( haveLeftover_ && panel == numFullInnerPanels_+1 )
+        return localBottomSize_ + localFullInnerSize_*numFullInnerPanels_;
     else
-        return localBottomHeight_ + localFullInnerHeight_*numFullInnerPanels_ +
-               localLeftoverInnerHeight_;
+        return localBottomSize_ + localFullInnerSize_*numFullInnerPanels_ +
+               localLeftoverInnerSize_;
 }
 
 template<typename R>
 int
-DistHelmholtz<R>::LocalPanelHeight( int whichPanel ) const
+DistHelmholtz<R>::LocalPanelSize( int panel ) const
 {
-    if( whichPanel == 0 )
-        return localBottomHeight_;
-    else if( whichPanel < numFullInnerPanels_+1 )
-        return localFullInnerHeight_;
-    else if( haveLeftover_ && whichPanel == numFullInnerPanels_+1 )
-        return localLeftoverInnerHeight_;
+    if( panel == 0 )
+        return localBottomSize_;
+    else if( panel < numFullInnerPanels_+1 )
+        return localFullInnerSize_;
+    else if( haveLeftover_ && panel == numFullInnerPanels_+1 )
+        return localLeftoverInnerSize_;
     else 
-        return localTopHeight_;
+        return localTopSize_;
 }
 
 template<typename R>
 void
-DistHelmholtz<R>::MapLocalPanelIndices
-( int commRank, int commSize, int whichPanel ) 
+DistHelmholtz<R>::MapLocalPanelIndices( int commRank, int commSize, int panel ) 
 {
-    const int vSize = PanelDepth( whichPanel );
-    const int vPadding = PanelPadding( whichPanel );
-    const int vOffset = PanelV( whichPanel );
-    int localOffset = LocalPanelOffset( whichPanel );
+    const int vSize = PanelDepth( panel );
+    const int vPadding = PanelPadding( panel );
+    const int vOffset = PanelV( panel );
+    int localOffset = LocalPanelOffset( panel );
     MapLocalPanelIndicesRecursion
     ( disc_.nx, disc_.ny, disc_.nz, disc_.nx, disc_.ny, vSize, 
       vPadding, 0, 0, vOffset, nestedCutoff_, commRank, commSize, 
@@ -975,9 +974,9 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localHeight = 
+        const int localSize = 
             LocalLength<int>( ySize*vSize, colShift, teamSize );
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
             const int yDelta = i % ySize;
@@ -1063,9 +1062,9 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localHeight = 
+        const int localSize = 
             LocalLength<int>( xSize*vSize, colShift, teamSize );
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
             const int xDelta = i % xSize;
@@ -1104,12 +1103,12 @@ template<typename R>
 void
 DistHelmholtz<R>::MapLocalConnectionIndices
 ( int commRank, int commSize, 
-  std::vector<int>& localConnections, int whichPanel ) const
+  std::vector<int>& localConnections, int panel ) const
 {
-    const int vSize = PanelDepth( whichPanel );
-    const int vPadding = PanelPadding( whichPanel );
-    const int vOffset = PanelV( whichPanel );
-    int panelOffset = LocalPanelOffset( whichPanel );
+    const int vSize = PanelDepth( panel );
+    const int vPadding = PanelPadding( panel );
+    const int vOffset = PanelV( panel );
+    int panelOffset = LocalPanelOffset( panel );
     int localOffset = localRowOffsets_[panelOffset];
     MapLocalConnectionIndicesRecursion
     ( disc_.nx, disc_.ny, disc_.nz, disc_.nx, disc_.ny, vSize, 
@@ -1208,9 +1207,9 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localHeight = 
+        const int localSize = 
             LocalLength<int>( ySize*vSize, colShift, teamSize );
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
             const int yDelta = i % ySize;
@@ -1287,9 +1286,9 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localHeight = 
+        const int localSize = 
             LocalLength<int>( xSize*vSize, colShift, teamSize );
-        for( int iLocal=0; iLocal<localHeight; ++iLocal )
+        for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
             const int xDelta = i % xSize;

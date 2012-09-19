@@ -37,7 +37,7 @@ public:
 
     DistHelmholtz
     ( const Discretization<R>& disc, mpi::Comm comm, 
-      R damping=7.5, int numPlanesPerPanel=4, int cutoff=12 );
+      R damping=7.0, int numPlanesPerPanel=4, int cutoff=12 );
 
     ~DistHelmholtz();
 
@@ -104,21 +104,21 @@ private:
     //
 
     // Information about the bottom (and full inner) panels
-    int bottomDepth_;          // including the original PML
-    int localBottomHeight_;    // local height of the bottom panel
-    int localFullInnerHeight_; // local height of full inner panels
-    int innerDepth_;           // total physical inner depth
-    int numFullInnerPanels_;   // number of full inner panels we need
-    int numPanels_;            // total number of panels
+    int bottomDepth_;        // including the original PML
+    int localBottomSize_;    // local number of d.o.f. in bottom panel
+    int localFullInnerSize_; // local number of d.o.f. in each full panel
+    int innerDepth_;         // total physical inner depth
+    int numFullInnerPanels_; // number of full inner panels we need
+    int numPanels_;          // total number of panels
 
     // Information about the leftover inner panel
     bool haveLeftover_;
     int leftoverInnerDepth_;
-    int localLeftoverInnerHeight_;
+    int localLeftoverInnerSize_;
 
     // Information about the top panel
     int topOrigDepth_;
-    int localTopHeight_;
+    int localTopSize_;
 
     // Analyses of each class of panels
     cliq::DistSymmInfo bottomInfo_, leftoverInnerInfo_, topInfo_;
@@ -140,7 +140,7 @@ private:
     //
 
     // Sparse matrix storage
-    int localHeight_;
+    int localSize_;
     std::vector<int> localToNaturalMap_;
     std::vector<int> localRowOffsets_;
     std::vector<int> owningProcesses_;
@@ -183,46 +183,59 @@ private:
     ( int xSize, int ySize, int cutoff, 
       int teamRank, int teamSize, int& numLocal );
 
+    static int DistributedDepth( int commRank, int commSize );
+    static void DistributedDepthRecursion
+    ( int commRank, int commSize, int& distDepth );
+
+    //
+    // Reordering-related routines
+    //
+
+    int PanelPadding( int panel ) const;
+    int PanelDepth( int panel ) const;
+    int WhichPanel( int v ) const;
+    int PanelV( int panel ) const;
+    int LocalV( int v ) const;
+
+    int LocalPanelOffset( int panel ) const;
+    int LocalPanelSize( int panel ) const;
+
+    int LocalPanelSize
+    ( int vSize, int vPadding, int commRank, int commSize ) const;
+    static void LocalPanelSizeRecursion
+    ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
+      int teamRank, int teamSize, int& localSize );
+
+    int OwningProcess( int naturalIndex, int commSize ) const;
+    int OwningProcess( int x, int y, int v, int commSize ) const;
+    static void OwningProcessRecursion
+    ( int x, int y, int vLocal, int xSize, int ySize, 
+      int teamSize, int& process );
+
+    void LocalReordering( std::map<int,int>& reordering, int vSize ) const;
+    static void LocalReorderingRecursion
+    ( std::map<int,int>& reordering, int offset, 
+      int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
+      int depthTilSerial, int cutoff, int commRank, int commSize );
+
+    int ReorderedIndex( int x, int y, int vLocal, int vSize ) const;
+    static int ReorderedIndexRecursion
+    ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
+      int depthTilSerial, int cutoff, int offset );
+
     //
     // Global sparse helper routines
     //
 
-    cliq::DistSymmFrontTree<C>& PanelFactorization( int whichPanel );
-    DistCompressedFrontTree<C>& PanelCompressedFactorization( int whichPanel );
-
-    const cliq::DistSymmFrontTree<C>& 
-    PanelFactorization( int whichPanel ) const;
-    const DistCompressedFrontTree<C>& 
-    PanelCompressedFactorization( int whichPanel ) const;
-
-    cliq::DistSymmInfo& PanelAnalysis( int whichPanel );
-    const cliq::DistSymmInfo& PanelAnalysis( int whichPanel ) const;
-
-    int PanelPadding( int whichPanel ) const;
-    int PanelDepth( int whichPanel ) const;
-    int WhichPanel( int v ) const;
-    int PanelV( int whichPanel ) const;
-    int LocalV( int v ) const;
-    int LocalPanelOffset( int whichPanel ) const;
-    int LocalPanelHeight( int whichPanel ) const;
-
     void GetGlobalVelocity
     ( const DistUniformGrid<R>& velocity,
-      std::vector<R>& myGlobalVelocity,
-      std::vector<int>& offsets ) const;
+      std::vector<R>& myGlobalVelocity, std::vector<int>& offsets ) const;
 
     void FormGlobalRow( R alpha, int x, int y, int v, int row );
 
-    int LocalPanelHeight
-    ( int vSize, int vPadding, int commRank, int commSize ) const;
-    static void LocalPanelHeightRecursion
-    ( int xSize, int ySize, int vSize, int vPadding, int cutoff, 
-      int teamRank, int teamSize, int& localHeight );
-
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
-    void MapLocalPanelIndices
-    ( int commRank, int commSize, int whichPanel );
+    void MapLocalPanelIndices( int commRank, int commSize, int panel );
     static void MapLocalPanelIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
@@ -231,27 +244,27 @@ private:
       int& localOffset );
 
     void MapLocalConnectionIndices
-    ( int commRank, int commSize,  
-      std::vector<int>& localConnections, int whichPanel ) const;
+    ( int commRank, int commSize, 
+      std::vector<int>& localConnections, int panel ) const;
     static void MapLocalConnectionIndicesRecursion
     ( int nx, int ny, int nz, int xSize, int ySize, int vSize, int vPadding,
       int xOffset, int yOffset, int vOffset, int cutoff,
       int teamRank, int teamSize,
       std::vector<int>& localConnections, int& localOffset );
 
-    int OwningProcess( int naturalIndex, int commSize ) const;
-    int OwningProcess( int x, int y, int v, int commSize ) const;
-    static void OwningProcessRecursion
-    ( int x, int y, int vLocal, int xSize, int ySize, 
-      int teamSize, int& process );
-
     //
     // Helpers for the PML-padded sparse-direct portion
     //
 
-    static int DistributedDepth( int commRank, int commSize );
-    static void DistributedDepthRecursion
-    ( int commRank, int commSize, int& distDepth );
+    cliq::DistSymmFrontTree<C>& PanelFactorization( int panel );
+    DistCompressedFrontTree<C>& PanelCompressedFactorization( int panel );
+
+    const cliq::DistSymmFrontTree<C>& PanelFactorization( int panel ) const;
+    const DistCompressedFrontTree<C>& 
+    PanelCompressedFactorization( int panel ) const;
+
+    cliq::DistSymmInfo& PanelAnalysis( int panel );
+    const cliq::DistSymmInfo& PanelAnalysis( int panel ) const;
 
     void GetPanelVelocity
     ( int vOffset, int vSize, 
@@ -289,17 +302,6 @@ private:
       std::map<int,int>& panelNaturalToNested, 
       std::vector<int>& frontIndices, std::vector<C>& values ) const;
 
-    void LocalReordering( std::map<int,int>& reordering, int vSize ) const;
-    static void LocalReorderingRecursion
-    ( std::map<int,int>& reordering, int offset, 
-      int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
-      int depthTilSerial, int cutoff, int commRank, int commSize );
-
-    int ReorderedIndex( int x, int y, int vLocal, int vSize ) const;
-    static int ReorderedIndexRecursion
-    ( int x, int y, int vLocal, int xSize, int ySize, int vSize,
-      int depthTilSerial, int cutoff, int offset );
-
     void FillPanelElimTree( int vSize, cliq::DistSymmElimTree& eTree ) const;
     void FillPanelDistElimTree
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
@@ -307,13 +309,6 @@ private:
     void FillPanelLocalElimTree
     ( int vSize, int& nxSub, int& nySub, int& xOffset, int& yOffset, 
       cliq::DistSymmElimTree& eTree ) const;
-   
-    // For use in FillPanelLocalElimTree
-    struct Box
-    {
-        int parentIndex, nx, ny, xOffset, yOffset;
-        bool leftChild;
-    };
 };
 
 } // namespace psp
