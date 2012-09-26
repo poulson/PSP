@@ -26,6 +26,9 @@ should be qualitatively similar to more sophisticated discretizations
    simply use a sparse-direct solver, ILU preconditioner, or shifted-Laplacian
    preconditioner.
 
+An under-review preprint of the first publication 
+`is available here <http://www.ices.utexas.edu/~poulson/pubs/sisc12-sweeping.pdf>`_.
+
 Dependencies
 ============
 PSP is built on top of `Clique <http://github.com/poulson/Clique>`_, which 

@@ -392,7 +392,7 @@ void DistFrontCompression
     PushCallStack("DistFrontCompression");
 #endif
     const R tolA = 0.02;
-    const R tolB = 0.1;
+    const R tolB = 0.02;
 
     const Grid& grid = front.frontL.Grid();
     const int snSize = front.frontL.Width();
