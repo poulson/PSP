@@ -26,7 +26,7 @@ namespace psp {
 template<typename R>
 void LocalFrontCompression
 ( LocalCompressedFront<Complex<R> >& front, 
-  int depth, bool isLeaf, bool useQR=false );
+  int depth, bool isLeaf, bool useQR, R tolA, R tolB );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -73,7 +73,7 @@ inline void LocalBlockCompression
 ( Matrix<Complex<R> >& A, 
   std::vector<Matrix<Complex<R> > >& greens, 
   std::vector<Matrix<Complex<R> > >& coefficients, 
-  int depth, R tolerance, bool useQR )
+  int depth, bool useQR, R tolerance )
 {
 #ifndef RELEASE
     PushCallStack("internal::LocalBlockCompression");
@@ -231,14 +231,11 @@ void LocalBlockSparsify
 template<typename R>
 void LocalFrontCompression
 ( LocalCompressedFront<Complex<R> >& front, 
-  int depth, bool isLeaf, bool useQR )
+  int depth, bool isLeaf, bool useQR, R tolA, R tolB )
 {
 #ifndef RELEASE
     PushCallStack("LocalFrontCompression");
 #endif
-    const R tolA = 0.02;
-    const R tolB = 0.1;
-
     const int snSize = front.frontL.Width();
     Matrix<Complex<R> > A, B;
     elem::PartitionDown
@@ -249,13 +246,13 @@ void LocalFrontCompression
     front.depth = depth;
     front.isLeaf = isLeaf;
     internal::LocalBlockCompression
-    ( A, front.AGreens, front.ACoefficients, depth, tolA, useQR );
+    ( A, front.AGreens, front.ACoefficients, depth, useQR, tolA );
     if( isLeaf )
         internal::LocalBlockSparsify
         ( B, front.BRows, front.BCols, front.BValues );
     else
         internal::LocalBlockCompression
-        ( B, front.BGreens, front.BCoefficients, depth, tolB, useQR );
+        ( B, front.BGreens, front.BCoefficients, depth, useQR, tolB );
     front.frontL.Empty();
 #ifndef RELEASE
     PopCallStack();

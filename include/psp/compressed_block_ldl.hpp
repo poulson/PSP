@@ -31,7 +31,8 @@ namespace psp {
 template<typename F>
 void CompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR=false );
+  bool useQR=false, 
+  typename Base<F>::type tolA=1e-3, typename Base<F>::type tolB=1e-3 );
 
 } // namespace psp
 
@@ -50,13 +51,13 @@ namespace psp {
 template<typename F>
 inline void CompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR )
+  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
 {
 #ifndef RELEASE
     PushCallStack("CompressedBlockLDL");
 #endif
-    LocalCompressedBlockLDL( info, L, depth, useQR );
-    DistCompressedBlockLDL( info, L, depth, useQR );
+    LocalCompressedBlockLDL( info, L, depth, useQR, tolA, tolB );
+    DistCompressedBlockLDL( info, L, depth, useQR, tolA, tolB );
 #ifndef RELEASE
     PopCallStack();
 #endif

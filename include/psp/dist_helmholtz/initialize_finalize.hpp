@@ -127,6 +127,13 @@ DistHelmholtz<R>::Initialize
     }
 
     //
+    // Compression control parameters
+    //
+    const bool useQR = false; // use the QR-algorithm for the bidiagonal SVD
+    const R tolA = 1e-3; // relative singular value tolerance for diag blocks
+    const R tolB = 1e-3; // relative singular value tolerance for couplings
+
+    //
     // Initialize and factor the top panel (first, since it is the largest)
     //
     {
@@ -165,7 +172,8 @@ DistHelmholtz<R>::Initialize
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            CompressedBlockLDL( topInfo_, topCompressedFact_, vSize );
+            CompressedBlockLDL
+            ( topInfo_, topCompressedFact_, vSize, useQR, tolA, tolB );
         else if( panelScheme == CLIQUE_LDL_SELINV_2D )
             cliq::LDL( topInfo_, topFact_, cliq::LDL_SELINV_2D );
         else if( panelScheme == CLIQUE_LDL_1D )
@@ -225,7 +233,8 @@ DistHelmholtz<R>::Initialize
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            CompressedBlockLDL( bottomInfo_, bottomCompressedFact_, vSize );
+            CompressedBlockLDL
+            ( bottomInfo_, bottomCompressedFact_, vSize, useQR, tolA, tolB );
         else if( panelScheme == CLIQUE_LDL_SELINV_2D )
             cliq::LDL( bottomInfo_, bottomFact_, cliq::LDL_SELINV_2D );
         else if( panelScheme == CLIQUE_LDL_1D )
@@ -299,7 +308,8 @@ DistHelmholtz<R>::Initialize
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             CompressedBlockLDL
-            ( bottomInfo_, *fullInnerCompressedFacts_[k], vSize );
+            ( bottomInfo_, *fullInnerCompressedFacts_[k], vSize, useQR, 
+              tolA, tolB );
         else if( panelScheme == CLIQUE_LDL_SELINV_2D )
             cliq::LDL( bottomInfo_, *fullInnerFacts_[k], cliq::LDL_SELINV_2D );
         else if( panelScheme == CLIQUE_LDL_1D )
@@ -364,7 +374,8 @@ DistHelmholtz<R>::Initialize
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
             CompressedBlockLDL
-            ( leftoverInnerInfo_, leftoverInnerCompressedFact_, vSize );
+            ( leftoverInnerInfo_, leftoverInnerCompressedFact_, vSize, useQR, 
+              tolA, tolB );
         else if( panelScheme == CLIQUE_LDL_SELINV_2D )
             cliq::LDL
             ( leftoverInnerInfo_, leftoverInnerFact_, cliq::LDL_SELINV_2D );

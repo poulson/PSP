@@ -26,7 +26,7 @@ namespace psp {
 template<typename F> 
 void DistCompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR=false );
+  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -35,7 +35,7 @@ void DistCompressedBlockLDL
 template<typename F> 
 inline void DistCompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR )
+  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
 {
 #ifndef RELEASE
     PushCallStack("DistCompressedBlockLDL");
@@ -208,7 +208,7 @@ inline void DistCompressedBlockLDL
             cliq::DistFrontBlockLDL( TRANSPOSE, front.frontL, front.work2d );
 
         // Separately compress the A and B blocks 
-        DistFrontCompression( front, depth, useQR );
+        DistFrontCompression( front, depth, useQR, tolA, tolB );
     }
     L.localFronts.back().work.Empty();
     L.distFronts.back().work2d.Empty();

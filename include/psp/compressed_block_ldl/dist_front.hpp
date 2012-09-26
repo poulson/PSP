@@ -25,7 +25,8 @@ namespace psp {
 
 template<typename R>
 void DistFrontCompression
-( DistCompressedFront<Complex<R> >& front, int depth, bool useQR=false );
+( DistCompressedFront<Complex<R> >& front, int depth, bool useQR,
+  R tolA, R tolB );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -74,7 +75,7 @@ inline void DistBlockCompression
 ( DistMatrix<Complex<R> >& A, 
   std::vector<DistMatrix<Complex<R> > >& greens, 
   std::vector<DistMatrix<Complex<R>,STAR,STAR> >& coefficients,
-  int depth, R tolerance, bool useQR=false )
+  int depth, bool useQR, R tolerance )
 {
 #ifndef RELEASE
     PushCallStack("DistBlockCompression");
@@ -386,14 +387,12 @@ inline void DistBlockCompression
 
 template<typename R>
 void DistFrontCompression
-( DistCompressedFront<Complex<R> >& front, int depth, bool useQR )
+( DistCompressedFront<Complex<R> >& front, int depth, bool useQR, 
+  R tolA, R tolB )
 {
 #ifndef RELEASE
     PushCallStack("DistFrontCompression");
 #endif
-    const R tolA = 0.02;
-    const R tolB = 0.02;
-
     const Grid& grid = front.frontL.Grid();
     const int snSize = front.frontL.Width();
     DistMatrix<Complex<R> > A(grid), B(grid);
@@ -405,9 +404,9 @@ void DistFrontCompression
     front.depth = depth;
     front.grid = &grid;
     internal::DistBlockCompression
-    ( A, front.AGreens, front.ACoefficients, depth, tolA, useQR );
+    ( A, front.AGreens, front.ACoefficients, depth, useQR, tolA );
     internal::DistBlockCompression
-    ( B, front.BGreens, front.BCoefficients, depth, tolB, useQR );
+    ( B, front.BGreens, front.BCoefficients, depth, useQR, tolB );
     front.frontL.Empty();
 #ifndef RELEASE
     PopCallStack();
