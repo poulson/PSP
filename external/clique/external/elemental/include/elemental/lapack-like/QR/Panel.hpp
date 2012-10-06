@@ -72,7 +72,7 @@ PanelQR( Matrix<Real>& A )
         const Real alpha = alpha11.Get(0,0);
         alpha11.Set(0,0,1);
 
-        Gemv( TRANSPOSE, (Real)1, ARightPan, aLeftCol, (Real)0, z );
+        Gemv( TRANSPOSE, Real(1), ARightPan, aLeftCol, Real(0), z );
         Ger( -tau, aLeftCol, z, ARightPan );
 
         alpha11.Set(0,0,alpha);
@@ -146,9 +146,9 @@ PanelQR( DistMatrix<Real>& A )
 
         Gemv
         ( TRANSPOSE, 
-          (Real)1, ARightPan.LockedLocalMatrix(), 
+          Real(1), ARightPan.LockedLocalMatrix(), 
                    aLeftCol_MC_STAR.LockedLocalMatrix(),
-          (Real)0, z_MR_STAR.LocalMatrix() );
+          Real(0), z_MR_STAR.LocalMatrix() );
         z_MR_STAR.SumOverCol(); 
 
         Ger
@@ -234,7 +234,7 @@ PanelQR
         const C alpha = alpha11.Get(0,0);
         alpha11.Set(0,0,1);
 
-        Gemv( ADJOINT, (C)1, ARightPan, aLeftCol, (C)0, z );
+        Gemv( ADJOINT, C(1), ARightPan, aLeftCol, C(0), z );
         Ger( -Conj(tau), aLeftCol, z, ARightPan );
 
         alpha11.Set(0,0,alpha);
@@ -338,9 +338,9 @@ PanelQR
 
         Gemv
         ( ADJOINT, 
-          (C)1, ARightPan.LockedLocalMatrix(), 
+          C(1), ARightPan.LockedLocalMatrix(), 
                 aLeftCol_MC_STAR.LockedLocalMatrix(),
-          (C)0, z_MR_STAR.LocalMatrix() );
+          C(0), z_MR_STAR.LocalMatrix() );
         z_MR_STAR.SumOverCol(); 
 
         Ger

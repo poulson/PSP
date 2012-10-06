@@ -162,6 +162,8 @@ main( int argc, char* argv[] )
             std::cout << "done, " << fillStop-fillStart << " seconds" 
                       << std::endl;
 
+        A.Print("A");
+
         if( commRank == 0 )
             std::cout << "Generating point-source for y..." << std::endl;
         DistVector<C> y( N, comm ), z( N, comm );
@@ -353,7 +355,7 @@ main( int argc, char* argv[] )
         if( commRank == 0 )
             std::cout << "Checking residual norm of solution..." << std::endl;
         const double bNorm = Norm( z );
-        Multiply( (C)-1, A, y, (C)1, z );
+        Multiply( C(-1), A, y, C(1), z );
         const double errorNorm = Norm( z );
         if( commRank == 0 )
         {

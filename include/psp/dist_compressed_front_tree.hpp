@@ -68,7 +68,81 @@ struct DistCompressedFrontTree
     bool isHermitian;
     std::vector<LocalCompressedFront<F> > localFronts;
     std::vector<DistCompressedFront<F> > distFronts;
+
+    void MemoryInfo
+    ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
+      double& numGlobalEntries ) const;
 };
+
+//----------------------------------------------------------------------------//
+// Implementation begins here                                                 //
+//----------------------------------------------------------------------------//
+
+template<typename F>
+inline void
+DistCompressedFrontTree<F>::MemoryInfo
+( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
+  double& numGlobalEntries ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistCompressedFrontTree::MemoryInfo");
+#endif
+    numLocalEntries = numGlobalEntries = 0;
+    const int numLocalFronts = localFronts.size();
+    const int numDistFronts = distFronts.size();
+    const Grid& grid = *(distFronts.back().grid);
+    mpi::Comm comm = grid.Comm();
+
+    for( int s=0; s<numLocalFronts; ++s )
+    {
+        const LocalCompressedFront<F>& front = localFronts[s];
+        numLocalEntries += front.frontL.MemorySize();
+        numLocalEntries += front.work.MemorySize();
+
+        const int numAGreens = front.AGreens.size();
+        const int numBGreens = front.BGreens.size();
+        const int numACoefficients = front.ACoefficients.size();
+        const int numBCoefficients = front.BCoefficients.size();
+        for( int t=0; t<numAGreens; ++t )
+            numLocalEntries += front.AGreens[t].MemorySize();
+        for( int t=0; t<numBGreens; ++t )
+            numLocalEntries += front.BGreens[t].MemorySize();
+        for( int t=0; t<numACoefficients; ++t )
+            numLocalEntries += front.ACoefficients[t].MemorySize();
+        for( int t=0; t<numBCoefficients; ++t )
+            numLocalEntries += front.BCoefficients[t].MemorySize();
+        // We now use the convention that four integers are equal to one 
+        // double-precision complex floating point number
+        numLocalEntries += 1.5*front.BValues.size();
+    }
+    for( int s=1; s<numDistFronts; ++s )
+    {
+        const DistCompressedFront<F>& front = distFronts[s];
+        numLocalEntries += front.frontL.AllocatedMemory();
+        numLocalEntries += front.work1d.AllocatedMemory();
+        numLocalEntries += front.work2d.AllocatedMemory();
+
+        const int numAGreens = front.AGreens.size();
+        const int numBGreens = front.BGreens.size();
+        const int numACoefficients = front.ACoefficients.size();
+        const int numBCoefficients = front.BCoefficients.size();
+        for( int t=0; t<numAGreens; ++t )
+            numLocalEntries += front.AGreens[t].AllocatedMemory();
+        for( int t=0; t<numBGreens; ++t )
+            numLocalEntries += front.BGreens[t].AllocatedMemory();
+        for( int t=0; t<numACoefficients; ++t )
+            numLocalEntries += front.ACoefficients[t].AllocatedMemory();
+        for( int t=0; t<numBCoefficients; ++t )
+            numLocalEntries += front.BCoefficients[t].AllocatedMemory();
+    }
+
+    mpi::AllReduce( &numLocalEntries, &minLocalEntries, 1, mpi::MIN, comm );
+    mpi::AllReduce( &numLocalEntries, &maxLocalEntries, 1, mpi::MAX, comm );
+    mpi::AllReduce( &numLocalEntries, &numGlobalEntries, 1, mpi::SUM, comm );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
 
 } // namespace psp
 

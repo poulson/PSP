@@ -26,7 +26,7 @@ void
 DistSpectralHelmholtz<R>::Initialize
 ( const DistUniformGrid<R>& velocity, PanelScheme panelScheme )
 {
-    if( disc_.omega == (R)0 )
+    if( disc_.omega == R(0) )
         throw std::logic_error("PML does not work at zero frequency");
     if( panelScheme < 0 || panelScheme > 2 )
     {

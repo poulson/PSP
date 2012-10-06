@@ -65,7 +65,7 @@ void CompressSVD
     {
         std::ostringstream msg;
         msg << "kept " << numKeptModes << "/" << k << " modes, "
-            << ((R)100*numKeptModes)/((R)k) << "%" << std::endl;
+            << (R(100)*numKeptModes)/R(k) << "%" << std::endl;
         std::cout << msg.str();
     }
 }

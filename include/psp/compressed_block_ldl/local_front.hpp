@@ -63,7 +63,7 @@ void CompressSVD
     {
         std::ostringstream msg;
         msg << "kept " << numKeptModes << "/" << k << " modes, "
-            << ((R)100*numKeptModes)/((R)k) << "%" << std::endl;
+            << (R(100)*numKeptModes)/R(k) << "%" << std::endl;
         std::cout << msg.str();
     }
 }
@@ -197,7 +197,7 @@ void LocalBlockSparsify
     {
         std::ostringstream msg;
         msg << "kept " << numNonzeros << "/" << height*width << " entries, "
-            << ((R)100*numNonzeros)/((R)height*width) << "%" << std::endl;
+            << (R(100)*numNonzeros)/R(height*width) << "%" << std::endl;
         std::cout << msg.str();
     }
 

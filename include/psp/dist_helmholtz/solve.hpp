@@ -558,7 +558,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
 
             // w := b - A x
             wList = xList; 
-            elem::Scal( (C)-1, wList );
+            elem::Scal( C(-1), wList );
             {
 #ifndef RELEASE
                 mpi::Barrier( comm_ );
@@ -577,7 +577,7 @@ DistHelmholtz<R>::InternalSolveWithGMRES
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
-            elem::Axpy( (C)1, bList, wList );
+            elem::Axpy( C(1), bList, wList );
 
             // Residual checks
             Norms( wList, residNormList, comm_ );

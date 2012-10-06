@@ -23,6 +23,9 @@
 
 namespace psp {
 
+// NOTE: This parallelization is known to be grossly suboptimal and will be
+//       replaced over the next few months.
+
 template<typename F>
 inline void
 DistFrontCompressedBlockLowerForwardSolve
@@ -74,7 +77,7 @@ DistFrontCompressedBlockLowerForwardSolve
             XTBlock_MR_STAR = XTBlock;
             elem::internal::LocalGemm
             ( NORMAL, NORMAL, 
-              (F)1, GA, XTBlock_MR_STAR, (F)0, ZTBlock_MC_STAR );
+              F(1), GA, XTBlock_MR_STAR, F(0), ZTBlock_MC_STAR );
             ZTBlocks[j].SumScatterFrom( ZTBlock_MC_STAR );
         }
         XTBlock_MR_STAR.FreeAlignments();
@@ -127,7 +130,7 @@ DistFrontCompressedBlockLowerForwardSolve
                 XTBlock_MR_STAR = XTBlock;
                 elem::internal::LocalGemm
                 ( NORMAL, NORMAL, 
-                  (F)1, GB, XTBlock_MR_STAR, (F)0, ZBBlock_MC_STAR );
+                  F(1), GB, XTBlock_MR_STAR, F(0), ZBBlock_MC_STAR );
                 ZBBlocks[j].SumScatterFrom( ZBBlock_MC_STAR );
             }
             XTBlock_MR_STAR.FreeAlignments();
@@ -142,7 +145,7 @@ DistFrontCompressedBlockLowerForwardSolve
         for( int i=0; i<depth; ++i )
         {
             XBBlock.View( XB, i*sB, 0, sB, numRhs );
-            elem::Axpy( (F)-1, XBUpdates[i], XBBlock );
+            elem::Axpy( F(-1), XBUpdates[i], XBBlock );
         }
     }
 #ifndef RELEASE
@@ -215,7 +218,7 @@ DistFrontCompressedBlockLowerBackwardSolve
                 XBBlock_MC_STAR = XBBlock;
                 elem::internal::LocalGemm
                 ( orientation, NORMAL,
-                  (F)1, GB, XBBlock_MC_STAR, (F)0, ZTBlock_MR_STAR );
+                  F(1), GB, XBBlock_MC_STAR, F(0), ZTBlock_MR_STAR );
                 ZTBlocks[j].SumScatterFrom( ZTBlock_MR_STAR );
             }
             XBBlock_MC_STAR.FreeAlignments();
@@ -270,7 +273,7 @@ DistFrontCompressedBlockLowerBackwardSolve
             YTBlock_MR_STAR = YTBlock;
             elem::internal::LocalGemm
             ( NORMAL, NORMAL,
-              (F)1, GA, YTBlock_MR_STAR, (F)0, ZTBlock_MC_STAR );
+              F(1), GA, YTBlock_MR_STAR, F(0), ZTBlock_MC_STAR );
             ZTBlocks[j].SumScatterFrom( ZTBlock_MC_STAR );
         }
         YTBlock_MR_STAR.FreeAlignments();
@@ -285,7 +288,7 @@ DistFrontCompressedBlockLowerBackwardSolve
     for( int i=0; i<depth; ++i )
     {
         XTBlock.View( XT, i*sT, 0, sT, numRhs );
-        elem::Axpy( (F)-1, XTUpdates[i], XTBlock );
+        elem::Axpy( F(-1), XTUpdates[i], XTBlock );
     }
 #ifndef RELEASE
     PopCallStack();

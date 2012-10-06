@@ -26,7 +26,7 @@ void
 DistHelmholtz<R>::Initialize
 ( const DistUniformGrid<R>& velocity, PanelScheme panelScheme )
 {
-    if( disc_.omega == (R)0 )
+    if( disc_.omega == R(0) )
         throw std::logic_error("PML does not work at zero frequency");
     if( panelScheme < 0 || panelScheme > 2 )
     {
@@ -172,8 +172,40 @@ DistHelmholtz<R>::Initialize
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
+        {
+            double numLocalEntries, minLocalEntries, maxLocalEntries,
+                   numGlobalEntries;
+            topCompressedFact_.MemoryInfo
+            ( numLocalEntries, minLocalEntries, maxLocalEntries, 
+              numGlobalEntries );
+            if( commRank == 0 )
+            {
+                std::cout << "  before compression:\n"
+                          << "    min local: " << minLocalEntries*sizeof(C)/1e6
+                          << " MB\n"
+                          << "    max local: " << maxLocalEntries*sizeof(C)/1e6
+                          << " MB\n"
+                          << "    global:    " << numGlobalEntries*sizeof(C)/1e6
+                          << " MB\n"
+                          << std::endl;
+            }
             CompressedBlockLDL
             ( topInfo_, topCompressedFact_, vSize, useQR, tolA, tolB );
+            topCompressedFact_.MemoryInfo
+            ( numLocalEntries, minLocalEntries, maxLocalEntries, 
+              numGlobalEntries );
+            if( commRank == 0 )
+            {
+                std::cout << "  after compression:\n"
+                          << "    min local: " << minLocalEntries*sizeof(C)/1e6
+                          << " MB\n"
+                          << "    max local: " << maxLocalEntries*sizeof(C)/1e6
+                          << " MB\n"
+                          << "    global:    " << numGlobalEntries*sizeof(C)/1e6
+                          << " MB\n"
+                          << std::endl;
+            }
+        }
         else if( panelScheme == CLIQUE_LDL_SELINV_2D )
             cliq::LDL( topInfo_, topFact_, cliq::LDL_SELINV_2D );
         else if( panelScheme == CLIQUE_LDL_1D )
@@ -1534,6 +1566,7 @@ DistHelmholtz<R>::FillPanelFronts
     {
         const cliq::DistSymmNodeInfo& node = info.distNodes[0];
         Matrix<C>& topLocalFrontL = fact.localFronts.back().frontL;
+        fact.distFronts[0].grid = node.grid;
         DistMatrix<C>& frontL = fact.distFronts[0].frontL;
         frontL.LockedView
         ( topLocalFrontL.Height(), topLocalFrontL.Width(), 0, 0,
@@ -1547,6 +1580,7 @@ DistHelmholtz<R>::FillPanelFronts
 
         // Initialize this front
         Grid& grid = *node.grid;
+        front.grid = node.grid;
         const int gridHeight = grid.Height();
         const int gridWidth = grid.Width();
         const int gridRow = grid.Row();

@@ -61,7 +61,7 @@ LocalFrontCompressedBlockLowerForwardSolve
         {
             ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
             YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
-            elem::Gemm( NORMAL, NORMAL, (F)1, GA, YTBlock, (F)0, ZTBlock );
+            elem::Gemm( NORMAL, NORMAL, F(1), GA, YTBlock, F(0), ZTBlock );
         }
 
         for( int i=0; i<depth; ++i )
@@ -107,7 +107,7 @@ LocalFrontCompressedBlockLowerForwardSolve
             {
                 ZBBlock.View( ZB, j*sB, 0, sB, numRhs );
                 XTBlock.LockedView( XT, j*sT, 0, sT, numRhs );
-                elem::Gemm( NORMAL, NORMAL, (F)1, GB, XTBlock, (F)0, ZBBlock );
+                elem::Gemm( NORMAL, NORMAL, F(1), GB, XTBlock, F(0), ZBBlock );
             }
 
             for( int i=0; i<depth; ++i )
@@ -193,7 +193,7 @@ LocalFrontCompressedBlockLowerBackwardSolve
                 ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
                 XBBlock.LockedView( XB, j*sB, 0, sB, numRhs );
                 elem::Gemm
-                ( orientation, NORMAL, (F)1, GB, XBBlock, (F)0, ZTBlock );
+                ( orientation, NORMAL, F(1), GB, XBBlock, F(0), ZTBlock );
             }
 
             for( int i=0; i<depth; ++i )
@@ -222,7 +222,7 @@ LocalFrontCompressedBlockLowerBackwardSolve
         {
             ZTBlock.View( ZT, j*sT, 0, sT, numRhs );
             YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
-            elem::Gemm( NORMAL, NORMAL, (F)1, GA, YTBlock, (F)0, ZTBlock );
+            elem::Gemm( NORMAL, NORMAL, F(1), GA, YTBlock, F(0), ZTBlock );
         }
 
         for( int i=0; i<depth; ++i )
