@@ -172,7 +172,7 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
         const LocalCompressedFront<F>& front = localFronts[s];
         Matrix<F> FTL,
                   FBL;
-        elem::PartitionDown
+        elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
         numLocalEntries += FTL.Height()*FTL.Width();
@@ -189,7 +189,7 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
         const DistCompressedFront<F>& front = distFronts[s];
         DistMatrix<F> FTL(grid),
                       FBL(grid);
-        elem::PartitionDown
+        elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
         numLocalEntries += FTL.LocalHeight()*FTL.LocalWidth();
@@ -231,7 +231,7 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
 
         Matrix<F> FTL,
                   FBL;
-        elem::PartitionDown
+        elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
         numLocalEntries += FBL.Height()*FBL.Width();
@@ -252,7 +252,7 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
 
         DistMatrix<F> FTL(grid),
                       FBL(grid);
-        elem::PartitionDown
+        elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
         numLocalEntries += FBL.LocalHeight()*FBL.LocalWidth();
