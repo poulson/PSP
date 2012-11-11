@@ -72,6 +72,14 @@ struct DistCompressedFrontTree
     void MemoryInfo
     ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
       double& numGlobalEntries ) const;
+
+    void TopLeftMemoryInfo
+    ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
+      double& numGlobalEntries ) const;
+
+    void BottomLeftMemoryInfo
+    ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
+      double& numGlobalEntries ) const;
 };
 
 //----------------------------------------------------------------------------//
@@ -132,6 +140,127 @@ DistCompressedFrontTree<F>::MemoryInfo
             numLocalEntries += front.BGreens[t].AllocatedMemory();
         for( int t=0; t<numACoefficients; ++t )
             numLocalEntries += front.ACoefficients[t].AllocatedMemory();
+        for( int t=0; t<numBCoefficients; ++t )
+            numLocalEntries += front.BCoefficients[t].AllocatedMemory();
+    }
+
+    mpi::AllReduce( &numLocalEntries, &minLocalEntries, 1, mpi::MIN, comm );
+    mpi::AllReduce( &numLocalEntries, &maxLocalEntries, 1, mpi::MAX, comm );
+    mpi::AllReduce( &numLocalEntries, &numGlobalEntries, 1, mpi::SUM, comm );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename F>
+inline void
+DistCompressedFrontTree<F>::TopLeftMemoryInfo
+( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
+  double& numGlobalEntries ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistCompressedFrontTree::TopLeftMemoryInfo");
+#endif
+    numLocalEntries = numGlobalEntries = 0;
+    const int numLocalFronts = localFronts.size();
+    const int numDistFronts = distFronts.size();
+    const Grid& grid = *(distFronts.back().grid);
+    mpi::Comm comm = grid.Comm();
+
+    for( int s=0; s<numLocalFronts; ++s )
+    {
+        const LocalCompressedFront<F>& front = localFronts[s];
+        Matrix<F> FTL,
+                  FBL;
+        elem::PartitionDown
+        ( front.frontL, FTL,
+                        FBL, front.frontL.Width() );
+        numLocalEntries += FTL.Height()*FTL.Width();
+
+        const int numAGreens = front.AGreens.size();
+        const int numACoefficients = front.ACoefficients.size();
+        for( int t=0; t<numAGreens; ++t )
+            numLocalEntries += front.AGreens[t].MemorySize();
+        for( int t=0; t<numACoefficients; ++t )
+            numLocalEntries += front.ACoefficients[t].MemorySize();
+    }
+    for( int s=1; s<numDistFronts; ++s )
+    {
+        const DistCompressedFront<F>& front = distFronts[s];
+        DistMatrix<F> FTL(grid),
+                      FBL(grid);
+        elem::PartitionDown
+        ( front.frontL, FTL,
+                        FBL, front.frontL.Width() );
+        numLocalEntries += FTL.LocalHeight()*FTL.LocalWidth();
+
+        const int numAGreens = front.AGreens.size();
+        const int numACoefficients = front.ACoefficients.size();
+        for( int t=0; t<numAGreens; ++t )
+            numLocalEntries += front.AGreens[t].AllocatedMemory();
+        for( int t=0; t<numACoefficients; ++t )
+            numLocalEntries += front.ACoefficients[t].AllocatedMemory();
+    }
+
+    mpi::AllReduce( &numLocalEntries, &minLocalEntries, 1, mpi::MIN, comm );
+    mpi::AllReduce( &numLocalEntries, &maxLocalEntries, 1, mpi::MAX, comm );
+    mpi::AllReduce( &numLocalEntries, &numGlobalEntries, 1, mpi::SUM, comm );
+#ifndef RELEASE
+    PopCallStack();
+#endif
+}
+
+template<typename F>
+inline void
+DistCompressedFrontTree<F>::BottomLeftMemoryInfo
+( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
+  double& numGlobalEntries ) const
+{
+#ifndef RELEASE
+    PushCallStack("DistCompressedFrontTree::BottomLeftMemoryInfo");
+#endif
+    numLocalEntries = numGlobalEntries = 0;
+    const int numLocalFronts = localFronts.size();
+    const int numDistFronts = distFronts.size();
+    const Grid& grid = *(distFronts.back().grid);
+    mpi::Comm comm = grid.Comm();
+
+    for( int s=0; s<numLocalFronts; ++s )
+    {
+        const LocalCompressedFront<F>& front = localFronts[s];
+
+        Matrix<F> FTL,
+                  FBL;
+        elem::PartitionDown
+        ( front.frontL, FTL,
+                        FBL, front.frontL.Width() );
+        numLocalEntries += FBL.Height()*FBL.Width();
+
+        const int numBGreens = front.BGreens.size();
+        const int numBCoefficients = front.BCoefficients.size();
+        for( int t=0; t<numBGreens; ++t )
+            numLocalEntries += front.BGreens[t].MemorySize();
+        for( int t=0; t<numBCoefficients; ++t )
+            numLocalEntries += front.BCoefficients[t].MemorySize();
+        // We now use the convention that four integers are equal to one 
+        // double-precision complex floating point number
+        numLocalEntries += 1.5*front.BValues.size();
+    }
+    for( int s=1; s<numDistFronts; ++s )
+    {
+        const DistCompressedFront<F>& front = distFronts[s];
+
+        DistMatrix<F> FTL(grid),
+                      FBL(grid);
+        elem::PartitionDown
+        ( front.frontL, FTL,
+                        FBL, front.frontL.Width() );
+        numLocalEntries += FBL.LocalHeight()*FBL.LocalWidth();
+
+        const int numBGreens = front.BGreens.size();
+        const int numBCoefficients = front.BCoefficients.size();
+        for( int t=0; t<numBGreens; ++t )
+            numLocalEntries += front.BGreens[t].AllocatedMemory();
         for( int t=0; t<numBCoefficients; ++t )
             numLocalEntries += front.BCoefficients[t].AllocatedMemory();
     }

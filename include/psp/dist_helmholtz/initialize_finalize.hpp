@@ -173,20 +173,40 @@ DistHelmholtz<R>::Initialize
         const double ldlStartTime = fillStopTime;
         if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
         {
-            double numLocalEntries, minLocalEntries, maxLocalEntries,
-                   numGlobalEntries;
+            double numLocalEntries, numLocalTopLeft, numLocalBottomLeft,
+                   minLocalEntries, minLocalTopLeft, minLocalBottomLeft,
+                   maxLocalEntries, maxLocalTopLeft, maxLocalBottomLeft,
+                   numGlobalEntries, numGlobalTopLeft, numGlobalBottomLeft;
             topCompressedFact_.MemoryInfo
             ( numLocalEntries, minLocalEntries, maxLocalEntries, 
               numGlobalEntries );
+            topCompressedFact_.TopLeftMemoryInfo
+            ( numLocalTopLeft, minLocalTopLeft, maxLocalTopLeft, 
+              numGlobalTopLeft );
+            topCompressedFact_.BottomLeftMemoryInfo
+            ( numLocalBottomLeft, minLocalBottomLeft, maxLocalBottomLeft, 
+              numGlobalBottomLeft );
             if( commRank == 0 )
             {
                 std::cout << "  before compression:\n"
-                          << "    min local: " << minLocalEntries*sizeof(C)/1e6
-                          << " MB\n"
-                          << "    max local: " << maxLocalEntries*sizeof(C)/1e6
-                          << " MB\n"
-                          << "    global:    " << numGlobalEntries*sizeof(C)/1e6
-                          << " MB\n"
+                          << "    min local: " 
+                          << minLocalEntries*sizeof(C)/1e6 << "MB\n"
+                          << "    max local: " 
+                          << maxLocalEntries*sizeof(C)/1e6 << " MB\n"
+                          << "    global:    " 
+                          << numGlobalEntries*sizeof(C)/1e6 << " MB\n"
+                          << "    min local top-left: " 
+                          << minLocalTopLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    max local top-left: " 
+                          << maxLocalTopLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    global top-left: "
+                          << numGlobalTopLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    min local bottom-left: " 
+                          << minLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    max local bottom-left: " 
+                          << maxLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    global bottom-left: "
+                          << numGlobalBottomLeft*sizeof(C)/1e6 << " MB\n"
                           << std::endl;
             }
             CompressedBlockLDL
@@ -194,16 +214,35 @@ DistHelmholtz<R>::Initialize
             topCompressedFact_.MemoryInfo
             ( numLocalEntries, minLocalEntries, maxLocalEntries, 
               numGlobalEntries );
+            topCompressedFact_.TopLeftMemoryInfo
+            ( numLocalTopLeft, minLocalTopLeft, maxLocalTopLeft, 
+              numGlobalTopLeft );
+            topCompressedFact_.BottomLeftMemoryInfo
+            ( numLocalBottomLeft, minLocalBottomLeft, maxLocalBottomLeft, 
+              numGlobalBottomLeft );
             if( commRank == 0 )
             {
                 std::cout << "  after compression:\n"
-                          << "    min local: " << minLocalEntries*sizeof(C)/1e6
-                          << " MB\n"
-                          << "    max local: " << maxLocalEntries*sizeof(C)/1e6
-                          << " MB\n"
-                          << "    global:    " << numGlobalEntries*sizeof(C)/1e6
-                          << " MB\n"
+                          << "    min local: " 
+                          << minLocalEntries*sizeof(C)/1e6 << "MB\n"
+                          << "    max local: " 
+                          << maxLocalEntries*sizeof(C)/1e6 << " MB\n"
+                          << "    global:    " 
+                          << numGlobalEntries*sizeof(C)/1e6 << " MB\n"
+                          << "    min local top-left: " 
+                          << minLocalTopLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    max local top-left: " 
+                          << maxLocalTopLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    global top-left: "
+                          << numGlobalTopLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    min local bottom-left: " 
+                          << minLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    max local bottom-left: " 
+                          << maxLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
+                          << "    global bottom-left: "
+                          << numGlobalBottomLeft*sizeof(C)/1e6 << " MB\n"
                           << std::endl;
+
             }
         }
         else if( panelScheme == CLIQUE_LDL_SELINV_2D )
