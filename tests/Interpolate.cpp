@@ -21,87 +21,50 @@
 #include "psp.hpp"
 using namespace psp;
 
-void Usage()
-{
-    std::cout << "Interpolate <velocity> <m1> <m2> <m3> <n1> <n2> <n3>"
-              << "  <velocity>: Which velocity field to use, {0,...,15}\n"
-              << "  <m1,m2,m3>: dimensions of original velocity field\n"
-              << "  <n1,n2,n3>: dimensions of interpolated velocity field\n"
-              << "\n"
-              << "\n"
-              << "velocity model:\n"
-              << "---------------------------------------------\n"
-              << "0) Unity\n"
-              << "1) Converging lense\n"
-              << "2) Wave guide\n"
-              << "3) Two decreasing layers\n"
-              << "4) Two increasing layers\n"
-              << "5) Two sideways layers\n"
-              << "6) Five decreasing layers\n"
-              << "7) Five increasing layers\n"
-              << "8) Five sideways layers\n"
-              << "9) Wedge\n"
-              << "10) Random\n"
-              << "11) Separator\n"
-              << "12) Cavity (will not converge quickly!)\n"
-              << "13) Reverse cavity\n"
-              << "14) Bottom half of cavity\n"
-              << "15) Top half of cavity\n"
-              << std::endl;
-}
-
 int
 main( int argc, char* argv[] )
 {
     psp::Initialize( argc, argv );
     mpi::Comm comm = mpi::COMM_WORLD;
-    const int commSize = mpi::CommSize( comm );
     const int commRank = mpi::CommRank( comm );
-
-    if( argc < 8 )
-    {
-        if( commRank == 0 )
-            Usage();
-        psp::Finalize();
-        return 0;
-    }
-    int argNum=1;
-    const int velocityModel = atoi(argv[argNum++]);
-    const int m1 = atoi(argv[argNum++]);
-    const int m2 = atoi(argv[argNum++]);
-    const int m3 = atoi(argv[argNum++]);
-    const int n1 = atoi(argv[argNum++]);
-    const int n2 = atoi(argv[argNum++]);
-    const int n3 = atoi(argv[argNum++]);
-
-    if( velocityModel < 0 || velocityModel > 15 )
-    {
-        if( commRank == 0 )
-            std::cout << "Invalid velocity model, must be in {0,...,15}\n"
-                      << "---------------------------------------------\n"
-                      << "0) Unity\n"
-                      << "1) Converging lense\n"
-                      << "2) Wave guide\n"
-                      << "3) Two decreasing layers\n"
-                      << "4) Two increasing layers\n"
-                      << "5) Two sideways layers\n"
-                      << "6) Five decreasing layers\n"
-                      << "7) Five increasing layers\n"
-                      << "8) Five sideways layers\n"
-                      << "9) Wedge\n"
-                      << "10) Random\n"
-                      << "11) Separator\n"
-                      << "12) Cavity (will not converge quickly!)\n"
-                      << "13) Reverse cavity\n"
-                      << "14) Bottom half of cavity\n"
-                      << "15) Top half of cavity\n"
-                      << std::endl;
-        psp::Finalize();
-        return 0;
-    }
 
     try 
     {
+        const int model = Input("--model","which velocity model: 0-15",2);
+        const int m1 = Input("--m1","first dim. size of original grid",30);
+        const int m2 = Input("--m2","second dim. size of original grid",30);
+        const int m3 = Input("--m3","third dim. size of original grid",30);
+        const int n1 = Input("--n1","first dim. size of interpolated grid",40);
+        const int n2 = Input("--n2","second dim. size of interpolated grid",40);
+        const int n3 = Input("--n3","third dim. size of interpolated grid",40);
+        ProcessInput();
+
+        if( model < 0 || model > 15 )
+        {
+            if( commRank == 0 )
+                std::cout << "Invalid velocity model, must be in {0,...,15}\n"
+                          << "---------------------------------------------\n"
+                          << "0) Unity\n"
+                          << "1) Converging lense\n"
+                          << "2) Wave guide\n"
+                          << "3) Two decreasing layers\n"
+                          << "4) Two increasing layers\n"
+                          << "5) Two sideways layers\n"
+                          << "6) Five decreasing layers\n"
+                          << "7) Five increasing layers\n"
+                          << "8) Five sideways layers\n"
+                          << "9) Wedge\n"
+                          << "10) Random\n"
+                          << "11) Separator\n"
+                          << "12) Cavity (will not converge quickly!)\n"
+                          << "13) Reverse cavity\n"
+                          << "14) Bottom half of cavity\n"
+                          << "15) Top half of cavity\n"
+                          << std::endl;
+            psp::Finalize();
+            return 0;
+        }
+
         DistUniformGrid<double> velocity( m1, m2, m3, comm );
         double* localVelocity = velocity.LocalBuffer();
         const int xLocalSize = velocity.XLocalSize();
@@ -113,7 +76,7 @@ main( int argc, char* argv[] )
         const int px = velocity.XStride();
         const int py = velocity.YStride();
         const int pz = velocity.ZStride();
-        switch( velocityModel )
+        switch( model )
         {
         case 0:
             if( commRank == 0 )
@@ -506,10 +469,13 @@ main( int argc, char* argv[] )
         if( commRank == 0 )
             std::cout << "done" << std::endl;
     }
+    catch( ArgException& e ) { }
     catch( std::exception& e )
     {
-        std::cerr << "Caught exception on process " << commRank << ":\n"
-                  << e.what() << std::endl;
+        std::ostringstream os;
+        os << "Caught exception on process " << commRank << ":\n" << e.what()
+           << std::endl;
+        std::cerr << os.str();
 #ifndef RELEASE
         elem::DumpCallStack();
         cliq::DumpCallStack();

@@ -67,6 +67,10 @@ using elem::Exp;
 
 using elem::Base;
 
+using elem::Input;
+using elem::ProcessInput;
+using elem::ArgException;
+
 #ifdef HAVE_MKDIR
 void EnsureDirExists( const char* path, mode_t mode=0777 );
 #endif

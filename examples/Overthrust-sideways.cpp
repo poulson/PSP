@@ -21,28 +21,6 @@
 #include "psp.hpp"
 using namespace psp;
 
-void Usage()
-{
-    std::cout << "Overthrust-sideways <nx> <ny> <nz> <omega> <px> <py> <pz> "
-                 "[pmlOnTop=true] [pmlSize=5] [sigma=24] [damping=7] "
-                 "[numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] "
-                 "[factBlocksize=96] [solveBlocksize=64]\n"
-              << "\n"
-              << "  nx,ny,nz: size of grid in each dimension\n"
-              << "  omega: frequency (in rad/sec) of problem\n"
-              << "  px,py,pz: 3D process grid dimensions\n"
-              << "  pmlOnTop: PML if nonzero, Dirichlet otherwise\n"
-              << "  pmlSize: number of grid points per PML boundary\n"
-              << "  sigma: magnitude of complex coordinate stretching for PML\n"
-              << "  damping: imaginary freq shift for preconditioner\n"
-              << "  numPlanesPerPanel: number of planes per subdomain\n"
-              << "  panelScheme: LDL_1D=0, LDL_SELINV_2D=1\n"
-              << "  fullViz: full volume visualization iff != 0\n" 
-              << "  factBlocksize: factorization algorithmic blocksize\n"
-              << "  solveBlocksize: solve algorithmic blocksize\n"
-              << std::endl;
-}
-
 int
 main( int argc, char* argv[] )
 {
@@ -53,35 +31,65 @@ main( int argc, char* argv[] )
     const int commSize = mpi::CommSize( comm );
     const int commRank = mpi::CommRank( comm );
 
-    if( argc < 5 )
-    {
-        if( commRank == 0 )
-            Usage();
-        psp::Finalize();
-        return 0;
-    }
-    int argNum=1;
-    const int nx = atoi(argv[argNum++]);
-    const int ny = atoi(argv[argNum++]);
-    const int nz = atoi(argv[argNum++]);
-    const double omega = atof(argv[argNum++]);
-    const int px = atoi(argv[argNum++]);
-    const int py = atoi(argv[argNum++]);
-    const int pz = atoi(argv[argNum++]);
-    const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : true );
-    const int pmlSize = ( argc>argNum ? atoi(argv[argNum++]) : 5 );
-    const double sigma = ( argc>argNum ? atof(argv[argNum++]) : 1.5*20 );
-    const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
-    const int numPlanesPerPanel = ( argc>argNum ? atoi(argv[argNum++]) : 4 );
-    const PanelScheme panelScheme = 
-        ( argc>argNum ? (PanelScheme)atoi(argv[argNum++]) 
-                      : CLIQUE_LDL_SELINV_2D );
-    const bool fullVisualize = ( argc>argNum ? atoi(argv[argNum++]) : true );
-    const int factBlocksize = ( argc>argNum ? atoi(argv[argNum++]) : 96 );
-    const int solveBlocksize = ( argc>argNum ? atoi(argv[argNum++]) : 64 );
-
     try 
     {
+        const int nx = Input("--nx","first dimension of grid",80);
+        const int ny = Input("--ny","second dimension of grid",80);
+        const int nz = Input("--nz","third dimension of grid",20);
+        const double omega = Input("--omega","angular frequency",0.5);
+        int px = Input("--px","first dimension of process grid",0);
+        int py = Input("--py","second dimension of process grid",0);
+        int pz = Input("--pz","third dimension of process grid",0);
+        const bool pmlOnTop = Input("--pmlOnTop","PML on top boundary?",true);
+        const int pmlSize = Input("--pmlSize","number of grid points of PML",4);
+        const double sigma = Input("--sigma","amplitude of PML profile",1.5*20);
+        const double damping = Input("--damping","damping factor",7.);
+        const int planesPerPanel = Input
+            ("--planesPerPanel","number of planes per subdomain",4);
+        const PanelScheme panelScheme = (PanelScheme)Input
+            ("--panelScheme",
+             "frontal scheme: 0=1D LDL, 1=2D sel. inv., 2=2D block LDL",1);
+        const bool fullViz = Input("--fullViz","visualize volume?",false);
+        const int nbFact = Input("--nbFact","factorization blocksize",96);
+        const int nbSolve = Input("--nbSolve","solve blocksize",64);
+        ProcessInput();
+
+        // Try to intelligently build a process grid in a way which matches
+        // any specified dimensions
+        if( px == 0 )
+        {
+            if( py == 0 && pz == 0 )
+            {
+                px = DistUniformGrid<int>::FindCubicFactor( commSize );
+                py = DistUniformGrid<int>::FindQuadraticFactor( commSize/px );
+                pz = commSize / (px*py);
+            }
+            else if( py == 0 )
+            {
+                px = DistUniformGrid<int>::FindQuadraticFactor( commSize/pz );
+                py = commSize / (px*pz);
+            }
+            else if( pz == 0 )
+            {
+                px = DistUniformGrid<int>::FindQuadraticFactor( commSize/py );
+                pz = commSize / (px*py);
+            }
+            else
+                px = commSize / (py*pz);
+        }
+        else if( py == 0 )
+        {
+            if( pz == 0 )
+            {
+                py = DistUniformGrid<int>::FindQuadraticFactor( commSize/px );
+                pz = commSize / (px*py);
+            }
+            else
+                py = commSize / (px*pz);
+        }
+        else if( pz == 0 )
+            pz = commSize / (px*py);
+
         Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
         const double wx = 4.65;
         const double wy = 20.;
@@ -90,8 +98,7 @@ main( int argc, char* argv[] )
         ( omega, nx, ny, nz, wx, wy, wz, PML, PML, PML, PML, topBC,
           pmlSize, sigma );
 
-        DistHelmholtz<double> helmholtz
-        ( disc, comm, damping, numPlanesPerPanel );
+        DistHelmholtz<double> helmholtz( disc, comm, damping, planesPerPanel );
 
         const int nxOrig = 187;
         const int nyOrig = 801;
@@ -115,7 +122,7 @@ main( int argc, char* argv[] )
         velocity.WritePlane( XY, nz/2, "velocity-middleXY" );
         velocity.WritePlane( XZ, ny/2, "velocity-middleXZ" );
         velocity.WritePlane( YZ, nx/2, "velocity-middleYZ" );
-        if( fullVisualize )
+        if( fullViz )
         {
             if( commRank == 0 )
             {
@@ -128,7 +135,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
-        elem::SetBlocksize( factBlocksize );
+        elem::SetBlocksize( nbFact );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
         mpi::Barrier( comm );
@@ -210,7 +217,7 @@ main( int argc, char* argv[] )
         B.WritePlane( XY, nz/2, "source-middleXY" );
         B.WritePlane( XZ, ny/2, "source-middleXZ" );
         B.WritePlane( YZ, nx/2, "source-middleYZ" );
-        if( fullVisualize )
+        if( fullViz )
         {
             if( commRank == 0 )
             {
@@ -222,7 +229,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
-        elem::SetBlocksize( solveBlocksize );
+        elem::SetBlocksize( nbSolve );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
         mpi::Barrier( comm );
@@ -241,7 +248,7 @@ main( int argc, char* argv[] )
         B.WritePlane( XY, nz/2, "solution-middleXY" );
         B.WritePlane( XZ, ny/2, "solution-middleXZ" );
         B.WritePlane( YZ, nx/2, "solution-middleYZ" );
-        if( fullVisualize )
+        if( fullViz )
         {
             if( commRank == 0 )
             {

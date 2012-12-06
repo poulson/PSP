@@ -108,6 +108,9 @@ public:
     ( PlaneType planeType, int whichPlane, std::string basename ) const;
 
     void WriteVolume( std::string basename ) const;
+
+    static int FindCubicFactor( int commSize );
+    static int FindQuadraticFactor( int commSize );
 private:
     int nx_, ny_, nz_;
     int px_, py_, pz_;
@@ -182,6 +185,26 @@ DistUniformGrid<F>::DistUniformGrid
     localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
 
+template<typename T>
+inline int
+DistUniformGrid<T>::FindCubicFactor( int commSize )
+{
+    int factor = std::max(1,(int)std::floor(pow((double)commSize,1./3.)));
+    while( commSize % factor != 0 )
+        ++factor;
+    return factor;
+}
+
+template<typename T>
+inline int
+DistUniformGrid<T>::FindQuadraticFactor( int commSize )
+{
+    int factor = std::max(1,(int)std::floor(pow((double)commSize,1./2.)));
+    while( commSize % factor != 0 )
+        ++factor;
+    return factor;
+}
+
 template<typename F>
 inline 
 DistUniformGrid<F>::DistUniformGrid
@@ -196,17 +219,9 @@ DistUniformGrid<F>::DistUniformGrid
     const int commRank = mpi::CommRank( comm );
     const int commSize = mpi::CommSize( comm );
 
-    const int cubeRoot = 
-        std::max(1,(int)std::floor(pow((double)commSize,1./3.)));
-    px_ = cubeRoot;
-    while( commSize % px_ != 0 )
-        ++px_;
+    px_ = FindCubicFactor( commSize );
     const int yzCommSize = commSize / px_;
-    const int squareRoot = 
-        std::max(1,(int)std::floor(sqrt((double)yzCommSize)));
-    py_ = squareRoot;
-    while( yzCommSize % py_ != 0 )
-        ++py_;
+    py_ = FindQuadraticFactor( yzCommSize );
     pz_ = yzCommSize / py_;
 
     if( commSize != px_*py_*pz_ )

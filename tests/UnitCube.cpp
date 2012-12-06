@@ -21,48 +21,6 @@
 #include "psp.hpp"
 using namespace psp;
 
-void Usage()
-{
-    std::cout << "UnitCube <velocity> <n> <omega> "
-                 "[pmlOnTop=true] [pmlSize=5] [sigma=1.5] [damping=7] "
-                 "[numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] "
-                 "[factBlocksize=96] [solveBlocksize=64]\n"
-              << "\n"
-              << "  velocity: which velocity field to use, {0,...,15}\n"
-              << "  n: size of grid in each dimension\n"
-              << "  omega: frequency (in rad/sec) of problem\n"
-              << "  pmlOnTop: PML if nonzero, Dirichlet otherwise\n"
-              << "  pmlSize: number of grid points per PML boundary condition\n"
-              << "  sigma: magnitude of complex coordinate stretching\n"
-              << "  damping: imaginary freq shift for preconditioner\n"
-              << "  numPlanesPerPanel: number of planes per subdomain\n"
-              << "  panelScheme: LDL_1D=0, LDL_SELINV_2D=1\n"
-              << "  fullViz: full volume visualization if nonzero\n"
-              << "  factBlocksize: algorithmic blocksize for factorization\n"
-              << "  solveBlocksize: algorithmic blocksize for factorization\n"
-              << "\n"
-              << "\n"
-              << "velocity model:\n"
-              << "---------------------------------------------\n"
-              << "0) Uniform\n"
-              << "1) Converging lense\n"
-              << "2) Wave guide\n"
-              << "3) Two decreasing layers\n"
-              << "4) Two increasing layers\n"
-              << "5) Two sideways layers\n"
-              << "6) Five decreasing layers\n"
-              << "7) Five increasing layers\n"
-              << "8) Five sideways layers\n"
-              << "9) Wedge\n"
-              << "10) Random\n"
-              << "11) Separator\n"
-              << "12) Cavity (will not converge quickly!)\n"
-              << "13) Reverse cavity\n"
-              << "14) Bottom half of cavity\n"
-              << "15) Top half of cavity\n"
-              << std::endl;
-}
-
 int
 main( int argc, char* argv[] )
 {
@@ -70,74 +28,66 @@ main( int argc, char* argv[] )
 
     psp::Initialize( argc, argv );
     mpi::Comm comm = mpi::COMM_WORLD;
-    const int commSize = mpi::CommSize( comm );
     const int commRank = mpi::CommRank( comm );
-
-    if( argc < 4 )
-    {
-        if( commRank == 0 )
-            Usage();
-        psp::Finalize();
-        return 0;
-    }
-    int argNum=1;
-    const int velocityModel = atoi(argv[argNum++]);
-    const int n = atoi(argv[argNum++]);
-    const double omega = atof(argv[argNum++]);
-    const bool pmlOnTop = ( argc>argNum ? atoi(argv[argNum++]) : true );
-    const int pmlSize = ( argc>argNum ? atoi(argv[argNum++]) : 5 );
-    const double sigma = ( argc>argNum ? atof(argv[argNum++]) : 1.5 );
-    const double damping = ( argc>argNum ? atof(argv[argNum++]) : 7. );
-    const int numPlanesPerPanel = ( argc>argNum ? atoi(argv[argNum++]) : 4 );
-    const PanelScheme panelScheme = 
-        ( argc>argNum ? (PanelScheme)atoi(argv[argNum++]) 
-                      : CLIQUE_LDL_SELINV_2D );
-    const bool fullVisualize = ( argc>argNum ? atoi(argv[argNum++]) : true );
-    const int factBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 96 );
-    const int solveBlocksize = ( argc>argNum ? atoi( argv[argNum++] ) : 64 );
-
-    if( velocityModel < 0 || velocityModel > 15 )
-    {
-        if( commRank == 0 )
-            std::cout << "Invalid velocity model, must be in {0,...,15}\n"
-                      << "---------------------------------------------\n"
-                      << "0) Uniform\n"
-                      << "1) Converging lense\n"
-                      << "2) Wave guide\n"
-                      << "3) Two decreasing layers\n"
-                      << "4) Two increasing layers\n"
-                      << "5) Two sideways layers\n"
-                      << "6) Five decreasing layers\n"
-                      << "7) Five increasing layers\n"
-                      << "8) Five sideways layers\n"
-                      << "9) Wedge\n"
-                      << "10) Random\n"
-                      << "11) Separator\n"
-                      << "12) Cavity (will not converge quickly!)\n"
-                      << "13) Reverse cavity\n"
-                      << "14) Bottom half of cavity\n"
-                      << "15) Top half of cavity\n"
-                      << std::endl;
-        psp::Finalize();
-        return 0;
-    }
-
-    if( commRank == 0 )
-    {
-        std::cout << "Running with n=" << n << ", omega=" << omega 
-                  << ", and numPlanesPerPanel=" << numPlanesPerPanel
-                  << " with velocity model " << velocityModel << std::endl;
-    }
 
     try 
     {
+        const int model = Input("--model","which velocity model: 0-15",2);
+        const int n = Input("--n","dimension of n x n x n grid",40);
+        const double omega = Input("--omega","angular frequency",30.);
+        const bool pmlOnTop = Input("--pmlOnTop","PML on top boundary?",true);
+        const int pmlSize = Input("--pmlSize","number of grid points of PML",5);
+        const double sigma = Input("--sigma","PML amplitude",1.5);
+        const double damping = Input("--damping","damping parameter",7.);
+        const int planesPerPanel = Input
+            ("--planesPerPanel","number of planes to process per subdomain",4);
+        const PanelScheme panelScheme = (PanelScheme) Input
+            ("--panelScheme",
+             "frontal scheme: 0=1D LDL, 1=2D sel. inv., 2=2D block LDL",1);
+        const bool fullViz = Input("--fullViz","visualize volume?",false);
+        const int nbFact = Input("--nbFact","factorization blocksize",96);
+        const int nbSolve = Input("--nbSolve","solve blocksize",64);
+        ProcessInput();
+
+        if( model < 0 || model > 15 )
+        {
+            if( commRank == 0 )
+                std::cout << "Invalid velocity model, must be in {0,...,15}\n"
+                          << "---------------------------------------------\n"
+                          << "0) Uniform\n"
+                          << "1) Converging lense\n"
+                          << "2) Wave guide\n"
+                          << "3) Two decreasing layers\n"
+                          << "4) Two increasing layers\n"
+                          << "5) Two sideways layers\n"
+                          << "6) Five decreasing layers\n"
+                          << "7) Five increasing layers\n"
+                          << "8) Five sideways layers\n"
+                          << "9) Wedge\n"
+                          << "10) Random\n"
+                          << "11) Separator\n"
+                          << "12) Cavity (will not converge quickly!)\n"
+                          << "13) Reverse cavity\n"
+                          << "14) Bottom half of cavity\n"
+                          << "15) Top half of cavity\n"
+                          << std::endl;
+            psp::Finalize();
+            return 0;
+        }
+
+        if( commRank == 0 )
+        {
+            std::cout << "Running with n=" << n << ", omega=" << omega 
+                      << ", and planesPerPanel=" << planesPerPanel
+                      << " with velocity model " << model << std::endl;
+        }
+
         Boundary topBC = ( pmlOnTop ? PML : DIRICHLET );
         Discretization<double> disc
         ( omega, n, n, n, 1., 1., 1., PML, PML, PML, PML, topBC, 
           pmlSize, sigma );
 
-        DistHelmholtz<double> helmholtz
-        ( disc, comm, damping, numPlanesPerPanel );
+        DistHelmholtz<double> helmholtz( disc, comm, damping, planesPerPanel );
 
         DistUniformGrid<double> velocity( n, n, n, comm );
         double* localVelocity = velocity.LocalBuffer();
@@ -150,7 +100,7 @@ main( int argc, char* argv[] )
         const int px = velocity.XStride();
         const int py = velocity.YStride();
         const int pz = velocity.ZStride();
-        switch( velocityModel )
+        switch( model )
         {
         case 0:
             if( commRank == 0 )
@@ -518,7 +468,7 @@ main( int argc, char* argv[] )
         velocity.WritePlane( XY, n/2, "velocity-middleXY" );
         velocity.WritePlane( XZ, n/2, "velocity-middleXZ" );
         velocity.WritePlane( YZ, n/2, "velocity-middleYZ" );
-        if( fullVisualize )
+        if( fullViz )
         {
             if( commRank == 0 )
             {
@@ -531,7 +481,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
-        elem::SetBlocksize( factBlocksize );
+        elem::SetBlocksize( nbFact );
         if( commRank == 0 )
             std::cout << "Beginning to initialize..." << std::endl;
         mpi::Barrier( comm );
@@ -606,7 +556,7 @@ main( int argc, char* argv[] )
         B.WritePlane( XY, n/2, "source-middleXY" );
         B.WritePlane( XZ, n/2, "source-middleXZ" );
         B.WritePlane( YZ, n/2, "source-middleYZ" );
-        if( fullVisualize )
+        if( fullViz )
         {
             if( commRank == 0 )
             {
@@ -618,7 +568,7 @@ main( int argc, char* argv[] )
                 std::cout << "done" << std::endl;
         }
 
-        elem::SetBlocksize( solveBlocksize );
+        elem::SetBlocksize( nbSolve );
         if( commRank == 0 )
             std::cout << "Beginning solve..." << std::endl;
         mpi::Barrier( comm );
@@ -637,7 +587,7 @@ main( int argc, char* argv[] )
         B.WritePlane( XY, n/2, "solution-middleXY" );
         B.WritePlane( XZ, n/2, "solution-middleXZ" );
         B.WritePlane( YZ, n/2, "solution-middleYZ" );
-        if( fullVisualize )
+        if( fullViz )
         {
             if( commRank == 0 )
             {
@@ -651,10 +601,13 @@ main( int argc, char* argv[] )
 
         helmholtz.Finalize();
     }
+    catch( ArgException& e ) { }
     catch( std::exception& e )
     {
-        std::cerr << "Caught exception on process " << commRank << ":\n"
-                  << e.what() << std::endl;
+        std::ostringstream os;
+        os << "Caught exception on process " << commRank << ":\n" << e.what()
+           << std::endl;
+        std::cerr << os.str();
 #ifndef RELEASE
         elem::DumpCallStack();
         cliq::DumpCallStack();
