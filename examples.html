@@ -57,22 +57,22 @@
 <h2>Overthrust<a class="headerlink" href="#overthrust" title="Permalink to this headline">¶</a></h2>
 <img alt="_images/velocity-overthrust.png" src="_images/velocity-overthrust.png" />
 <p><strong>TODO: Describe ``examples/Overthrust.cpp``</strong></p>
-<p>Usage</p>
-<div class="highlight-python"><pre>Overthrust &lt;nx&gt; &lt;ny&gt; &lt;nz&gt; &lt;omega&gt; &lt;px&gt; &lt;py&gt; &lt;pz&gt; [pmlOnTop=true] [pmlSize=5] [sigma=24] [damping=7] [numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] [factBlocksize=96] [solveBlocksize=64]</pre>
+<p>Example usage</p>
+<div class="highlight-python"><pre>Overthrust --nx 801 --ny 801 --nz 187 --omega 50.27 --sigma 24 --fullViz 1</pre>
 </div>
 <ul class="simple">
 <li><cite>nx</cite>, <cite>ny</cite>, <cite>nz</cite>: size of grid in each dimension</li>
 <li><cite>omega</cite>: frequency (in rad/sec) of the problem</li>
 <li><cite>px</cite>, <cite>py</cite>, <cite>pz</cite>: 3D process grid dimensions</li>
-<li><cite>pmlOnTop</cite>: PML if nonzero, Dirichlet otherwise</li>
-<li><cite>pmlSize</cite>: number of grid points per PML boundary condition</li>
-<li><cite>sigma</cite>: magnitude of complex coordinate stretching for PML</li>
-<li><cite>damping</cite>: imaginary frequency shift for preconditioner</li>
-<li><cite>numPlanesPerPanel</cite>: number of planes per subdomain</li>
-<li><cite>panelScheme</cite>: traditional approach if zero, selective inversion if 1</li>
-<li><cite>fullViz</cite>: full volume visualization if nonzero</li>
-<li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
-<li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
+<li><cite>pmlOnTop</cite>: PML if nonzero, Dirichlet otherwise (default is true)</li>
+<li><cite>pmlSize</cite>: number of grid points per PML boundary condition (default is 5)</li>
+<li><cite>sigma</cite>: magnitude of complex coordinate stretching for PML (default is 35)</li>
+<li><cite>damping</cite>: imaginary frequency shift for preconditioner (default is 7)</li>
+<li><cite>planesPerPanel</cite>: number of planes per subdomain (default is 4)</li>
+<li><cite>panelScheme</cite>: traditional approach if zero, selective inversion if 1 (default is 1)</li>
+<li><cite>fullViz</cite>: full volume visualization if nonzero (default is false)</li>
+<li><cite>factBlocksize</cite>: algorithmic blocksize for factorization (default is 96)</li>
+<li><cite>solveBlocksize</cite>: algorithmic blocksize for solves (default is 64)</li>
 </ul>
 <div class="section" id="eight-hz-example">
 <h3>Eight Hz example<a class="headerlink" href="#eight-hz-example" title="Permalink to this headline">¶</a></h3>
@@ -80,11 +80,11 @@
 (<span class="math">\(801 \times 801 \times 187\)</span>) at a frequency of 8 Hz in order to ensure
 that there are slightly more than 10 points per wavelength at the shortest
 wavelength. The command used was:</p>
-<div class="highlight-python"><pre>Overthrust 801 801 187 50.26 16 16 8 1 5 15 7.07 4 1</pre>
+<div class="highlight-python"><pre>Overthrust --nx 801 --ny 801 --nz 187 --omega 50.26 --px 16 --py 16 --pz 8 --sigma 7.5 --damping 7.07 --fullViz 1</pre>
 </div>
 <p>and all four residuals converged to five digits of relative accuracy in
-77 iterations of GMRES(20) on 256 nodes of Lonestar
-(using eight cores per node, in roughly ten minutes, including the
+72 iterations of GMRES(20) on 256 nodes of Lonestar
+(using eight cores per node, in roughly seven and a half minutes, including the
 preconditioner setup time).</p>
 <img alt="_images/solution-overthrust-singleShot-YZ-8.png" src="_images/solution-overthrust-singleShot-YZ-8.png" />
 <p>The middle YZ plane of the single-shot solution.</p>

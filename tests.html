@@ -163,22 +163,22 @@ problems do not replace strong with PML.</p>
 preconditioner on a variety of different velocity models.</p>
 <div class="section" id="parameters">
 <h3>Parameters<a class="headerlink" href="#parameters" title="Permalink to this headline">¶</a></h3>
-<p>Usage</p>
-<div class="highlight-python"><pre>UnitCube &lt;velocity&gt; &lt;n&gt; &lt;omega&gt; [pmlOnTop=true] [pmlSize=5] [sigma=1.5] [damping=7] [numPlanesPerPanel=4] [panelScheme=1] [fullViz=1] [factBlocksize=96] [solveBlocksize=64]</pre>
+<p>Example usage</p>
+<div class="highlight-python"><pre>UnitCube --model 2 --n 100 --omega 60. --pmlSize 5 --sigma 1.5 --fullViz 1</pre>
 </div>
 <ul class="simple">
-<li><cite>velocity</cite>: which velocity field to use, see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a></li>
-<li><cite>n</cite>: size of grid in each dimension</li>
-<li><cite>omega</cite>: frequency in rad/sec of problem</li>
-<li><cite>pmlOnTop</cite>: PML if nonzero, Dirichlet otherwise</li>
-<li><cite>pmlSize</cite>: number of grid points of per PML boundary condition</li>
-<li><cite>sigma</cite>: magnitude of complex coordinate-stretching for PML</li>
-<li><cite>damping</cite>: imaginary frequency shift for preconditioner</li>
-<li><cite>numPlanesPerPanel</cite>: number of planes per subdomain</li>
-<li><cite>panelScheme</cite>: use traditional scheme if 0, selective inversion if 1</li>
-<li><cite>fullViz</cite>: full volume visualization if nonzero</li>
-<li><cite>factBlocksize</cite>: algorithmic blocksize for factorization</li>
-<li><cite>solveBlocksize</cite>: algorithmic blocksize for solves</li>
+<li><cite>model</cite>: which velocity field to use, see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a> (default is the waveguide model)</li>
+<li><cite>n</cite>: size of grid in each dimension (default is 40)</li>
+<li><cite>omega</cite>: frequency in rad/sec of problem, <span class="math">\(2 \pi (n/10)\)</span> is a reasonable value (default is 30)</li>
+<li><cite>pmlOnTop</cite>: PML if nonzero, Dirichlet otherwise (default is true)</li>
+<li><cite>pmlSize</cite>: number of grid points of per PML boundary condition (default is 5)</li>
+<li><cite>sigma</cite>: magnitude of complex coordinate-stretching for PML (default is 1.5)</li>
+<li><cite>damping</cite>: imaginary frequency shift for preconditioner (default is 7)</li>
+<li><cite>planesPerPanel</cite>: number of planes per subdomain (default is 4)</li>
+<li><cite>panelScheme</cite>: use traditional scheme if 0, selective inversion if 1 (default is 1)</li>
+<li><cite>fullViz</cite>: full volume visualization if nonzero (default is false)</li>
+<li><cite>nbFact</cite>: algorithmic blocksize for factorization (default is 96)</li>
+<li><cite>nbSolve</cite>: algorithmic blocksize for solves (default is 64)</li>
 </ul>
 <p>For each run of the <tt class="docutils literal"><span class="pre">UnitCube</span></tt> driver, four different sets of sources are used:</p>
 <ol class="arabic simple">
@@ -193,7 +193,7 @@ preconditioner on a variety of different velocity models.</p>
 <p>The following results are gathered from running at 314.16 rad/sec over the
 uniform velocity model with a <span class="math">\(500 \times 500 \times 500\)</span> grid, via the
 command:</p>
-<div class="highlight-python"><pre>UnitCube 0 500 314.16</pre>
+<div class="highlight-python"><pre>UnitCube --model 0 --n 500 --omega 314.16 --fullViz 1</pre>
 </div>
 <p>which converged to five digits of relative accuracy in 22 iterations of
 GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
@@ -208,7 +208,7 @@ GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
 <h3>Converging lens example<a class="headerlink" href="#converging-lens-example" title="Permalink to this headline">¶</a></h3>
 <p>This example used the converging lens velocity model at 235.62 rad/sec over
 another <span class="math">\(500 \times 500 \times 500\)</span> grid, via the command:</p>
-<div class="highlight-python"><pre>UnitCube 1 500 235.62 1 5 2.0</pre>
+<div class="highlight-python"><pre>UnitCube --model 1 --n 500 --omega 235.62 --sigma 2.0 --fullViz 1</pre>
 </div>
 <p>and converged to five digits of relative accuracy in 44 iterations of GMRES(20)
 on 256 nodes of TACC&#8217;s Lonestar.</p>
@@ -224,12 +224,12 @@ on 256 nodes of TACC&#8217;s Lonestar.</p>
 <p>This third example uses the wave guide velocity model over a
 <span class="math">\(500 \times 500 \times 500\)</span> grid, again at 235.62 rad/sec. Using five
 grid points of PML, with a coordinate-stretching magnitude of 2.0, via:</p>
-<div class="highlight-python"><pre>UnitCube 2 500 235.62 1 5 2.0</pre>
+<div class="highlight-python"><pre>UnitCube --model 2 --n 500 --omega 235.62 --sigma 2.0 --fullViz 1</pre>
 </div>
 <p>and all four residuals converged to five digits of relative accuracy in
 52 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar. With six grid points
 of PML, via:</p>
-<div class="highlight-python"><pre>UnitCube 2 500 235.62 1 6 2.0</pre>
+<div class="highlight-python"><pre>UnitCube --model 2 --n 500 --omega 235.62 --pmlSize 6 --sigma 2.0 --fullViz 1</pre>
 </div>
 <p>the same model converged in 27 iterations.</p>
 <img alt="_images/solution-guide-singleShot-YZ-37.5.png" src="_images/solution-guide-singleShot-YZ-37.5.png" />
@@ -249,7 +249,7 @@ of PML, via:</p>
 with wave speeds which vary by a factor of four. The grid size was
 <span class="math">\(500 \times 500 \times 500\)</span>, and the frequency was set to 314.16
 radians/second. Using a PML magnitude of 4.0, via the command:</p>
-<div class="highlight-python"><pre>UnitCube 5 500 314.16 1 5 4.0</pre>
+<div class="highlight-python"><pre>UnitCube --model 5 --n 500 --omega 314.16 --sigma 4.0 --fullViz 1</pre>
 </div>
 <p>all four residuals converged to five digits of relative accuracy in
 48 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
@@ -268,7 +268,7 @@ radians/second. Using a PML magnitude of 4.0, via the command:</p>
 materials, with the lowest velocity material wedged into the middle. The grid
 size was <span class="math">\(500 \times 500 \times 500\)</span>, and the frequency was set to 471.25
 radians/second. Using a PML magnitude of 4.0, via the command:</p>
-<div class="highlight-python"><pre>UnitCube 9 500 471.25 1 5 4.0</pre>
+<div class="highlight-python"><pre>UnitCube --model 9 --n 500 --omega 471.25 --sigma 4.0 --fullViz 1</pre>
 </div>
 <p>all four residuals converged to five digits of relative accuracy in 49
 iterations of GMRES(20) on 256 nodes of TACC&#8217;s Lonestar.</p>
@@ -286,7 +286,7 @@ be harmless: even though there is a &#8220;separator&#8221; with a velocity whic
 orders of magnitude larger than the background velocity, the sweeping
 preconditioner converged in only 28 iterations for the 50 wavelength
 calculation:</p>
-<div class="highlight-python"><pre>UnitCube 11 500 314.16 1 5 3.0</pre>
+<div class="highlight-python"><pre>UnitCube --model 11 --n 500 --omega 314.16 --sigma 3.0 --fullViz 1</pre>
 </div>
 <img alt="_images/solution-separator-singleShot-YZ-50-0.7.png" src="_images/solution-separator-singleShot-YZ-50-0.7.png" />
 <p>An off-center YZ plane (x=0.7) of the single-shot solution.</p>
@@ -302,13 +302,13 @@ is meant to exercise the routine
 linearly interpolating a velocity model into a different grid size in parallel.</p>
 <div class="section" id="id2">
 <h3>Parameters<a class="headerlink" href="#id2" title="Permalink to this headline">¶</a></h3>
-<p>Usage</p>
-<div class="highlight-python"><pre>Interpolate &lt;velocity&gt; &lt;m1&gt; &lt;m2&gt; &lt;m3&gt; &lt;n1&gt; &lt;n2&gt; &lt;n3&gt;</pre>
+<p>Example usage</p>
+<div class="highlight-python"><pre>Interpolate --model 2 --m1 30 --m2 30 --m3 30 --n1 40 --n2 40 --n3 40</pre>
 </div>
 <ul class="simple">
-<li><cite>velocity</cite>: see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a></li>
-<li><cite>m1</cite>, <cite>m2</cite>, <cite>m3</cite>: original grid size</li>
-<li><cite>n1</cite>, <cite>n2</cite>, <cite>n3</cite>: interpolated grid size</li>
+<li><cite>model</cite>: see <a class="reference internal" href="#analytical-velocity-models">Analytical velocity models</a> (default is waveguide model)</li>
+<li><cite>m1</cite>, <cite>m2</cite>, <cite>m3</cite>: original grid size (default values are 30)</li>
+<li><cite>n1</cite>, <cite>n2</cite>, <cite>n3</cite>: interpolated grid size (default values are 40)</li>
 </ul>
 <p><strong>TODO:</strong> Show some results.</p>
 </div>
