@@ -1,22 +1,10 @@
 #
-#  Clique: a scalable implementation of the multifrontal method.
-#
-#  Copyright (C) 2010-2012 Jack Poulson <jack.poulson@gmail.com>
 #  Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
 #  The University of Texas at Austin
 # 
-#  This program is free software: you can redistribute it and/or modify
-#  it under the terms of the GNU General Public License as published by
-#  the Free Software Foundation, either version 3 of the License, or
-#  (at your option) any later version.
-#
-#  This program is distributed in the hope that it will be useful,
-#  but WITHOUT ANY WARRANTY; without even the implied warranty of
-#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#  GNU General Public License for more details.
-# 
-#  You should have received a copy of the GNU General Public License
-#  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#  This file is part of Clique and is under the GNU General Public License,
+#  which can be found in the LICENSE file in the root directory, or at 
+#  <http://www.gnu.org/licenses/>.
 #
 cmake_minimum_required(VERSION 2.8.5)
 project(Clique)
@@ -73,8 +61,6 @@ elseif(MANUAL_PARMETIS)
   include_directories(${PARMETIS_ROOT}/include)
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
-
 # Create the Clique configuration header
 configure_file( 
   ${PROJECT_SOURCE_DIR}/cmake/config.h.cmake
@@ -100,17 +86,16 @@ set(CLIQUE_SRC "${CLIQUE_CPP};${CLIQUE_HEADERS}")
 
 # The main library
 add_library(clique ${LIBRARY_TYPE} ${CLIQUE_SRC})
-if(MANUAL_ELEMENTAL)
-  target_link_libraries(clique ${ELEM_LIBS})
-else()
-  target_link_libraries(clique elemental)
-endif()
 if(BUILD_PARMETIS)
   target_link_libraries(clique parmetis-addons metis-addons parmetis)
 elseif(MANUAL_PARMETIS)
   target_link_libraries(clique parmetis-addons metis-addons ${PARMETIS_LIBS})
 endif()
-set(MPI_LINK_FLAGS "${MPI_CXX_LINK_FLAGS}")
+if(MANUAL_ELEMENTAL)
+  target_link_libraries(clique ${ELEM_LIBS})
+else()
+  target_link_libraries(clique elemental)
+endif()
 install(TARGETS clique DESTINATION lib)
 
 # Define the header-file preparation rules
@@ -188,6 +173,8 @@ set(BARRIER_IN_ALLTOALLV ${BARRIER_IN_ALLTOALLV} PARENT_SCOPE)
 set(HAVE_PARMETIS ${HAVE_PARMETIS} PARENT_SCOPE)
 
 set(LIBRARY_TYPE ${LIBRARY_TYPE} PARENT_SCOPE)
+string(TOUPPER ${CMAKE_BUILD_TYPE} UPPER_BUILD_TYPE)
+set(CMAKE_CXX_FLAGS_${UPPER_BUILD_TYPE} ${CMAKE_CXX_FLAGS_${UPPER_BUILD_TYPE}} PARENT_SCOPE)
 set(MPI_C_COMPILER ${MPI_C_COMPILER} PARENT_SCOPE)
 set(MPI_C_INCLUDE_PATH ${MPI_C_INCLUDE_PATH} PARENT_SCOPE)
 set(MPI_C_COMPILE_FLAGS ${MPI_C_COMPILE_FLAGS} PARENT_SCOPE)
@@ -198,6 +185,7 @@ set(MPI_CXX_INCLUDE_PATH ${MPI_CXX_INCLUDE_PATH} PARENT_SCOPE)
 set(MPI_CXX_COMPILE_FLAGS ${MPI_CXX_COMPILE_FLAGS} PARENT_SCOPE)
 set(MPI_CXX_LINK_FLAGS ${MPI_CXX_LINK_FLAGS} PARENT_SCOPE)
 set(MPI_CXX_LIBRARIES ${MPI_CXX_LIBRARIES} PARENT_SCOPE)
+set(MPI_LINK_FLAGS ${MPI_LINK_FLAGS} PARENT_SCOPE)
 set(MATH_LIBS ${MATH_LIBS} PARENT_SCOPE)
 set(RESTRICT ${RESTRICT} PARENT_SCOPE)
 set(RELEASE ${RELEASE} PARENT_SCOPE)

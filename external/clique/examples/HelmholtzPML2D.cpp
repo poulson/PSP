@@ -1,21 +1,10 @@
 /*
-   Clique: a scalable implementation of the multifrontal algorithm
-
    Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
    The University of Texas at Austin
  
-   This program is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
- 
-   This program is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
- 
-   You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   This file is part of Clique and is under the GNU General Public License,
+   which can be found in the LICENSE file in the root directory, or at 
+   <http://www.gnu.org/licenses/>.
 */
 #include "clique.hpp"
 using namespace cliq;
@@ -73,6 +62,7 @@ main( int argc, char* argv[] )
             ("--numSeqSeps",
              "number of separators to try per sequential partition",1);
         const int cutoff = Input("--cutoff","cutoff for nested dissection",128);
+        const bool print = Input("--print","print matrix?",false);
         ProcessInput();
 
         const double k = omega/(2*M_PI);
@@ -141,7 +131,8 @@ main( int argc, char* argv[] )
             std::cout << "done, " << fillStop-fillStart << " seconds" 
                       << std::endl;
 
-        A.Print("A");
+        if( print )
+            A.Print("A");
 
         if( commRank == 0 )
             std::cout << "Generating point-source for y..." << std::endl;
@@ -327,9 +318,6 @@ main( int argc, char* argv[] )
         if( commRank == 0 )
             std::cout << "done, " << solveStop-solveStart << " seconds"
                       << std::endl;
-
-        if( mpi::CommSize( comm ) == 1 )
-            y.LocalVector().Print("solution");
 
         if( commRank == 0 )
             std::cout << "Checking residual norm of solution..." << std::endl;
