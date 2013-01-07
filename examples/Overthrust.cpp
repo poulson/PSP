@@ -32,6 +32,9 @@ main( int argc, char* argv[] )
         const int pmlSize = Input("--pmlSize","number of grid points of PML",4);
         const double sigma = Input("--sigma","amplitude of PML profile",1.5*20);
         const double damping = Input("--damping","damping factor",7.);
+        const int m = Input("--m","GMRES restart size",20);
+        const double relTol = Input("--relTol","GMRES relative tolerance",1e-5);
+        const bool viewIterates = Input("--viewIts","view iterates?",false);
         const int planesPerPanel = Input
             ("--planesPerPanel","number of planes per subdomain",4);
         const PanelScheme panelScheme = (PanelScheme)Input
@@ -220,9 +223,6 @@ main( int argc, char* argv[] )
             std::cout << "Beginning solve..." << std::endl;
         mpi::Barrier( comm );
         const double solveStartTime = mpi::Time();
-        const int m = 20;
-        const double relTol = 1e-5;
-        const bool viewIterates = false;
         helmholtz.Solve( B, m, relTol, viewIterates );
         mpi::Barrier( comm );
         const double solveStopTime = mpi::Time();
