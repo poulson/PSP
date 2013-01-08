@@ -44,7 +44,7 @@ inline void DistCompressedBlockLowerForwardSolve
     const LocalCompressedFront<F>& localRootFront = L.localFronts.back();
     const DistCompressedFront<F>& distLeafFront = L.distFronts[0];
     const Grid& leafGrid = *distLeafFront.grid;
-    distLeafFront.work1d.LockedView
+    distLeafFront.work1d.LockedAttach
     ( localRootFront.work.Height(), localRootFront.work.Width(), 0,
       localRootFront.work.LockedBuffer(), localRootFront.work.LDim(), 
       leafGrid );
@@ -79,7 +79,7 @@ inline void DistCompressedBlockLowerForwardSolve
 
         // Pull in the relevant information from the RHS
         Matrix<F> localXT;
-        localXT.View( localX, node.localOffset1d, 0, node.localSize1d, width );
+        View( localXT, localX, node.localOffset1d, 0, node.localSize1d, width );
         WT.LocalMatrix() = localXT;
         elem::MakeZeros( WB );
 
@@ -87,7 +87,7 @@ inline void DistCompressedBlockLowerForwardSolve
         DistMatrix<F,VC,STAR>& childW = childFront.work1d;
         const int updateSize = childW.Height()-childNode.size;
         DistMatrix<F,VC,STAR> childUpdate;
-        childUpdate.LockedView( childW, childNode.size, 0, updateSize, width );
+        LockedView( childUpdate, childW, childNode.size, 0, updateSize, width );
         int sendBufferSize = 0;
         std::vector<int> sendCounts(commSize), sendDispls(commSize);
         for( int proc=0; proc<commSize; ++proc )
@@ -194,7 +194,7 @@ inline void DistCompressedBlockLowerBackwardSolve
     const LocalCompressedFront<F>& localRootFront = L.localFronts.back();
     if( numDistNodes == 1 )
     {
-        localRootFront.work.View
+        localRootFront.work.Attach
         ( rootNode.size, width,
           localX.Buffer(rootNode.localOffset1d,0), localX.LDim() );
         LocalFrontCompressedBlockLowerBackwardSolve
@@ -204,7 +204,7 @@ inline void DistCompressedBlockLowerBackwardSolve
     {
         const DistCompressedFront<F>& rootFront = L.distFronts.back();
         const Grid& rootGrid = *rootFront.grid;
-        rootFront.work1d.View
+        rootFront.work1d.Attach
         ( rootNode.size, width, 0,
           localX.Buffer(rootNode.localOffset1d,0), localX.LDim(), rootGrid );
         DistFrontCompressedBlockLowerBackwardSolve
@@ -241,7 +241,7 @@ inline void DistCompressedBlockLowerBackwardSolve
 
         // Pull in the relevant information from the RHS
         Matrix<F> localXT;
-        localXT.View( localX, node.localOffset1d, 0, node.localSize1d, width );
+        View( localXT, localX, node.localOffset1d, 0, node.localSize1d, width );
         WT.LocalMatrix() = localXT;
 
         //
@@ -330,7 +330,7 @@ inline void DistCompressedBlockLowerBackwardSolve
             DistFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
         else
         {
-            localRootFront.work.View( W.LocalMatrix() );
+            View( localRootFront.work, W.LocalMatrix() );
             LocalFrontCompressedBlockLowerBackwardSolve
             ( orientation, localRootFront, localRootFront.work );
         }

@@ -61,7 +61,7 @@ DistFrontCompressedBlockLowerForwardSolve
         XTBlock_MR_STAR.AlignWith( GA );
         for( int j=0; j<depth; ++j )
         {
-            XTBlock.LockedView( XT, j*sT, 0, sT, numRhs );
+            LockedView( XTBlock, XT, j*sT, 0, sT, numRhs );
             XTBlock_MR_STAR = XTBlock;
             elem::internal::LocalGemm
             ( NORMAL, NORMAL, 
@@ -78,7 +78,7 @@ DistFrontCompressedBlockLowerForwardSolve
     // redistributions to fix alignments
     for( int i=0; i<depth; ++i )
     {
-        XTBlock.View( XT, i*sT, 0, sT, numRhs );
+        View( XTBlock, XT, i*sT, 0, sT, numRhs );
         XTBlock = XTBlocks[i];
     }
     XTBlocks.clear();
@@ -114,7 +114,7 @@ DistFrontCompressedBlockLowerForwardSolve
             XTBlock_MR_STAR.AlignWith( GB );
             for( int j=0; j<depth; ++j )
             {
-                XTBlock.LockedView( XT, j*sT, 0, sT, numRhs );
+                LockedView( XTBlock, XT, j*sT, 0, sT, numRhs );
                 XTBlock_MR_STAR = XTBlock;
                 elem::internal::LocalGemm
                 ( NORMAL, NORMAL, 
@@ -132,7 +132,7 @@ DistFrontCompressedBlockLowerForwardSolve
         DistMatrix<F,VC,STAR> XBBlock(g);
         for( int i=0; i<depth; ++i )
         {
-            XBBlock.View( XB, i*sB, 0, sB, numRhs );
+            View( XBBlock, XB, i*sB, 0, sB, numRhs );
             elem::Axpy( F(-1), XBUpdates[i], XBBlock );
         }
     }
@@ -202,7 +202,7 @@ DistFrontCompressedBlockLowerBackwardSolve
             XBBlock_MC_STAR.AlignWith( GB );
             for( int j=0; j<depth; ++j )
             {
-                XBBlock.LockedView( XB, j*sB, 0, sB, numRhs );
+                LockedView( XBBlock, XB, j*sB, 0, sB, numRhs );
                 XBBlock_MC_STAR = XBBlock;
                 elem::internal::LocalGemm
                 ( orientation, NORMAL,
@@ -228,7 +228,7 @@ DistFrontCompressedBlockLowerBackwardSolve
         DistMatrix<F,VC,STAR> YTBlock(g);
         for( int i=0; i<depth; ++i )
         {
-            YTBlock.View( YT, i*sT, 0, sT, numRhs );
+            View( YTBlock, YT, i*sT, 0, sT, numRhs );
             YTBlock = YTBlocks[i];
         }
     }
@@ -257,7 +257,7 @@ DistFrontCompressedBlockLowerBackwardSolve
         YTBlock_MR_STAR.AlignWith( GA );
         for( int j=0; j<depth; ++j )
         {
-            YTBlock.LockedView( YT, j*sT, 0, sT, numRhs );
+            LockedView( YTBlock, YT, j*sT, 0, sT, numRhs );
             YTBlock_MR_STAR = YTBlock;
             elem::internal::LocalGemm
             ( NORMAL, NORMAL,
@@ -275,7 +275,7 @@ DistFrontCompressedBlockLowerBackwardSolve
     DistMatrix<F,VC,STAR> XTBlock(g);
     for( int i=0; i<depth; ++i )
     {
-        XTBlock.View( XT, i*sT, 0, sT, numRhs );
+        View( XTBlock, XT, i*sT, 0, sT, numRhs );
         elem::Axpy( F(-1), XTUpdates[i], XTBlock );
     }
 #ifndef RELEASE

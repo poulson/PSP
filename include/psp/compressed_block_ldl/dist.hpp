@@ -42,7 +42,7 @@ inline void DistCompressedBlockLDL
     bottomDistFront.ACoefficients.clear();
     bottomDistFront.BCoefficients.clear();
     bottomDistFront.work2d.Empty();
-    bottomDistFront.work2d.LockedView
+    bottomDistFront.work2d.LockedAttach
     ( topLocalFront.work.Height(), topLocalFront.work.Width(), 0, 0,
       topLocalFront.work.LockedBuffer(), topLocalFront.work.LDim(),
       bottomGrid );

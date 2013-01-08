@@ -99,7 +99,7 @@ inline void LocalBlockCompression
         // Compress
         Matrix<R> s;
         Matrix<C> ZT, W;
-        ZT.View( Z, 0, 0, n, n );
+        View( ZT, Z, 0, 0, n, n );
         W = ZT;
         elem::MakeTrapezoidal( LEFT, UPPER, 0, W );
         elem::SVD( W, s, V, useQR );

@@ -317,7 +317,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
 
         // v0 := w / beta
         Matrix<C> v0List;
-        v0List.View( VInter, 0, 0, localSize, numRhs );
+        View( v0List, VInter, 0, 0, localSize, numRhs );
         v0List = wList;
         DivideColumns( v0List, betaList );
 
@@ -330,7 +330,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
         {
             // w := A v_j
             Matrix<C> vjList;
-            vjList.LockedView( VInter, 0, j*numRhs, localSize, numRhs );
+            LockedView( vjList, VInter, 0, j*numRhs, localSize, numRhs );
             wList = vjList;
             {
 #ifndef RELEASE
@@ -392,7 +392,8 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 {
                     // H(i,j) := v_i' w
                     Matrix<C> viList;
-                    viList.LockedView( VInter, 0, i*numRhs, localSize, numRhs );
+                    LockedView
+                    ( viList, VInter, 0, i*numRhs, localSize, numRhs );
                     InnerProducts( viList, wList, alphaList, comm_ );
                     for( int k=0; k<numRhs; ++k )
                         HList.Set(i,j+k*m,alphaList[k]);
@@ -418,7 +419,8 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 if( j+1 != m )
                 {
                     Matrix<C> vjp1List;
-                    vjp1List.View( VInter, 0, (j+1)*numRhs, localSize, numRhs );
+                    View
+                    ( vjp1List, VInter, 0, (j+1)*numRhs, localSize, numRhs );
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
                 }
@@ -441,7 +443,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 for( int k=0; k<numRhs; ++k )
                 {
                     Matrix<C> H;
-                    H.View( HList, 0, k*m, j+1, j+1 );
+                    View( H, HList, 0, k*m, j+1, j+1 );
                     for( int i=0; i<j; ++i )
                     {
                         const R c = csList.Get(i,k);
@@ -475,7 +477,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 {
                     // Apply the rotation to the new column of H
                     Matrix<C> H;
-                    H.View( HList, 0, k*m, j+1, j+1 );
+                    View( H, HList, 0, k*m, j+1, j+1 );
                     const C eta_j_j = H.Get(j,j);
                     const C eta_jp1_j = deltaList[k];
                     if( CheckForNaN(eta_j_j) )
@@ -505,19 +507,19 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
 
                     // Minimize the residual
                     Matrix<C> y, z;
-                    z.LockedView( zList, 0, k, j+1, 1 );
+                    LockedView( z, zList, 0, k, j+1, 1 );
                     y = z;
                     elem::Trsv( UPPER, NORMAL, NON_UNIT, H, y );
 
                     // x := x0 + Vj y
                     Matrix<C> x, x0, vi;
-                    x.View(         xList, 0, k, localSize, 1 );
-                    x0.LockedView( x0List, 0, k, localSize, 1 );
+                    View(        x,  xList, 0, k, localSize, 1 );
+                    LockedView( x0, x0List, 0, k, localSize, 1 );
                     x = x0;
                     for( int i=0; i<=j; ++i )
                     {
                         const C eta_i = y.Get(i,0);
-                        vi.LockedView( VInter, 0, i*numRhs+k, localSize, 1 );
+                        LockedView( vi, VInter, 0, i*numRhs+k, localSize, 1 );
                         elem::Axpy( eta_i, vi, x );
                     }
                 }

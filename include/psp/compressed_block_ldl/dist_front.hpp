@@ -117,7 +117,7 @@ inline void DistBlockCompression
             {
                 for( int j1=0; j1<depth; ++j1 )
                 {
-                    D.LockedView( A, j1*s1, j2*s2, s1, s2 );
+                    LockedView( D, A, j1*s1, j2*s2, s1, s2 );
                     const int DLocalHeight = D.LocalHeight();
                     const int DLocalWidth = D.LocalWidth();
                     const int DColShift = D.ColShift();
@@ -186,7 +186,7 @@ inline void DistBlockCompression
             {
                 for( int j1=0; j1<depth; ++j1 )
                 {
-                    D.LockedView( A, j1*s1, j2*s2, s1, s2 );
+                    LockedView( D, A, j1*s1, j2*s2, s1, s2 );
                     const int DLocalHeight = D.LocalHeight();
                     const int DLocalWidth = D.LocalWidth();
                     const int DColShift = D.ColShift();
@@ -291,7 +291,7 @@ inline void DistBlockCompression
 
         // Compress
         DistMatrix<C> ZT( g );
-        ZT.View( Z, 0, 0, n, n );
+        View( ZT, Z, 0, 0, n, n );
 
         DistMatrix<R,STAR,STAR> s_STAR_STAR( n, 1, g );
         DistMatrix<C,STAR,STAR> W_STAR_STAR( ZT );
@@ -356,8 +356,8 @@ inline void DistBlockCompression
         DistMatrix<C> UStrip( g ), GStrip( g );
         for( int i2=0; i2<s2; ++i2 )
         {
-            UStrip.LockedView( U, i2*s1, t, s1, 1 );
-            GStrip.View( G, 0, i2, s1, 1 );
+            LockedView( UStrip, U, i2*s1, t, s1, 1 );
+            View( GStrip, G, 0, i2, s1, 1 );
             GStrip = UStrip; 
         }
 

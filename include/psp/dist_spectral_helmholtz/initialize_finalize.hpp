@@ -1525,7 +1525,7 @@ DistSpectralHelmholtz<R>::FillPanelFronts
         const cliq::DistSymmNodeInfo& node = info.distNodes[0];
         Matrix<C>& topLocalFrontL = fact.localFronts.back().frontL;
         DistMatrix<C>& frontL = fact.distFronts[0].frontL;
-        frontL.LockedView
+        frontL.LockedAttach
         ( topLocalFrontL.Height(), topLocalFrontL.Width(), 0, 0,
           topLocalFrontL.LockedBuffer(), topLocalFrontL.LDim(),
           *node.grid );
