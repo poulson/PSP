@@ -6,8 +6,15 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
+#pragma once
+#ifndef LAPACK_HERMITIANEIG_HPP
+#define LAPACK_HERMITIANEIG_HPP
 
 #ifndef WITHOUT_PMRRR
+
+#include "elemental/lapack-like/ApplyPackedReflectors.hpp"
+#include "elemental/lapack-like/HermitianNorm.hpp"
+#include "elemental/lapack-like/HermitianTridiag.hpp"
 
 namespace elem {
 
@@ -258,7 +265,7 @@ HermitianEig
     }
     else
     {
-        paddedZ.Align( 0, 0 );
+        paddedZ.Empty();
         paddedZ.ResizeTo( N, K );
     }
 
@@ -271,7 +278,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -425,7 +432,7 @@ HermitianEig
     }
     else
     {
-        paddedZ.Align( 0, 0 );
+        paddedZ.Empty();
         paddedZ.ResizeTo( N, K );
     }
 
@@ -438,7 +445,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -598,10 +605,7 @@ HermitianEig
         if( w.Height() != n || w.Width() != 1 )
             throw std::logic_error("w was a view but was not the proper size");
     }
-    else
-    {
-        w.Align( 0 );
-    }
+    else w.Empty();
 
     // Check if we need to rescale the matrix, and do so if necessary
     bool needRescaling;
@@ -645,7 +649,7 @@ HermitianEig
         if( !paddedZ.Viewing() )
         {
             const int K = MaxLocalLength(k,g.Size())*g.Size(); 
-            paddedZ.Align( 0, 0 );
+            paddedZ.Empty();
             paddedZ.ResizeTo( N, K );
         }
 
@@ -762,7 +766,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -846,7 +850,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -925,10 +929,7 @@ HermitianEig
         if( w.Height() != n || w.Width() != 1 )
             throw std::logic_error("w was a view but was not the proper size");
     }
-    else
-    {
-        w.Align( 0 );
-    }
+    else w.Empty();
 
     // Check if we need to rescale the matrix, and do so if necessary
     bool needRescaling;
@@ -1016,7 +1017,7 @@ HermitianEig
     }
     else
     {
-        paddedZ.Align( 0, 0 );
+        paddedZ.Empty();
         paddedZ.ResizeTo( N, K );
     }
 
@@ -1029,7 +1030,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -1186,7 +1187,7 @@ HermitianEig
     }
     else
     {
-        paddedZ.Align( 0, 0 );
+        paddedZ.Empty();
         paddedZ.ResizeTo( N, K );
     }
 
@@ -1199,7 +1200,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -1362,10 +1363,7 @@ HermitianEig
         if( w.Height() != n || w.Width() != 1 )
             throw std::logic_error("w was a view but was not the proper size");
     }
-    else
-    {
-        w.Align( 0 );
-    }
+    else w.Empty();
 
     // Check if we need to rescale the matrix, and do so if necessary
     bool needRescaling;
@@ -1410,7 +1408,7 @@ HermitianEig
         if( !paddedZ.Viewing() )
         {
             const int K = MaxLocalLength(k,g.Size())*g.Size();
-            paddedZ.Align( 0, 0 );
+            paddedZ.Empty();
             paddedZ.ResizeTo( N, K );
         }
 
@@ -1530,7 +1528,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -1615,7 +1613,7 @@ HermitianEig
     }
     else
     {
-        w.Align( 0 );
+        w.Empty();
         w.ResizeTo( k, 1 );
     }
 
@@ -1695,10 +1693,7 @@ HermitianEig
         if( w.Height() != n || w.Width() != 1 )
             throw std::logic_error("w was a view but was not the proper size");
     }
-    else
-    {
-        w.Align( 0 );
-    }
+    else w.Empty();
 
     // Check if we need to rescale the matrix, and do so if necessary
     bool needRescaling;
@@ -1752,3 +1747,5 @@ HermitianEig
 } // namespace elem
 
 #endif // WITHOUT_PMRRR
+
+#endif // ifndef LAPACK_HERMITIANEIG_HPP

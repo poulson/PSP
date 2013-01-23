@@ -6,8 +6,13 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
+#pragma once
+#ifndef LAPACK_SKEWHERMITIANEIG_HPP
+#define LAPACK_SKEWHERMITIANEIG_HPP
 
 #ifndef WITHOUT_PMRRR
+
+#include "elemental/lapack-like/HermitianEig.hpp"
 
 namespace elem {
 
@@ -31,7 +36,7 @@ SkewHermitianEig
     const Grid& grid = G.Grid();
 
     DistMatrix<Complex<double> > A(grid);
-    A.Align( G.ColAlignment(), G.RowAlignment() );
+    A.AlignWith( G.DistData() );
     A.ResizeTo( n, n );
 
     const int localHeight = A.LocalHeight();
@@ -77,7 +82,7 @@ SkewHermitianEig
     const Grid& grid = G.Grid();
 
     DistMatrix<Complex<double> > A(grid);
-    A.Align( G.ColAlignment(), G.RowAlignment() );
+    A.AlignWith( G.DistData() );
     A.ResizeTo( n, n );
 
     const int localHeight = A.LocalHeight();
@@ -121,7 +126,7 @@ SkewHermitianEig
     const Grid& grid = G.Grid();
 
     DistMatrix<Complex<double> > A(grid);
-    A.Align( G.ColAlignment(), G.RowAlignment() );
+    A.AlignWith( G.DistData() );
     A.ResizeTo( n, n );
 
     const int localHeight = A.LocalHeight();
@@ -162,7 +167,7 @@ SkewHermitianEig
     const Grid& grid = G.Grid();
 
     DistMatrix<Complex<double> > A(grid);
-    A.Align( G.ColAlignment(), G.RowAlignment() );
+    A.AlignWith( G.DistData() );
     A.ResizeTo( n, n );
 
     const int localHeight = A.LocalHeight();
@@ -207,7 +212,7 @@ SkewHermitianEig
     const Grid& grid = G.Grid();
 
     DistMatrix<Complex<double> > A(grid);
-    A.Align( G.ColAlignment(), G.RowAlignment() );
+    A.AlignWith( G.DistData() );
     A.ResizeTo( n, n );
 
     const int localHeight = A.LocalHeight();
@@ -250,7 +255,7 @@ SkewHermitianEig
     const Grid& grid = G.Grid();
 
     DistMatrix<Complex<double> > A(grid);
-    A.Align( G.ColAlignment(), G.RowAlignment() );
+    A.AlignWith( G.DistData() );
     A.ResizeTo( n, n );
 
     const int localHeight = A.LocalHeight();
@@ -450,3 +455,5 @@ SkewHermitianEig
 } // namespace elem
 
 #endif // WITHOUT_PMRRR
+
+#endif // ifndef LAPACK_SKEWHERMITIANEIG_HPP

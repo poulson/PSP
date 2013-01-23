@@ -6,6 +6,9 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
+#pragma once
+#ifndef LAPACK_HERMITIANTRIDIAG_PANELUSQUARE_HPP
+#define LAPACK_HERMITIANTRIDIAG_PANELUSQUARE_HPP
 
 namespace elem {
 namespace internal {
@@ -748,7 +751,7 @@ HermitianPanelTridiagUSquare
     DistMatrix<R,MD,STAR> e(g);
     DistMatrix<C> expandedABR(g);
     View( expandedABR, A, topSize-1, topSize-1, panelSize+1, panelSize+1 );
-    e.AlignWithDiagonal( expandedABR, 1 );
+    e.AlignWithDiagonal( expandedABR.DistData(), 1 );
     e.ResizeTo( panelSize, 1 );
 
     // Matrix views 
@@ -1401,3 +1404,5 @@ HermitianPanelTridiagUSquare
 
 } // namespace internal
 } // namespace elem
+
+#endif // ifndef LAPACK_HERMITIANTRIDIAG_PANELUSQUARE_HPP

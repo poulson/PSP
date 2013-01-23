@@ -1,5 +1,6 @@
 /*
    Copyright (c) 2009-2013, Jack Poulson
+                      2013, Jeff Hammond
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -58,6 +59,13 @@ bool Finalized()
     int finalized;
     MPI_Finalized( &finalized );
     return finalized;
+}
+
+int QueryThread()
+{
+    int provided;
+    MPI_Query_thread( &provided );
+    return provided;
 }
 
 double Time()
@@ -190,7 +198,11 @@ void ErrorHandlerSet( Comm comm, ErrorHandler errorHandler )
 #ifndef RELEASE
     PushCallStack("mpi::ErrorHandlerSet");
 #endif
+#ifdef HAVE_MPI_COMM_SET_ERRHANDLER
+    SafeMpi( MPI_Comm_set_errhandler( comm, errorHandler ) );
+#else
     SafeMpi( MPI_Errhandler_set( comm, errorHandler ) );
+#endif
 #ifndef RELEASE
     PopCallStack();
 #endif

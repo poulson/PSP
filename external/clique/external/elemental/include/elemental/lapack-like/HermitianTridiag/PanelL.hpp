@@ -6,6 +6,9 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
+#pragma once
+#ifndef LAPACK_HERMITIANTRIDIAG_PANELL_HPP
+#define LAPACK_HERMITIANTRIDIAG_PANELL_HPP
 
 namespace elem {
 namespace internal {
@@ -784,7 +787,7 @@ HermitianPanelTridiagL
 
     // Create a distributed matrix for storing the subdiagonal
     DistMatrix<R,MD,STAR> e(g);
-    e.AlignWithDiagonal( A, -1 );
+    e.AlignWithDiagonal( A.DistData(), -1 );
     e.ResizeTo( panelSize, 1 );
 
     if( !g.InGrid() )
@@ -1199,8 +1202,8 @@ HermitianPanelTridiagL
         PopBlocksizeStack();
         Zero( p21_MC_STAR );
         Zero( q21_MR_STAR );
-        LocalHemvColAccumulateL
-        ( C(1), A22, a21_MC_STAR, a21_MR_STAR, p21_MC_STAR, q21_MR_STAR );
+        LocalSymvColAccumulateL
+        ( C(1), A22, a21_MC_STAR, a21_MR_STAR, p21_MC_STAR, q21_MR_STAR, true );
         PushBlocksizeStack( 1 );
 
         LocalGemv( ADJOINT, C(1), W20B, a21B_MC_STAR, C(0), x01_MR_STAR );
@@ -1508,3 +1511,5 @@ HermitianPanelTridiagL
 
 } // namespace internal
 } // namespace elem
+
+#endif // ifndef LAPACK_HERMITIANTRIDIAG_PANELL_HPP

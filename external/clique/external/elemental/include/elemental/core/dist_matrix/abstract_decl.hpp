@@ -6,6 +6,9 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
+#pragma once
+#ifndef CORE_DISTMATRIX_ABSTRACT_DECL_HPP
+#define CORE_DISTMATRIX_ABSTRACT_DECL_HPP
 
 namespace elem {
 
@@ -102,6 +105,10 @@ public:
     Int ColShift() const;
     Int RowShift() const;
 
+    void Align( Int colAlignment, Int rowAlignment );
+    void AlignCols( Int colAlignment );
+    void AlignRows( Int rowAlignment );
+
     //
     // Local entry manipulation
     //
@@ -139,12 +146,20 @@ public:
     //
 
     void Empty();
+    void EmptyData();
+    void SetGrid( const elem::Grid& grid );
 
     //------------------------------------------------------------------------//
     // Routines that can be overridden in derived classes                     //
     //------------------------------------------------------------------------//
 
     virtual bool Participating() const;
+    virtual void AlignWith( const elem::DistData<Int>& data );
+    virtual void AlignWith( const AbstractDistMatrix<T,Int>& A );
+    virtual void AlignColsWith( const elem::DistData<Int>& data );
+    virtual void AlignColsWith( const AbstractDistMatrix<T,Int>& A );
+    virtual void AlignRowsWith( const elem::DistData<Int>& data );
+    virtual void AlignRowsWith( const AbstractDistMatrix<T,Int>& A );
 
     //------------------------------------------------------------------------//
     // Routines that MUST be implemented in non-abstract derived classes      //
@@ -154,7 +169,8 @@ public:
     // Basic information
     //
 
-    virtual void SetGrid( const elem::Grid& grid ) = 0;
+    virtual elem::DistData<Int> DistData() const = 0;
+
     // So that the local row indices are given by
     //   A.ColShift():A.ColStride():A.Height()
     virtual Int ColStride() const = 0; 
@@ -244,6 +260,10 @@ protected:
       Int ldim,
       const elem::Grid& g );
 
+protected:
+    void SetShifts();
+    void SetGrid();
+
     virtual void PrintBase( std::ostream& os, const std::string msg ) const = 0;
 
     template<typename S,Distribution U,Distribution V,typename Ord> 
@@ -296,4 +316,6 @@ protected:
     friend class DistMatrix;
 };
 
-} // elem
+} // namespace elem
+
+#endif // ifndef CORE_DISTMATRIX_ABSTRACT_DECL_HPP

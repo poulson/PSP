@@ -6,6 +6,9 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
+#pragma once
+#ifndef CORE_DISTMATRIX_STAR_STAR_DECL_HPP
+#define CORE_DISTMATRIX_STAR_STAR_DECL_HPP
 
 namespace elem {
 
@@ -81,7 +84,7 @@ public:
     operator=( const DistMatrix<T,STAR,STAR,Int>& A );
 
     //------------------------------------------------------------------------//
-    // Fulfillments of abstract virtual func's from AbstractDistMatrix        //
+    // Overrides of AbstractDistMatrix                                        //
     //------------------------------------------------------------------------//
 
     //
@@ -92,12 +95,11 @@ public:
     virtual Int RowStride() const;
     virtual Int ColRank() const;
     virtual Int RowRank() const;
+    virtual elem::DistData<Int> DistData() const;
 
     //
     // Collective routines
     //
-
-    virtual void SetGrid( const elem::Grid& grid );
 
     virtual T Get( Int i, Int j ) const;
     virtual void Set( Int i, Int j, T alpha );
@@ -124,24 +126,9 @@ public:
     //------------------------------------------------------------------------//
 
     //
-    // Non-collective routines
-    //
-
-    // (empty)
-
-    //
     // Collective routines
     //
     
-    // The following are all no-ops that exist to allow for more flexible 
-    // templating over distribution parameters.
-    template<typename S,Distribution U,Distribution V,typename N>
-    void AlignWith( const DistMatrix<S,U,V,N>& A ) { }
-    template<typename S,Distribution U,Distribution V,typename N>
-    void AlignColsWith( const DistMatrix<S,U,V,N>& A ) { }
-    template<typename S,Distribution U,Distribution V,typename N>
-    void AlignRowsWith( const DistMatrix<S,U,V,N>& A ) { }
-
     // (Immutable) view of a distributed matrix's buffer
     void Attach
     ( Int height, Int width,
@@ -157,8 +144,10 @@ public:
 private:
     virtual void PrintBase( std::ostream& os, const std::string msg="" ) const;
 
-    template<typename S,Distribution U,Distribution V,typename Ord>
+    template<typename S,Distribution U,Distribution V,typename N>
     friend class DistMatrix;
 };
 
 } // namespace elem
+
+#endif // ifndef CORE_DISTMATRIX_STAR_STAR_DECL_HPP
