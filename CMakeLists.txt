@@ -1,12 +1,12 @@
 #
-# Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-# The University of Texas at Austin
+# Copyright (C) 2011-2013 Jack Poulson, Lexing Ying, 
+# The University of Texas at Austin, and Stanford University
 #
 # This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
 # GNU General Public License, which can be found in the LICENSE file in the 
 # root directory, or at <http://www.gnu.org/licenses/>.
 #
-cmake_minimum_required(VERSION 2.8.5)
+cmake_minimum_required(VERSION 2.8.10) # needed for Mercurial downloads
 project(PSP)
 
 set(PSP_VERSION_MAJOR 0)
@@ -16,17 +16,29 @@ option(PSP_TESTS "Build a collection of test executables" OFF)
 option(PSP_EXAMPLES "Build one or more example executables" OFF)
 option(PRINT_RITZ_VALUES "Print Ritz values before restarting GMRES" OFF)
 
-# TODO: Think of how to avoid this mess...
-add_subdirectory(external/clique)
-include_directories("${PROJECT_BINARY_DIR}/external/clique/include")
+set(CLIQ_REV 371)
+if(NOT EXISTS ${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV})
+  find_package(Hg)
+  if(HG_FOUND)
+    execute_process(COMMAND
+      ${HG_EXECUTABLE} clone https://bitbucket.org/poulson/clique
+      ${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV})
+  else()
+    message(FATAL_ERROR
+      "Could not find Mercurial, which is needed for checking out Clique")
+  endif()
+endif()
+add_subdirectory(external/clique-r${CLIQ_REV})
+include_directories(
+  "${PROJECT_BINARY_DIR}/external/clique-r${CLIQ_REV}/include")
 if(HAVE_PARMETIS)
   include_directories(
-    "${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/include")
+    "${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV}/external/parmetis/include")
   include_directories(
-    "${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/metis/include")
+    "${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV}/external/parmetis/metis/include")
 endif()
 include_directories(
-  "${PROJECT_BINARY_DIR}/external/clique/external/elemental/include")
+    "${PROJECT_BINARY_DIR}/external/clique-r${CLIQ_REV}/external/elemental-r${ELEM_REV}/include")
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
