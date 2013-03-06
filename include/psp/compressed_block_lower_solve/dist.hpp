@@ -41,7 +41,7 @@ inline void DistCompressedBlockLowerForwardSolve
     const int width = localX.Width();
 
     // Copy the information from the local portion into the distributed leaf
-    const LocalCompressedFront<F>& localRootFront = L.localFronts.back();
+    const CompressedFront<F>& localRootFront = L.localFronts.back();
     const DistCompressedFront<F>& distLeafFront = L.distFronts[0];
     const Grid& leafGrid = *distLeafFront.grid;
     distLeafFront.work1d.LockedAttach
@@ -80,7 +80,7 @@ inline void DistCompressedBlockLowerForwardSolve
         // Pull in the relevant information from the RHS
         Matrix<F> localXT;
         View( localXT, localX, node.localOffset1d, 0, node.localSize1d, width );
-        WT.LocalMatrix() = localXT;
+        WT.Matrix() = localXT;
         elem::MakeZeros( WB );
 
         // Pack our child's update
@@ -153,8 +153,8 @@ inline void DistCompressedBlockLowerForwardSolve
             {
                 const int iFrontLocal = recvIndices[k];
                 const F* recvRow = &recvValues[k*width];
-                F* WRow = W.LocalBuffer( iFrontLocal, 0 );
-                const int WLDim = W.LocalLDim();
+                F* WRow = W.Buffer( iFrontLocal, 0 );
+                const int WLDim = W.LDim();
                 for( int j=0; j<width; ++j )
                     WRow[j*WLDim] += recvRow[j];
             }
@@ -164,10 +164,10 @@ inline void DistCompressedBlockLowerForwardSolve
         recvDispls.clear();
 
         // Now that the RHS is set up, perform this node's solve
-        DistFrontCompressedBlockLowerForwardSolve( front, W );
+        FrontCompressedBlockLowerForwardSolve( front, W );
 
         // Store this node's portion of the result
-        localXT = WT.LocalMatrix();
+        localXT = WT.Matrix();
     }
     L.localFronts.back().work.Empty();
     L.distFronts.back().work1d.Empty();
@@ -191,13 +191,13 @@ inline void DistCompressedBlockLowerBackwardSolve
 
     // Directly operate on the root separator's portion of the right-hand sides
     const cliq::DistSymmNodeInfo& rootNode = info.distNodes.back();
-    const LocalCompressedFront<F>& localRootFront = L.localFronts.back();
+    const CompressedFront<F>& localRootFront = L.localFronts.back();
     if( numDistNodes == 1 )
     {
         localRootFront.work.Attach
         ( rootNode.size, width,
           localX.Buffer(rootNode.localOffset1d,0), localX.LDim() );
-        LocalFrontCompressedBlockLowerBackwardSolve
+        FrontCompressedBlockLowerBackwardSolve
         ( orientation, localRootFront, localRootFront.work );
     }
     else
@@ -207,7 +207,7 @@ inline void DistCompressedBlockLowerBackwardSolve
         rootFront.work1d.Attach
         ( rootNode.size, width, 0,
           localX.Buffer(rootNode.localOffset1d,0), localX.LDim(), rootGrid );
-        DistFrontCompressedBlockLowerBackwardSolve
+        FrontCompressedBlockLowerBackwardSolve
         ( orientation, rootFront, rootFront.work1d );
     }
 
@@ -242,7 +242,7 @@ inline void DistCompressedBlockLowerBackwardSolve
         // Pull in the relevant information from the RHS
         Matrix<F> localXT;
         View( localXT, localX, node.localOffset1d, 0, node.localSize1d, width );
-        WT.LocalMatrix() = localXT;
+        WT.Matrix() = localXT;
 
         //
         // Set the bottom from the parent
@@ -271,9 +271,8 @@ inline void DistCompressedBlockLowerBackwardSolve
             {
                 const int iFrontLocal = recvIndices[k];
                 F* sendRow = &sendValues[k*width];
-                const F* workRow = 
-                    parentWork.LockedLocalBuffer( iFrontLocal, 0 );
-                const int workLDim = parentWork.LocalLDim();
+                const F* workRow = parentWork.LockedBuffer( iFrontLocal, 0 );
+                const int workLDim = parentWork.LDim();
                 for( int j=0; j<width; ++j )
                     sendRow[j] = workRow[j*workLDim];
             }
@@ -327,16 +326,16 @@ inline void DistCompressedBlockLowerBackwardSolve
 
         // Use the distributed compressed data
         if( s > 0 )
-            DistFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
+            FrontCompressedBlockLowerBackwardSolve( orientation, front, W );
         else
         {
-            View( localRootFront.work, W.LocalMatrix() );
-            LocalFrontCompressedBlockLowerBackwardSolve
+            View( localRootFront.work, W.Matrix() );
+            FrontCompressedBlockLowerBackwardSolve
             ( orientation, localRootFront, localRootFront.work );
         }
 
         // Store this node's portion of the result
-        localXT = WT.LocalMatrix();
+        localXT = WT.Matrix();
     }
 #ifndef RELEASE
     PopCallStack();

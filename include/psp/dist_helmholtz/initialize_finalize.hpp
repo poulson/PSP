@@ -50,7 +50,7 @@ DistHelmholtz<R>::Initialize
     const int yLocalSize = velocity.YLocalSize();
     const int zLocalSize = velocity.ZLocalSize();
     const int localSize = xLocalSize*yLocalSize*zLocalSize;
-    const R* localVelocity = velocity.LockedLocalBuffer();
+    const R* localVelocity = velocity.LockedBuffer();
     for( int i=0; i<localSize; ++i )
         maxLocalVelocity=std::max(maxLocalVelocity,localVelocity[i]);
     R maxVelocity;
@@ -993,7 +993,7 @@ DistHelmholtz<R>::GetGlobalVelocity
 
     // Pack and send our velocity data.
     std::vector<R> sendVelocity( totalSendCount );
-    const R* localVelocity = velocity.LockedLocalBuffer();
+    const R* localVelocity = velocity.LockedBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         R* procVelocity = &sendVelocity[sendDispls[proc]];
@@ -1050,7 +1050,7 @@ DistHelmholtz<R>::GetPanelVelocity
     const int numLocalNodes = info.localNodes.size();
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int offset = node.offset;
         for( int j=0; j<size; ++j )
@@ -1074,7 +1074,7 @@ DistHelmholtz<R>::GetPanelVelocity
 
         const int size = node.size;
         const int offset = node.offset;
-        const int localWidth = LocalLength( size, gridCol, gridWidth );
+        const int localWidth = Length( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
             const int j = gridCol + jLocal*gridWidth;
@@ -1109,7 +1109,7 @@ DistHelmholtz<R>::GetPanelVelocity
     std::vector<int> recvIndices( totalRecvCount );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int offset = node.offset;
         for( int j=0; j<size; ++j )
@@ -1132,7 +1132,7 @@ DistHelmholtz<R>::GetPanelVelocity
 
         const int size = node.size;
         const int offset = node.offset;
-        const int localWidth = LocalLength( size, gridCol, gridWidth );
+        const int localWidth = Length( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
             const int j = gridCol + jLocal*gridWidth;
@@ -1153,7 +1153,7 @@ DistHelmholtz<R>::GetPanelVelocity
 
     // Pack and send our velocity data.
     std::vector<R> sendVelocity( totalSendCount );
-    const R* localVelocity = velocity.LockedLocalBuffer();
+    const R* localVelocity = velocity.LockedBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         R* procVelocity = &sendVelocity[sendDispls[proc]];
@@ -1442,8 +1442,8 @@ DistHelmholtz<R>::FillPanelFronts
     fact.localFronts.resize( numLocalNodes );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        cliq::LocalSymmFront<C>& front = fact.localFronts[t];
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
+        cliq::SymmFront<C>& front = fact.localFronts[t];
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
 
         // Initialize this front
         const int offset = node.offset;
@@ -1554,8 +1554,8 @@ DistHelmholtz<R>::FillPanelFronts
     fact.localFronts.resize( numLocalNodes );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        LocalCompressedFront<C>& front = fact.localFronts[t];
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
+        CompressedFront<C>& front = fact.localFronts[t];
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
 
         // Initialize this front
         const int offset = node.offset;

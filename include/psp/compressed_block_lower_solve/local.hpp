@@ -41,8 +41,8 @@ inline void LocalCompressedBlockLowerForwardSolve
     const int width = X.Width();
     for( int s=0; s<numLocalNodes; ++s )
     {
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[s];
-        const LocalCompressedFront<F>& front = L.localFronts[s];
+        const cliq::SymmNodeInfo& node = info.localNodes[s];
+        const CompressedFront<F>& front = L.localFronts[s];
         const int sT = front.sT;
         const int sB = front.sB;
         const int depth = front.depth;
@@ -103,7 +103,7 @@ inline void LocalCompressedBlockLowerForwardSolve
         // else numChildren == 0
 
         // Solve against this front
-        LocalFrontCompressedBlockLowerForwardSolve( front, W );
+        FrontCompressedBlockLowerForwardSolve( front, W );
 
         // Store the node portion of the result
         XT = WT;
@@ -128,8 +128,8 @@ inline void LocalCompressedBlockLowerBackwardSolve
 
     for( int s=numLocalNodes-2; s>=0; --s )
     {
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[s];
-        const LocalCompressedFront<F>& front = L.localFronts[s];
+        const cliq::SymmNodeInfo& node = info.localNodes[s];
+        const CompressedFront<F>& front = L.localFronts[s];
         const int sT = front.sT;
         const int sB = front.sB;
         const int depth = front.depth;
@@ -151,7 +151,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
         // Update using the parent
         const int parent = node.parent;
         Matrix<F>& parentWork = L.localFronts[parent].work;
-        const cliq::LocalSymmNodeInfo& parentNode = info.localNodes[parent];
+        const cliq::SymmNodeInfo& parentNode = info.localNodes[parent];
         const int currentUpdateSize = WB.Height();
         const std::vector<int>& parentRelIndices = 
           ( node.isLeftChild ? 
@@ -174,7 +174,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
         }
 
         // Solve against this front
-        LocalFrontCompressedBlockLowerBackwardSolve( orientation, front, W );
+        FrontCompressedBlockLowerBackwardSolve( orientation, front, W );
 
         // Store the node portion of the result
         XT = WT;

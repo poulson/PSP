@@ -144,7 +144,7 @@ main( int argc, char* argv[] )
         const int xLocalSize = B.XLocalSize();
         const int yLocalSize = B.YLocalSize();
         const int zLocalSize = B.ZLocalSize();
-        C* localB = B.LocalBuffer();
+        C* localB = B.Buffer();
         const double center0[] = { 0.5, 0.5, 0.1 };
         const double center1[] = { 0.25, 0.25, 0.1 };
         const double center2[] = { 0.75, 0.75, 0.5 };

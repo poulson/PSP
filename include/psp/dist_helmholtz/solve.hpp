@@ -115,7 +115,7 @@ DistHelmholtz<R>::PullRightHandSides
 
     // Pack and send our right-hand side data.
     std::vector<C> sendB( totalSendCount );
-    const C* gridBBuffer = gridB.LockedLocalBuffer();
+    const C* gridBBuffer = gridB.LockedBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         C* procB = &sendB[sendDispls[proc]];
@@ -226,7 +226,7 @@ DistHelmholtz<R>::PushRightHandSides
     sendB.clear();
 
     // Unpack the right-hand side data
-    C* gridBBuffer = gridB.LocalBuffer();
+    C* gridBBuffer = gridB.Buffer();
     for( int proc=0; proc<commSize; ++proc )
     {
         const C* procB = &recvB[recvDispls[proc]];
@@ -778,7 +778,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     const int numLocalNodes = info.localNodes.size();
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int myOffset = node.myOffset;
 
@@ -815,8 +815,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
-        const int localPaddingSize = 
-            LocalLength( paddingSize, gridRank, gridSize );
+        const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
         const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )
@@ -842,7 +841,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
     BOffset = LocalPanelOffset( i );
     for( int t=0; t<numLocalNodes; ++t )
     {
-        const cliq::LocalSymmNodeInfo& node = info.localNodes[t];
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
         const int myOffset = node.myOffset;
 
@@ -878,8 +877,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
 #endif
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
-        const int localPaddingSize = 
-            LocalLength( paddingSize, gridRank, gridSize );
+        const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
         const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )

@@ -78,7 +78,7 @@ main( int argc, char* argv[] )
         DistHelmholtz<double> helmholtz( disc, comm, damping, planesPerPanel );
 
         DistUniformGrid<double> velocity( n, n, n, comm );
-        double* localVelocity = velocity.LocalBuffer();
+        double* localVelocity = velocity.Buffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
         const int zLocalSize = velocity.ZLocalSize();
@@ -483,7 +483,7 @@ main( int argc, char* argv[] )
                       << " seconds." << std::endl;
 
         DistUniformGrid<C> B( n, n, n, comm, 4 );
-        C* localB = B.LocalBuffer();
+        C* localB = B.Buffer();
         const double center0[] = { 0.5, 0.5, 0.1 };
         const double center1[] = { 0.25, 0.25, 0.1 };
         const double center2[] = { 0.75, 0.75, 0.5 };

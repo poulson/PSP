@@ -12,7 +12,7 @@
 namespace psp {
 
 template<typename R>
-void DistFrontCompression
+void CompressFront
 ( DistCompressedFront<Complex<R> >& front, int depth, bool useQR,
   R tolA, R tolB );
 
@@ -32,7 +32,7 @@ void CompressSVD
     typedef Complex<R> C;
 
     // Compress
-    const R twoNorm = elem::Norm( s.LocalMatrix(), elem::MAX_NORM );
+    const R twoNorm = elem::MaxNorm( s.Matrix() );
     const R cutoff = twoNorm*tolerance;
     const int k = s.Height();
     int numKeptModes = k;
@@ -59,14 +59,14 @@ void CompressSVD
 }
 
 template<typename R> 
-inline void DistBlockCompression
+inline void CompressBlock
 ( DistMatrix<Complex<R> >& A, 
   std::vector<DistMatrix<Complex<R> > >& greens, 
   std::vector<DistMatrix<Complex<R>,STAR,STAR> >& coefficients,
   int depth, bool useQR, R tolerance )
 {
 #ifndef RELEASE
-    PushCallStack("DistBlockCompression");
+    PushCallStack("internal::CompressBlock");
 #endif
     typedef Complex<R> C;
     const Grid& g = A.Grid();
@@ -213,7 +213,7 @@ inline void DistBlockCompression
         std::vector<int> recvCounts( gridSize, 0 );
         const int AColAlignment = A.ColAlignment();
         const int ARowAlignment = A.RowAlignment();
-        const int ZLocalHeight = LocalLength( s1*s2, gridRank, gridSize );
+        const int ZLocalHeight = Length( s1*s2, gridRank, gridSize );
         for( int j2=0; j2<depth; ++j2 )
         {
             for( int j1=0; j1<depth; ++j1 )
@@ -298,9 +298,8 @@ inline void DistBlockCompression
         elem::MakeTrapezoidal( LEFT, UPPER, 0, W_STAR_STAR );
         V_STAR_STAR.ResizeTo( n, n );
         elem::SVD
-        ( W_STAR_STAR.LocalMatrix(),
-          s_STAR_STAR.LocalMatrix(),
-          V_STAR_STAR.LocalMatrix(), useQR );
+        ( W_STAR_STAR.Matrix(), s_STAR_STAR.Matrix(), V_STAR_STAR.Matrix(), 
+          useQR );
         internal::CompressSVD
         ( W_STAR_STAR, s_STAR_STAR, V_STAR_STAR, tolerance );
         DiagonalScale( RIGHT, NORMAL, s_STAR_STAR, V_STAR_STAR );
@@ -324,9 +323,8 @@ inline void DistBlockCompression
         DistMatrix<C,STAR,STAR> U_STAR_STAR( Z );
         V_STAR_STAR.ResizeTo( n, k );
         elem::SVD
-        ( U_STAR_STAR.LocalMatrix(), 
-          s_STAR_STAR.LocalMatrix(), 
-          V_STAR_STAR.LocalMatrix(), useQR );
+        ( U_STAR_STAR.Matrix(), s_STAR_STAR.Matrix(), V_STAR_STAR.Matrix(), 
+          useQR );
         internal::CompressSVD
         ( U_STAR_STAR, s_STAR_STAR, V_STAR_STAR, tolerance );
         U = U_STAR_STAR;
@@ -374,12 +372,12 @@ inline void DistBlockCompression
 } // namespace internal
 
 template<typename R>
-void DistFrontCompression
+void CompressFront
 ( DistCompressedFront<Complex<R> >& front, int depth, bool useQR, 
   R tolA, R tolB )
 {
 #ifndef RELEASE
-    PushCallStack("DistFrontCompression");
+    PushCallStack("CompressFront");
 #endif
     const Grid& grid = front.frontL.Grid();
     const int snSize = front.frontL.Width();
@@ -391,9 +389,9 @@ void DistFrontCompression
     front.sB = B.Height() / depth;
     front.depth = depth;
     front.grid = &grid;
-    internal::DistBlockCompression
+    internal::CompressBlock
     ( A, front.AGreens, front.ACoefficients, depth, useQR, tolA );
-    internal::DistBlockCompression
+    internal::CompressBlock
     ( B, front.BGreens, front.BCoefficients, depth, useQR, tolB );
     front.frontL.Empty();
 #ifndef RELEASE

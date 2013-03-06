@@ -508,7 +508,7 @@ DistSpectralHelmholtz<R>::LocalPanelSizeRecursion
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localSize += LocalLength<int>( ySize*vSize, colShift, teamSize );
+        localSize += Length<int>( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSizeProp = (xSize-1) / 2;
@@ -562,7 +562,7 @@ DistSpectralHelmholtz<R>::LocalPanelSizeRecursion
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localSize += LocalLength<int>( xSize*vSize, colShift, teamSize );
+        localSize += Length<int>( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSizeProp = (ySize-1) / 2;
@@ -1028,8 +1028,7 @@ DistSpectralHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = 
-            LocalLength<int>( ySize*vSize, colShift, teamSize );
+        const int localSize = Length<int>( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1121,8 +1120,7 @@ DistSpectralHelmholtz<R>::MapLocalPanelIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = 
-            LocalLength<int>( xSize*vSize, colShift, teamSize );
+        const int localSize = Length<int>( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1304,8 +1302,7 @@ DistSpectralHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = 
-            LocalLength<int>( ySize*vSize, colShift, teamSize );
+        const int localSize = Length<int>( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1418,8 +1415,7 @@ DistSpectralHelmholtz<R>::MapLocalConnectionIndicesRecursion
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
         const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = 
-            LocalLength<int>( xSize*vSize, colShift, teamSize );
+        const int localSize = Length<int>( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1997,8 +1993,8 @@ DistSpectralHelmholtz<R>::FillPanelLocalElimTree
         Box box = boxStack.top();
         boxStack.pop();
 
-        eTree.localNodes[s] = new cliq::LocalSymmNode;
-        cliq::LocalSymmNode& node = *eTree.localNodes[s];
+        eTree.localNodes[s] = new cliq::SymmNode;
+        cliq::SymmNode& node = *eTree.localNodes[s];
         node.parent = box.parentIndex;
         if( node.parent != -1 )
         {

@@ -12,8 +12,8 @@
 namespace psp {
 
 template<typename R>
-void LocalFrontCompression
-( LocalCompressedFront<Complex<R> >& front, 
+void CompressFront
+( CompressedFront<Complex<R> >& front, 
   int depth, bool isLeaf, bool useQR, R tolA, R tolB );
 
 //----------------------------------------------------------------------------//
@@ -57,14 +57,14 @@ void CompressSVD
 }
 
 template<typename R> 
-inline void LocalBlockCompression
+inline void CompressBlock
 ( Matrix<Complex<R> >& A, 
   std::vector<Matrix<Complex<R> > >& greens, 
   std::vector<Matrix<Complex<R> > >& coefficients, 
   int depth, bool useQR, R tolerance )
 {
 #ifndef RELEASE
-    PushCallStack("internal::LocalBlockCompression");
+    PushCallStack("internal::CompressBlock");
 #endif
     typedef Complex<R> C;
 
@@ -159,14 +159,14 @@ inline void LocalBlockCompression
 }
 
 template<typename R>
-void LocalBlockSparsify
+void SparsifyBlock
 ( Matrix<Complex<R> >& B, 
   std::vector<int>& rows, 
   std::vector<int>& cols, 
   std::vector<Complex<R> >& values ) 
 {
 #ifndef RELEASE
-    PushCallStack("internal::LocalBlockSparsify");
+    PushCallStack("internal::SparsifyBlock");
 #endif
     typedef Complex<R> C;
 
@@ -217,12 +217,12 @@ void LocalBlockSparsify
 } // namespace internal
 
 template<typename R>
-void LocalFrontCompression
-( LocalCompressedFront<Complex<R> >& front, 
+void CompressFront
+( CompressedFront<Complex<R> >& front, 
   int depth, bool isLeaf, bool useQR, R tolA, R tolB )
 {
 #ifndef RELEASE
-    PushCallStack("LocalFrontCompression");
+    PushCallStack("CompressFront");
 #endif
     const int snSize = front.frontL.Width();
     Matrix<Complex<R> > A, B;
@@ -233,13 +233,13 @@ void LocalFrontCompression
     front.sB = B.Height() / depth;
     front.depth = depth;
     front.isLeaf = isLeaf;
-    internal::LocalBlockCompression
+    internal::CompressBlock
     ( A, front.AGreens, front.ACoefficients, depth, useQR, tolA );
     if( isLeaf )
-        internal::LocalBlockSparsify
+        internal::SparsifyBlock
         ( B, front.BRows, front.BCols, front.BValues );
     else
-        internal::LocalBlockCompression
+        internal::CompressBlock
         ( B, front.BGreens, front.BCoefficients, depth, useQR, tolB );
     front.frontL.Empty();
 #ifndef RELEASE

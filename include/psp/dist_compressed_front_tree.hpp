@@ -21,7 +21,7 @@ namespace psp {
 //
 
 template<typename F>
-struct LocalCompressedFront
+struct CompressedFront
 {
     Matrix<F> frontL;
     mutable Matrix<F> work;
@@ -54,7 +54,7 @@ template<typename F>
 struct DistCompressedFrontTree
 {
     bool isHermitian;
-    std::vector<LocalCompressedFront<F> > localFronts;
+    std::vector<CompressedFront<F> > localFronts;
     std::vector<DistCompressedFront<F> > distFronts;
 
     void MemoryInfo
@@ -91,7 +91,7 @@ DistCompressedFrontTree<F>::MemoryInfo
 
     for( int s=0; s<numLocalFronts; ++s )
     {
-        const LocalCompressedFront<F>& front = localFronts[s];
+        const CompressedFront<F>& front = localFronts[s];
         numLocalEntries += front.frontL.MemorySize();
         numLocalEntries += front.work.MemorySize();
 
@@ -157,7 +157,7 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
 
     for( int s=0; s<numLocalFronts; ++s )
     {
-        const LocalCompressedFront<F>& front = localFronts[s];
+        const CompressedFront<F>& front = localFronts[s];
         Matrix<F> FTL,
                   FBL;
         elem::LockedPartitionDown
@@ -215,7 +215,7 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
 
     for( int s=0; s<numLocalFronts; ++s )
     {
-        const LocalCompressedFront<F>& front = localFronts[s];
+        const CompressedFront<F>& front = localFronts[s];
 
         Matrix<F> FTL,
                   FBL;

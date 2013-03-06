@@ -54,7 +54,7 @@ main( int argc, char* argv[] )
         }
 
         DistUniformGrid<double> velocity( m1, m2, m3, comm );
-        double* localVelocity = velocity.LocalBuffer();
+        double* localVelocity = velocity.Buffer();
         const int xLocalSize = velocity.XLocalSize();
         const int yLocalSize = velocity.YLocalSize();
         const int zLocalSize = velocity.ZLocalSize();

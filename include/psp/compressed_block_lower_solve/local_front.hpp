@@ -13,11 +13,11 @@ namespace psp {
 
 template<typename F>
 inline void
-LocalFrontCompressedBlockLowerForwardSolve
-( const LocalCompressedFront<F>& front, Matrix<F>& X )
+FrontCompressedBlockLowerForwardSolve
+( const CompressedFront<F>& front, Matrix<F>& X )
 {
 #ifndef RELEASE
-    PushCallStack("LocalFrontCompressedBlockLowerForwardSolve");
+    PushCallStack("FrontCompressedBlockLowerForwardSolve");
 #endif
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
@@ -116,11 +116,11 @@ LocalFrontCompressedBlockLowerForwardSolve
 
 template<typename F>
 inline void
-LocalFrontCompressedBlockLowerBackwardSolve
-( Orientation orientation, const LocalCompressedFront<F>& front, Matrix<F>& X )
+FrontCompressedBlockLowerBackwardSolve
+( Orientation orientation, const CompressedFront<F>& front, Matrix<F>& X )
 {
 #ifndef RELEASE
-    PushCallStack("LocalFrontCompressedBlockLowerBackwardSolve");
+    PushCallStack("FrontCompressedBlockLowerBackwardSolve");
 #endif
     const int numKeptModesA = front.AGreens.size();
 

@@ -29,7 +29,7 @@ inline void DistCompressedBlockLDL
     PushCallStack("DistCompressedBlockLDL");
 #endif
     // The bottom front is already compressed, so just view the relevant data
-    LocalCompressedFront<F>& topLocalFront = L.localFronts.back();
+    CompressedFront<F>& topLocalFront = L.localFronts.back();
     DistCompressedFront<F>& bottomDistFront = L.distFronts[0];
     const Grid& bottomGrid = *info.distNodes[0].grid;
     bottomDistFront.grid = &bottomGrid;
@@ -163,7 +163,7 @@ inline void DistCompressedBlockLDL
         elem::Zeros( updateSize, updateSize, front.work2d );
         const int leftLocalWidth = front.frontL.LocalWidth();
         const int topLocalHeight = 
-            LocalLength<int>( node.size, grid.MCRank(), gridHeight );
+            Length<int>( node.size, grid.MCRank(), gridHeight );
         for( unsigned proc=0; proc<commSize; ++proc )
         {
             const F* recvValues = &recvBuffer[recvDispls[proc]];
@@ -191,12 +191,12 @@ inline void DistCompressedBlockLDL
 
         // Now that the frontal matrix is set up, perform the factorization
         if( L.isHermitian )
-            cliq::DistFrontBlockLDL( ADJOINT, front.frontL, front.work2d );
+            cliq::FrontBlockLDL( ADJOINT, front.frontL, front.work2d );
         else
-            cliq::DistFrontBlockLDL( TRANSPOSE, front.frontL, front.work2d );
+            cliq::FrontBlockLDL( TRANSPOSE, front.frontL, front.work2d );
 
         // Separately compress the A and B blocks 
-        DistFrontCompression( front, depth, useQR, tolA, tolB );
+        CompressFront( front, depth, useQR, tolA, tolB );
     }
     L.localFronts.back().work.Empty();
     L.distFronts.back().work2d.Empty();

@@ -45,7 +45,7 @@ using elem::Grid;
 using elem::DistMatrix;
 
 // Pull in a few indexing functions
-using elem::LocalLength;
+using elem::Length;
 using elem::Shift;
 
 // Pull in a few scalar math functions

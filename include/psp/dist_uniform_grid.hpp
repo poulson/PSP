@@ -72,8 +72,8 @@ public:
     int LocalIndex( int naturalIndex ) const;
     int LocalIndex( int x, int y, int z ) const;
     int NaturalIndex( int x, int y, int z ) const;
-    F* LocalBuffer();
-    const F* LockedLocalBuffer() const;
+    F* Buffer();
+    const F* LockedBuffer() const;
 
     int XShift() const;
     int YShift() const;
@@ -108,7 +108,7 @@ private:
 
     int xShift_, yShift_, zShift_;
     int xLocalSize_, yLocalSize_, zLocalSize_;
-    std::vector<F> localData_;
+    std::vector<F> data_;
 
     void RedistributeForVtk( std::vector<F>& localBox ) const;
     
@@ -167,10 +167,10 @@ DistUniformGrid<F>::DistUniformGrid
     xShift_ = commRank % px;
     yShift_ = (commRank/px) % py;
     zShift_ = commRank/(px*py);
-    xLocalSize_ = LocalLength( nx, xShift_, px );
-    yLocalSize_ = LocalLength( ny, yShift_, py );
-    zLocalSize_ = LocalLength( nz, zShift_, pz );
-    localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
+    xLocalSize_ = Length( nx, xShift_, px );
+    yLocalSize_ = Length( ny, yShift_, py );
+    zLocalSize_ = Length( nz, zShift_, pz );
+    data_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 }
 
 template<typename T>
@@ -218,10 +218,10 @@ DistUniformGrid<F>::DistUniformGrid
     xShift_ = commRank % px_;
     yShift_ = (commRank/px_) % py_;
     zShift_ = commRank/(px_*py_);
-    xLocalSize_ = LocalLength( nx, xShift_, px_ );
-    yLocalSize_ = LocalLength( ny, yShift_, py_ );
-    zLocalSize_ = LocalLength( nz, zShift_, pz_ );
-    localData_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
+    xLocalSize_ = Length( nx, xShift_, px_ );
+    yLocalSize_ = Length( ny, yShift_, py_ );
+    zLocalSize_ = Length( nz, zShift_, pz_ );
+    data_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
 #ifndef RELEASE
     PopCallStack();
 #endif
@@ -294,13 +294,13 @@ DistUniformGrid<F>::ZLocalSize() const
 
 template<typename F>
 inline F* 
-DistUniformGrid<F>::LocalBuffer()
-{ return &localData_[0]; }
+DistUniformGrid<F>::Buffer()
+{ return &data_[0]; }
 
 template<typename F>
 inline const F* 
-DistUniformGrid<F>::LockedLocalBuffer() const
-{ return &localData_[0]; }
+DistUniformGrid<F>::LockedBuffer() const
+{ return &data_[0]; }
 
 template<typename F>
 inline int 
@@ -418,7 +418,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
                     is.read
-                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
+                    ( (char*)&data_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -438,7 +438,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
                     is.read
-                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
+                    ( (char*)&data_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -458,7 +458,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
                     is.read
-                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
+                    ( (char*)&data_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -478,7 +478,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
                     is.read
-                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
+                    ( (char*)&data_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -498,7 +498,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
                     is.read
-                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
+                    ( (char*)&data_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -518,7 +518,7 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
                     is.seekg( pos );             
                     const int localIndex = LocalIndex( x, y, z );
                     is.read
-                    ( (char*)&localData_[localIndex], numScalars_*sizeof(F) );
+                    ( (char*)&data_[localIndex], numScalars_*sizeof(F) );
                 }
             }
         }
@@ -543,9 +543,9 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     const int nzOld = nz_;
 
     // Compute the new local dimensions
-    const int xLocalNewSize = LocalLength( nx, xShift_, px_ );
-    const int yLocalNewSize = LocalLength( ny, yShift_, py_ );
-    const int zLocalNewSize = LocalLength( nz, zShift_, pz_ );
+    const int xLocalNewSize = Length( nx, xShift_, px_ );
+    const int yLocalNewSize = Length( ny, yShift_, py_ );
+    const int zLocalNewSize = Length( nz, zShift_, pz_ );
     const double xRatio = (1.*(nx-1)) / (nxOld-1);
     const double yRatio = (1.*(ny-1)) / (nyOld-1);
     const double zRatio = (1.*(nz-1)) / (nzOld-1);
@@ -648,7 +648,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     {
         const int localIndex = LocalIndex( sendIndices[s] );
         for( int t=0; t<numScalars_; ++t )
-            sendValues[s*numScalars_+t] = localData_[localIndex+t];
+            sendValues[s*numScalars_+t] = data_[localIndex+t];
     }
     for( int q=0; q<commSize; ++q )
     {
@@ -672,7 +672,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     xLocalSize_ = xLocalNewSize;
     yLocalSize_ = yLocalNewSize;
     zLocalSize_ = zLocalNewSize;
-    localData_.resize( xLocalNewSize*yLocalNewSize*zLocalNewSize*numScalars_ );
+    data_.resize( xLocalNewSize*yLocalNewSize*zLocalNewSize*numScalars_ );
     F values[2][2][2];
     int indices[2][2][2], offs[2][2][2];
     for( int zLocal=0; zLocal<zLocalNewSize; ++zLocal )
@@ -757,7 +757,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
                     // Interpolate in the x dimension
                     t = xOld-floor(xOld);
                     const F average = (1.-t)*values[0][0][0]+t*values[1][0][0];
-                    localData_[localIndex+s] = average;
+                    data_[localIndex+s] = average;
                 }
             }
         }
@@ -815,10 +815,10 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             recvCounts.resize( commSize, 0 );
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = LocalLength( ny, yProc, 0, py );
+                const int yLength = Length( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*yLength*numScalars;
@@ -848,7 +848,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                     const int localIndex = 
                         parent.LocalIndex( x, y, whichPlane );
                     for( int k=0; k<numScalars; ++k )
-                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                        sendBuffer[offset+k] = parent.data_[localIndex+k];
                     offset += numScalars;
                 }
             }
@@ -867,10 +867,10 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             const int planeSize = nx*ny;
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = LocalLength( ny, yProc, 0, py );
+                const int yLength = Length( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<yLength; ++jLocal )
@@ -952,10 +952,10 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*zLength*numScalars;
@@ -985,7 +985,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                     const int localIndex = 
                         parent.LocalIndex( x, whichPlane, z );
                     for( int k=0; k<numScalars; ++k )
-                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                        sendBuffer[offset+k] = parent.data_[localIndex+k];
                     offset += numScalars;
                 }
             }
@@ -1004,10 +1004,10 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             const int planeSize = nx*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -1087,10 +1087,10 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
-                    const int yLength = LocalLength( ny, yProc, 0, py );
+                    const int yLength = Length( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += yLength*zLength*numScalars;
@@ -1120,7 +1120,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                     const int localIndex = 
                         parent.LocalIndex( whichPlane, y, z );
                     for( int k=0; k<numScalars; ++k )
-                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                        sendBuffer[offset+k] = parent.data_[localIndex+k];
                     offset += numScalars;
                 }
             }
@@ -1139,10 +1139,10 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             const int planeSize = ny*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
-                    const int yLength = LocalLength( ny, yProc, 0, py );
+                    const int yLength = Length( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -1249,10 +1249,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
             recvCounts.resize( commSize, 0 );
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = LocalLength( ny, yProc, 0, py );
+                const int yLength = Length( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*yLength*numScalars;
@@ -1282,7 +1282,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                     const int localIndex = 
                         parent.LocalIndex( x, y, whichPlane );
                     for( int k=0; k<numScalars; ++k )
-                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                        sendBuffer[offset+k] = parent.data_[localIndex+k];
                     offset += numScalars;
                 }
             }
@@ -1301,10 +1301,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
             const int planeSize = nx*ny;
             for( int yProc=0; yProc<py; ++yProc )
             {
-                const int yLength = LocalLength( ny, yProc, 0, py );
+                const int yLength = Length( ny, yProc, 0, py );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<yLength; ++jLocal )
@@ -1401,10 +1401,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += xLength*zLength*numScalars;
@@ -1434,7 +1434,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                     const int localIndex = 
                         parent.LocalIndex( x, whichPlane, z );
                     for( int k=0; k<numScalars; ++k )
-                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                        sendBuffer[offset+k] = parent.data_[localIndex+k];
                     offset += numScalars;
                 }
             }
@@ -1453,10 +1453,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
             const int planeSize = nx*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int xProc=0; xProc<px; ++xProc )
                 {
-                    const int xLength = LocalLength( nx, xProc, 0, px );
+                    const int xLength = Length( nx, xProc, 0, px );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -1552,10 +1552,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
             recvCounts.resize( commSize, 0 );
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
-                    const int yLength = LocalLength( ny, yProc, 0, py );
+                    const int yLength = Length( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     recvCounts[proc] += yLength*zLength*numScalars;
@@ -1585,7 +1585,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                     const int localIndex = 
                         parent.LocalIndex( whichPlane, y, z );
                     for( int k=0; k<numScalars; ++k )
-                        sendBuffer[offset+k] = parent.localData_[localIndex+k];
+                        sendBuffer[offset+k] = parent.data_[localIndex+k];
                     offset += numScalars;
                 }
             }
@@ -1604,10 +1604,10 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
             const int planeSize = ny*nz;
             for( int zProc=0; zProc<pz; ++zProc )
             {
-                const int zLength = LocalLength( nz, zProc, 0, pz );
+                const int zLength = Length( nz, zProc, 0, pz );
                 for( int yProc=0; yProc<py; ++yProc )
                 {
-                    const int yLength = LocalLength( ny, yProc, 0, py );
+                    const int yLength = Length( ny, yProc, 0, py );
                     const int proc = xProc + yProc*px + zProc*px*py;
 
                     for( int jLocal=0; jLocal<zLength; ++jLocal )
@@ -1737,13 +1737,13 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
     const int zAlign = zBoxStart % pz_;
     for( int zProc=0; zProc<pz_; ++zProc )
     {
-        const int zLength = LocalLength( zBoxSize, zProc, zAlign, pz_ );
+        const int zLength = Length( zBoxSize, zProc, zAlign, pz_ );
         for( int yProc=0; yProc<py_; ++yProc )
         {
-            const int yLength = LocalLength( yBoxSize, yProc, yAlign, py_ );
+            const int yLength = Length( yBoxSize, yProc, yAlign, py_ );
             for( int xProc=0; xProc<px_; ++xProc )
             {
-                const int xLength = LocalLength( xBoxSize, xProc, xAlign, px_ );
+                const int xLength = Length( xBoxSize, xProc, xAlign, px_ );
                 const int proc = xProc + yProc*px_ + zProc*px_*py_;
 
                 recvCounts[proc] += xLength*yLength*zLength*numScalars_;
@@ -1785,7 +1785,7 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
 
                 const int localIndex = LocalIndex( x, y, z );
                 for( int k=0; k<numScalars_; ++k )
-                    sendBuffer[offsets[proc]+k] = localData_[localIndex+k];
+                    sendBuffer[offsets[proc]+k] = data_[localIndex+k];
                 offsets[proc] += numScalars_;
             }
         }
@@ -1803,15 +1803,15 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
     for( int zProc=0; zProc<pz_; ++zProc )
     {
         const int zOffset = Shift( zProc, zAlign, pz_ );
-        const int zLength = LocalLength( zBoxSize, zOffset, pz_ );
+        const int zLength = Length( zBoxSize, zOffset, pz_ );
         for( int yProc=0; yProc<py_; ++yProc )
         {
             const int yOffset = Shift( yProc, yAlign, py_ );
-            const int yLength = LocalLength( yBoxSize, yOffset, py_ );
+            const int yLength = Length( yBoxSize, yOffset, py_ );
             for( int xProc=0; xProc<px_; ++xProc )
             {
                 const int xOffset = Shift( xProc, xAlign, px_ );
-                const int xLength = LocalLength( xBoxSize, xOffset, px_ );
+                const int xLength = Length( xBoxSize, xOffset, px_ );
                 const int proc = xProc + yProc*px_ + zProc*px_*py_;
 
                 // Unpack all of the data from this process

@@ -31,9 +31,9 @@ inline void LocalCompressedBlockLDL
     const int numLocalNodes = info.localNodes.size();
     for( int s=0; s<numLocalNodes; ++s )
     {
-        cliq::LocalSymmNodeInfo& node = info.localNodes[s];
+        cliq::SymmNodeInfo& node = info.localNodes[s];
         const int updateSize = node.lowerStruct.size();
-        LocalCompressedFront<F>& front = L.localFronts[s];
+        CompressedFront<F>& front = L.localFronts[s];
         Matrix<F>& frontL = front.frontL;
         Matrix<F>& frontBR = front.work;
         frontBR.Empty();
@@ -92,12 +92,12 @@ inline void LocalCompressedBlockLDL
 
         // Call the custom partial block LDL
         if( L.isHermitian )
-            cliq::LocalFrontBlockLDL( ADJOINT, frontL, frontBR );
+            cliq::FrontBlockLDL( ADJOINT, frontL, frontBR );
         else
-            cliq::LocalFrontBlockLDL( TRANSPOSE, frontL, frontBR );
+            cliq::FrontBlockLDL( TRANSPOSE, frontL, frontBR );
 
         // Separately compress the A and B portions of the front
-        LocalFrontCompression( front, depth, false, useQR, tolA, tolB );
+        CompressFront( front, depth, false, useQR, tolA, tolB );
     }
 #ifndef RELEASE
     PopCallStack();
