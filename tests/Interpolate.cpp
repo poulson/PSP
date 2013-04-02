@@ -277,7 +277,7 @@ main( int argc, char* argv[] )
             if( commRank == 0 )
                 std::cout << "Uniform random over [1,3]" << std::endl;
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
-                localVelocity[i] = 2.+plcg::ParallelUniform<double>();
+                localVelocity[i] = 2.+elem::Uniform();
             break;
         case 11:
             if( commRank == 0 )
