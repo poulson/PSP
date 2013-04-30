@@ -771,7 +771,7 @@ DistHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         info.distNodes.back().localSize1d;
 
     Matrix<C> localPanelB;
-    elem::Zeros( localSize1d, numRhs, localPanelB );
+    elem::Zeros( localPanelB, localSize1d, numRhs );
 
     // For each node, pull in each right-hand side with a memcpy
     int BOffset = LocalPanelOffset( i );

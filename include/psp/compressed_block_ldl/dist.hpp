@@ -26,7 +26,7 @@ inline void DistCompressedBlockLDL
   bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
 {
 #ifndef RELEASE
-    PushCallStack("DistCompressedBlockLDL");
+    CallStackEntry entry("DistCompressedBlockLDL");
 #endif
     // The bottom front is already compressed, so just view the relevant data
     CompressedFront<F>& topLocalFront = L.localFronts.back();
@@ -160,7 +160,7 @@ inline void DistCompressedBlockLDL
         // Unpack the child udpates (with an Axpy)
         front.work2d.SetGrid( front.frontL.Grid() );
         front.work2d.Align( node.size % gridHeight, node.size % gridWidth );
-        elem::Zeros( updateSize, updateSize, front.work2d );
+        elem::Zeros( front.work2d, updateSize, updateSize );
         const int leftLocalWidth = front.frontL.LocalWidth();
         const int topLocalHeight = 
             Length<int>( node.size, grid.MCRank(), gridHeight );
@@ -200,9 +200,6 @@ inline void DistCompressedBlockLDL
     }
     L.localFronts.back().work.Empty();
     L.distFronts.back().work2d.Empty();
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

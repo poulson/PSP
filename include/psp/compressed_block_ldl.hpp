@@ -42,13 +42,10 @@ inline void CompressedBlockLDL
   bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
 {
 #ifndef RELEASE
-    PushCallStack("CompressedBlockLDL");
+    CallStackEntry entry("CompressedBlockLDL");
 #endif
     LocalCompressedBlockLDL( info, L, depth, useQR, tolA, tolB );
     DistCompressedBlockLDL( info, L, depth, useQR, tolA, tolB );
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

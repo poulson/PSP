@@ -66,7 +66,7 @@ inline void CompressBlock
   int depth, bool useQR, R tolerance )
 {
 #ifndef RELEASE
-    PushCallStack("internal::CompressBlock");
+    CallStackEntry entry("internal::CompressBlock");
 #endif
     typedef Complex<R> C;
     const Grid& g = A.Grid();
@@ -364,9 +364,6 @@ inline void CompressBlock
             for( int j1=0; j1<depth; ++j1 )
                 D.Set( j1, j2, Conj(V_STAR_STAR.Get(j1+j2*depth,t)) );
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace internal
@@ -377,7 +374,7 @@ void CompressFront
   R tolA, R tolB )
 {
 #ifndef RELEASE
-    PushCallStack("CompressFront");
+    CallStackEntry entry("CompressFront");
 #endif
     const Grid& grid = front.frontL.Grid();
     const int snSize = front.frontL.Width();
@@ -394,9 +391,6 @@ void CompressFront
     internal::CompressBlock
     ( B, front.BGreens, front.BCoefficients, depth, useQR, tolB );
     front.frontL.Empty();
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

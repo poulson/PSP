@@ -20,7 +20,7 @@ FrontCompressedBlockLowerForwardSolve
 ( const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
 {
 #ifndef RELEASE
-    PushCallStack("FrontCompressedBlockLowerForwardSolve");
+    CallStackEntry entry("FrontCompressedBlockLowerForwardSolve");
 #endif
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
@@ -46,13 +46,13 @@ FrontCompressedBlockLowerForwardSolve
     {
         XTBlocks[i].SetGrid( g );
         ZTBlocks[i].SetGrid( g );
-        Zeros( sT, numRhs, XTBlocks[i] );
-        Zeros( sT, numRhs, ZTBlocks[i] );
+        Zeros( XTBlocks[i], sT, numRhs );
+        Zeros( ZTBlocks[i], sT, numRhs );
     }
     DistMatrix<F,VC,STAR> XTBlock(g);
     DistMatrix<F,MR,STAR> XTBlock_MR_STAR(g);
     DistMatrix<F,MC,STAR> ZTBlock_MC_STAR( g );
-    Zeros( sT, numRhs, ZTBlock_MC_STAR );
+    Zeros( ZTBlock_MC_STAR, sT, numRhs );
     for( int t=0; t<numKeptModesA; ++t )
     {
         const DistMatrix<F>& GA = front.AGreens[t];
@@ -63,7 +63,7 @@ FrontCompressedBlockLowerForwardSolve
         {
             LockedView( XTBlock, XT, j*sT, 0, sT, numRhs );
             XTBlock_MR_STAR = XTBlock;
-            elem::internal::LocalGemm
+            elem::LocalGemm
             ( NORMAL, NORMAL, 
               F(1), GA, XTBlock_MR_STAR, F(0), ZTBlock_MC_STAR );
             ZTBlocks[j].SumScatterFrom( ZTBlock_MC_STAR );
@@ -99,13 +99,13 @@ FrontCompressedBlockLowerForwardSolve
         {
             XBUpdates[i].SetGrid( g );
             ZBBlocks[i].SetGrid( g );
-            Zeros( sB, numRhs, XBUpdates[i] );
-            Zeros( sB, numRhs, ZBBlocks[i] );
+            Zeros( XBUpdates[i], sB, numRhs );
+            Zeros( ZBBlocks[i], sB, numRhs );
         }
         DistMatrix<F,VC,STAR> XTBlock(g);
         DistMatrix<F,MR,STAR> XTBlock_MR_STAR(g);
         DistMatrix<F,MC,STAR> ZBBlock_MC_STAR( g );
-        Zeros( sB, numRhs, ZBBlock_MC_STAR );
+        Zeros( ZBBlock_MC_STAR, sB, numRhs );
         for( int t=0; t<numKeptModesB; ++t )
         {
             const DistMatrix<F>& GB = front.BGreens[t];
@@ -116,7 +116,7 @@ FrontCompressedBlockLowerForwardSolve
             {
                 LockedView( XTBlock, XT, j*sT, 0, sT, numRhs );
                 XTBlock_MR_STAR = XTBlock;
-                elem::internal::LocalGemm
+                elem::LocalGemm
                 ( NORMAL, NORMAL, 
                   F(1), GB, XTBlock_MR_STAR, F(0), ZBBlock_MC_STAR );
                 ZBBlocks[j].SumScatterFrom( ZBBlock_MC_STAR );
@@ -136,9 +136,6 @@ FrontCompressedBlockLowerForwardSolve
             elem::Axpy( F(-1), XBUpdates[i], XBBlock );
         }
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -148,19 +145,14 @@ FrontCompressedBlockLowerBackwardSolve
   const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
 {
 #ifndef RELEASE
-    PushCallStack("FrontCompressedBlockLowerBackwardSolve");
+    CallStackEntry entry("FrontCompressedBlockLowerBackwardSolve");
 #endif
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
 
     if( numKeptModesB == 0 )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
         return;
-    }
 
     const int sT = front.sT;
     const int sB = front.sB;
@@ -187,13 +179,13 @@ FrontCompressedBlockLowerBackwardSolve
         {
             YTBlocks[i].SetGrid( g );
             ZTBlocks[i].SetGrid( g );
-            Zeros( sT, numRhs, YTBlocks[i] );
-            Zeros( sT, numRhs, ZTBlocks[i] );
+            Zeros( YTBlocks[i], sT, numRhs );
+            Zeros( ZTBlocks[i], sT, numRhs );
         }
         DistMatrix<F,VC,STAR> XBBlock(g);
         DistMatrix<F,MC,STAR> XBBlock_MC_STAR(g);
         DistMatrix<F,MR,STAR> ZTBlock_MR_STAR(g);
-        Zeros( sT, numRhs, ZTBlock_MR_STAR );
+        Zeros( ZTBlock_MR_STAR, sT, numRhs );
         for( int t=0; t<numKeptModesB; ++t )
         {
             const DistMatrix<F>& GB = front.BGreens[t];
@@ -204,7 +196,7 @@ FrontCompressedBlockLowerBackwardSolve
             {
                 LockedView( XBBlock, XB, j*sB, 0, sB, numRhs );
                 XBBlock_MC_STAR = XBBlock;
-                elem::internal::LocalGemm
+                elem::LocalGemm
                 ( orientation, NORMAL,
                   F(1), GB, XBBlock_MC_STAR, F(0), ZTBlock_MR_STAR );
                 ZTBlocks[j].SumScatterFrom( ZTBlock_MR_STAR );
@@ -242,13 +234,13 @@ FrontCompressedBlockLowerBackwardSolve
     {
         XTUpdates[i].SetGrid( g );
         ZTBlocks[i].SetGrid( g );
-        Zeros( sT, numRhs, XTUpdates[i] );
-        Zeros( sT, numRhs, ZTBlocks[i] );
+        Zeros( XTUpdates[i], sT, numRhs );
+        Zeros( ZTBlocks[i], sT, numRhs );
     }
     DistMatrix<F,VC,STAR> YTBlock(g);
     DistMatrix<F,MR,STAR> YTBlock_MR_STAR(g);
     DistMatrix<F,MC,STAR> ZTBlock_MC_STAR(g);
-    Zeros( sT, numRhs, ZTBlock_MC_STAR );
+    Zeros( ZTBlock_MC_STAR, sT, numRhs );
     for( int t=0; t<numKeptModesA; ++t )
     {
         const DistMatrix<F>& GA = front.AGreens[t];
@@ -259,7 +251,7 @@ FrontCompressedBlockLowerBackwardSolve
         {
             LockedView( YTBlock, YT, j*sT, 0, sT, numRhs );
             YTBlock_MR_STAR = YTBlock;
-            elem::internal::LocalGemm
+            elem::LocalGemm
             ( NORMAL, NORMAL,
               F(1), GA, YTBlock_MR_STAR, F(0), ZTBlock_MC_STAR );
             ZTBlocks[j].SumScatterFrom( ZTBlock_MC_STAR );
@@ -278,9 +270,6 @@ FrontCompressedBlockLowerBackwardSolve
         View( XTBlock, XT, i*sT, 0, sT, numRhs );
         elem::Axpy( F(-1), XTUpdates[i], XTBlock );
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

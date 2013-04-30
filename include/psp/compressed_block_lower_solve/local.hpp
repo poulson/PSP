@@ -35,7 +35,7 @@ inline void LocalCompressedBlockLowerForwardSolve
         Matrix<F>& X )
 {
 #ifndef RELEASE
-    PushCallStack("LocalCompressedBlockLowerForwardSolve");
+    CallStackEntry entry("LocalCompressedBlockLowerForwardSolve");
 #endif
     const int numLocalNodes = info.localNodes.size();
     const int width = X.Width();
@@ -108,9 +108,6 @@ inline void LocalCompressedBlockLowerForwardSolve
         // Store the node portion of the result
         XT = WT;
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F> 
@@ -121,7 +118,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
         Matrix<F>& X )
 {
 #ifndef RELEASE
-    PushCallStack("LocalCompressedBlockLowerBackwardSolve");
+    CallStackEntry entry("LocalCompressedBlockLowerBackwardSolve");
 #endif
     const int numLocalNodes = info.localNodes.size();
     const int width = X.Width();
@@ -184,9 +181,6 @@ inline void LocalCompressedBlockLowerBackwardSolve
     L.distFronts[0].work1d.Empty();
     for( int s=0; s<numLocalNodes; ++s )
         L.localFronts[s].work.Empty();
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

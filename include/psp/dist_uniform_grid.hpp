@@ -202,7 +202,7 @@ DistUniformGrid<F>::DistUniformGrid
   numScalars_(numScalars), order_(order)
 {
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::DistUniformGrid");
+    CallStackEntry entry("DistUniformGrid::DistUniformGrid");
 #endif
     const int commRank = mpi::CommRank( comm );
     const int commSize = mpi::CommSize( comm );
@@ -222,9 +222,6 @@ DistUniformGrid<F>::DistUniformGrid
     yLocalSize_ = Length( ny, yShift_, py_ );
     zLocalSize_ = Length( nz, zShift_, pz_ );
     data_.resize( numScalars*xLocalSize_*yLocalSize_*zLocalSize_ );
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -342,14 +339,13 @@ inline int
 DistUniformGrid<F>::LocalIndex( int x, int y, int z ) const
 { 
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::LocalIndex");
+    CallStackEntry entry("DistUniformGrid::LocalIndex");
     if( x % px_ != xShift_ )
         throw std::logic_error("x coordinate not owned by this process");
     if( y % py_ != yShift_ )
         throw std::logic_error("y coordinate not owned by this process");
     if( z % pz_ != zShift_ )
         throw std::logic_error("z coordinate not owned by this process");
-    PopCallStack();
 #endif
     const int xLocal = (x-xShift_) / px_;
     const int yLocal = (y-yShift_) / py_;
@@ -390,7 +386,7 @@ inline void
 DistUniformGrid<F>::SequentialLoad( std::string filename )
 {
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::SequentialLoad");
+    CallStackEntry entry("DistUniformGrid::SequentialLoad");
 #endif
     std::ifstream is;
     is.open( filename.c_str(), std::ios::in|std::ios::binary );
@@ -524,9 +520,6 @@ DistUniformGrid<F>::SequentialLoad( std::string filename )
         }
         break;
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -536,7 +529,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     if( nx == nx_ && ny == ny_ && nz == nz_ )
         return;
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::InterpolateTo");
+    CallStackEntry entry("DistUniformGrid::InterpolateTo");
 #endif
     const int nxOld = nx_;
     const int nyOld = ny_;
@@ -762,9 +755,6 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
             }
         }
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -781,7 +771,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
   PlaneType planeType, int whichPlane, std::string basename )
 {
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::WritePlaneHelper");
+    CallStackEntry entry("DistUniformGrid::WritePlaneHelper");
 #endif
     const int commRank = mpi::CommRank( parent.comm_ );
     const int commSize = mpi::CommSize( parent.comm_ );
@@ -1204,9 +1194,6 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
             }
         }
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -1692,7 +1679,7 @@ inline void
 DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::RedistributeForVtk");
+    CallStackEntry entry("DistUniformGrid::RedistributeForVtk");
 #endif
     const int commSize = mpi::CommSize( comm_ );
 
@@ -1842,9 +1829,6 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
             }
         }
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -1859,7 +1843,7 @@ DistUniformGrid<F>::WriteVolumeHelper<R>::Func
 ( const DistUniformGrid<R>& parent, std::string basename )
 {
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::WriteVolumeHelper");
+    CallStackEntry entry("DistUniformGrid::WriteVolumeHelper");
 #endif
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
@@ -2034,9 +2018,6 @@ DistUniformGrid<F>::WriteVolumeHelper<R>::Func
         files[k]->close();
         delete files[k];
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -2046,7 +2027,7 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, std::string basename )
 {
 #ifndef RELEASE
-    PushCallStack("DistUniformGrid::WriteVolumeHelper");
+    CallStackEntry entry("DistUniformGrid::WriteVolumeHelper");
 #endif
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
@@ -2266,9 +2247,6 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
         delete realFiles[k];
         delete imagFiles[k];
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

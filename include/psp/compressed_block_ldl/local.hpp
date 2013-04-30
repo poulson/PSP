@@ -26,7 +26,7 @@ inline void LocalCompressedBlockLDL
   bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
 {
 #ifndef RELEASE
-    PushCallStack("LocalCompressedBlockLDL");
+    CallStackEntry entry("LocalCompressedBlockLDL");
 #endif
     const int numLocalNodes = info.localNodes.size();
     for( int s=0; s<numLocalNodes; ++s )
@@ -44,7 +44,7 @@ inline void LocalCompressedBlockLDL
 #endif
 
         // Add updates from children (if they exist)
-        elem::Zeros( updateSize, updateSize, frontBR );
+        elem::Zeros( frontBR, updateSize, updateSize );
         const int numChildren = node.children.size();
         if( numChildren == 2 )
         {
@@ -99,9 +99,6 @@ inline void LocalCompressedBlockLDL
         // Separately compress the A and B portions of the front
         CompressFront( front, depth, false, useQR, tolA, tolB );
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

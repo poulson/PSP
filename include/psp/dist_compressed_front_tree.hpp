@@ -81,7 +81,7 @@ DistCompressedFrontTree<F>::MemoryInfo
   double& numGlobalEntries ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistCompressedFrontTree::MemoryInfo");
+    CallStackEntry entry("DistCompressedFrontTree::MemoryInfo");
 #endif
     numLocalEntries = numGlobalEntries = 0;
     const int numLocalFronts = localFronts.size();
@@ -135,9 +135,6 @@ DistCompressedFrontTree<F>::MemoryInfo
     mpi::AllReduce( &numLocalEntries, &minLocalEntries, 1, mpi::MIN, comm );
     mpi::AllReduce( &numLocalEntries, &maxLocalEntries, 1, mpi::MAX, comm );
     mpi::AllReduce( &numLocalEntries, &numGlobalEntries, 1, mpi::SUM, comm );
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -147,7 +144,7 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
   double& numGlobalEntries ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistCompressedFrontTree::TopLeftMemoryInfo");
+    CallStackEntry entry("DistCompressedFrontTree::TopLeftMemoryInfo");
 #endif
     numLocalEntries = numGlobalEntries = 0;
     const int numLocalFronts = localFronts.size();
@@ -193,9 +190,6 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
     mpi::AllReduce( &numLocalEntries, &minLocalEntries, 1, mpi::MIN, comm );
     mpi::AllReduce( &numLocalEntries, &maxLocalEntries, 1, mpi::MAX, comm );
     mpi::AllReduce( &numLocalEntries, &numGlobalEntries, 1, mpi::SUM, comm );
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -205,7 +199,7 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
   double& numGlobalEntries ) const
 {
 #ifndef RELEASE
-    PushCallStack("DistCompressedFrontTree::BottomLeftMemoryInfo");
+    CallStackEntry entry("DistCompressedFrontTree::BottomLeftMemoryInfo");
 #endif
     numLocalEntries = numGlobalEntries = 0;
     const int numLocalFronts = localFronts.size();
@@ -256,9 +250,6 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
     mpi::AllReduce( &numLocalEntries, &minLocalEntries, 1, mpi::MIN, comm );
     mpi::AllReduce( &numLocalEntries, &maxLocalEntries, 1, mpi::MAX, comm );
     mpi::AllReduce( &numLocalEntries, &numGlobalEntries, 1, mpi::SUM, comm );
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

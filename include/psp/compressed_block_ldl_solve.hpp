@@ -28,7 +28,7 @@ inline void CompressedBlockLDLSolve
         Matrix<F>& localX )
 {
 #ifndef RELEASE
-    PushCallStack("CompressedBlockLDLSolve");
+    CallStackEntry entry("CompressedBlockLDLSolve");
 #endif
     // Solve against block diagonal factor, L D
     CompressedBlockLowerSolve( NORMAL, info, L, localX );
@@ -38,9 +38,6 @@ inline void CompressedBlockLDLSolve
         CompressedBlockLowerSolve( ADJOINT, info, L, localX );
     else
         CompressedBlockLowerSolve( TRANSPOSE, info, L, localX );
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

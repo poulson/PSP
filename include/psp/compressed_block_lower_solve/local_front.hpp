@@ -17,7 +17,7 @@ FrontCompressedBlockLowerForwardSolve
 ( const CompressedFront<F>& front, Matrix<F>& X )
 {
 #ifndef RELEASE
-    PushCallStack("FrontCompressedBlockLowerForwardSolve");
+    CallStackEntry entry("FrontCompressedBlockLowerForwardSolve");
 #endif
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
@@ -38,7 +38,7 @@ FrontCompressedBlockLowerForwardSolve
     Matrix<F> YT, ZT;
     YT = XT;
     MakeZeros( XT );
-    Zeros( snSize, numRhs, ZT );
+    Zeros( ZT, snSize, numRhs );
     Matrix<F> XTBlock, YTBlock, ZTBlock;
     for( int t=0; t<numKeptModesA; ++t )
     {
@@ -84,7 +84,7 @@ FrontCompressedBlockLowerForwardSolve
         const int sB = front.sB;
 
         Matrix<F> ZB;
-        Zeros( XB.Height(), numRhs, ZB );
+        Zeros( ZB, XB.Height(), numRhs );
         Matrix<F> XBBlock, ZBBlock;
         for( int t=0; t<numKeptModesB; ++t )
         {
@@ -109,9 +109,6 @@ FrontCompressedBlockLowerForwardSolve
             }
         }
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 template<typename F>
@@ -120,7 +117,7 @@ FrontCompressedBlockLowerBackwardSolve
 ( Orientation orientation, const CompressedFront<F>& front, Matrix<F>& X )
 {
 #ifndef RELEASE
-    PushCallStack("FrontCompressedBlockLowerBackwardSolve");
+    CallStackEntry entry("FrontCompressedBlockLowerBackwardSolve");
 #endif
     const int numKeptModesA = front.AGreens.size();
 
@@ -129,12 +126,7 @@ FrontCompressedBlockLowerBackwardSolve
     const int numNonzeros = ( isLeaf ? front.BRows.size() : 0 );
 
     if( (isLeaf && numNonzeros==0) || (!isLeaf && numKeptModesB==0) )
-    {
-#ifndef RELEASE
-        PopCallStack();
-#endif
         return;
-    }
 
     const int sT = front.sT;
     const int sB = front.sB;
@@ -151,8 +143,8 @@ FrontCompressedBlockLowerBackwardSolve
 
     // YT := LB^[T/H] XB
     Matrix<F> YT, ZT, YTBlock, ZTBlock;
-    Zeros( snSize, numRhs, YT );
-    Zeros( snSize, numRhs, ZT );
+    Zeros( YT, snSize, numRhs );
+    Zeros( ZT, snSize, numRhs );
     if( isLeaf )
     {
         for( int k=0; k<numNonzeros; ++k )
@@ -223,9 +215,6 @@ FrontCompressedBlockLowerBackwardSolve
             }
         }
     }
-#ifndef RELEASE
-    PopCallStack();
-#endif
 }
 
 } // namespace psp

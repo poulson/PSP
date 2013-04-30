@@ -1381,7 +1381,7 @@ DistSpectralHelmholtz<R>::FillPanelFronts
         const int size = node.size;
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
-        elem::Zeros( frontSize, size, front.frontL );
+        elem::Zeros( front.frontL, frontSize, size );
         for( int j=0; j<size; ++j )
         {
             // Extract the velocity from the recv buffer
@@ -1426,7 +1426,7 @@ DistSpectralHelmholtz<R>::FillPanelFronts
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.front2dL.SetGrid( grid );
-        elem::Zeros( frontSize, size, front.front2dL );
+        elem::Zeros( front.front2dL, frontSize, size );
         const int localSize = front.front2dL.LocalWidth();
         for( int jLocal=0; jLocal<localSize; ++jLocal )
         {
@@ -1493,7 +1493,7 @@ DistSpectralHelmholtz<R>::FillPanelFronts
         const int size = node.size;
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
-        elem::Zeros( frontSize, size, front.frontL );
+        elem::Zeros( front.frontL, frontSize, size );
         for( int j=0; j<size; ++j )
         {
             // Extract the velocity from the recv buffer
@@ -1546,7 +1546,7 @@ DistSpectralHelmholtz<R>::FillPanelFronts
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
         front.frontL.SetGrid( grid );
-        elem::Zeros( frontSize, size, front.frontL );
+        elem::Zeros( front.frontL, frontSize, size );
         const int localSize = front.frontL.LocalWidth();
         for( int jLocal=0; jLocal<localSize; ++jLocal )
         {
