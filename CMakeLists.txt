@@ -16,7 +16,7 @@ option(PSP_TESTS "Build a collection of test executables" OFF)
 option(PSP_EXAMPLES "Build one or more example executables" OFF)
 option(PRINT_RITZ_VALUES "Print Ritz values before restarting GMRES" OFF)
 
-set(CLIQ_REV 3a57fb2176c1)
+set(CLIQ_REV 7e3b5d247d2e)
 if(NOT EXISTS ${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV})
   find_package(Hg)
   if(HG_FOUND)
