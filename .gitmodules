@@ -1,0 +1,3 @@
+[submodule "external/clique"]
+	path = external/clique
+	url = http://git@github.com/poulson/Clique.git

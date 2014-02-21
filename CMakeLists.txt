@@ -16,29 +16,16 @@ option(PSP_TESTS "Build a collection of test executables" OFF)
 option(PSP_EXAMPLES "Build one or more example executables" OFF)
 option(PRINT_RITZ_VALUES "Print Ritz values before restarting GMRES" OFF)
 
-set(CLIQ_REV 7e3b5d247d2e)
-if(NOT EXISTS ${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV})
-  find_package(Hg)
-  if(HG_FOUND)
-    execute_process(COMMAND
-      ${HG_EXECUTABLE} clone https://bitbucket.org/poulson/clique -r ${CLIQ_REV}
-      ${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV})
-  else()
-    message(FATAL_ERROR
-      "Could not find Mercurial, which is needed for checking out Clique")
-  endif()
-endif()
-add_subdirectory(external/clique-r${CLIQ_REV})
-include_directories(
-  "${PROJECT_BINARY_DIR}/external/clique-r${CLIQ_REV}/include")
+add_subdirectory(external/clique)
+include_directories(${PROJECT_BINARY_DIR}/external/clique/include)
 if(HAVE_PARMETIS)
   include_directories(
-    "${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV}/external/parmetis/include")
+    ${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/include)
   include_directories(
-    "${PROJECT_SOURCE_DIR}/external/clique-r${CLIQ_REV}/external/parmetis/metis/include")
+    ${PROJECT_SOURCE_DIR}/external/clique/external/parmetis/metis/include)
 endif()
 include_directories(
-    "${PROJECT_BINARY_DIR}/external/clique-r${CLIQ_REV}/external/elemental-r${ELEM_REV}/include")
+  ${PROJECT_BINARY_DIR}/external/clique/external/elemental/include)
 include_directories(${MPI_CXX_INCLUDE_PATH})
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${MPI_CXX_COMPILE_FLAGS}")
