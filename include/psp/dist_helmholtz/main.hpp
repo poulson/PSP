@@ -1,11 +1,12 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+
 namespace psp {
 
 template<typename R>
@@ -35,7 +36,7 @@ DistHelmholtz<R>::DistHelmholtz
     bottomDepth_ = bz+numPlanesPerPanel_;
     topOrigDepth_ = (topHasPML ? bz+numPlanesPerPanel_ : numPlanesPerPanel_ );
     if( nz <= bottomDepth_+topOrigDepth_ )
-        throw std::logic_error
+        LogicError
         ("The domain is very shallow. Please run a sparse-direct factorization "
          "instead.");
 
@@ -338,10 +339,10 @@ DistHelmholtz<R>::DistHelmholtz
                     break;
                 }
             }
-#ifndef RELEASE
-            if( localIndex == -1 )
-                throw std::logic_error("Did not find subdiag connection");
-#endif
+            DEBUG_ONLY(
+                if( localIndex == -1 )
+                    LogicError("Did not find subdiag connection");
+            )
 
             const int proc = OwningProcess( x, y, v-1, commSize );
             const int index = (panel-1)*commSize + proc;
@@ -368,10 +369,10 @@ DistHelmholtz<R>::DistHelmholtz
                     break;
                 }
             }
-#ifndef RELEASE
-            if( localIndex == -1 )
-                throw std::logic_error("Did not find supdiag connection");
-#endif
+            DEBUG_ONLY(
+                if( localIndex == -1 )
+                    LogicError("Did not find supdiag connection");
+            )
 
             const int proc = OwningProcess( x, y, v+1, commSize );
             const int index = panel*commSize + proc;
@@ -470,8 +471,8 @@ DistHelmholtz<R>::LocalPanelSizeRecursion
 
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localSize += Length<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        localSize += Length( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSize = (xSize-1) / 2;
@@ -518,8 +519,8 @@ DistHelmholtz<R>::LocalPanelSizeRecursion
 
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localSize += Length<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        localSize += Length( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSize = (ySize-1) / 2;
@@ -961,8 +962,8 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1048,8 +1049,8 @@ DistHelmholtz<R>::MapLocalPanelIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1192,8 +1193,8 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1270,8 +1271,8 @@ DistHelmholtz<R>::MapLocalConnectionIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1550,7 +1551,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
             // Form the structure of a partition of the X dimension
             const int middle = (nxSub-1)/2;
             node.size = nySub*vSize;
-            node.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
+            node.off = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
 
             // Allocate space for the lower structure
             int numJoins = 0;
@@ -1591,7 +1592,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
             // Form the structure of a partition of the Y dimension
             const int middle = (nySub-1)/2;
             node.size = nxSub*vSize;
-            node.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
+            node.off = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
 
             // Allocate space for the lower structure
             int numJoins = 0;
@@ -1634,7 +1635,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
     if( nxSub*nySub <= cutoff )
     {
         node.size = nxSub*nySub*vSize;
-        node.offset = ReorderedIndex( xOffset, yOffset, 0, vSize );
+        node.off = ReorderedIndex( xOffset, yOffset, 0, vSize );
 
         // Count, allocate, and fill the lower struct
         int joinSize = 0;
@@ -1678,7 +1679,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
         // Form the structure of a partition of the X dimension
         const int middle = (nxSub-1)/2;
         node.size = nySub*vSize;
-        node.offset = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
+        node.off = ReorderedIndex( xOffset+middle, yOffset, 0, vSize );
 
         // Allocate space for the lower structure
         int numJoins = 0;
@@ -1707,7 +1708,7 @@ DistHelmholtz<R>::FillPanelDistElimTree
         // Form the structure of a partition of the Y dimension
         const int middle = (nySub-1)/2;
         node.size = nxSub*vSize;
-        node.offset = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
+        node.off = ReorderedIndex( xOffset, yOffset+middle, 0, vSize );
 
         // Allocate space for the lower structure
         int numJoins = 0;
@@ -1781,7 +1782,7 @@ DistHelmholtz<R>::FillPanelLocalElimTree
         if( box.nx*box.ny <= cutoff )
         {
             node.size = box.nx*box.ny*vSize;
-            node.offset = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
+            node.off = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
             node.children.clear();
 
             // Count, allocate, and fill the lower struct
@@ -1829,7 +1830,7 @@ DistHelmholtz<R>::FillPanelLocalElimTree
                 // Partition the X dimension (this is the separator)
                 const int middle = (box.nx-1)/2;
                 node.size = box.ny*vSize;
-                node.offset = ReorderedIndex
+                node.off = ReorderedIndex
                     ( box.xOffset+middle, box.yOffset, 0, vSize );
 
                 // Count, allocate, and fill the lower struct
@@ -1878,7 +1879,7 @@ DistHelmholtz<R>::FillPanelLocalElimTree
                 // Partition the Y dimension (this is the separator)
                 const int middle = (box.ny-1)/2;
                 node.size = box.nx*vSize;
-                node.offset = ReorderedIndex
+                node.off = ReorderedIndex
                     ( box.xOffset, box.yOffset+middle, 0, vSize );
 
                 // Count, allocate, and fill the lower struct

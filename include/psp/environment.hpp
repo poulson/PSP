@@ -1,15 +1,18 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_ENVIRONMENT_HPP
-#define PSP_ENVIRONMENT_HPP 1
+#define PSP_ENVIRONMENT_HPP
 
 #include "clique.hpp"
+#include ELEM_MAXNORM_INC
+#include ELEM_SVD_INC
 
 namespace psp {
 
@@ -63,6 +66,9 @@ using elem::DistMatrix;
 using elem::Length;
 using elem::Shift;
 
+using elem::LogicError;
+using elem::RuntimeError;
+
 // Pull in a few scalar math functions
 using elem::Abs;
 using elem::Conj;
@@ -90,9 +96,7 @@ bool CheckForZero( const std::vector<T>& alphaList );
 
 template<typename F>
 void Norms
-( const Matrix<F>& xList, 
-  std::vector<typename Base<F>::type >& normList,
-  mpi::Comm comm );
+( const Matrix<F>& xList, std::vector<Base<F>>& normList, mpi::Comm comm );
 
 template<typename F>
 void InnerProducts
@@ -133,10 +137,10 @@ inline void  EnsureDirExists( const char* path, mode_t mode=0777 )
     {
         // The directory doesn't yet exist, so try to create it
         if( mkdir( path, mode ) != 0 )
-            throw std::runtime_error("Could not create directory");
+            RuntimeError("Could not create directory");
     }
     else if( !S_ISDIR( s.st_mode ) )
-        throw std::runtime_error("Invalid directory");
+        RuntimeError("Invalid directory");
 }
 #endif
 
@@ -171,19 +175,17 @@ inline bool CheckForZero( const std::vector<T>& alphaList )
 
 template<typename F>
 void Norms
-( const Matrix<F>& xList, 
-  std::vector<typename Base<F>::type >& normList,
-  mpi::Comm comm )
+( const Matrix<F>& xList, std::vector<Base<F>>& normList, mpi::Comm comm )
 {
-    typedef typename Base<F>::type R;
+    typedef Base<F> Real;
 
     const int numCols = xList.Width();
     const int localHeight = xList.Height();
     const int commSize = mpi::CommSize( comm );
-    std::vector<R> localNorms( numCols );
+    std::vector<Real> localNorms( numCols );
     for( int j=0; j<numCols; ++j )
         localNorms[j] = blas::Nrm2( localHeight, xList.LockedBuffer(0,j), 1 );
-    std::vector<R> allLocalNorms( numCols*commSize );
+    std::vector<Real> allLocalNorms( numCols*commSize );
     mpi::AllGather( &localNorms[0], numCols, &allLocalNorms[0], numCols, comm );
     normList.resize( numCols );
     for( int j=0; j<numCols; ++j )

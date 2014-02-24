@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
-#define PSP_DIST_COMPRESSED_BLOCK_LOWER_SOLVE_HPP 1
+#define PSP_DIST_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
 
 namespace psp {
 
@@ -19,10 +20,9 @@ void DistCompressedBlockLowerForwardSolve
 
 template<typename F>
 void DistCompressedBlockLowerBackwardSolve
-( Orientation orientation, 
-  const cliq::DistSymmInfo& info,
+( const cliq::DistSymmInfo& info,
   const DistCompressedFrontTree<F>& L,
-        Matrix<F>& localX );
+        Matrix<F>& localX, bool conjugate=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -34,9 +34,7 @@ inline void DistCompressedBlockLowerForwardSolve
   const DistCompressedFrontTree<F>& L, 
         Matrix<F>& localX )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistCompressedBlockLowerForwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistCompressedBlockLowerForwardSolve"))
     const int numDistNodes = info.distNodes.size();
     const int width = localX.Width();
 
@@ -71,15 +69,18 @@ inline void DistCompressedBlockLowerForwardSolve
         // Set up a workspace
         DistMatrix<F,VC,STAR>& W = front.work1d;
         W.SetGrid( grid );
-        W.ResizeTo( frontHeight, width );
+        W.Resize( frontHeight, width );
         DistMatrix<F,VC,STAR> WT(grid), WB(grid);
         elem::PartitionDown
         ( W, WT,
              WB, node.size );
 
         // Pull in the relevant information from the RHS
+        // TODO: Switch to approach closer to what Clique now does
         Matrix<F> localXT;
-        View( localXT, localX, node.localOffset1d, 0, node.localSize1d, width );
+        View
+        ( localXT, localX, 
+          node.multiVecMeta.localOff, 0, node.multiVecMeta.localSize, width );
         WT.Matrix() = localXT;
         elem::MakeZeros( WB );
 
@@ -92,7 +93,7 @@ inline void DistCompressedBlockLowerForwardSolve
         std::vector<int> sendCounts(commSize), sendDispls(commSize);
         for( int proc=0; proc<commSize; ++proc )
         {
-            const int sendSize = node.numChildSolveSendIndices[proc]*width;
+            const int sendSize = node.multiVecMeta.numChildSendInds[proc]*width;
             sendCounts[proc] = sendSize;
             sendDispls[proc] = sendBufferSize;
             sendBufferSize += sendSize;
@@ -101,8 +102,7 @@ inline void DistCompressedBlockLowerForwardSolve
 
         const bool isLeftChild = ( commRank < commSize/2 );
         const std::vector<int>& myChildRelIndices = 
-            ( isLeftChild ? node.leftChildRelIndices
-                          : node.rightChildRelIndices );
+            ( isLeftChild ? node.leftRelInds : node.rightRelInds );
         const int updateColShift = childUpdate.ColShift();
         const int updateLocalHeight = childUpdate.LocalHeight();
         std::vector<int> packOffsets = sendDispls;
@@ -125,7 +125,8 @@ inline void DistCompressedBlockLowerForwardSolve
         std::vector<int> recvCounts(commSize), recvDispls(commSize);
         for( int proc=0; proc<commSize; ++proc )
         {
-            const int recvSize = node.childSolveRecvIndices[proc].size()*width;
+            const int recvSize = 
+                node.multiVecMeta.childRecvInds[proc].size()*width;
             recvCounts[proc] = recvSize;
             recvDispls[proc] = recvBufferSize;
             recvBufferSize += recvSize;
@@ -147,8 +148,8 @@ inline void DistCompressedBlockLowerForwardSolve
         for( int proc=0; proc<commSize; ++proc )
         {
             const F* recvValues = &recvBuffer[recvDispls[proc]];
-            const std::deque<int>& recvIndices = 
-                node.childSolveRecvIndices[proc];
+            const std::vector<int>& recvIndices = 
+                node.multiVecMeta.childRecvInds[proc];
             for( unsigned k=0; k<recvIndices.size(); ++k )
             {
                 const int iFrontLocal = recvIndices[k];
@@ -175,14 +176,11 @@ inline void DistCompressedBlockLowerForwardSolve
 
 template<typename F>
 inline void DistCompressedBlockLowerBackwardSolve
-( Orientation orientation, 
-  const cliq::DistSymmInfo& info,
+( const cliq::DistSymmInfo& info,
   const DistCompressedFrontTree<F>& L,
-        Matrix<F>& localX )
+        Matrix<F>& localX, bool conjugate )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistCompressedBlockLowerBackwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistCompressedBlockLowerBackwardSolve"))
     const int numDistNodes = info.distNodes.size();
     const int width = localX.Width();
 
@@ -193,9 +191,9 @@ inline void DistCompressedBlockLowerBackwardSolve
     {
         localRootFront.work.Attach
         ( rootNode.size, width,
-          localX.Buffer(rootNode.localOffset1d,0), localX.LDim() );
+          localX.Buffer(rootNode.multiVecMeta.localOff,0), localX.LDim() );
         FrontCompressedBlockLowerBackwardSolve
-        ( orientation, localRootFront, localRootFront.work );
+        ( localRootFront, localRootFront.work, conjugate );
     }
     else
     {
@@ -203,9 +201,10 @@ inline void DistCompressedBlockLowerBackwardSolve
         const Grid& rootGrid = *rootFront.grid;
         rootFront.work1d.Attach
         ( rootNode.size, width, 0,
-          localX.Buffer(rootNode.localOffset1d,0), localX.LDim(), rootGrid );
+          localX.Buffer(rootNode.multiVecMeta.localOff,0), localX.LDim(), 
+          rootGrid );
         FrontCompressedBlockLowerBackwardSolve
-        ( orientation, rootFront, rootFront.work1d );
+        ( rootFront, rootFront.work1d, conjugate );
     }
 
     std::vector<int>::const_iterator it;
@@ -230,7 +229,7 @@ inline void DistCompressedBlockLowerBackwardSolve
         // Set up a workspace
         DistMatrix<F,VC,STAR>& W = front.work1d;
         W.SetGrid( grid );
-        W.ResizeTo( frontHeight, width );
+        W.Resize( frontHeight, width );
         DistMatrix<F,VC,STAR> WT(grid), WB(grid);
         elem::PartitionDown
         ( W, WT,
@@ -238,7 +237,9 @@ inline void DistCompressedBlockLowerBackwardSolve
 
         // Pull in the relevant information from the RHS
         Matrix<F> localXT;
-        View( localXT, localX, node.localOffset1d, 0, node.localSize1d, width );
+        View
+        ( localXT, localX, 
+          node.multiVecMeta.localOff, 0, node.multiVecMeta.localSize, width );
         WT.Matrix() = localXT;
 
         //
@@ -251,7 +252,7 @@ inline void DistCompressedBlockLowerBackwardSolve
         for( int proc=0; proc<parentCommSize; ++proc )
         {
             const int sendSize = 
-                parentNode.childSolveRecvIndices[proc].size()*width;
+                parentNode.multiVecMeta.childRecvInds[proc].size()*width;
             sendCounts[proc] = sendSize;
             sendDispls[proc] = sendBufferSize;
             sendBufferSize += sendSize;
@@ -262,8 +263,8 @@ inline void DistCompressedBlockLowerBackwardSolve
         for( int proc=0; proc<parentCommSize; ++proc )
         {
             F* sendValues = &sendBuffer[sendDispls[proc]];
-            const std::deque<int>& recvIndices = 
-                parentNode.childSolveRecvIndices[proc];
+            const std::vector<int>& recvIndices = 
+                parentNode.multiVecMeta.childRecvInds[proc];
             for( unsigned k=0; k<recvIndices.size(); ++k )
             {
                 const int iFrontLocal = recvIndices[k];
@@ -282,15 +283,15 @@ inline void DistCompressedBlockLowerBackwardSolve
         for( int proc=0; proc<parentCommSize; ++proc )
         {
             const int recvSize = 
-                parentNode.numChildSolveSendIndices[proc]*width;
+                parentNode.multiVecMeta.numChildSendInds[proc]*width;
             recvCounts[proc] = recvSize;
             recvDispls[proc] = recvBufferSize;
             recvBufferSize += recvSize;
         }
         std::vector<F> recvBuffer( recvBufferSize );
-#ifndef RELEASE
-        cliq::VerifySendsAndRecvs( sendCounts, recvCounts, parentComm );
-#endif
+        DEBUG_ONLY(
+            cliq::VerifySendsAndRecvs( sendCounts, recvCounts, parentComm )
+        )
 
         // AllToAll to send and recv parent updates
         cliq::SparseAllToAll
@@ -303,8 +304,7 @@ inline void DistCompressedBlockLowerBackwardSolve
         // Unpack the updates using the send approach from the forward solve
         const bool isLeftChild = ( parentCommRank < parentCommSize/2 );
         const std::vector<int>& myRelIndices = 
-            ( isLeftChild ? parentNode.leftChildRelIndices
-                          : parentNode.rightChildRelIndices );
+            ( isLeftChild ? parentNode.leftRelInds : parentNode.rightRelInds );
         const int updateColShift = WB.ColShift();
         const int updateLocalHeight = WB.LocalHeight();
         for( int iUpdateLocal=0; 
@@ -323,12 +323,12 @@ inline void DistCompressedBlockLowerBackwardSolve
 
         // Use the distributed compressed data
         if( s > 0 )
-            FrontCompressedBlockLowerBackwardSolve( orientation, front, W );
+            FrontCompressedBlockLowerBackwardSolve( front, W, conjugate );
         else
         {
             View( localRootFront.work, W.Matrix() );
             FrontCompressedBlockLowerBackwardSolve
-            ( orientation, localRootFront, localRootFront.work );
+            ( localRootFront, localRootFront.work, conjugate );
         }
 
         // Store this node's portion of the result

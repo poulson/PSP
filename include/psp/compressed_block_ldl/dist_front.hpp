@@ -1,20 +1,21 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_FRONT_COMPRESSION_HPP
-#define PSP_DIST_FRONT_COMPRESSION_HPP 1
+#define PSP_DIST_FRONT_COMPRESSION_HPP
 
 namespace psp {
 
-template<typename R>
+template<typename Real>
 void CompressFront
-( DistCompressedFront<Complex<R> >& front, int depth, bool useQR,
-  R tolA, R tolB );
+( DistCompressedFront<Complex<Real>>& front, int depth, bool useQR,
+  Real tolA, Real tolB );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -22,18 +23,18 @@ void CompressFront
 
 namespace internal {
 
-template<typename R>
+template<typename Real>
 void CompressSVD
-( DistMatrix<Complex<R>,STAR,STAR>& U, 
-  DistMatrix<R,STAR,STAR>& s, 
-  DistMatrix<Complex<R>,STAR,STAR>& V,
-  R tolerance )
+( DistMatrix<Complex<Real>,STAR,STAR>& U, 
+  DistMatrix<Real,STAR,STAR>& s, 
+  DistMatrix<Complex<Real>,STAR,STAR>& V,
+  Real tolerance )
 {
-    typedef Complex<R> C;
+    typedef Complex<Real> C;
 
     // Compress
-    const R twoNorm = elem::MaxNorm( s.Matrix() );
-    const R cutoff = twoNorm*tolerance;
+    const Real twoNorm = elem::MaxNorm( s.Matrix() );
+    const Real cutoff = twoNorm*tolerance;
     const int k = s.Height();
     int numKeptModes = k;
     for( int i=1; i<k; ++i )
@@ -44,31 +45,29 @@ void CompressSVD
             break;
         }
     }
-    U.ResizeTo( U.Height(), numKeptModes );
-    s.ResizeTo( numKeptModes, 1 );
-    V.ResizeTo( V.Height(), numKeptModes );
+    U.Resize( U.Height(), numKeptModes );
+    s.Resize( numKeptModes, 1 );
+    V.Resize( V.Height(), numKeptModes );
 
     const int worldRank = mpi::CommRank( mpi::COMM_WORLD );
     if( worldRank == 0 && numKeptModes > 0 )
     {
         std::ostringstream msg;
         msg << "kept " << numKeptModes << "/" << k << " modes, "
-            << (R(100)*numKeptModes)/R(k) << "%" << std::endl;
+            << (Real(100)*numKeptModes)/Real(k) << "%" << std::endl;
         std::cout << msg.str();
     }
 }
 
-template<typename R> 
+template<typename Real> 
 inline void CompressBlock
-( DistMatrix<Complex<R> >& A, 
-  std::vector<DistMatrix<Complex<R> > >& greens, 
-  std::vector<DistMatrix<Complex<R>,STAR,STAR> >& coefficients,
-  int depth, bool useQR, R tolerance )
+( DistMatrix<Complex<Real>>& A, 
+  std::vector<DistMatrix<Complex<Real>>>& greens, 
+  std::vector<DistMatrix<Complex<Real>,STAR,STAR>>& coefficients,
+  int depth, bool useQR, Real tolerance )
 {
-#ifndef RELEASE
-    CallStackEntry entry("internal::CompressBlock");
-#endif
-    typedef Complex<R> C;
+    DEBUG_ONLY(CallStackEntry entry("internal::CompressBlock"))
+    typedef Complex<Real> C;
     const Grid& g = A.Grid();
     const int gridRank = g.Rank();
     const int gridSize = g.Size();
@@ -211,8 +210,8 @@ inline void CompressBlock
 
         // Count the recv data
         std::vector<int> recvCounts( gridSize, 0 );
-        const int AColAlignment = A.ColAlignment();
-        const int ARowAlignment = A.RowAlignment();
+        const int AColAlign = A.ColAlign();
+        const int ARowAlign = A.RowAlign();
         const int ZLocalHeight = Length( s1*s2, gridRank, gridSize );
         for( int j2=0; j2<depth; ++j2 )
         {
@@ -224,8 +223,8 @@ inline void CompressBlock
                     const int i1 = i % s1;
                     const int i2 = i / s1;
 
-                    const int origRow = (i1+j1*s1+AColAlignment) % gridHeight;
-                    const int origCol = (i2+j2*s2+ARowAlignment) % gridWidth;
+                    const int origRow = (i1+j1*s1+AColAlign) % gridHeight;
+                    const int origCol = (i2+j2*s2+ARowAlign) % gridWidth;
                     const int origProc = origRow + origCol*gridHeight;
                     ++recvCounts[origProc];
                 }
@@ -251,7 +250,7 @@ inline void CompressBlock
         sendDispls.clear();
 
         // Unpack the recv data into Z[VC,* ]
-        Z_VC_STAR.ResizeTo( s1*s2, depth*depth );
+        Z_VC_STAR.Resize( s1*s2, depth*depth );
         offsets = recvDispls;
 
         for( int j2=0; j2<depth; ++j2 )
@@ -264,8 +263,8 @@ inline void CompressBlock
                     const int i1 = i % s1;
                     const int i2 = i / s1;
 
-                    const int origCol = (i2+j2*s2+ARowAlignment) % gridWidth;
-                    const int origRow = (i1+j1*s1+AColAlignment) % gridHeight;
+                    const int origCol = (i2+j2*s2+ARowAlign) % gridWidth;
+                    const int origRow = (i1+j1*s1+AColAlign) % gridHeight;
                     const int origProc = origRow + origCol*gridHeight;
 
                     const C value = recvBuffer[offsets[origProc]];
@@ -293,10 +292,10 @@ inline void CompressBlock
         DistMatrix<C> ZT( g );
         View( ZT, Z, 0, 0, n, n );
 
-        DistMatrix<R,STAR,STAR> s_STAR_STAR( n, 1, g );
+        DistMatrix<Real,STAR,STAR> s_STAR_STAR( n, 1, g );
         DistMatrix<C,STAR,STAR> W_STAR_STAR( ZT );
-        elem::MakeTrapezoidal( LEFT, UPPER, 0, W_STAR_STAR );
-        V_STAR_STAR.ResizeTo( n, n );
+        elem::MakeTriangular( UPPER, W_STAR_STAR );
+        V_STAR_STAR.Resize( n, n );
         elem::SVD
         ( W_STAR_STAR.Matrix(), s_STAR_STAR.Matrix(), V_STAR_STAR.Matrix(), 
           useQR );
@@ -306,7 +305,7 @@ inline void CompressBlock
 
         // Reexpand (TODO: Think about explicitly expanded reflectors)
         const int numKeptModes = s_STAR_STAR.Height();
-        U.ResizeTo( m, numKeptModes );
+        U.Resize( m, numKeptModes );
         DistMatrix<C> UT( g ), UB( g );
         elem::PartitionDown
         ( U, UT,
@@ -319,9 +318,9 @@ inline void CompressBlock
     else
     {
         const int k = std::min( m, n );
-        DistMatrix<R,STAR,STAR> s_STAR_STAR( k, 1, g);
+        DistMatrix<Real,STAR,STAR> s_STAR_STAR( k, 1, g);
         DistMatrix<C,STAR,STAR> U_STAR_STAR( Z );
-        V_STAR_STAR.ResizeTo( n, k );
+        V_STAR_STAR.Resize( n, k );
         elem::SVD
         ( U_STAR_STAR.Matrix(), s_STAR_STAR.Matrix(), V_STAR_STAR.Matrix(), 
           useQR );
@@ -342,8 +341,8 @@ inline void CompressBlock
 
         G.SetGrid( g );
         D.SetGrid( g );
-        G.ResizeTo( s1, s2 );
-        D.ResizeTo( depth, depth );
+        G.Resize( s1, s2 );
+        D.Resize( depth, depth );
 
         // Unshuffle U 
         // (if the number of processes evenly divided s1, this would just be
@@ -368,17 +367,15 @@ inline void CompressBlock
 
 } // namespace internal
 
-template<typename R>
+template<typename Real>
 void CompressFront
-( DistCompressedFront<Complex<R> >& front, int depth, bool useQR, 
-  R tolA, R tolB )
+( DistCompressedFront<Complex<Real>>& front, int depth, bool useQR, 
+  Real tolA, Real tolB )
 {
-#ifndef RELEASE
-    CallStackEntry entry("CompressFront");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("CompressFront"))
     const Grid& grid = front.frontL.Grid();
     const int snSize = front.frontL.Width();
-    DistMatrix<Complex<R> > A(grid), B(grid);
+    DistMatrix<Complex<Real>> A(grid), B(grid);
     elem::PartitionDown
     ( front.frontL, A,
                     B, snSize );

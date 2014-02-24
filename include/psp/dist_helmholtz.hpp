@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_HELMHOLTZ_HPP
-#define PSP_DIST_HELMHOLTZ_HPP 1
+#define PSP_DIST_HELMHOLTZ_HPP
 
 namespace psp {
 
@@ -17,26 +18,26 @@ enum PanelScheme {
   COMPRESSED_BLOCK_LDL_2D=2
 };
 
-template<typename R>
+template<typename Real>
 class DistHelmholtz
 {
 public:
-    typedef Complex<R> C;
+    typedef Complex<Real> C;
 
     DistHelmholtz
-    ( const Discretization<R>& disc, mpi::Comm comm, 
-      R damping=7.0, int numPlanesPerPanel=4, int cutoff=12 );
+    ( const Discretization<Real>& disc, mpi::Comm comm, 
+      Real damping=7.0, int numPlanesPerPanel=4, int cutoff=12 );
 
     ~DistHelmholtz();
 
     // Build the sparse matrix and the preconditioner
     void Initialize
-    ( const DistUniformGrid<R>& velocity, 
+    ( const DistUniformGrid<Real>& velocity, 
       PanelScheme panelScheme=CLIQUE_LDL_SELINV_2D );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
     void Solve
-    ( DistUniformGrid<C>& B, int m=20, R relTol=1e-4, 
+    ( DistUniformGrid<C>& B, int m=20, Real relTol=1e-4, 
       bool viewIterates=false ) const;
 
     // Destroy the sparse matrix and the preconditioner
@@ -46,9 +47,9 @@ private:
     PanelScheme panelScheme_;
     mpi::Comm comm_;
     int distDepth_;
-    const Discretization<R> disc_;
-    const R hx_, hy_, hz_; // grid spacings
-    const R damping_;
+    const Discretization<Real> disc_;
+    const Real hx_, hy_, hz_; // grid spacings
+    const Real damping_;
     const int numPlanesPerPanel_;
     const int nestedCutoff_;
 
@@ -66,7 +67,7 @@ private:
     ( DistUniformGrid<C>& gridB, const Matrix<C>& B ) const;
 
     void InternalSolveWithGMRES
-    ( DistUniformGrid<C>& gridB, Matrix<C>& B, int m, R relTol, 
+    ( DistUniformGrid<C>& gridB, Matrix<C>& B, int m, Real relTol, 
       bool viewIteratees ) const;
 
     void Multiply( Matrix<C>& B ) const;
@@ -224,10 +225,10 @@ private:
     //
 
     void GetGlobalVelocity
-    ( const DistUniformGrid<R>& velocity,
-      std::vector<R>& myGlobalVelocity, std::vector<int>& offsets ) const;
+    ( const DistUniformGrid<Real>& velocity,
+      std::vector<Real>& myGlobalVelocity, std::vector<int>& offsets ) const;
 
-    void FormGlobalRow( R alpha, int x, int y, int v, int row );
+    void FormGlobalRow( Real alpha, int x, int y, int v, int row );
 
     // For building localToNaturalMap_, which takes our local index in the 
     // global sparse matrix and returns the original 'natural' index.
@@ -265,8 +266,8 @@ private:
     void GetPanelVelocity
     ( int vOffset, int vSize, 
       const cliq::DistSymmInfo& info,
-      const DistUniformGrid<R>& velocity,
-      std::vector<R>& myPanelVelocity,
+      const DistUniformGrid<Real>& velocity,
+      std::vector<Real>& myPanelVelocity,
       std::vector<int>& offsets,
       std::map<int,int>& panelNestedToNatural, 
       std::map<int,int>& panelNaturalToNested ) const;
@@ -275,8 +276,8 @@ private:
     ( int vOffset, int vSize,
       const cliq::DistSymmInfo& info,
             cliq::DistSymmFrontTree<C>& fact,
-      const DistUniformGrid<R>& velocity,
-      const std::vector<R>& myPanelVelocity,
+      const DistUniformGrid<Real>& velocity,
+      const std::vector<Real>& myPanelVelocity,
             std::vector<int>& offsets,
             std::map<int,int>& panelNestedToNatural,
             std::map<int,int>& panelNaturalToNested ) const;
@@ -284,14 +285,14 @@ private:
     ( int vOffset, int vSize,
       const cliq::DistSymmInfo& info,
             DistCompressedFrontTree<C>& fact,
-      const DistUniformGrid<R>& velocity,
-      const std::vector<R>& myPanelVelocity,
+      const DistUniformGrid<Real>& velocity,
+      const std::vector<Real>& myPanelVelocity,
             std::vector<int>& offsets,
             std::map<int,int>& panelNestedToNatural,
             std::map<int,int>& panelNaturalToNested ) const;
 
     void FormLowerColumnOfNode
-    ( R alpha, int x, int y, int v, int vOffset, int vSize,
+    ( Real alpha, int x, int y, int v, int vOffset, int vSize,
       int offset, int size, int j, 
       const std::vector<int>& origLowerStruct, 
       const std::vector<int>& origLowerRelIndices,
@@ -317,4 +318,4 @@ private:
 #include "./dist_helmholtz/initialize_finalize.hpp"
 #include "./dist_helmholtz/solve.hpp"
 
-#endif // PSP_DIST_HELMHOLTZ_HPP
+#endif // ifndef PSP_DIST_HELMHOLTZ_HPP

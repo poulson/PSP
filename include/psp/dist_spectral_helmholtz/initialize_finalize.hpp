@@ -15,22 +15,22 @@ DistSpectralHelmholtz<R>::Initialize
 ( const DistUniformGrid<R>& velocity, PanelScheme panelScheme )
 {
     if( disc_.omega == R(0) )
-        throw std::logic_error("PML does not work at zero frequency");
+        LogicError("PML does not work at zero frequency");
     if( panelScheme < 0 || panelScheme > 2 )
     {
         std::ostringstream msg;
         msg << "Invalid panelScheme value: " << panelScheme;
-        throw std::logic_error( msg.str().c_str() );
+        LogicError( msg.str().c_str() );
     }
     panelScheme_ = panelScheme;
     if( disc_.nx != velocity.XSize() ||
         disc_.ny != velocity.YSize() ||
         disc_.nz != velocity.ZSize() )
-        throw std::logic_error("Velocity grid is incorrect");
+        LogicError("Velocity grid is incorrect");
     if( !mpi::CongruentComms( comm_, velocity.Comm() ) )
-        throw std::logic_error("Velocity does not have a congruent comm");
+        LogicError("Velocity does not have a congruent comm");
     if( velocity.NumScalars() != 1 )
-        throw std::logic_error("Velocity grid should have one entry per point");
+        LogicError("Velocity grid should have one entry per point");
     const int commRank = mpi::CommRank( comm_ );
     const R omega = disc_.omega;
     const R wx = disc_.wx;
@@ -720,10 +720,10 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
@@ -746,10 +746,10 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
@@ -772,10 +772,10 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
@@ -798,10 +798,10 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
@@ -824,10 +824,10 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }
@@ -850,10 +850,10 @@ DistSpectralHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
                 frontIndices.push_back( origLowerRelIndices[whichLower] );
             }

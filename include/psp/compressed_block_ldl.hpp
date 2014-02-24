@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_COMPRESSED_BLOCK_LDL_HPP
-#define PSP_COMPRESSED_BLOCK_LDL_HPP 1
+#define PSP_COMPRESSED_BLOCK_LDL_HPP
 
 namespace psp {
 
@@ -19,8 +20,7 @@ namespace psp {
 template<typename F>
 void CompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR=false, 
-  typename Base<F>::type tolA=1e-3, typename Base<F>::type tolB=1e-3 );
+  bool useQR=false, Base<F> tolA=1e-3, Base<F> tolB=1e-3 );
 
 } // namespace psp
 
@@ -39,15 +39,13 @@ namespace psp {
 template<typename F>
 inline void CompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
+  bool useQR, Base<F> tolA, Base<F> tolB )
 {
-#ifndef RELEASE
-    CallStackEntry entry("CompressedBlockLDL");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("CompressedBlockLDL"))
     LocalCompressedBlockLDL( info, L, depth, useQR, tolA, tolB );
     DistCompressedBlockLDL( info, L, depth, useQR, tolA, tolB );
 }
 
 } // namespace psp
 
-#endif /* PSP_COMPRESSED_BLOCK_LDL_HPP */
+#endif // ifndef PSP_COMPRESSED_BLOCK_LDL_HPP

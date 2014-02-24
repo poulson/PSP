@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
-#define PSP_DIST_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP 1
+#define PSP_DIST_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
 
 namespace psp {
 
@@ -19,9 +20,7 @@ inline void
 FrontCompressedBlockLowerForwardSolve
 ( const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
 {
-#ifndef RELEASE
-    CallStackEntry entry("FrontCompressedBlockLowerForwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("FrontCompressedBlockLowerForwardSolve"))
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
@@ -31,15 +30,12 @@ FrontCompressedBlockLowerForwardSolve
     const int snSize = sT*depth;
     const int numRhs = X.Width();
 
-    DistMatrix<F,VC,STAR> XT(g),
-                          XB(g);
-    elem::PartitionDown
-    ( X, XT,
-         XB, snSize );
+    DistMatrix<F,VC,STAR> XT(g), XB(g);
+    elem::PartitionDown( X, XT, XB, snSize );
 
     // XT := inv(ATL) XT
     //     = \sum_t (CA_t o GA_t) XT
-    std::vector<DistMatrix<F,VC,STAR> > XTBlocks, ZTBlocks;
+    std::vector<DistMatrix<F,VC,STAR>> XTBlocks, ZTBlocks;
     XTBlocks.resize( depth );
     ZTBlocks.resize( depth );
     for( int i=0; i<depth; ++i )
@@ -92,7 +88,7 @@ FrontCompressedBlockLowerForwardSolve
     {
         const int sB = front.sB;
 
-        std::vector<DistMatrix<F,VC,STAR> > XBUpdates, ZBBlocks;
+        std::vector<DistMatrix<F,VC,STAR>> XBUpdates, ZBBlocks;
         XBUpdates.resize( depth );
         ZBBlocks.resize( depth );
         for( int i=0; i<depth; ++i )
@@ -141,12 +137,10 @@ FrontCompressedBlockLowerForwardSolve
 template<typename F>
 inline void
 FrontCompressedBlockLowerBackwardSolve
-( Orientation orientation, 
-  const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X )
+( const DistCompressedFront<F>& front, DistMatrix<F,VC,STAR>& X,
+  bool conjugate=false )
 {
-#ifndef RELEASE
-    CallStackEntry entry("FrontCompressedBlockLowerBackwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("FrontCompressedBlockLowerBackwardSolve"))
     const Grid& g = *front.grid;
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
@@ -159,13 +153,10 @@ FrontCompressedBlockLowerBackwardSolve
     const int depth = front.depth;
     const int snSize = sT*depth;
     const int numRhs = X.Width();
-    const bool conjugated = ( orientation==ADJOINT ? true : false );
+    const Orientation orientation = ( conjugate ? ADJOINT : TRANSPOSE );
 
-    DistMatrix<F,VC,STAR> XT(g),
-                          XB(g);
-    elem::PartitionDown
-    ( X, XT,
-         XB, snSize );
+    DistMatrix<F,VC,STAR> XT(g), XB(g);
+    elem::PartitionDown( X, XT, XB, snSize );
 
     // YT := LB^[T/H] XB
     //     = \sum_t (CB_t o GB_t)^[T/H] XB
@@ -208,7 +199,7 @@ FrontCompressedBlockLowerBackwardSolve
                 for( int j=0; j<depth; ++j )
                 {
                     const F entry = CB.Get(j,i);
-                    const F scalar = ( conjugated ? Conj(entry) : entry );
+                    const F scalar = ( conjugate ? Conj(entry) : entry );
                     elem::Axpy( scalar, ZTBlocks[j], YTBlocks[i] );
                 }
             }
@@ -274,4 +265,4 @@ FrontCompressedBlockLowerBackwardSolve
 
 } // namespace psp
 
-#endif // PSP_DIST_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
+#endif // ifndef PSP_DIST_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP

@@ -1,20 +1,21 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_COMPRESSED_BLOCK_LDL_HPP 
-#define PSP_DIST_COMPRESSED_BLOCK_LDL_HPP 1
+#define PSP_DIST_COMPRESSED_BLOCK_LDL_HPP
 
 namespace psp {
 
 template<typename F> 
 void DistCompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB );
+  bool useQR, Base<F> tolA, Base<F> tolB );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -23,11 +24,9 @@ void DistCompressedBlockLDL
 template<typename F> 
 inline void DistCompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
+  bool useQR, Base<F> tolA, Base<F> tolB )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistCompressedBlockLDL");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistCompressedBlockLDL"))
     // The bottom front is already compressed, so just view the relevant data
     CompressedFront<F>& topLocalFront = L.localFronts.back();
     DistCompressedFront<F>& bottomDistFront = L.distFronts[0];
@@ -59,7 +58,7 @@ inline void DistCompressedBlockLDL
         front.work2d.Empty();
 
         const bool computeFactRecvIndices = 
-            ( node.childFactRecvIndices.size() == 0 );
+            ( node.factorMeta.childRecvInds.size() == 0 );
 
         // Grab this front's grid information
         const Grid& grid = front.frontL.Grid();
@@ -81,7 +80,7 @@ inline void DistCompressedBlockLDL
         int sendBufferSize = 0;
         for( unsigned proc=0; proc<commSize; ++proc )
         {
-            const int sendSize = node.numChildFactSendIndices[proc];
+            const int sendSize = node.factorMeta.numChildSendInds[proc];
             sendCounts[proc] = sendSize;
             sendDispls[proc] = sendBufferSize;
             sendBufferSize += sendSize;
@@ -89,8 +88,7 @@ inline void DistCompressedBlockLDL
         std::vector<F> sendBuffer( sendBufferSize );
 
         const std::vector<int>& myChildRelIndices = 
-            ( isLeftChild ? node.leftChildRelIndices
-                          : node.rightChildRelIndices );
+            ( isLeftChild ? node.leftRelInds : node.rightRelInds );
         const int updateColShift = childUpdate.ColShift();
         const int updateRowShift = childUpdate.RowShift();
         const int updateLocalHeight = childUpdate.LocalHeight();
@@ -119,14 +117,14 @@ inline void DistCompressedBlockLDL
                     childUpdate.GetLocal(iChildLocal,jChildLocal);
             }
         }
-#ifndef RELEASE
-        for( unsigned proc=0; proc<commSize; ++proc )
-        {
-            if( packOffsets[proc]-sendDispls[proc] != 
-                node.numChildFactSendIndices[proc] )
-                throw std::logic_error("Error in packing stage");
-        }
-#endif
+        DEBUG_ONLY(
+            for( unsigned proc=0; proc<commSize; ++proc )
+            {
+                if( packOffsets[proc]-sendDispls[proc] != 
+                    node.factorMeta.numChildSendInds[proc] )
+                    LogicError("Error in packing stage");
+            }
+        )
         packOffsets.clear();
         childFront.work2d.Empty();
         if( s == 1 )
@@ -134,12 +132,12 @@ inline void DistCompressedBlockLDL
 
         // Set up the recv buffer for the AllToAll
         if( computeFactRecvIndices )
-            ComputeFactRecvIndices( node, childNode );
+            ComputeFactRecvInds( node, childNode );
         std::vector<int> recvCounts(commSize), recvDispls(commSize);
         int recvBufferSize=0;
         for( unsigned proc=0; proc<commSize; ++proc )
         {
-            const int recvSize = node.childFactRecvIndices[proc].size()/2;
+            const int recvSize = node.factorMeta.childRecvInds[proc].size()/2;
             recvCounts[proc] = recvSize;
             recvDispls[proc] = recvBufferSize;
             recvBufferSize += recvSize;
@@ -163,12 +161,12 @@ inline void DistCompressedBlockLDL
         elem::Zeros( front.work2d, updateSize, updateSize );
         const int leftLocalWidth = front.frontL.LocalWidth();
         const int topLocalHeight = 
-            Length<int>( node.size, grid.MCRank(), gridHeight );
+            Length( node.size, grid.MCRank(), gridHeight );
         for( unsigned proc=0; proc<commSize; ++proc )
         {
             const F* recvValues = &recvBuffer[recvDispls[proc]];
-            const std::deque<int>& recvIndices = 
-                node.childFactRecvIndices[proc];
+            const std::vector<int>& recvIndices = 
+                node.factorMeta.childRecvInds[proc];
             const int numRecvIndexPairs = recvIndices.size()/2;
             for( int k=0; k<numRecvIndexPairs; ++k )
             {
@@ -187,13 +185,10 @@ inline void DistCompressedBlockLDL
         recvCounts.clear();
         recvDispls.clear();
         if( computeFactRecvIndices )
-            node.childFactRecvIndices.clear();
+            node.factorMeta.childRecvInds.clear();
 
         // Now that the frontal matrix is set up, perform the factorization
-        if( L.isHermitian )
-            cliq::FrontBlockLDL( ADJOINT, front.frontL, front.work2d );
-        else
-            cliq::FrontBlockLDL( TRANSPOSE, front.frontL, front.work2d );
+        cliq::FrontBlockLDL( front.frontL, front.work2d, L.isHermitian );
 
         // Separately compress the A and B blocks 
         CompressFront( front, depth, useQR, tolA, tolB );

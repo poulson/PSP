@@ -1,6 +1,6 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
@@ -9,33 +9,29 @@
 
 namespace psp {
 
-template<typename R>
+template<typename Real>
 void
-DistHelmholtz<R>::Initialize
-( const DistUniformGrid<R>& velocity, PanelScheme panelScheme )
+DistHelmholtz<Real>::Initialize
+( const DistUniformGrid<Real>& velocity, PanelScheme panelScheme )
 {
-    if( disc_.omega == R(0) )
-        throw std::logic_error("PML does not work at zero frequency");
+    if( disc_.omega == Real(0) )
+        LogicError("PML does not work at zero frequency");
     if( panelScheme < 0 || panelScheme > 2 )
-    {
-        std::ostringstream msg;
-        msg << "Invalid panelScheme value: " << panelScheme;
-        throw std::logic_error( msg.str().c_str() );
-    }
+        LogicError("Invalid panelScheme value: ",panelScheme);
     panelScheme_ = panelScheme;
     if( disc_.nx != velocity.XSize() ||
         disc_.ny != velocity.YSize() ||
         disc_.nz != velocity.ZSize() )
-        throw std::logic_error("Velocity grid is incorrect");
+        LogicError("Velocity grid is incorrect");
     if( !mpi::CongruentComms( comm_, velocity.Comm() ) )
-        throw std::logic_error("Velocity does not have a congruent comm");
+        LogicError("Velocity does not have a congruent comm");
     if( velocity.NumScalars() != 1 )
-        throw std::logic_error("Velocity grid should have one entry per point");
+        LogicError("Velocity grid should have one entry per point");
     const int commRank = mpi::CommRank( comm_ );
-    const R omega = disc_.omega;
-    const R wx = disc_.wx;
-    const R wy = disc_.wy;
-    const R wz = disc_.wz;
+    const Real omega = disc_.omega;
+    const Real wx = disc_.wx;
+    const Real wy = disc_.wy;
+    const Real wz = disc_.wz;
     const int nx = disc_.nx;
     const int ny = disc_.ny;
     const int nz = disc_.nz;
@@ -45,35 +41,35 @@ DistHelmholtz<R>::Initialize
 
     // Compute the minimum and maximum velocities, then the characteristic 
     // wavelength and the maximum number of wavelengths in an x/y/z direction.
-    R maxLocalVelocity=-1;
+    Real maxLocalVelocity=-1;
     const int xLocalSize = velocity.XLocalSize();
     const int yLocalSize = velocity.YLocalSize();
     const int zLocalSize = velocity.ZLocalSize();
     const int localSize = xLocalSize*yLocalSize*zLocalSize;
-    const R* localVelocity = velocity.LockedBuffer();
+    const Real* localVelocity = velocity.LockedBuffer();
     for( int i=0; i<localSize; ++i )
         maxLocalVelocity=std::max(maxLocalVelocity,localVelocity[i]);
-    R maxVelocity;
+    Real maxVelocity;
     mpi::AllReduce( &maxLocalVelocity, &maxVelocity, 1, mpi::MAX, comm_ );
-    R minLocalVelocity=maxVelocity;
+    Real minLocalVelocity=maxVelocity;
     for( int i=0; i<localSize; ++i )
         minLocalVelocity=std::min(minLocalVelocity,localVelocity[i]);
-    R minVelocity;
+    Real minVelocity;
     mpi::AllReduce( &minLocalVelocity, &minVelocity, 1, mpi::MIN, comm_ );
-    const R medianVelocity = (minVelocity+maxVelocity) / 2;
-    const R wavelength = 2.0*M_PI*minVelocity/omega;
-    const R maxDimension = std::max(std::max(wx,wy),wz);
-    const R numWavelengths = maxDimension / wavelength;
-    const R xSizeInWavelengths = wx / wavelength;
-    const R ySizeInWavelengths = wy / wavelength;
-    const R zSizeInWavelengths = wz / wavelength;
-    const R xPPW = nx / xSizeInWavelengths;
-    const R yPPW = ny / ySizeInWavelengths;
-    const R zPPW = nz / zSizeInWavelengths;
-    const R minPPW = std::min(std::min(xPPW,yPPW),zPPW);
-    const R xPMLMagRule = 12.*maxDimension/minPPW;
-    const R yPMLMagRule = 12.*maxDimension/minPPW;
-    const R zPMLMagRule = 12.*maxDimension/minPPW;
+    const Real medianVelocity = (minVelocity+maxVelocity) / 2;
+    const Real wavelength = 2.0*M_PI*minVelocity/omega;
+    const Real maxDimension = std::max(std::max(wx,wy),wz);
+    const Real numWavelengths = maxDimension / wavelength;
+    const Real xSizeInWavelengths = wx / wavelength;
+    const Real ySizeInWavelengths = wy / wavelength;
+    const Real zSizeInWavelengths = wz / wavelength;
+    const Real xPPW = nx / xSizeInWavelengths;
+    const Real yPPW = ny / ySizeInWavelengths;
+    const Real zPPW = nz / zSizeInWavelengths;
+    const Real minPPW = std::min(std::min(xPPW,yPPW),zPPW);
+    const Real xPMLMagRule = 12.*maxDimension/minPPW;
+    const Real yPMLMagRule = 12.*maxDimension/minPPW;
+    const Real zPMLMagRule = 12.*maxDimension/minPPW;
     const int minPML = std::min(bx,std::min(by,bz));
     if( commRank == 0 )
     {
@@ -118,8 +114,8 @@ DistHelmholtz<R>::Initialize
     // Compression control parameters
     //
     const bool useQR = false; // use the QR-algorithm for the bidiagonal SVD
-    const R tolA = 1e-3; // relative singular value tolerance for diag blocks
-    const R tolB = 1e-3; // relative singular value tolerance for couplings
+    const Real tolA = 1e-3; // relative singular value tolerance for diag blocks
+    const Real tolB = 1e-3; // relative singular value tolerance for couplings
 
     //
     // Initialize and factor the top panel (first, since it is the largest)
@@ -133,7 +129,7 @@ DistHelmholtz<R>::Initialize
         const double gatherStartTime = startTime;
         const int vOffset = bottomDepth_ + innerDepth_ - bz;
         const int vSize = topOrigDepth_ + bz;
-        std::vector<R> myPanelVelocity;
+        std::vector<Real> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
@@ -266,7 +262,7 @@ DistHelmholtz<R>::Initialize
         const double gatherStartTime = startTime;
         const int vOffset = 0;
         const int vSize = bottomDepth_;
-        std::vector<R> myPanelVelocity;
+        std::vector<Real> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
@@ -332,7 +328,7 @@ DistHelmholtz<R>::Initialize
         const double gatherStartTime = startTime;
         const int vOffset = bottomDepth_ + k*numPlanesPerPanel_ - bz;
         const int vSize = numPlanesPerPanel_ + bz;
-        std::vector<R> myPanelVelocity;
+        std::vector<Real> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
@@ -404,7 +400,7 @@ DistHelmholtz<R>::Initialize
         const int vOffset = bottomDepth_ + innerDepth_ - 
                             leftoverInnerDepth_ - bz;
         const int vSize = leftoverInnerDepth_ + bz;
-        std::vector<R> myPanelVelocity;
+        std::vector<Real> myPanelVelocity;
         std::vector<int> offsets;
         std::map<int,int> panelNestedToNatural, panelNaturalToNested;
         GetPanelVelocity
@@ -470,7 +466,7 @@ DistHelmholtz<R>::Initialize
         const double startTime = mpi::Time();
 
         // Gather the velocity for the global sparse matrix
-        std::vector<R> myGlobalVelocity;
+        std::vector<Real> myGlobalVelocity;
         std::vector<int> offsets;
         GetGlobalVelocity( velocity, myGlobalVelocity, offsets );
 
@@ -485,7 +481,7 @@ DistHelmholtz<R>::Initialize
             const int z = naturalIndex/(nx*ny);
             const int proc = velocity.OwningProcess( x, y, z );
 
-            const R alpha = myGlobalVelocity[offsets[proc]++];
+            const Real alpha = myGlobalVelocity[offsets[proc]++];
             const int rowOffset = localRowOffsets_[iLocal];
             const int v = (nz-1) - z;
             FormGlobalRow( alpha, x, y, v, rowOffset );
@@ -497,9 +493,9 @@ DistHelmholtz<R>::Initialize
     }
 }
 
-template<typename R>
+template<typename Real>
 void
-DistHelmholtz<R>::Finalize()
+DistHelmholtz<Real>::Finalize()
 {
     // Release the global sparse matrix memory
     localEntries_.clear();
@@ -548,26 +544,26 @@ DistHelmholtz<R>::Finalize()
 // left-most 'p' grid point, where it is zero.
 //
 
-template<typename R>
-Complex<R>
-DistHelmholtz<R>::s1Inv( int x ) const
+template<typename Real>
+Complex<Real>
+DistHelmholtz<Real>::s1Inv( int x ) const
 {
     const int bx = disc_.bx;
-    const R etax = bx*hx_;
+    const Real etax = bx*hx_;
     if( x < (bx-1) && disc_.frontBC==PML )
     {
-        const R delta = (bx-1) - x;
-        const R realPart = 1;
-        const R imagPart = 
+        const Real delta = (bx-1) - x;
+        const Real realPart = 1;
+        const Real imagPart = 
             (disc_.sigmax/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else if( x > (disc_.nx-bx) && disc_.backBC==PML )
     {
-        const R delta = x-(disc_.nx-bx);
-        const R realPart = 1;
-        const R imagPart =
+        const Real delta = x-(disc_.nx-bx);
+        const Real realPart = 1;
+        const Real imagPart =
             (disc_.sigmax/etax)*(delta/bx)*(delta/bx)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
@@ -576,26 +572,26 @@ DistHelmholtz<R>::s1Inv( int x ) const
         return 1;
 }
 
-template<typename R>
-Complex<R>
-DistHelmholtz<R>::s2Inv( int y ) const
+template<typename Real>
+Complex<Real>
+DistHelmholtz<Real>::s2Inv( int y ) const
 {
     const int by = disc_.by;
-    const R etay = by*hy_;
+    const Real etay = by*hy_;
     if( y < (by-1) && disc_.leftBC==PML )
     {
-        const R delta = (by-1) - y;
-        const R realPart = 1;
-        const R imagPart = 
+        const Real delta = (by-1) - y;
+        const Real realPart = 1;
+        const Real imagPart = 
             (disc_.sigmay/etay)*(delta/by)*(delta/by)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else if( y > (disc_.ny-by) && disc_.rightBC==PML )
     {
-        const R delta = y-(disc_.ny-by);
-        const R realPart = 1;
-        const R imagPart =
+        const Real delta = y-(disc_.ny-by);
+        const Real realPart = 1;
+        const Real imagPart =
             (disc_.sigmay/etay)*(delta/by)*(delta/by)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
@@ -604,26 +600,26 @@ DistHelmholtz<R>::s2Inv( int y ) const
         return 1;
 }
 
-template<typename R>
-Complex<R>
-DistHelmholtz<R>::s3Inv( int v ) const
+template<typename Real>
+Complex<Real>
+DistHelmholtz<Real>::s3Inv( int v ) const
 {
     const int bz = disc_.bz;
-    const R etaz = bz*hz_;
+    const Real etaz = bz*hz_;
     if( v < bz-1 )
     {
-        const R delta = (bz-1) - v;
-        const R realPart = 1;
-        const R imagPart = 
+        const Real delta = (bz-1) - v;
+        const Real realPart = 1;
+        const Real imagPart = 
             (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else if( v > (disc_.nz-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (disc_.nz-bz);
-        const R realPart = 1;
-        const R imagPart = 
+        const Real delta = v - (disc_.nz-bz);
+        const Real realPart = 1;
+        const Real imagPart = 
             (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
@@ -632,26 +628,26 @@ DistHelmholtz<R>::s3Inv( int v ) const
         return 1;
 }
 
-template<typename R>
-Complex<R>
-DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
+template<typename Real>
+Complex<Real>
+DistHelmholtz<Real>::s3InvArtificial( int v, int vOffset ) const
 {
     const int bz = disc_.bz;
-    const R etaz = bz*hz_;
+    const Real etaz = bz*hz_;
     if( v < vOffset+bz-1 )
     {
-        const R delta = (vOffset+bz-1) - v;
-        const R realPart = 1;
-        const R imagPart = 
+        const Real delta = (vOffset+bz-1) - v;
+        const Real realPart = 1;
+        const Real imagPart = 
             (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
     }
     else if( v > (disc_.nz-bz) && disc_.topBC==PML )
     {
-        const R delta = v - (disc_.nz-bz);
-        const R realPart = 1;
-        const R imagPart = 
+        const Real delta = v - (disc_.nz-bz);
+        const Real realPart = 1;
+        const Real imagPart = 
             (disc_.sigmaz/etaz)*(delta/bz)*(delta/bz)*
             (2*M_PI/disc_.omega);
         return C(realPart,imagPart);
@@ -660,10 +656,10 @@ DistHelmholtz<R>::s3InvArtificial( int v, int vOffset ) const
         return 1;
 }
 
-template<typename R>
+template<typename Real>
 void
-DistHelmholtz<R>::FormGlobalRow
-( R alpha, int x, int y, int v, int row )
+DistHelmholtz<Real>::FormGlobalRow
+( Real alpha, int x, int y, int v, int row )
 {
     // Evaluate all of the inverse s functions
     const C s1InvL = s1Inv( x-1 );
@@ -723,13 +719,13 @@ DistHelmholtz<R>::FormGlobalRow
         localEntries_[offset++] = -vTermR;
 }
 
-template<typename R>
+template<typename Real>
 void
-DistHelmholtz<R>::FormLowerColumnOfNode
-( R alpha, int x, int y, int v, int vOffset, int vSize, 
+DistHelmholtz<Real>::FormLowerColumnOfNode
+( Real alpha, int x, int y, int v, int vOffset, int vSize, 
   int offset, int size, int j,
   const std::vector<int>& origLowerStruct, 
-  const std::vector<int>& origLowerRelIndices,
+  const std::vector<int>& origLowerRelInds,
         std::map<int,int>& panelNaturalToNested, 
         std::vector<int>& frontIndices, 
         std::vector<C>& values ) const
@@ -800,12 +796,12 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
-                frontIndices.push_back( origLowerRelIndices[whichLower] );
+                frontIndices.push_back( origLowerRelInds[whichLower] );
             }
             values.push_back( -xTermL );
         }
@@ -826,12 +822,12 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
-                frontIndices.push_back( origLowerRelIndices[whichLower] );
+                frontIndices.push_back( origLowerRelInds[whichLower] );
             }
             values.push_back( -xTermR );
         }
@@ -852,12 +848,12 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
-                frontIndices.push_back( origLowerRelIndices[whichLower] );
+                frontIndices.push_back( origLowerRelInds[whichLower] );
             }
             values.push_back( -yTermL );
         }
@@ -878,12 +874,12 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
-                frontIndices.push_back( origLowerRelIndices[whichLower] );
+                frontIndices.push_back( origLowerRelInds[whichLower] );
             }
             values.push_back( -yTermR );
         }
@@ -904,12 +900,12 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
-                frontIndices.push_back( origLowerRelIndices[whichLower] );
+                frontIndices.push_back( origLowerRelInds[whichLower] );
             }
             values.push_back( -vTermL );
         }
@@ -930,23 +926,23 @@ DistHelmholtz<R>::FormLowerColumnOfNode
                 first = std::lower_bound
                     ( origLowerStruct.begin(), origLowerStruct.end(), 
                       nestedIndex ); 
-#ifndef RELEASE
-                if( first == origLowerStruct.end() )
-                    throw std::logic_error("Did not find original connection");
-#endif
+                DEBUG_ONLY(
+                    if( first == origLowerStruct.end() )
+                        LogicError("Did not find original connection");
+                )
                 const int whichLower = int(first-origLowerStruct.begin());
-                frontIndices.push_back( origLowerRelIndices[whichLower] );
+                frontIndices.push_back( origLowerRelInds[whichLower] );
             }
             values.push_back( -vTermR );
         }
     }
 }
         
-template<typename R>
+template<typename Real>
 void
-DistHelmholtz<R>::GetGlobalVelocity
-( const DistUniformGrid<R>& velocity,
-        std::vector<R>& myGlobalVelocity,
+DistHelmholtz<Real>::GetGlobalVelocity
+( const DistUniformGrid<Real>& velocity,
+        std::vector<Real>& myGlobalVelocity,
         std::vector<int>& offsets ) const
 {
     const int commSize = mpi::CommSize( comm_ );
@@ -992,11 +988,11 @@ DistHelmholtz<R>::GetGlobalVelocity
     recvIndices.clear();
 
     // Pack and send our velocity data.
-    std::vector<R> sendVelocity( totalSendCount );
-    const R* localVelocity = velocity.LockedBuffer();
+    std::vector<Real> sendVelocity( totalSendCount );
+    const Real* localVelocity = velocity.LockedBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
-        R* procVelocity = &sendVelocity[sendDispls[proc]];
+        Real* procVelocity = &sendVelocity[sendDispls[proc]];
         const int* procIndices = &sendIndices[sendDispls[proc]];
         for( int iLocal=0; iLocal<sendCounts[proc]; ++iLocal )
         {
@@ -1016,13 +1012,13 @@ DistHelmholtz<R>::GetGlobalVelocity
     offsets = recvDispls;
 }
 
-template<typename R>
+template<typename Real>
 void
-DistHelmholtz<R>::GetPanelVelocity
+DistHelmholtz<Real>::GetPanelVelocity
 ( int vOffset, int vSize, 
   const cliq::DistSymmInfo& info,
-  const DistUniformGrid<R>& velocity,
-        std::vector<R>& myPanelVelocity,
+  const DistUniformGrid<Real>& velocity,
+        std::vector<Real>& myPanelVelocity,
         std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
@@ -1052,7 +1048,7 @@ DistHelmholtz<R>::GetPanelVelocity
     {
         const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
-        const int offset = node.offset;
+        const int offset = node.off;
         for( int j=0; j<size; ++j )
         {
             const int naturalIndex = panelNestedToNatural[offset+j];
@@ -1073,7 +1069,7 @@ DistHelmholtz<R>::GetPanelVelocity
         const int gridWidth = grid.Width();
 
         const int size = node.size;
-        const int offset = node.offset;
+        const int offset = node.off;
         const int localWidth = Length( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
@@ -1111,7 +1107,7 @@ DistHelmholtz<R>::GetPanelVelocity
     {
         const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
-        const int offset = node.offset;
+        const int offset = node.off;
         for( int j=0; j<size; ++j )
         {
             const int naturalIndex = panelNestedToNatural[offset+j];
@@ -1131,7 +1127,7 @@ DistHelmholtz<R>::GetPanelVelocity
         const int gridWidth = grid.Width();
 
         const int size = node.size;
-        const int offset = node.offset;
+        const int offset = node.off;
         const int localWidth = Length( size, gridCol, gridWidth );
         for( int jLocal=0; jLocal<localWidth; ++jLocal )
         {
@@ -1152,11 +1148,11 @@ DistHelmholtz<R>::GetPanelVelocity
     recvIndices.clear();
 
     // Pack and send our velocity data.
-    std::vector<R> sendVelocity( totalSendCount );
-    const R* localVelocity = velocity.LockedBuffer();
+    std::vector<Real> sendVelocity( totalSendCount );
+    const Real* localVelocity = velocity.LockedBuffer();
     for( int proc=0; proc<commSize; ++proc )
     {
-        R* procVelocity = &sendVelocity[sendDispls[proc]];
+        Real* procVelocity = &sendVelocity[sendDispls[proc]];
         const int* procIndices = &sendIndices[sendDispls[proc]];
         for( int iLocal=0; iLocal<sendCounts[proc]; ++iLocal )
         {
@@ -1180,8 +1176,8 @@ DistHelmholtz<R>::GetPanelVelocity
     offsets = recvDispls;
 }
 
-template<typename R>
-int DistHelmholtz<R>::LocalReorderedIndex( int x, int y, int v ) const
+template<typename Real>
+int DistHelmholtz<Real>::LocalReorderedIndex( int x, int y, int v ) const
 {
     const int panel = WhichPanel( v );
 
@@ -1195,8 +1191,8 @@ int DistHelmholtz<R>::LocalReorderedIndex( int x, int y, int v ) const
     return localPanelOffset + localPanelIndex;
 }
 
-template<typename R>
-int DistHelmholtz<R>::LocalReorderedIndex
+template<typename Real>
+int DistHelmholtz<Real>::LocalReorderedIndex
 ( int x, int y, int vLocal, int vSize ) const
 {
     const int commRank = mpi::CommRank( comm_ );
@@ -1207,8 +1203,8 @@ int DistHelmholtz<R>::LocalReorderedIndex
       commRank, commSize );
 }
 
-template<typename R>
-int DistHelmholtz<R>::LocalReorderedIndexRecursion
+template<typename Real>
+int DistHelmholtz<Real>::LocalReorderedIndexRecursion
 ( int x, int y, int vLocal, int xSize, int ySize, int vSize, 
   int cutoff, int offset, int commRank, int commSize )
 {
@@ -1294,8 +1290,8 @@ int DistHelmholtz<R>::LocalReorderedIndexRecursion
     }
 }
 
-template<typename R>
-void DistHelmholtz<R>::LocalReordering
+template<typename Real>
+void DistHelmholtz<Real>::LocalReordering
 ( std::map<int,int>& reordering, int vSize ) const
 {
     const int commRank = mpi::CommRank( comm_ );
@@ -1307,8 +1303,8 @@ void DistHelmholtz<R>::LocalReordering
       nestedCutoff_, commRank, commSize );
 }
 
-template<typename R>
-void DistHelmholtz<R>::LocalReorderingRecursion
+template<typename Real>
+void DistHelmholtz<Real>::LocalReorderingRecursion
 ( std::map<int,int>& reordering, int offset,
   int xOffset, int yOffset, int xSize, int ySize, int vSize, int nx, int ny,
   int cutoff, int commRank, int commSize )
@@ -1418,14 +1414,14 @@ void DistHelmholtz<R>::LocalReorderingRecursion
     }
 }
 
-template<typename R>        
+template<typename Real>        
 void
-DistHelmholtz<R>::FillPanelFronts
+DistHelmholtz<Real>::FillPanelFronts
 ( int vOffset, int vSize, 
   const cliq::DistSymmInfo& info,
         cliq::DistSymmFrontTree<C>& fact,
-  const DistUniformGrid<R>& velocity,
-  const std::vector<R>& myPanelVelocity,
+  const DistUniformGrid<Real>& velocity,
+  const std::vector<Real>& myPanelVelocity,
         std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
@@ -1446,7 +1442,7 @@ DistHelmholtz<R>::FillPanelFronts
         const cliq::SymmNodeInfo& node = info.localNodes[t];
 
         // Initialize this front
-        const int offset = node.offset;
+        const int offset = node.off;
         const int size = node.size;
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
@@ -1461,12 +1457,12 @@ DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = velocity.OwningProcess( x, y, z );
-            const R alpha = myPanelVelocity[offsets[proc]++];
+            const Real alpha = myPanelVelocity[offsets[proc]++];
 
             // Form the j'th lower column of this node
             FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              node.origLowerStruct, node.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelInds, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1490,7 +1486,7 @@ DistHelmholtz<R>::FillPanelFronts
         const int gridWidth = grid.Width();
         const int gridRow = grid.Row();
         const int gridCol = grid.Col();
-        const int offset = node.offset;
+        const int offset = node.off;
         const int size = node.size;
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
@@ -1509,12 +1505,12 @@ DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = velocity.OwningProcess( x, y, z );
-            const R alpha = myPanelVelocity[offsets[proc]++];
+            const Real alpha = myPanelVelocity[offsets[proc]++];
 
             // Form the j'th lower column of this node
             FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              node.origLowerStruct, node.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelInds, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1530,14 +1526,14 @@ DistHelmholtz<R>::FillPanelFronts
     }
 }
 
-template<typename R>        
+template<typename Real>        
 void
-DistHelmholtz<R>::FillPanelFronts
+DistHelmholtz<Real>::FillPanelFronts
 ( int vOffset, int vSize, 
   const cliq::DistSymmInfo& info,
         DistCompressedFrontTree<C>& fact,
-  const DistUniformGrid<R>& velocity,
-  const std::vector<R>& myPanelVelocity,
+  const DistUniformGrid<Real>& velocity,
+  const std::vector<Real>& myPanelVelocity,
         std::vector<int>& offsets,
         std::map<int,int>& panelNestedToNatural,
         std::map<int,int>& panelNaturalToNested ) const
@@ -1558,7 +1554,7 @@ DistHelmholtz<R>::FillPanelFronts
         const cliq::SymmNodeInfo& node = info.localNodes[t];
 
         // Initialize this front
-        const int offset = node.offset;
+        const int offset = node.off;
         const int size = node.size;
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
@@ -1573,12 +1569,12 @@ DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = velocity.OwningProcess( x, y, z );
-            const R alpha = myPanelVelocity[offsets[proc]++];
+            const Real alpha = myPanelVelocity[offsets[proc]++];
 
             // Form the j'th lower column of this node
             FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              node.origLowerStruct, node.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelInds, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )
@@ -1612,7 +1608,7 @@ DistHelmholtz<R>::FillPanelFronts
         const int gridWidth = grid.Width();
         const int gridRow = grid.Row();
         const int gridCol = grid.Col();
-        const int offset = node.offset;
+        const int offset = node.off;
         const int size = node.size;
         const int updateSize = node.lowerStruct.size();
         const int frontSize = size + updateSize;
@@ -1631,12 +1627,12 @@ DistHelmholtz<R>::FillPanelFronts
             const int v = vOffset + vPanel;
             const int z = (nz-1) - v;
             const int proc = velocity.OwningProcess( x, y, z );
-            const R alpha = myPanelVelocity[offsets[proc]++];
+            const Real alpha = myPanelVelocity[offsets[proc]++];
 
             // Form the j'th lower column of this node
             FormLowerColumnOfNode
             ( alpha, x, y, v, vOffset, vSize, offset, size, j,
-              node.origLowerStruct, node.origLowerRelIndices, 
+              node.origLowerStruct, node.origLowerRelInds, 
               panelNaturalToNested, frontIndices, values );
             const int numMatches = frontIndices.size();
             for( int k=0; k<numMatches; ++k )

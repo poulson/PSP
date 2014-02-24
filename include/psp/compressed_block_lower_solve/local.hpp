@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_LOCAL_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
-#define PSP_LOCAL_COMPRESSED_BLOCK_LOWER_SOLVE_HPP 1
+#define PSP_LOCAL_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
 
 namespace psp {
 
@@ -19,10 +20,9 @@ void LocalCompressedBlockLowerForwardSolve
 
 template<typename F> 
 void LocalCompressedBlockLowerBackwardSolve
-( Orientation orientation, 
-  const cliq::DistSymmInfo& info, 
+( const cliq::DistSymmInfo& info, 
   const DistCompressedFrontTree<F>& L,
-        Matrix<F>& X );
+        Matrix<F>& X, bool conjugate=false );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -34,9 +34,7 @@ inline void LocalCompressedBlockLowerForwardSolve
   const DistCompressedFrontTree<F>& L,
         Matrix<F>& X )
 {
-#ifndef RELEASE
-    CallStackEntry entry("LocalCompressedBlockLowerForwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("LocalCompressedBlockLowerForwardSolve"))
     const int numLocalNodes = info.localNodes.size();
     const int width = X.Width();
     for( int s=0; s<numLocalNodes; ++s )
@@ -50,15 +48,13 @@ inline void LocalCompressedBlockLowerForwardSolve
         Matrix<F>& W = front.work;
 
         // Set up a workspace
-        W.ResizeTo( frontHeight, width );
+        W.Resize( frontHeight, width );
         Matrix<F> WT, WB;
-        elem::PartitionDown
-        ( W, WT,
-             WB, node.size );
+        elem::PartitionDown( W, WT, WB, node.size );
 
         // Pull in the relevant information from the RHS
         Matrix<F> XT;
-        View( XT, X, node.myOffset, 0, node.size, width );
+        View( XT, X, node.myOff, 0, node.size, width );
         WT = XT;
         elem::MakeZeros( WB );
 
@@ -81,7 +77,7 @@ inline void LocalCompressedBlockLowerForwardSolve
             ( leftUpdate, leftWork, leftNodeSize, 0, leftUpdateSize, width );
             for( int iChild=0; iChild<leftUpdateSize; ++iChild )
             {
-                const int iFront = node.leftChildRelIndices[iChild]; 
+                const int iFront = node.leftRelInds[iChild]; 
                 for( int j=0; j<width; ++j )
                     W.Update( iFront, j, leftUpdate.Get(iChild,j) );
             }
@@ -94,7 +90,7 @@ inline void LocalCompressedBlockLowerForwardSolve
               rightWork, rightNodeSize, 0, rightUpdateSize, width );
             for( int iChild=0; iChild<rightUpdateSize; ++iChild )
             {
-                const int iFront = node.rightChildRelIndices[iChild];
+                const int iFront = node.rightRelInds[iChild];
                 for( int j=0; j<width; ++j )
                     W.Update( iFront, j, rightUpdate.Get(iChild,j) );
             }
@@ -112,14 +108,11 @@ inline void LocalCompressedBlockLowerForwardSolve
 
 template<typename F> 
 inline void LocalCompressedBlockLowerBackwardSolve
-( Orientation orientation, 
-  const cliq::DistSymmInfo& info, 
+( const cliq::DistSymmInfo& info, 
   const DistCompressedFrontTree<F>& L,
-        Matrix<F>& X )
+        Matrix<F>& X, bool conjugate )
 {
-#ifndef RELEASE
-    CallStackEntry entry("LocalCompressedBlockLowerBackwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("LocalCompressedBlockLowerBackwardSolve"))
     const int numLocalNodes = info.localNodes.size();
     const int width = X.Width();
 
@@ -134,15 +127,13 @@ inline void LocalCompressedBlockLowerBackwardSolve
         Matrix<F>& W = front.work;
 
         // Set up a workspace
-        W.ResizeTo( frontHeight, width );
+        W.Resize( frontHeight, width );
         Matrix<F> WT, WB;
-        elem::PartitionDown
-        ( W, WT,
-             WB, node.size );
+        elem::PartitionDown( W, WT, WB, node.size );
 
         // Pull in the relevant information from the RHS
         Matrix<F> XT;
-        View( XT, X, node.myOffset, 0, node.size, width );
+        View( XT, X, node.myOff, 0, node.size, width );
         WT = XT;
 
         // Update using the parent
@@ -151,9 +142,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
         const cliq::SymmNodeInfo& parentNode = info.localNodes[parent];
         const int currentUpdateSize = WB.Height();
         const std::vector<int>& parentRelIndices = 
-          ( node.isLeftChild ? 
-            parentNode.leftChildRelIndices :
-            parentNode.rightChildRelIndices );
+          ( node.onLeft ? parentNode.leftRelInds : parentNode.rightRelInds );
         for( int iCurrent=0; iCurrent<currentUpdateSize; ++iCurrent )
         {
             const int iParent = parentRelIndices[iCurrent];
@@ -163,7 +152,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
 
         // The left child is numbered lower than the right child, so 
         // we can safely free the parent's work if we are the left child
-        if( node.isLeftChild )
+        if( node.onLeft )
         {
             parentWork.Empty();
             if( parent == numLocalNodes-1 )
@@ -171,7 +160,7 @@ inline void LocalCompressedBlockLowerBackwardSolve
         }
 
         // Solve against this front
-        FrontCompressedBlockLowerBackwardSolve( orientation, front, W );
+        FrontCompressedBlockLowerBackwardSolve( front, W, conjugate );
 
         // Store the node portion of the result
         XT = WT;
@@ -185,4 +174,4 @@ inline void LocalCompressedBlockLowerBackwardSolve
 
 } // namespace psp
 
-#endif // PSP_LOCAL_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
+#endif // ifndef PSP_LOCAL_COMPRESSED_BLOCK_LOWER_SOLVE_HPP

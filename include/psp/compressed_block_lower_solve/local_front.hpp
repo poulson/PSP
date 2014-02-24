@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_LOCAL_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
-#define PSP_LOCAL_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP 1
+#define PSP_LOCAL_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
 
 namespace psp {
 
@@ -16,9 +17,7 @@ inline void
 FrontCompressedBlockLowerForwardSolve
 ( const CompressedFront<F>& front, Matrix<F>& X )
 {
-#ifndef RELEASE
-    CallStackEntry entry("FrontCompressedBlockLowerForwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("FrontCompressedBlockLowerForwardSolve"))
     const int numKeptModesA = front.AGreens.size();
     const int numKeptModesB = front.BGreens.size();
 
@@ -27,11 +26,8 @@ FrontCompressedBlockLowerForwardSolve
     const int snSize = sT*depth;
     const int numRhs = X.Width();
 
-    Matrix<F> XT,
-              XB;
-    elem::PartitionDown
-    ( X, XT,
-         XB, snSize );
+    Matrix<F> XT, XB;
+    elem::PartitionDown( X, XT, XB, snSize );
 
     // XT := inv(ATL) XT
     //     = \sum_t (CA_t o GA_t) XT
@@ -114,11 +110,9 @@ FrontCompressedBlockLowerForwardSolve
 template<typename F>
 inline void
 FrontCompressedBlockLowerBackwardSolve
-( Orientation orientation, const CompressedFront<F>& front, Matrix<F>& X )
+( const CompressedFront<F>& front, Matrix<F>& X, bool conjugate=false )
 {
-#ifndef RELEASE
-    CallStackEntry entry("FrontCompressedBlockLowerBackwardSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("FrontCompressedBlockLowerBackwardSolve"))
     const int numKeptModesA = front.AGreens.size();
 
     const bool isLeaf = front.isLeaf;
@@ -133,13 +127,10 @@ FrontCompressedBlockLowerBackwardSolve
     const int depth = front.depth;
     const int snSize = sT*depth;
     const int numRhs = X.Width();
-    const bool conjugate = ( orientation==ADJOINT ? true : false );
+    const Orientation orientation = ( conjugate ? ADJOINT : TRANSPOSE );
 
-    Matrix<F> XT,
-              XB;
-    elem::PartitionDown
-    ( X, XT,
-         XB, snSize );
+    Matrix<F> XT, XB;
+    elem::PartitionDown( X, XT, XB, snSize );
 
     // YT := LB^[T/H] XB
     Matrix<F> YT, ZT, YTBlock, ZTBlock;
@@ -219,4 +210,4 @@ FrontCompressedBlockLowerBackwardSolve
 
 } // namespace psp
 
-#endif // PSP_LOCAL_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP
+#endif // ifndef PSP_LOCAL_FRONT_COMPRESSED_BLOCK_LOWER_SOLVE_HPP

@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_COMPRESSED_FRONT_TREE_HPP
-#define PSP_DIST_COMPRESSED_FRONT_TREE_HPP 1
+#define PSP_DIST_COMPRESSED_FRONT_TREE_HPP
 
 namespace psp {
 
@@ -80,9 +81,7 @@ DistCompressedFrontTree<F>::MemoryInfo
 ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
   double& numGlobalEntries ) const
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistCompressedFrontTree::MemoryInfo");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistCompressedFrontTree::MemoryInfo"))
     numLocalEntries = numGlobalEntries = 0;
     const int numLocalFronts = localFronts.size();
     const int numDistFronts = distFronts.size();
@@ -143,9 +142,9 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
 ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
   double& numGlobalEntries ) const
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistCompressedFrontTree::TopLeftMemoryInfo");
-#endif
+    DEBUG_ONLY(
+        CallStackEntry entry("DistCompressedFrontTree::TopLeftMemoryInfo")
+    )
     numLocalEntries = numGlobalEntries = 0;
     const int numLocalFronts = localFronts.size();
     const int numDistFronts = distFronts.size();
@@ -155,8 +154,7 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
     for( int s=0; s<numLocalFronts; ++s )
     {
         const CompressedFront<F>& front = localFronts[s];
-        Matrix<F> FTL,
-                  FBL;
+        Matrix<F> FTL, FBL;
         elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
@@ -172,8 +170,7 @@ DistCompressedFrontTree<F>::TopLeftMemoryInfo
     for( int s=1; s<numDistFronts; ++s )
     {
         const DistCompressedFront<F>& front = distFronts[s];
-        DistMatrix<F> FTL(grid),
-                      FBL(grid);
+        DistMatrix<F> FTL(grid), FBL(grid);
         elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
@@ -198,9 +195,9 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
 ( double& numLocalEntries, double& minLocalEntries, double& maxLocalEntries,
   double& numGlobalEntries ) const
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistCompressedFrontTree::BottomLeftMemoryInfo");
-#endif
+    DEBUG_ONLY(
+        CallStackEntry entry("DistCompressedFrontTree::BottomLeftMemoryInfo")
+    )
     numLocalEntries = numGlobalEntries = 0;
     const int numLocalFronts = localFronts.size();
     const int numDistFronts = distFronts.size();
@@ -211,8 +208,7 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
     {
         const CompressedFront<F>& front = localFronts[s];
 
-        Matrix<F> FTL,
-                  FBL;
+        Matrix<F> FTL, FBL;
         elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
@@ -232,8 +228,7 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
     {
         const DistCompressedFront<F>& front = distFronts[s];
 
-        DistMatrix<F> FTL(grid),
-                      FBL(grid);
+        DistMatrix<F> FTL(grid), FBL(grid);
         elem::LockedPartitionDown
         ( front.frontL, FTL,
                         FBL, front.frontL.Width() );
@@ -254,4 +249,4 @@ DistCompressedFrontTree<F>::BottomLeftMemoryInfo
 
 } // namespace psp
 
-#endif // PSP_DIST_COMPRESSED_FRONT_TREE_HPP
+#endif // ifndef PSP_DIST_COMPRESSED_FRONT_TREE_HPP

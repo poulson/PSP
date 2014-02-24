@@ -35,7 +35,7 @@ DistSpectralHelmholtz<R>::DistSpectralHelmholtz
     bottomDepth_ = bz+numPlanesPerPanel_;
     topOrigDepth_ = (topHasPML ? bz+numPlanesPerPanel_ : numPlanesPerPanel_ );
     if( nz <= bottomDepth_+topOrigDepth_ )
-        throw std::logic_error
+        LogicError
         ("The domain is very shallow. Please run a sparse-direct factorization "
          "instead.");
 
@@ -44,11 +44,11 @@ DistSpectralHelmholtz<R>::DistSpectralHelmholtz
     if( (nx-1) % polyOrder != 0 || 
         (ny-1) % polyOrder != 0 ||
         (nz-1) % polyOrder != 0 )
-        throw std::logic_error("Number of grid points is invalid");
+        LogicError("Number of grid points is invalid");
     if( disc.bx % polyOrder != 0 ||
         disc.by % polyOrder != 0 ||
         disc.bz % polyOrder != 0 )
-        throw std::logic_error("One or more invalid PML size");
+        LogicError("One or more invalid PML size");
 
     // Compute the depths of each interior panel class and the number of 
     // full inner panels.
@@ -368,10 +368,10 @@ DistSpectralHelmholtz<R>::DistSpectralHelmholtz
                         break;
                     }
                 }
-#ifndef RELEASE
-                if( localIndex == -1 )
-                    throw std::logic_error("Did not find subdiag connection");
-#endif
+                DEBUG_ONLY(
+                    if( localIndex == -1 )
+                        LogicError("Did not find subdiag connection");
+                )
 
                 const int proc = OwningProcess( x, y, v-(s+1), commSize );
                 const int index = (panel-1)*commSize + proc;
@@ -403,10 +403,10 @@ DistSpectralHelmholtz<R>::DistSpectralHelmholtz
                         break;
                     }
                 }
-#ifndef RELEASE
-                if( localIndex == -1 )
-                    throw std::logic_error("Did not find supdiag connection");
-#endif
+                DEBUG_ONLY(
+                    if( localIndex == -1 )
+                        LogicError("Did not find supdiag connection");
+                )
 
                 const int proc = OwningProcess( x, y, v+(s+1), commSize );
                 const int index = panel*commSize + proc;
@@ -507,8 +507,8 @@ DistSpectralHelmholtz<R>::LocalPanelSizeRecursion
 
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localSize += Length<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        localSize += Length( ySize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int xLeftSizeProp = (xSize-1) / 2;
@@ -561,8 +561,8 @@ DistSpectralHelmholtz<R>::LocalPanelSizeRecursion
 
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        localSize += Length<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        localSize += Length( xSize*vSize, colShift, teamSize );
 
         // Add the left and/or right sides
         const int yLeftSizeProp = (ySize-1) / 2;
@@ -1027,8 +1027,8 @@ DistSpectralHelmholtz<R>::MapLocalPanelIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1119,8 +1119,8 @@ DistSpectralHelmholtz<R>::MapLocalPanelIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1301,8 +1301,8 @@ DistSpectralHelmholtz<R>::MapLocalConnectionIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (ySize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( ySize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( ySize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;
@@ -1414,8 +1414,8 @@ DistSpectralHelmholtz<R>::MapLocalConnectionIndicesRecursion
         
         // Add our local portion of the partition
         const int alignment = (xSize*vPadding) % teamSize;
-        const int colShift = Shift<int>( teamRank, alignment, teamSize );
-        const int localSize = Length<int>( xSize*vSize, colShift, teamSize );
+        const int colShift = Shift( teamRank, alignment, teamSize );
+        const int localSize = Length( xSize*vSize, colShift, teamSize );
         for( int iLocal=0; iLocal<localSize; ++iLocal )
         {
             const int i = colShift + iLocal*teamSize;

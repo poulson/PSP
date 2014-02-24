@@ -15,7 +15,7 @@ DistSpectralHelmholtz<R>::Solve
 ( DistUniformGrid<C>& gridB, int m, R relTol, bool viewIterates ) const
 {
     if( !mpi::CongruentComms( comm_, gridB.Comm() ) )
-        throw std::logic_error("B does not have a congruent comm");
+        LogicError("B does not have a congruent comm");
     const int commRank = mpi::CommRank( comm_ );
 
     // Convert B into custom nested-dissection based ordering
@@ -278,7 +278,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
     Norms( wList, origResidNormList, comm_ );
     const bool origResidHasNaN = CheckForNaN( origResidNormList );
     if( origResidHasNaN )
-        throw std::runtime_error("Original residual norms had a NaN");
+        RuntimeError("Original residual norms had a NaN");
 
     int it=0;
     bool converged=false;
@@ -293,9 +293,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
         // w := inv(M) w
         // beta := ||w||_2
         {
-#ifndef RELEASE
-            mpi::Barrier( comm_ );
-#endif
+            DEBUG_ONLY(mpi::Barrier( comm_ ))
             if( commRank == 0 )
             {
                 std::cout << "  startup preconditioner application...";
@@ -303,9 +301,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
             }
             const double startTime = mpi::Time();
             Precondition( wList );
-#ifndef RELEASE
-            mpi::Barrier( comm_ );
-#endif
+            DEBUG_ONLY(mpi::Barrier( comm_ ))
             const double stopTime = mpi::Time();
             if( commRank == 0 )
                 std::cout << stopTime-startTime << " secs" << std::endl;
@@ -313,7 +309,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
         Norms( wList, betaList, comm_ );
         const bool betaListHasNaN = CheckForNaN( betaList );
         if( betaListHasNaN )
-            throw std::runtime_error("beta list had a NaN");
+            RuntimeError("beta list had a NaN");
 
         // v0 := w / beta
         Matrix<C> v0List;
@@ -333,9 +329,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
             LockedView( vjList, VInter, 0, j*numRhs, localSize, numRhs );
             wList = vjList;
             {
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 if( commRank == 0 )
                 {
                     std::cout << "    multiplying...";
@@ -343,19 +337,17 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 }
                 const double startTime = mpi::Time();
                 Multiply( wList );
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
-#ifndef RELEASE
-            Norms( wList, deltaList, comm_ );
-            const bool multiplyHasNaN = CheckForNaN( deltaList );
-            if( multiplyHasNaN )
-                throw std::runtime_error("multiply had a NaN");
-#endif
+            DEBUG_ONLY(
+                Norms( wList, deltaList, comm_ );
+                const bool multiplyHasNaN = CheckForNaN( deltaList );
+                if( multiplyHasNaN )
+                    RuntimeError("multiply had a NaN");
+            )
 
             // w := inv(M) w
             {
@@ -366,19 +358,17 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 }
                 const double startTime = mpi::Time();
                 Precondition( wList );
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
             }
-#ifndef RELEASE
-            Norms( wList, deltaList, comm_ );
-            const bool preconditionHasNaN = CheckForNaN( deltaList );
-            if( preconditionHasNaN )
-                throw std::runtime_error("precondition had a NaN");
-#endif
+            DEBUG_ONLY(
+                Norms( wList, deltaList, comm_ );
+                const bool preconditionHasNaN = CheckForNaN( deltaList );
+                if( preconditionHasNaN )
+                    RuntimeError("precondition had a NaN");
+            )
 
             // Run the j'th step of Arnoldi
             {
@@ -404,7 +394,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 Norms( wList, deltaList, comm_ );
                 const bool deltaListHasNaN = CheckForNaN( deltaList );
                 if( deltaListHasNaN )
-                    throw std::runtime_error("delta list had a NaN");
+                    RuntimeError("delta list had a NaN");
                 // TODO: Handle "lucky breakdown" much more carefully
                 const bool zeroDelta = CheckForZero( deltaList );
                 if( zeroDelta )
@@ -424,9 +414,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                     vjp1List = wList;
                     DivideColumns( vjp1List, deltaList );
                 }
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
@@ -455,9 +443,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                         H.Set( i+1, j, -sConj*eta_i_j + c*eta_ip1_j );
                     }
                 }
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
@@ -481,19 +467,19 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                     const C eta_j_j = H.Get(j,j);
                     const C eta_jp1_j = deltaList[k];
                     if( CheckForNaN(eta_j_j) )
-                        throw std::runtime_error("H(j,j) was NaN");
+                        RuntimeError("H(j,j) was NaN");
                     if( CheckForNaN(eta_jp1_j) )
-                        throw std::runtime_error("H(j+1,j) was NaN");
+                        RuntimeError("H(j+1,j) was NaN");
                     R c;
                     C s, rho;
                     lapack::ComputeGivens
                     ( eta_j_j, eta_jp1_j, &c, &s, &rho );
                     if( CheckForNaN(c) )
-                        throw std::runtime_error("c in Givens was NaN");
+                        RuntimeError("c in Givens was NaN");
                     if( CheckForNaN(s) )
-                        throw std::runtime_error("s in Givens was NaN");
+                        RuntimeError("s in Givens was NaN");
                     if( CheckForNaN(rho) )
-                        throw std::runtime_error("rho in Givens was NaN");
+                        RuntimeError("rho in Givens was NaN");
                     H.Set(j,j,rho);
                     csList.Set(j,k,c);
                     snList.Set(j,k,s);
@@ -523,9 +509,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                         elem::Axpy( eta_i, vi, x );
                     }
                 }
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
@@ -535,9 +519,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
             wList = xList; 
             elem::Scal( C(-1), wList );
             {
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 if( commRank == 0 )
                 {
                     std::cout << "    residual multiply...";
@@ -545,9 +527,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
                 }
                 const double startTime = mpi::Time();
                 Multiply( wList );
-#ifndef RELEASE
-                mpi::Barrier( comm_ );
-#endif
+                DEBUG_ONLY(mpi::Barrier( comm_ ))
                 const double stopTime = mpi::Time();
                 if( commRank == 0 )
                     std::cout << stopTime-startTime << " secs" << std::endl;
@@ -558,7 +538,7 @@ DistSpectralHelmholtz<R>::InternalSolveWithGMRES
             Norms( wList, residNormList, comm_ );
             const bool residNormListHasNaN = CheckForNaN( residNormList );
             if( residNormListHasNaN )
-                throw std::runtime_error("resid norm list has NaN");
+                RuntimeError("resid norm list has NaN");
             for( int k=0; k<numRhs; ++k )
                 relResidNormList[k] = residNormList[k]/origResidNormList[k];
             R maxRelResidNorm = 0;
@@ -745,10 +725,10 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int size = node.size;
         const int myOffset = node.myOffset;
 
-#ifndef RELEASE
-        if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Local node size problem");
-#endif
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Local node size problem");
+        )
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int remainingSize = xySize*panelDepth;
@@ -772,10 +752,10 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
-#ifndef RELEASE
-        if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Dist node size problem");
-#endif
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Dist node size problem");
+        )
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
@@ -788,10 +768,10 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
               localRemainingSize );
         BOffset += localRemainingSize;
     }
-#ifndef RELEASE
-    if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
-        throw std::logic_error("Invalid BOffset usage in pull");
-#endif
+    DEBUG_ONLY(
+        if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
+            LogicError("Invalid BOffset usage in pull");
+    )
 
     // Solve against the panel
     if( panelScheme_ == COMPRESSED_BLOCK_LDL_2D )
@@ -808,10 +788,10 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int size = node.size;
         const int myOffset = node.myOffset;
 
-#ifndef RELEASE
-        if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Local node size problem");
-#endif
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Local node size problem");
+        )
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int remainingSize = size - paddingSize;
@@ -834,10 +814,10 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
-#ifndef RELEASE
-        if( size % (panelPadding+panelDepth) != 0 )
-            throw std::logic_error("Dist node size problem");
-#endif
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Dist node size problem");
+        )
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
@@ -850,10 +830,10 @@ DistSpectralHelmholtz<R>::SolvePanel( Matrix<C>& B, int i ) const
               localRemainingSize );
         BOffset += localRemainingSize;
     }
-#ifndef RELEASE
-    if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
-        throw std::logic_error("Invalid BOffset usage in push");
-#endif
+    DEBUG_ONLY(
+        if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
+            LogicError("Invalid BOffset usage in push");
+    )
 }
 
 // B_{i+1} := B_{i+1} - A_{i+1,i} B_i
@@ -965,7 +945,7 @@ DistSpectralHelmholtz<R>::MultiplySuperdiagonal( Matrix<C>& B, int i ) const
             std::cout << "s=" << s << "\n"
                       << "offset i+1=" << LocalPanelOffset(i+1) << ", \n"
                       << "iLocal=" << iLocal << std::endl;
-            throw std::logic_error("Send index was too small");
+            LogicError("Send index was too small");
         }
         if( iLocal >= LocalPanelOffset(i+1)+LocalPanelSize(i+1) )
         {
@@ -973,7 +953,7 @@ DistSpectralHelmholtz<R>::MultiplySuperdiagonal( Matrix<C>& B, int i ) const
                       << "offset i+1=" << LocalPanelOffset(i+1) << ", \n"
                       << "height i+1=" << LocalPanelSize(i+1) << ", \n"
                       << "iLocal    =" << iLocal << std::endl;
-            throw std::logic_error("Send index was too big");
+            LogicError("Send index was too big");
         }
 #endif
         for( int k=0; k<numRhs; ++k ) 

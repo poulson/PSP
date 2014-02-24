@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_DIST_UNIFORM_GRID_HPP
-#define PSP_DIST_UNIFORM_GRID_HPP 1
+#define PSP_DIST_UNIFORM_GRID_HPP
 
 namespace psp {
 
@@ -160,9 +161,9 @@ DistUniformGrid<F>::DistUniformGrid
     const int commRank = mpi::CommRank( comm );
     const int commSize = mpi::CommSize( comm );
     if( commSize != px*py*pz )
-        throw std::logic_error("px*py*pz != commSize");
+        LogicError("px*py*pz != commSize");
     if( px < 0 || py < 0 || pz < 0 )
-        throw std::logic_error("process dimensions must be non-negative");
+        LogicError("process dimensions must be non-negative");
 
     xShift_ = commRank % px;
     yShift_ = (commRank/px) % py;
@@ -201,9 +202,7 @@ DistUniformGrid<F>::DistUniformGrid
 : nx_(nx), ny_(ny), nz_(nz), comm_(comm),
   numScalars_(numScalars), order_(order)
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::DistUniformGrid");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::DistUniformGrid"))
     const int commRank = mpi::CommRank( comm );
     const int commSize = mpi::CommSize( comm );
 
@@ -213,7 +212,7 @@ DistUniformGrid<F>::DistUniformGrid
     pz_ = yzCommSize / py_;
 
     if( commSize != px_*py_*pz_ )
-        throw std::logic_error("px*py*pz != commSize");
+        LogicError("px*py*pz != commSize");
 
     xShift_ = commRank % px_;
     yShift_ = (commRank/px_) % py_;
@@ -225,69 +224,35 @@ DistUniformGrid<F>::DistUniformGrid
 }
 
 template<typename F>
-inline int 
-DistUniformGrid<F>::XSize() const
-{ return nx_; }
+inline int DistUniformGrid<F>::XSize() const { return nx_; }
+template<typename F>
+inline int DistUniformGrid<F>::YSize() const { return ny_; }
+template<typename F>
+inline int DistUniformGrid<F>::ZSize() const { return nz_; }
 
 template<typename F>
-inline int 
-DistUniformGrid<F>::YSize() const
-{ return ny_; }
+inline mpi::Comm DistUniformGrid<F>::Comm() const { return comm_; }
 
 template<typename F>
-inline int 
-DistUniformGrid<F>::ZSize() const
-{ return nz_; }
+inline int DistUniformGrid<F>::XShift() const { return xShift_; }
+template<typename F>
+inline int DistUniformGrid<F>::YShift() const { return yShift_; }
+template<typename F>
+inline int DistUniformGrid<F>::ZShift() const { return zShift_; }
 
 template<typename F>
-inline mpi::Comm 
-DistUniformGrid<F>::Comm() const
-{ return comm_; }
+inline int DistUniformGrid<F>::XStride() const { return px_; }
+template<typename F>
+inline int DistUniformGrid<F>::YStride() const { return py_; }
+template<typename F>
+inline int DistUniformGrid<F>::ZStride() const { return pz_; }
 
 template<typename F>
-inline int 
-DistUniformGrid<F>::XShift() const
-{ return xShift_; }
-
+inline int DistUniformGrid<F>::XLocalSize() const { return xLocalSize_; }
 template<typename F>
-inline int 
-DistUniformGrid<F>::YShift() const
-{ return yShift_; }
-
+inline int DistUniformGrid<F>::YLocalSize() const { return yLocalSize_; }
 template<typename F>
-inline int 
-DistUniformGrid<F>::ZShift() const
-{ return zShift_; }
-
-template<typename F>
-inline int 
-DistUniformGrid<F>::XStride() const
-{ return px_; }
-
-template<typename F>
-inline int 
-DistUniformGrid<F>::YStride() const
-{ return py_; }
-
-template<typename F>
-inline int 
-DistUniformGrid<F>::ZStride() const
-{ return pz_; }
-
-template<typename F>
-inline int 
-DistUniformGrid<F>::XLocalSize() const
-{ return xLocalSize_; }
-
-template<typename F>
-inline int 
-DistUniformGrid<F>::YLocalSize() const
-{ return yLocalSize_; }
-
-template<typename F>
-inline int 
-DistUniformGrid<F>::ZLocalSize() const
-{ return zLocalSize_; }
+inline int DistUniformGrid<F>::ZLocalSize() const { return zLocalSize_; }
 
 template<typename F>
 inline F* 
@@ -341,11 +306,11 @@ DistUniformGrid<F>::LocalIndex( int x, int y, int z ) const
 #ifndef RELEASE
     CallStackEntry entry("DistUniformGrid::LocalIndex");
     if( x % px_ != xShift_ )
-        throw std::logic_error("x coordinate not owned by this process");
+        LogicError("x coordinate not owned by this process");
     if( y % py_ != yShift_ )
-        throw std::logic_error("y coordinate not owned by this process");
+        LogicError("y coordinate not owned by this process");
     if( z % pz_ != zShift_ )
-        throw std::logic_error("z coordinate not owned by this process");
+        LogicError("z coordinate not owned by this process");
 #endif
     const int xLocal = (x-xShift_) / px_;
     const int yLocal = (y-yShift_) / py_;
@@ -385,17 +350,11 @@ template<typename F>
 inline void
 DistUniformGrid<F>::SequentialLoad( std::string filename )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::SequentialLoad");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::SequentialLoad"))
     std::ifstream is;
     is.open( filename.c_str(), std::ios::in|std::ios::binary );
     if( !is.is_open() )
-    {
-        std::ostringstream os;
-        os << "Could not open " << filename;
-        throw std::logic_error( os.str().c_str() );
-    }
+        LogicError("Could not open ",filename);
 
     switch( order_ )
     {
@@ -528,9 +487,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
 {
     if( nx == nx_ && ny == ny_ && nz == nz_ )
         return;
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::InterpolateTo");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::InterpolateTo"))
     const int nxOld = nx_;
     const int nyOld = ny_;
     const int nzOld = nz_;
@@ -554,7 +511,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
         const int zUpper = ( zLower!=nzOld-1 ? zLower+1 : zLower );
 #ifndef RELEASE
         if( zLower < 0 || zUpper >= nzOld )
-            throw std::logic_error("z interpolation out of bounds");
+            LogicError("z interpolation out of bounds");
 #endif
         for( int yLocal=0; yLocal<yLocalNewSize; ++yLocal )
         {
@@ -564,7 +521,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
             const int yUpper = ( yLower!=nyOld-1 ? yLower+1 : yLower );
 #ifndef RELEASE
             if( yLower < 0 || yUpper >= nyOld )
-                throw std::logic_error("y interpolation out of bounds");
+                LogicError("y interpolation out of bounds");
 #endif
             for( int xLocal=0; xLocal<xLocalNewSize; ++xLocal )
             {
@@ -574,7 +531,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
                 const int xUpper = ( xLower!=nxOld-1 ? xLower+1 : xLower );
 #ifndef RELEASE
                 if( xLower < 0 || xUpper >= nxOld )
-                    throw std::logic_error("x interpolation out of bounds");
+                    LogicError("x interpolation out of bounds");
 #endif
                 surroundingSet.insert( NaturalIndex(xLower,yLower,zLower) );
                 surroundingSet.insert( NaturalIndex(xLower,yLower,zUpper) );
@@ -716,8 +673,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
                             pointer = std::lower_bound( beg, end, index );
 #ifndef RELEASE
                             if( pointer == end )
-                                throw std::logic_error
-                                ("Could not find surrounding index");
+                                LogicError("Could not find surrounding index");
 #endif
                             const int offset = pointer - &recvIndices[0];
                             offs[i][j][k] = offset;
@@ -770,9 +726,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
 ( const DistUniformGrid<R>& parent, 
   PlaneType planeType, int whichPlane, std::string basename )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::WritePlaneHelper");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::WritePlaneHelper"))
     const int commRank = mpi::CommRank( parent.comm_ );
     const int commSize = mpi::CommSize( parent.comm_ );
     const int nx = parent.nx_;
@@ -790,7 +744,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
     if( planeType == XY )
     {
         if( whichPlane < 0 || whichPlane >= nz )
-            throw std::logic_error("Invalid plane");
+            LogicError("Invalid plane");
 
         // Compute the number of entries to send to the root
         const int zProc = whichPlane % pz;
@@ -927,7 +881,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
     else if( planeType == XZ )
     {
         if( whichPlane < 0 || whichPlane >= ny )
-            throw std::logic_error("Invalid plane");
+            LogicError("Invalid plane");
 
         // Compute the number of entries to send to the root
         const int yProc = whichPlane % py;
@@ -1062,7 +1016,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
     else if( planeType == YZ )
     {
         if( whichPlane < 0 || whichPlane >= nx )
-            throw std::logic_error("Invalid plane");
+            LogicError("Invalid plane");
 
         // Compute the number of entries to send to the root
         const int xProc = whichPlane % px;
@@ -1221,7 +1175,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
     if( planeType == XY )
     {
         if( whichPlane < 0 || whichPlane >= nz )
-            throw std::logic_error("Invalid plane");
+            LogicError("Invalid plane");
 
         // Compute the number of entries to send to the root
         const int zProc = whichPlane % pz;
@@ -1341,7 +1295,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = plane[i+j*nx].real;
+                        double value = plane[i+j*nx].real();
                         if( Abs(value) < 1.0e-300 )
                             value = 0;
                         realFile << value << " ";
@@ -1352,7 +1306,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = plane[i+j*nx].imag;
+                        double value = plane[i+j*nx].imag();
                         if( Abs(value) < 1.0e-300 )
                             value = 0;
                         imagFile << value << " ";
@@ -1373,7 +1327,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
     else if( planeType == XZ )
     {
         if( whichPlane < 0 || whichPlane >= ny )
-            throw std::logic_error("Invalid plane");
+            LogicError("Invalid plane");
 
         // Compute the number of entries to send to the root
         const int yProc = whichPlane % py;
@@ -1492,7 +1446,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = plane[i+j*nx].real;
+                        double value = plane[i+j*nx].real();
                         if( Abs(value) < 1.0e-300 )
                             value = 0;
                         realFile << value << " ";
@@ -1503,7 +1457,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 {
                     for( int i=0; i<nx; ++i )
                     {
-                        double value = plane[i+j*nx].imag;
+                        double value = plane[i+j*nx].imag();
                         if( Abs(value) < 1.0e-300 )
                             value = 0;
                         imagFile << value << " ";
@@ -1524,7 +1478,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
     else if( planeType == YZ )
     {
         if( whichPlane < 0 || whichPlane >= nx )
-            throw std::logic_error("Invalid plane");
+            LogicError("Invalid plane");
 
         // Compute the number of entries to send to the root
         const int xProc = whichPlane % px;
@@ -1643,7 +1597,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 {
                     for( int i=0; i<ny; ++i )
                     {
-                        double value = plane[i+j*ny].real;
+                        double value = plane[i+j*ny].real();
                         if( Abs(value) < 1.0e-300 )
                             value = 0;
                         realFile << value << " ";
@@ -1654,7 +1608,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                 {
                     for( int i=0; i<ny; ++i )
                     {
-                        double value = plane[i+j*ny].imag;
+                        double value = plane[i+j*ny].imag();
                         if( Abs(value) < 1.0e-300 )
                             value = 0;
                         imagFile << value << " ";
@@ -1678,9 +1632,7 @@ template<typename F>
 inline void 
 DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::RedistributeForVtk");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::RedistributeForVtk"))
     const int commSize = mpi::CommSize( comm_ );
 
     // Compute our local box
@@ -1750,7 +1702,7 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
     }
 #ifndef RELEASE
     if( totalRecvSize != xBoxSize*yBoxSize*zBoxSize*numScalars_ )
-        throw std::logic_error("Incorrect total recv size");
+        LogicError("Incorrect total recv size");
 #endif
 
     // Pack the send buffer
@@ -1842,9 +1794,7 @@ inline void
 DistUniformGrid<F>::WriteVolumeHelper<R>::Func
 ( const DistUniformGrid<R>& parent, std::string basename )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::WriteVolumeHelper");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::WriteVolumeHelper"))
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
@@ -2026,9 +1976,7 @@ inline void
 DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
 ( const DistUniformGrid<Complex<R> >& parent, std::string basename )
 {
-#ifndef RELEASE
-    CallStackEntry entry("DistUniformGrid::WriteVolumeHelper");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("DistUniformGrid::WriteVolumeHelper"))
     const int commRank = mpi::CommRank( parent.comm_ );
     const int px = parent.px_;
     const int py = parent.py_;
@@ -2216,8 +2164,8 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
                 for( int k=0; k<numScalars; ++k )
                 {
                     const Complex<double> alpha = localBox[offset*numScalars+k];
-                    double realAlpha = alpha.real;
-                    double imagAlpha = alpha.imag;
+                    double realAlpha = alpha.real();
+                    double imagAlpha = alpha.imag();
                     if( Abs(realAlpha) < 1.0e-300 )
                         realAlpha = 0;
                     if( Abs(imagAlpha) < 1.0e-300 )
@@ -2251,4 +2199,4 @@ DistUniformGrid<F>::WriteVolumeHelper<Complex<R> >::Func
 
 } // namespace psp
 
-#endif // PSP_DIST_UNIFORM_GRID_HPP
+#endif // ifndef PSP_DIST_UNIFORM_GRID_HPP

@@ -1,20 +1,21 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_LOCAL_COMPRESSED_BLOCK_LDL_HPP
-#define PSP_LOCAL_COMPRESSED_BLOCK_LDL_HPP 1
+#define PSP_LOCAL_COMPRESSED_BLOCK_LDL_HPP
 
 namespace psp {
 
 template<typename F> 
 void LocalCompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB );
+  bool useQR, Base<F> tolA, Base<F> tolB );
 
 //----------------------------------------------------------------------------//
 // Implementation begins here                                                 //
@@ -23,11 +24,9 @@ void LocalCompressedBlockLDL
 template<typename F> 
 inline void LocalCompressedBlockLDL
 ( cliq::DistSymmInfo& info, DistCompressedFrontTree<F>& L, int depth,
-  bool useQR, typename Base<F>::type tolA, typename Base<F>::type tolB )
+  bool useQR, Base<F> tolA, Base<F> tolB )
 {
-#ifndef RELEASE
-    CallStackEntry entry("LocalCompressedBlockLDL");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("LocalCompressedBlockLDL"))
     const int numLocalNodes = info.localNodes.size();
     for( int s=0; s<numLocalNodes; ++s )
     {
@@ -37,11 +36,11 @@ inline void LocalCompressedBlockLDL
         Matrix<F>& frontL = front.frontL;
         Matrix<F>& frontBR = front.work;
         frontBR.Empty();
-#ifndef RELEASE
-        if( frontL.Height() != node.size+updateSize ||
-            frontL.Width() != node.size )
-            throw std::logic_error("Front was not the proper size");
-#endif
+        DEBUG_ONLY(
+            if( frontL.Height() != node.size+updateSize ||
+                frontL.Width() != node.size )
+                LogicError("Front was not the proper size");
+        )
 
         // Add updates from children (if they exist)
         elem::Zeros( frontBR, updateSize, updateSize );
@@ -57,10 +56,10 @@ inline void LocalCompressedBlockLDL
             const int leftUpdateSize = leftUpdate.Height();
             for( int jChild=0; jChild<leftUpdateSize; ++jChild )
             {
-                const int jFront = node.leftChildRelIndices[jChild];
+                const int jFront = node.leftRelInds[jChild];
                 for( int iChild=0; iChild<leftUpdateSize; ++iChild )
                 {
-                    const int iFront = node.leftChildRelIndices[iChild];
+                    const int iFront = node.leftRelInds[iChild];
                     const F value = leftUpdate.Get(iChild,jChild);
                     if( jFront < node.size )
                         frontL.Update( iFront, jFront, value );
@@ -75,10 +74,10 @@ inline void LocalCompressedBlockLDL
             const int rightUpdateSize = rightUpdate.Height();
             for( int jChild=0; jChild<rightUpdateSize; ++jChild )
             {
-                const int jFront = node.rightChildRelIndices[jChild];
+                const int jFront = node.rightRelInds[jChild];
                 for( int iChild=0; iChild<rightUpdateSize; ++iChild )
                 {
-                    const int iFront = node.rightChildRelIndices[iChild];
+                    const int iFront = node.rightRelInds[iChild];
                     const F value = rightUpdate.Get(iChild,jChild);
                     if( jFront < node.size )
                         frontL.Update( iFront, jFront, value );
@@ -91,10 +90,7 @@ inline void LocalCompressedBlockLDL
         }
 
         // Call the custom partial block LDL
-        if( L.isHermitian )
-            cliq::FrontBlockLDL( ADJOINT, frontL, frontBR );
-        else
-            cliq::FrontBlockLDL( TRANSPOSE, frontL, frontBR );
+        cliq::FrontBlockLDL( frontL, frontBR, L.isHermitian );
 
         // Separately compress the A and B portions of the front
         CompressFront( front, depth, false, useQR, tolA, tolB );

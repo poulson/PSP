@@ -1,13 +1,14 @@
 /*
-   Copyright (C) 2011-2012 Jack Poulson, Lexing Ying, and 
-   The University of Texas at Austin
+   Copyright (C) 2011-2014 Jack Poulson, Lexing Ying, 
+   The University of Texas at Austin, and the Georgia Institute of Technology
  
    This file is part of Parallel Sweeping Preconditioner (PSP) and is under the
    GNU General Public License, which can be found in the LICENSE file in the 
    root directory, or at <http://www.gnu.org/licenses/>.
 */
+#pragma once
 #ifndef PSP_COMPRESSED_BLOCK_LDL_SOLVE_HPP
-#define PSP_COMPRESSED_BLOCK_LDL_SOLVE_HPP 1
+#define PSP_COMPRESSED_BLOCK_LDL_SOLVE_HPP
 
 namespace psp {
 
@@ -27,9 +28,7 @@ inline void CompressedBlockLDLSolve
   const DistCompressedFrontTree<F>& L,
         Matrix<F>& localX )
 {
-#ifndef RELEASE
-    CallStackEntry entry("CompressedBlockLDLSolve");
-#endif
+    DEBUG_ONLY(CallStackEntry entry("CompressedBlockLDLSolve"))
     // Solve against block diagonal factor, L D
     CompressedBlockLowerSolve( NORMAL, info, L, localX );
 
@@ -42,4 +41,4 @@ inline void CompressedBlockLDLSolve
 
 } // namespace psp
 
-#endif // PSP_COMPRESSED_BLOCK_LDL_SOLVE_HPP
+#endif // ifndef PSP_COMPRESSED_BLOCK_LDL_SOLVE_HPP
