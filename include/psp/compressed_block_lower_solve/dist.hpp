@@ -43,7 +43,7 @@ inline void DistCompressedBlockLowerForwardSolve
     const DistCompressedFront<F>& distLeafFront = L.distFronts[0];
     const Grid& leafGrid = *distLeafFront.grid;
     distLeafFront.work1d.LockedAttach
-    ( localRootFront.work.Height(), localRootFront.work.Width(), 0,
+    ( localRootFront.work.Height(), localRootFront.work.Width(), 0, 0,
       localRootFront.work.LockedBuffer(), localRootFront.work.LDim(), 
       leafGrid );
     
@@ -200,7 +200,7 @@ inline void DistCompressedBlockLowerBackwardSolve
         const DistCompressedFront<F>& rootFront = L.distFronts.back();
         const Grid& rootGrid = *rootFront.grid;
         rootFront.work1d.Attach
-        ( rootNode.size, width, 0,
+        ( rootNode.size, width, 0, 0,
           localX.Buffer(rootNode.multiVecMeta.localOff,0), localX.LDim(), 
           rootGrid );
         FrontCompressedBlockLowerBackwardSolve
