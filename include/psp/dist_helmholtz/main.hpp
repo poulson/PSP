@@ -162,13 +162,13 @@ DistHelmholtz<R>::DistHelmholtz
             recvIndices[offsets[proc]++] = naturalCol;
         }
     }
-    offsets.clear();
+    SwapClear( offsets );
     globalSendIndices_.resize( totalSendCount );
     mpi::AllToAll
     ( &recvIndices[0],        &globalRecvCounts_[0], &globalRecvDispls_[0],
       &globalSendIndices_[0], &globalSendCounts_[0], &globalSendDispls_[0], 
       comm );
-    recvIndices.clear();
+    SwapClear( recvIndices );
 
     // Invert the local to natural map
     std::map<int,int> naturalToLocalMap;
@@ -242,10 +242,10 @@ DistHelmholtz<R>::DistHelmholtz
             supdiagRecvCounts_[newIndex] = supdiagRecvCountsPerm[oldIndex];
         }
     }
-    subdiagSendCountsPerm.clear();
-    subdiagRecvCountsPerm.clear();
-    supdiagSendCountsPerm.clear();
-    supdiagRecvCountsPerm.clear();
+    SwapClear( subdiagSendCountsPerm );
+    SwapClear( subdiagRecvCountsPerm );
+    SwapClear( supdiagSendCountsPerm );
+    SwapClear( supdiagRecvCountsPerm );
 
     // Compute the send and recv offsets and total sizes
     int subdiagTotalSendCount=0, subdiagTotalRecvCount=0,
@@ -384,8 +384,8 @@ DistHelmholtz<R>::DistHelmholtz
             ++supdiagOffsets[index];
         }
     }
-    subdiagOffsets.clear();
-    supdiagOffsets.clear();
+    SwapClear( subdiagOffsets );
+    SwapClear( supdiagOffsets );
     subdiagSendIndices_.resize( subdiagTotalSendCount );
     supdiagSendIndices_.resize( supdiagTotalSendCount );
     // TODO: Think about reducing to a single AllToAll?
@@ -408,8 +408,8 @@ DistHelmholtz<R>::DistHelmholtz
           &supdiagSendDispls_[i*commSize],
           comm );
     }
-    subdiagRecvIndices.clear();
-    supdiagRecvIndices.clear();
+    SwapClear( subdiagRecvIndices );
+    SwapClear( supdiagRecvIndices );
 
     // Convert the natural indices to their local indices in place
     for( int i=0; i<subdiagTotalSendCount; ++i )
@@ -1783,7 +1783,7 @@ DistHelmholtz<R>::FillPanelLocalElimTree
         {
             node.size = box.nx*box.ny*vSize;
             node.off = ReorderedIndex( box.xOffset, box.yOffset, 0, vSize );
-            node.children.clear();
+            SwapClear( node.children );
 
             // Count, allocate, and fill the lower struct
             int joinSize = 0;

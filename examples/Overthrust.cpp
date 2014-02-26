@@ -39,7 +39,7 @@ main( int argc, char* argv[] )
             ("--planesPerPanel","number of planes per subdomain",4);
         const PanelScheme panelScheme = (PanelScheme)Input
             ("--panelScheme",
-             "frontal scheme: 0=1D LDL, 1=2D sel. inv., 2=2D block LDL",1);
+             "frontal scheme: 0=1D LDL, 1=1D sel. inv.",1);
         const bool fullViz = Input("--fullViz","visualize volume?",false);
         const int nbFact = Input("--nbFact","factorization blocksize",96);
         const int nbSolve = Input("--nbSolve","solve blocksize",64);

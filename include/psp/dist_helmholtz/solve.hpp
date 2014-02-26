@@ -71,9 +71,7 @@ DistHelmholtz<Real>::PullRightHandSides
         ++recvCounts[proc];
     }
     std::vector<int> sendCounts( commSize );
-    mpi::AllToAll
-    ( &recvCounts[0], 1,
-      &sendCounts[0], 1, comm_ );
+    mpi::AllToAll( &recvCounts[0], 1, &sendCounts[0], 1, comm_ );
 
     // Compute the send and recv offsets and total sizes
     int totalSendCount=0, totalRecvCount=0;
@@ -99,7 +97,7 @@ DistHelmholtz<Real>::PullRightHandSides
     mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
-    recvIndices.clear();
+    SwapClear( recvIndices );
 
     // Scale the send and recv counts to make up for their being several RHS
     const int numRhs = gridB.NumScalars();
@@ -129,12 +127,12 @@ DistHelmholtz<Real>::PullRightHandSides
                 procB[s*numRhs+k] = gridBBuffer[localIndex+k];
         }
     }
-    sendIndices.clear();
+    SwapClear( sendIndices );
     std::vector<C> recvB( totalRecvCount );
     mpi::AllToAll
     ( &sendB[0], &sendCounts[0], &sendDispls[0], 
       &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
-    sendB.clear();
+    SwapClear( sendB );
 
     // Unpack the received right-hand side data
     offsets = recvDispls;
@@ -166,9 +164,7 @@ DistHelmholtz<Real>::PushRightHandSides
         ++sendCounts[proc];
     }
     std::vector<int> recvCounts( commSize );
-    mpi::AllToAll
-    ( &sendCounts[0], 1, 
-      &recvCounts[0], 1, comm_ );
+    mpi::AllToAll( &sendCounts[0], 1, &recvCounts[0], 1, comm_ );
 
     // Compute the send and recv offsets and total sizes
     int totalSendCount=0, totalRecvCount=0;
@@ -195,7 +191,7 @@ DistHelmholtz<Real>::PushRightHandSides
     mpi::AllToAll
     ( &sendIndices[0], &sendCounts[0], &sendDispls[0], 
       &recvIndices[0], &recvCounts[0], &recvDispls[0], comm_ );
-    sendIndices.clear();
+    SwapClear( sendIndices );
 
     // Scale the counts and offsets by the number of right-hand sides
     totalSendCount *= numRhs;
@@ -223,7 +219,7 @@ DistHelmholtz<Real>::PushRightHandSides
     mpi::AllToAll
     ( &sendB[0], &sendCounts[0], &sendDispls[0],
       &recvB[0], &recvCounts[0], &recvDispls[0], comm_ );
-    sendB.clear();
+    SwapClear( sendB );
 
     // Unpack the right-hand side data
     C* gridBBuffer = gridB.Buffer();
@@ -655,7 +651,7 @@ DistHelmholtz<Real>::Multiply( Matrix<C>& B ) const
     cliq::SparseAllToAll
     ( sendRhs, sendCounts, sendDispls,
       recvRhs, recvCounts, recvDispls, comm_ );
-    sendRhs.clear();
+    SwapClear( sendRhs );
 
     // Run the local multiplies to form the result
     std::vector<int> offsets = recvDispls;
@@ -742,134 +738,145 @@ template<typename Real>
 void
 DistHelmholtz<Real>::SolvePanel( Matrix<C>& B, int i ) const
 {
-    // TODO: Cheaply construct a DistNodalMultiVec as necessary...
-    const cliq::DistSymmInfo& info = PanelAnalysis( i );
+    const cliq::DistSymmInfo& info = PanelAnalysis(i);
     const int numRhs = B.Width();
-    const int panelPadding = PanelPadding( i );
-    const int panelDepth = PanelDepth( i );
-    const int localSize1d = 
-        info.distNodes.back().multiVecMeta.localOff + 
-        info.distNodes.back().multiVecMeta.localSize;
+    const int panelPadding = PanelPadding(i);
+    const int panelDepth = PanelDepth(i);
+    const int numLocalNodes = info.localNodes.size();
+    const int numDistNodes = info.distNodes.size();
 
-    Matrix<C> localPanelB;
-    elem::Zeros( localPanelB, localSize1d, numRhs );
+    cliq::DistNodalMultiVec<C> panelB;
+    panelB.localNodes.resize( numLocalNodes );
+    panelB.distNodes.resize( numDistNodes-1 );
+    const int localPanelOff = LocalPanelOffset(i);
+    const int localPanelSize = LocalPanelSize(i);
 
     // For each node, pull in each right-hand side with a memcpy
-    int BOffset = LocalPanelOffset( i );
-    const int numLocalNodes = info.localNodes.size();
+    int BOff = localPanelOff;
     for( int t=0; t<numLocalNodes; ++t )
     {
         const cliq::SymmNodeInfo& node = info.localNodes[t];
         const int size = node.size;
-        const int myOff = node.myOff;
-
-        DEBUG_ONLY(
-            if( size % (panelPadding+panelDepth) != 0 )
-                LogicError("Local node size problem");
-        )
-        const int xySize = size/(panelPadding+panelDepth);
-        const int paddingSize = xySize*panelPadding;
-        const int remainingSize = xySize*panelDepth;
-
-        for( int k=0; k<numRhs; ++k )
-            elem::MemCopy
-            ( localPanelB.Buffer(myOff+paddingSize,k), 
-              B.LockedBuffer(BOffset,k),
-              remainingSize );
-        BOffset += remainingSize;
-    }
-    const int numDistNodes = info.distNodes.size();
-    for( int t=1; t<numDistNodes; ++t )
-    {
-        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
-        const int size = node.size;
-        const int localOffset1d = node.multiVecMeta.localOff;
-        const int localSize1d = node.multiVecMeta.localSize;
-
-        const Grid& grid = *node.grid;
-        const int gridSize = grid.Size();
-        const int gridRank = grid.VCRank();
-
-        DEBUG_ONLY(
-            if( size % (panelPadding+panelDepth) != 0 )
-                LogicError("Dist node size problem");
-        )
-        const int xySize = size/(panelPadding+panelDepth);
-        const int paddingSize = xySize*panelPadding;
-        const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
-        const int localRemainingSize = localSize1d - localPaddingSize;
-
-        for( int k=0; k<numRhs; ++k )
-            elem::MemCopy
-            ( localPanelB.Buffer(localOffset1d+localPaddingSize,k),
-              B.LockedBuffer(BOffset,k),
-              localRemainingSize );
-        BOffset += localRemainingSize;
-    }
-    DEBUG_ONLY(
-        if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
-            LogicError("Invalid BOffset usage in pull");
-    )
-
-    // Solve against the panel
-    if( panelScheme_ == COMPRESSED_BLOCK_LDL_2D )
-        CompressedBlockLDLSolve
-        ( info, PanelCompressedFactorization( i ), localPanelB );
-    else
-        cliq::Solve( info, PanelFactorization( i ), localPanelB );
-
-    // For each node, extract each right-hand side with memcpy
-    BOffset = LocalPanelOffset( i );
-    for( int t=0; t<numLocalNodes; ++t )
-    {
-        const cliq::SymmNodeInfo& node = info.localNodes[t];
-        const int size = node.size;
-        const int myOff = node.myOff;
-
-        DEBUG_ONLY(
-            if( size % (panelPadding+panelDepth) != 0 )
-                LogicError("Local node size problem");
-        )
         const int xySize = size/(panelPadding+panelDepth);
         const int paddingSize = xySize*panelPadding;
         const int remainingSize = size - paddingSize;
 
+        Matrix<C>& mat = panelB.localNodes[t];
+        elem::Zeros( mat, size, numRhs );
+
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Local node size problem");
+        )
+
         for( int k=0; k<numRhs; ++k )
             elem::MemCopy
-            ( B.Buffer(BOffset,k),
-              localPanelB.LockedBuffer(myOff+paddingSize,k), 
+            ( mat.Buffer(paddingSize,k), B.LockedBuffer(BOff,k),
               remainingSize );
-        BOffset += remainingSize;
+
+        BOff += remainingSize;
+    }
+    // Handle the truly distributed nodes
+    for( int t=1; t<numDistNodes; ++t )
+    {
+        const cliq::DistSymmNodeInfo& node = info.distNodes[t];
+        const int size = node.size;
+        const int localSize = node.multiVecMeta.localSize;
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+
+        const Grid& grid = *node.grid;
+        const int gridSize = grid.Size();
+        const int gridRank = grid.VCRank();
+        const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
+        const int localRemainingSize = localSize - localPaddingSize;
+
+        DistMatrix<C,VC,STAR>& distMat = panelB.distNodes[t-1];
+        distMat.SetGrid( grid );
+        distMat.Align( 0, 0 );
+        elem::Zeros( distMat, size, numRhs );
+
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Dist node size problem");
+            if( localSize != distMat.LocalHeight() )
+                LogicError
+                ("localSize=",localSize,", localHeight=",distMat.LocalHeight());
+        )
+
+        for( int k=0; k<numRhs; ++k )
+            elem::MemCopy
+            ( distMat.Buffer(localPaddingSize,k),
+              B.LockedBuffer(BOff,k), localRemainingSize );
+
+        BOff += localRemainingSize;
+    }
+    panelB.UpdateHeight();
+    panelB.UpdateWidth();
+    DEBUG_ONLY(
+        if( BOff != localPanelOff+localPanelSize )
+            LogicError("Invalid BOffset usage in pull");
+    )
+
+    // Solve against the panel
+    cliq::Solve( info, PanelFactorization(i), panelB );
+
+    // For each node, extract each right-hand side with memcpy
+    BOff = localPanelOff;
+    for( int t=0; t<numLocalNodes; ++t )
+    {
+        const cliq::SymmNodeInfo& node = info.localNodes[t];
+        const int size = node.size;
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+        const int remainingSize = size - paddingSize;
+
+        const Matrix<C>& mat = panelB.localNodes[t];
+
+        DEBUG_ONLY(
+            if( size % (panelPadding+panelDepth) != 0 )
+                LogicError("Local node size problem");
+        )
+
+        for( int k=0; k<numRhs; ++k )
+            elem::MemCopy
+            ( B.Buffer(BOff,k),
+              mat.LockedBuffer(paddingSize,k), remainingSize );
+
+        BOff += remainingSize;
     }
     for( int t=1; t<numDistNodes; ++t )
     {
         const cliq::DistSymmNodeInfo& node = info.distNodes[t];
         const int size = node.size;
-        const int localOffset1d = node.multiVecMeta.localOff;
-        const int localSize1d = node.multiVecMeta.localSize;
+        const int localSize = node.multiVecMeta.localSize;
 
         const Grid& grid = *node.grid;
         const int gridSize = grid.Size();
         const int gridRank = grid.VCRank();
 
+        const int xySize = size/(panelPadding+panelDepth);
+        const int paddingSize = xySize*panelPadding;
+        const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
+        const int localRemainingSize = localSize - localPaddingSize;
+
+        const DistMatrix<C,VC,STAR>& distMat = panelB.distNodes[t-1];
+
         DEBUG_ONLY(
             if( size % (panelPadding+panelDepth) != 0 )
                 LogicError("Dist node size problem");
         )
-        const int xySize = size/(panelPadding+panelDepth);
-        const int paddingSize = xySize*panelPadding;
-        const int localPaddingSize = Length( paddingSize, gridRank, gridSize );
-        const int localRemainingSize = localSize1d - localPaddingSize;
 
         for( int k=0; k<numRhs; ++k )
             elem::MemCopy
-            ( B.Buffer(BOffset,k),
-              localPanelB.LockedBuffer(localOffset1d+localPaddingSize,k),
+            ( B.Buffer(BOff,k),
+              distMat.LockedBuffer(localPaddingSize,k),
               localRemainingSize );
-        BOffset += localRemainingSize;
+
+        BOff += localRemainingSize;
     }
     DEBUG_ONLY(
-        if( BOffset != LocalPanelOffset(i)+LocalPanelSize(i) )
+        if( BOff != localPanelOff+localPanelSize )
             LogicError("Invalid BOffset usage in push");
     )
 }
@@ -911,9 +918,9 @@ DistHelmholtz<Real>::SubdiagonalUpdate( Matrix<C>& B, int i ) const
     cliq::SparseAllToAll
     ( sendBuffer, sendCounts, sendDispls,
       recvBuffer, recvCounts, recvDispls, comm_ );
-    sendBuffer.clear();
-    sendCounts.clear();
-    sendDispls.clear();
+    SwapClear( sendBuffer );
+    SwapClear( sendCounts );
+    SwapClear( sendDispls );
 
     // Perform the local update
     const int* recvLocalRows = &subdiagRecvLocalRows_[panelRecvOffset];
@@ -946,8 +953,8 @@ template<typename Real>
 void
 DistHelmholtz<Real>::ExtractPanel( Matrix<C>& B, int i, Matrix<C>& Z ) const
 {
-    const int localPanelOffset = LocalPanelOffset( i );
-    const int localPanelSize = LocalPanelSize( i );
+    const int localPanelOffset = LocalPanelOffset(i);
+    const int localPanelSize = LocalPanelSize(i);
     const int numRhs = B.Width();
     Z.Resize( localPanelSize, numRhs );
 
@@ -1010,9 +1017,9 @@ DistHelmholtz<Real>::MultiplySuperdiagonal( Matrix<C>& B, int i ) const
     cliq::SparseAllToAll
     ( sendBuffer, sendCounts, sendDispls,
       recvBuffer, recvCounts, recvDispls, comm_ );
-    sendBuffer.clear();
-    sendCounts.clear();
-    sendDispls.clear();
+    SwapClear( sendBuffer );
+    SwapClear( sendCounts );
+    SwapClear( sendDispls );
 
     // Perform the local multiply
     const int* recvLocalRows = &supdiagRecvLocalRows_[panelRecvOffset];
@@ -1045,8 +1052,8 @@ void
 DistHelmholtz<Real>::UpdatePanel
 ( Matrix<C>& B, int i, const Matrix<C>& Z ) const
 {
-    const int localPanelOffset = LocalPanelOffset( i );
-    const int localPanelSize = LocalPanelSize( i );
+    const int localPanelOffset = LocalPanelOffset(i);
+    const int localPanelSize = LocalPanelSize(i);
     const int numRhs = Z.Width();
     for( int k=0; k<numRhs; ++k )
         for( int s=0; s<localPanelSize; ++s )

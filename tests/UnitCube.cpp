@@ -31,7 +31,7 @@ main( int argc, char* argv[] )
             ("--planesPerPanel","number of planes to process per subdomain",4);
         const PanelScheme panelScheme = (PanelScheme) Input
             ("--panelScheme",
-             "frontal scheme: 0=1D LDL, 1=2D sel. inv., 2=2D block LDL",1);
+             "frontal scheme: 0=1D LDL, 1=1D sel. inv.",1);
         const bool fullViz = Input("--fullViz","visualize volume?",false);
         const int nbFact = Input("--nbFact","factorization blocksize",96);
         const int nbSolve = Input("--nbSolve","solve blocksize",64);
@@ -300,7 +300,7 @@ main( int argc, char* argv[] )
             if( commRank == 0 )
                 std::cout << "Uniform random over [1,3]" << std::endl;
             for( int i=0; i<xLocalSize*yLocalSize*zLocalSize; ++i )
-                localVelocity[i] = 2.+elem::Uniform();
+                localVelocity[i] = elem::SampleUniform(1.,3.);
             break;
         case 11:
             if( commRank == 0 )

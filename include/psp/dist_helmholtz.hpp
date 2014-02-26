@@ -14,8 +14,8 @@ namespace psp {
 
 enum PanelScheme {
   CLIQUE_LDL_1D=0, 
-  CLIQUE_LDL_SELINV_2D=1,
-  COMPRESSED_BLOCK_LDL_2D=2
+  CLIQUE_LDL_SELINV_1D=1
+  // TODO: Various other (e.g., intraPiv and 2D) schemes
 };
 
 template<typename Real>
@@ -33,7 +33,7 @@ public:
     // Build the sparse matrix and the preconditioner
     void Initialize
     ( const DistUniformGrid<Real>& velocity, 
-      PanelScheme panelScheme=CLIQUE_LDL_SELINV_2D );
+      PanelScheme panelScheme=CLIQUE_LDL_SELINV_1D );
 
     // Solves an O(1) set of linear systems with the sweeping preconditioner
     void Solve

@@ -66,6 +66,7 @@ using elem::DistMatrix;
 using elem::Length;
 using elem::Shift;
 
+using elem::SwapClear;
 using elem::LogicError;
 using elem::RuntimeError;
 

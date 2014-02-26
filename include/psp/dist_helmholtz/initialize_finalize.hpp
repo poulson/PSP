@@ -111,13 +111,6 @@ DistHelmholtz<Real>::Initialize
     }
 
     //
-    // Compression control parameters
-    //
-    const bool useQR = false; // use the QR-algorithm for the bidiagonal SVD
-    const Real tolA = 1e-3; // relative singular value tolerance for diag blocks
-    const Real tolB = 1e-3; // relative singular value tolerance for couplings
-
-    //
     // Initialize and factor the top panel (first, since it is the largest)
     //
     {
@@ -140,99 +133,21 @@ DistHelmholtz<Real>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            FillPanelFronts
-            ( vOffset, vSize, topInfo_, topCompressedFact_,
-              velocity, myPanelVelocity, offsets, 
-              panelNestedToNatural, panelNaturalToNested );
-        else
-            FillPanelFronts
-            ( vOffset, vSize, topInfo_, topFact_,
-              velocity, myPanelVelocity, offsets, 
-              panelNestedToNatural, panelNaturalToNested );
+        FillPanelFronts
+        ( vOffset, vSize, topInfo_, topFact_,
+          velocity, myPanelVelocity, offsets, 
+          panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization 
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-        {
-            double numLocalEntries, numLocalTopLeft, numLocalBottomLeft,
-                   minLocalEntries, minLocalTopLeft, minLocalBottomLeft,
-                   maxLocalEntries, maxLocalTopLeft, maxLocalBottomLeft,
-                   numGlobalEntries, numGlobalTopLeft, numGlobalBottomLeft;
-            topCompressedFact_.MemoryInfo
-            ( numLocalEntries, minLocalEntries, maxLocalEntries, 
-              numGlobalEntries );
-            topCompressedFact_.TopLeftMemoryInfo
-            ( numLocalTopLeft, minLocalTopLeft, maxLocalTopLeft, 
-              numGlobalTopLeft );
-            topCompressedFact_.BottomLeftMemoryInfo
-            ( numLocalBottomLeft, minLocalBottomLeft, maxLocalBottomLeft, 
-              numGlobalBottomLeft );
-            if( commRank == 0 )
-            {
-                std::cout << "  before compression:\n"
-                          << "    min local: " 
-                          << minLocalEntries*sizeof(C)/1e6 << "MB\n"
-                          << "    max local: " 
-                          << maxLocalEntries*sizeof(C)/1e6 << " MB\n"
-                          << "    global:    " 
-                          << numGlobalEntries*sizeof(C)/1e6 << " MB\n"
-                          << "    min local top-left: " 
-                          << minLocalTopLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    max local top-left: " 
-                          << maxLocalTopLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    global top-left: "
-                          << numGlobalTopLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    min local bottom-left: " 
-                          << minLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    max local bottom-left: " 
-                          << maxLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    global bottom-left: "
-                          << numGlobalBottomLeft*sizeof(C)/1e6 << " MB\n"
-                          << std::endl;
-            }
-            CompressedBlockLDL
-            ( topInfo_, topCompressedFact_, vSize, useQR, tolA, tolB );
-            topCompressedFact_.MemoryInfo
-            ( numLocalEntries, minLocalEntries, maxLocalEntries, 
-              numGlobalEntries );
-            topCompressedFact_.TopLeftMemoryInfo
-            ( numLocalTopLeft, minLocalTopLeft, maxLocalTopLeft, 
-              numGlobalTopLeft );
-            topCompressedFact_.BottomLeftMemoryInfo
-            ( numLocalBottomLeft, minLocalBottomLeft, maxLocalBottomLeft, 
-              numGlobalBottomLeft );
-            if( commRank == 0 )
-            {
-                std::cout << "  after compression:\n"
-                          << "    min local: " 
-                          << minLocalEntries*sizeof(C)/1e6 << "MB\n"
-                          << "    max local: " 
-                          << maxLocalEntries*sizeof(C)/1e6 << " MB\n"
-                          << "    global:    " 
-                          << numGlobalEntries*sizeof(C)/1e6 << " MB\n"
-                          << "    min local top-left: " 
-                          << minLocalTopLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    max local top-left: " 
-                          << maxLocalTopLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    global top-left: "
-                          << numGlobalTopLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    min local bottom-left: " 
-                          << minLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    max local bottom-left: " 
-                          << maxLocalBottomLeft*sizeof(C)/1e6 << " MB\n"
-                          << "    global bottom-left: "
-                          << numGlobalBottomLeft*sizeof(C)/1e6 << " MB\n"
-                          << std::endl;
-
-            }
-        }
-        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
-            cliq::LDL( topInfo_, topFact_, cliq::LDL_SELINV_2D );
+        if( panelScheme == CLIQUE_LDL_SELINV_1D )
+            cliq::LDL( topInfo_, topFact_, cliq::LDL_SELINV_1D );
         else if( panelScheme == CLIQUE_LDL_1D )
             cliq::LDL( topInfo_, topFact_, cliq::LDL_1D );
+        else
+            LogicError("Unhandled factorization case");
         const double ldlStopTime = mpi::Time();
 
         const double stopTime = mpi::Time();
@@ -272,28 +187,21 @@ DistHelmholtz<Real>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            FillPanelFronts
-            ( vOffset, vSize, bottomInfo_, bottomCompressedFact_,
-              velocity, myPanelVelocity, offsets,
-              panelNestedToNatural, panelNaturalToNested );
-        else
-            FillPanelFronts
-            ( vOffset, vSize, bottomInfo_, bottomFact_,
-              velocity, myPanelVelocity, offsets,
-              panelNestedToNatural, panelNaturalToNested );
+        FillPanelFronts
+        ( vOffset, vSize, bottomInfo_, bottomFact_,
+          velocity, myPanelVelocity, offsets,
+          panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            CompressedBlockLDL
-            ( bottomInfo_, bottomCompressedFact_, vSize, useQR, tolA, tolB );
-        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
-            cliq::LDL( bottomInfo_, bottomFact_, cliq::LDL_SELINV_2D );
+        if( panelScheme == CLIQUE_LDL_SELINV_1D )
+            cliq::LDL( bottomInfo_, bottomFact_, cliq::LDL_SELINV_1D );
         else if( panelScheme == CLIQUE_LDL_1D )
             cliq::LDL( bottomInfo_, bottomFact_, cliq::LDL_1D );
+        else
+            LogicError("Unhandled factorization case");
         const double ldlStopTime = mpi::Time();
 
         const double stopTime = mpi::Time();
@@ -301,7 +209,8 @@ DistHelmholtz<Real>::Initialize
         {
             std::cout << "    gather: " << gatherStopTime-gatherStartTime     
                       << " secs\n"
-                      << "    fill:   " << fillStopTime-fillStartTime                       << " secs\n"
+                      << "    fill:   " << fillStopTime-fillStartTime           
+                      << " secs\n"
                       << "    ldl:    " << ldlStopTime-ldlStartTime
                       << " secs\n"
                       << "    total:  " << stopTime-startTime 
@@ -313,10 +222,7 @@ DistHelmholtz<Real>::Initialize
     //
     // Initialize and factor the full inner panels
     //
-    if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-        fullInnerCompressedFacts_.resize( numFullInnerPanels_ );
-    else
-        fullInnerFacts_.resize( numFullInnerPanels_ );
+    fullInnerFacts_.resize( numFullInnerPanels_ );
     for( int k=0; k<numFullInnerPanels_; ++k )
     {
         if( commRank == 0 )
@@ -339,36 +245,22 @@ DistHelmholtz<Real>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-        {
-            fullInnerCompressedFacts_[k] = new DistCompressedFrontTree<C>;
-            FillPanelFronts
-            ( vOffset, vSize, bottomInfo_, 
-              *fullInnerCompressedFacts_[k],
-              velocity, myPanelVelocity, offsets,
-              panelNestedToNatural, panelNaturalToNested );
-        }
-        else 
-        {
-            fullInnerFacts_[k] = new cliq::DistSymmFrontTree<C>;
-            FillPanelFronts
-            ( vOffset, vSize, bottomInfo_, *fullInnerFacts_[k],
-              velocity, myPanelVelocity, offsets,
-              panelNestedToNatural, panelNaturalToNested );
-        }
+        fullInnerFacts_[k] = new cliq::DistSymmFrontTree<C>;
+        FillPanelFronts
+        ( vOffset, vSize, bottomInfo_, *fullInnerFacts_[k],
+          velocity, myPanelVelocity, offsets,
+          panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the k'th inner panel
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            CompressedBlockLDL
-            ( bottomInfo_, *fullInnerCompressedFacts_[k], vSize, useQR, 
-              tolA, tolB );
-        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
-            cliq::LDL( bottomInfo_, *fullInnerFacts_[k], cliq::LDL_SELINV_2D );
+        if( panelScheme == CLIQUE_LDL_SELINV_1D )
+            cliq::LDL( bottomInfo_, *fullInnerFacts_[k], cliq::LDL_SELINV_1D );
         else if( panelScheme == CLIQUE_LDL_1D )
             cliq::LDL( bottomInfo_, *fullInnerFacts_[k], cliq::LDL_1D );
+        else
+            LogicError("Unhandled factorization case");
         const double ldlStopTime = mpi::Time();
 
         const double stopTime = mpi::Time();
@@ -411,32 +303,23 @@ DistHelmholtz<Real>::Initialize
 
         // Initialize the fronts with the original sparse matrix
         const double fillStartTime = gatherStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            FillPanelFronts
-            ( vOffset, vSize, leftoverInnerInfo_, 
-              leftoverInnerCompressedFact_,
-              velocity, myPanelVelocity, offsets,
-              panelNestedToNatural, panelNaturalToNested );
-        else
-            FillPanelFronts
-            ( vOffset, vSize, leftoverInnerInfo_, leftoverInnerFact_,
-              velocity, myPanelVelocity, offsets,
-              panelNestedToNatural, panelNaturalToNested );
+        FillPanelFronts
+        ( vOffset, vSize, leftoverInnerInfo_, leftoverInnerFact_,
+          velocity, myPanelVelocity, offsets,
+          panelNestedToNatural, panelNaturalToNested );
         const double fillStopTime = mpi::Time();
 
         // Compute the sparse-direct LDL^T factorization of the leftover panel
         // (and possibly invert and/or redistribute the fronts)
         const double ldlStartTime = fillStopTime;
-        if( panelScheme == COMPRESSED_BLOCK_LDL_2D )
-            CompressedBlockLDL
-            ( leftoverInnerInfo_, leftoverInnerCompressedFact_, vSize, useQR, 
-              tolA, tolB );
-        else if( panelScheme == CLIQUE_LDL_SELINV_2D )
+        if( panelScheme == CLIQUE_LDL_SELINV_1D )
             cliq::LDL
-            ( leftoverInnerInfo_, leftoverInnerFact_, cliq::LDL_SELINV_2D );
+            ( leftoverInnerInfo_, leftoverInnerFact_, cliq::LDL_SELINV_1D );
         else if( panelScheme == CLIQUE_LDL_1D )
             cliq::LDL
             ( leftoverInnerInfo_, leftoverInnerFact_, cliq::LDL_1D );
+        else
+            LogicError("Unhandled factorization case");
         const double ldlStopTime = mpi::Time();
 
         const double stopTime = mpi::Time();
@@ -498,33 +381,18 @@ void
 DistHelmholtz<Real>::Finalize()
 {
     // Release the global sparse matrix memory
-    localEntries_.clear();
+    SwapClear( localEntries_ );
 
     // Release the padded panel memory
-    if( panelScheme_ == COMPRESSED_BLOCK_LDL_2D )
-    {
-        bottomCompressedFact_.localFronts.clear();
-        bottomCompressedFact_.distFronts.clear();
-        for( int k=0; k<numFullInnerPanels_; ++k )
-            delete fullInnerCompressedFacts_[k];
-        fullInnerCompressedFacts_.clear();
-        leftoverInnerCompressedFact_.localFronts.clear();
-        leftoverInnerCompressedFact_.distFronts.clear();
-        topCompressedFact_.localFronts.clear();
-        topCompressedFact_.distFronts.clear();
-    }
-    else
-    {
-        bottomFact_.localFronts.clear();
-        bottomFact_.distFronts.clear();
-        for( int k=0; k<numFullInnerPanels_; ++k )
-            delete fullInnerFacts_[k];
-        fullInnerFacts_.clear();
-        leftoverInnerFact_.localFronts.clear();
-        leftoverInnerFact_.distFronts.clear();
-        topFact_.localFronts.clear();
-        topFact_.distFronts.clear();
-    }
+    SwapClear( bottomFact_.localFronts );
+    SwapClear( bottomFact_.distFronts );
+    for( int k=0; k<numFullInnerPanels_; ++k )
+        delete fullInnerFacts_[k];
+    SwapClear( fullInnerFacts_ );
+    SwapClear( leftoverInnerFact_.localFronts );
+    SwapClear( leftoverInnerFact_.distFronts );
+    SwapClear( topFact_.localFronts );
+    SwapClear( topFact_.distFronts );
 }
 
 //
@@ -658,8 +526,7 @@ DistHelmholtz<Real>::s3InvArtificial( int v, int vOffset ) const
 
 template<typename Real>
 void
-DistHelmholtz<Real>::FormGlobalRow
-( Real alpha, int x, int y, int v, int row )
+DistHelmholtz<Real>::FormGlobalRow( Real alpha, int x, int y, int v, int row )
 {
     // Evaluate all of the inverse s functions
     const C s1InvL = s1Inv( x-1 );
@@ -985,7 +852,7 @@ DistHelmholtz<Real>::GetGlobalVelocity
     mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0], 
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
-    recvIndices.clear();
+    SwapClear( recvIndices );
 
     // Pack and send our velocity data.
     std::vector<Real> sendVelocity( totalSendCount );
@@ -1001,7 +868,7 @@ DistHelmholtz<Real>::GetGlobalVelocity
             procVelocity[iLocal] = localVelocity[localIndex];
         }
     }
-    sendIndices.clear();
+    SwapClear( sendIndices );
 
     myGlobalVelocity.resize( totalRecvCount );
     mpi::AllToAll
@@ -1029,8 +896,8 @@ DistHelmholtz<Real>::GetPanelVelocity
     const int commSize = mpi::CommSize( comm_ );
 
     // Compute the reorderings for the indices in the nodes in our local tree
-    panelNestedToNatural.clear();
-    panelNaturalToNested.clear();
+    SwapClear( panelNestedToNatural );
+    SwapClear( panelNaturalToNested );
     LocalReordering( panelNestedToNatural, vSize );
     std::map<int,int>::const_iterator it;
     for( it=panelNestedToNatural.begin(); 
@@ -1145,7 +1012,7 @@ DistHelmholtz<Real>::GetPanelVelocity
     mpi::AllToAll
     ( &recvIndices[0], &recvCounts[0], &recvDispls[0],
       &sendIndices[0], &sendCounts[0], &sendDispls[0], comm_ );
-    recvIndices.clear();
+    SwapClear( recvIndices );
 
     // Pack and send our velocity data.
     std::vector<Real> sendVelocity( totalSendCount );
@@ -1165,12 +1032,12 @@ DistHelmholtz<Real>::GetPanelVelocity
             procVelocity[iLocal] = localVelocity[localIndex];
         }
     }
-    sendIndices.clear();
+    SwapClear( sendIndices );
     myPanelVelocity.resize( totalRecvCount );
     mpi::AllToAll
     ( &sendVelocity[0],    &sendCounts[0], &sendDispls[0],
       &myPanelVelocity[0], &recvCounts[0], &recvDispls[0], comm_ );
-    sendVelocity.clear();
+    SwapClear( sendVelocity );
 
     // Reset the offsets
     offsets = recvDispls;

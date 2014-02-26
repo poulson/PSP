@@ -613,7 +613,7 @@ DistUniformGrid<F>::InterpolateTo( int nx, int ny, int nz )
     mpi::AllToAll
     ( &sendValues[0], &sendSizes[0], &sendOffsets[0],
       &recvValues[0], &recvSizes[0], &recvOffsets[0], comm_ );
-    sendValues.clear();
+    SwapClear( sendValues );
 
     // Interpolate to generate the new grid
     nx_ = nx;
@@ -802,7 +802,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
-        sendBuffer.clear();
+        SwapClear( sendBuffer );
 
         if( commRank == 0 )
         {
@@ -830,7 +830,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                     }
                 }
             }
-            recvBuffer.clear();
+            SwapClear( recvBuffer );
             
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
@@ -939,7 +939,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
-        sendBuffer.clear();
+        SwapClear( sendBuffer );
 
         if( commRank == 0 )
         {
@@ -967,7 +967,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                     }
                 }
             }
-            recvBuffer.clear();
+            SwapClear( recvBuffer );
             
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
@@ -1074,7 +1074,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
-        sendBuffer.clear();
+        SwapClear( sendBuffer );
 
         if( commRank == 0 )
         {
@@ -1102,7 +1102,7 @@ DistUniformGrid<F>::WritePlaneHelper<R>::Func
                     }
                 }
             }
-            recvBuffer.clear();
+            SwapClear( recvBuffer );
             
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
@@ -1233,7 +1233,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
-        sendBuffer.clear();
+        SwapClear( sendBuffer );
 
         if( commRank == 0 )
         {
@@ -1261,7 +1261,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                     }
                 }
             }
-            recvBuffer.clear();
+            SwapClear( recvBuffer );
             
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
@@ -1385,7 +1385,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
-        sendBuffer.clear();
+        SwapClear( sendBuffer );
 
         if( commRank == 0 )
         {
@@ -1413,7 +1413,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                     }
                 }
             }
-            recvBuffer.clear();
+            SwapClear( recvBuffer );
             
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
@@ -1536,7 +1536,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
         mpi::Gather
         ( &sendBuffer[0], sendCount,
           &recvBuffer[0], &recvCounts[0], &recvDispls[0], 0, parent.comm_ );
-        sendBuffer.clear();
+        SwapClear( sendBuffer );
 
         if( commRank == 0 )
         {
@@ -1564,7 +1564,7 @@ DistUniformGrid<F>::WritePlaneHelper<Complex<R> >::Func
                     }
                 }
             }
-            recvBuffer.clear();
+            SwapClear( recvBuffer );
             
             // Write the data to file
             for( int k=0; k<numScalars; ++k )
@@ -1735,7 +1735,7 @@ DistUniformGrid<F>::RedistributeForVtk( std::vector<F>& localBox ) const
     mpi::AllToAll
     ( &sendBuffer[0], &sendCounts[0], &sendDispls[0],
       &recvBuffer[0], &recvCounts[0], &recvDispls[0], comm_ );
-    sendBuffer.clear();
+    SwapClear( sendBuffer );
 
     // Unpack the recv buffer
     localBox.resize( totalRecvSize );
