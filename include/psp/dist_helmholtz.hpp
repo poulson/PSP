@@ -57,9 +57,8 @@ private:
     // preconditioner
     bool initialized_; 
 
-    //
     // Solve helpers
-    //
+    // =============
 
     void PullRightHandSides
     ( const DistUniformGrid<C>& gridB, Matrix<C>& B ) const;
@@ -88,9 +87,8 @@ private:
     // B_i := B_i + Z
     void UpdatePanel( Matrix<C>& B, int i, const Matrix<C>& Z ) const;
 
-    //
     // Information related to the decomposition of the domain into panels
-    //
+    // ==================================================================
 
     // Information about the bottom (and full inner) panels
     int bottomDepth_;        // including the original PML
@@ -118,15 +116,8 @@ private:
     cliq::DistSymmFrontTree<C> leftoverInnerFact_;
     cliq::DistSymmFrontTree<C> topFact_;
 
-    // Compressed factorizations of each panel
-    DistCompressedFrontTree<C> bottomCompressedFact_;
-    std::vector<DistCompressedFrontTree<C>*> fullInnerCompressedFacts_;
-    DistCompressedFrontTree<C> leftoverInnerCompressedFact_;
-    DistCompressedFrontTree<C> topCompressedFact_;
-
-    //
     // Information related to the global sparse matrix
-    //
+    // ===============================================
 
     // Sparse matrix storage
     int localSize_;
@@ -158,9 +149,8 @@ private:
     std::vector<int> supdiagRecvLocalIndices_,
                      supdiagRecvLocalRows_;
 
-    //
     // General helper routines 
-    //
+    // =======================
 
     C s1Inv( int x ) const;
     C s2Inv( int y ) const;
@@ -176,9 +166,8 @@ private:
     static void DistributedDepthRecursion
     ( int commRank, int commSize, int& distDepth );
 
-    //
     // Reordering-related routines
-    //
+    // ===========================
 
     int PanelPadding( int panel ) const;
     int PanelDepth( int panel ) const;
@@ -220,9 +209,8 @@ private:
       int xSize, int ySize, int vSize, int nx, int ny,
       int cutoff, int commRank, int commSize );
 
-    //
     // Global sparse helper routines
-    //
+    // =============================
 
     void GetGlobalVelocity
     ( const DistUniformGrid<Real>& velocity,
@@ -249,16 +237,11 @@ private:
       int teamRank, int teamSize,
       std::vector<int>& localConnections, int& localOffset );
 
-    //
     // Helpers for the PML-padded sparse-direct portion
-    //
+    // ================================================
 
-    cliq::DistSymmFrontTree<C>& PanelFactorization( int panel );
-    DistCompressedFrontTree<C>& PanelCompressedFactorization( int panel );
-
+          cliq::DistSymmFrontTree<C>& PanelFactorization( int panel );
     const cliq::DistSymmFrontTree<C>& PanelFactorization( int panel ) const;
-    const DistCompressedFrontTree<C>& 
-    PanelCompressedFactorization( int panel ) const;
 
     cliq::DistSymmInfo& PanelAnalysis( int panel );
     const cliq::DistSymmInfo& PanelAnalysis( int panel ) const;
@@ -276,15 +259,6 @@ private:
     ( int vOffset, int vSize,
       const cliq::DistSymmInfo& info,
             cliq::DistSymmFrontTree<C>& fact,
-      const DistUniformGrid<Real>& velocity,
-      const std::vector<Real>& myPanelVelocity,
-            std::vector<int>& offsets,
-            std::map<int,int>& panelNestedToNatural,
-            std::map<int,int>& panelNaturalToNested ) const;
-    void FillPanelFronts
-    ( int vOffset, int vSize,
-      const cliq::DistSymmInfo& info,
-            DistCompressedFrontTree<C>& fact,
       const DistUniformGrid<Real>& velocity,
       const std::vector<Real>& myPanelVelocity,
             std::vector<int>& offsets,
@@ -309,10 +283,6 @@ private:
 };
 
 } // namespace psp
-
-//----------------------------------------------------------------------------//
-// Implementation begins here                                                 //
-//----------------------------------------------------------------------------//
 
 #include "./dist_helmholtz/main.hpp"
 #include "./dist_helmholtz/initialize_finalize.hpp"
